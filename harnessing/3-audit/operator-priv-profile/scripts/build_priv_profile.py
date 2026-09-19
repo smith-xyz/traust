@@ -98,11 +98,31 @@ def _sc(sc: dict | None) -> dict:
     return out
 
 
+def _k8s_name(value):
+    """A Kubernetes object name is ALWAYS a string (RFC 1123 label).
+
+    YAML coerces an unquoted scalar, so a manifest carrying `name: 0`
+    parses as the integer 0 while the very same object written `name: "0"`
+    parses as a string -- both occur in one repo upstream
+    (red-hat-data-services/llm-d-routing-sidecar, deploy/common). That is a
+    parsing artifact, not data, and passing it through made the profile fail
+    contract validation on `name` while describing a real workload.
+
+    Absent stays absent: a kustomize patch fragment legitimately has no
+    metadata.name, and "unnamed" must not become the string "None".
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):  # YAML `name: yes` -- coerce, never bool
+        return "true" if value else "false"
+    return value if isinstance(value, str) else str(value)
+
+
 def _workload(rel, spec_outer, kind, name):
     pod = (spec_outer.get("template") or {}).get("spec") or {}
     return {
         "kind": kind,
-        "name": name,
+        "name": _k8s_name(name),
         "manifest": str(rel),
         "serviceAccountName": pod.get("serviceAccountName") or pod.get("serviceAccount"),
         "hostNetwork": bool(pod.get("hostNetwork")),
@@ -112,7 +132,7 @@ def _workload(rel, spec_outer, kind, name):
         "pod_securityContext": _sc(pod.get("securityContext")),
         "containers": [
             {
-                "name": c.get("name"),
+                "name": _k8s_name(c.get("name")),
                 "image": c.get("image"),
                 "securityContext": _sc(c.get("securityContext")),
             }
