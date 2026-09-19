@@ -115,6 +115,7 @@ Two ways to run the engine, each with its own guide:
 | [docs/adversarial-content-doctrine.md](docs/adversarial-content-doctrine.md) | The single-source CWE-1427 doctrine every untrusted-content-reading skill references |
 | [docs/risk-rating-methodology.md](docs/risk-rating-methodology.md) | How per-finding scores become portfolio risk metrics (findings-trends) |
 | [docs/signing.md](docs/signing.md) | **Ledger signing** — what is signed (format-4 payload), when (every write, stamp then sign), who needs the key, configuration variables, the `ledger` CLI, cosign v3 behaviour, rotation |
+| [docs/sla-policy.md](docs/sla-policy.md) | **Configuring your own service levels** — SLAs are policy data, never code: per-severity deadlines, multiple profiles, which timestamp starts the clock, and the three states that are not "compliant" |
 | [docs/storage.md](docs/storage.md) | Where each kind of data lives — ledgers in git, results local or in object storage, roll-ups, projections, operational config — and the variables that place them |
 | [docs/routers.md](docs/routers.md) | **Authoritative index of all seven router kinds** (work/rescan, cost/budget-guard, model, findings, owner, defect, feed) plus the five worklist builders — what each may write, and links to the detail |
 | [docs/findings-routing.md](docs/findings-routing.md) | **Canonical:** how a finding gets into the ledger — the findings routers, idempotence, id minting, and the baseline-ownership rule. Disambiguates the other three kinds of routing (work/rescan, owner, defect) |

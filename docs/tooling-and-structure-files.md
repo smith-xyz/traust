@@ -32,7 +32,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | `schemas/v1/pqc-blockers.schema.json` | JSON Schema for the findings-shaped projection of readiness remediations (`*-pqc-blockers.json`, emitted by `build_pqc_blockers.py`) — mirrors the security-audit findings vocabulary without claiming `report.schema.json` conformance |
 | `schemas/v1/pqc-decision-tree.schema.json` | JSON Schema for the PQC provenance decision tree |
 | `schemas/v1/fleet-fix.schema.json` | JSON Schema for fleet-fix transform specs |
-| `schemas/v1/sla-policy.schema.json` | JSON Schema for SLA policy files (sla-view) |
+| `schemas/v1/sla-policy.schema.json` | JSON Schema for SLA policy files (sla-view) — adopters configuring their own service levels start at [sla-policy.md](sla-policy.md) |
 | `schemas/v1/model-registry.schema.json` | JSON Schema for the model registry (config/model-registry.yaml — role routing, tier floors, spend policy) |
 | `schemas/v1/benchmark-target.schema.json` | JSON Schema for recall-benchmark target definitions |
 | `schemas/v1/attack-mapping.schema.json` | JSON Schema for the finding-category→ATT&CK mapping table |
