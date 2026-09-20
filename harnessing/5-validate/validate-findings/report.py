@@ -238,11 +238,35 @@ def build_validation_json(
     for c in chains:
         c_steps = []
         c_verdict = "not_attempted"
+        # A chain is a PATH: entry point to terminal asset, one step per
+        # finding actually attempted along it.
+        #
+        # Two filters, both load-bearing, and their absence produced a
+        # 13.6 GB artifact (pipelines.v03: 33,911,376 chain steps across
+        # 9,675 chains -- 3,505 per chain, against 7 in a healthy one):
+        #
+        #   GLUE steps are connectors, not path steps. The verdict logic
+        #   above already excludes them for exactly this reason; chain
+        #   assembly never applied the same rule. 33,925,626 of those
+        #   33.9M steps were glue, most carrying a single cascaded
+        #   `precondition-failed` and the same finding_ref.
+        #
+        #   DE-DUPLICATION by step_id. results_by_fid holds every result
+        #   recorded for a finding, so each chain re-appended all of them
+        #   -- the cartesian product of chains x findings x results.
+        seen_steps: set = set()
         for fid in c.finding_ids:
             for r in results_by_fid.get(fid, ()):
+                if getattr(r, "verb", "") in GLUE_VERBS:
+                    continue
+                step_id = getattr(r, "step_id", None)
+                if step_id is not None and step_id in seen_steps:
+                    continue
+                if step_id is not None:
+                    seen_steps.add(step_id)
                 c_steps.append(
                     {
-                        "step_id": getattr(r, "step_id", None),
+                        "step_id": step_id,
                         "finding_ref": r.finding_ref,
                         "verdict": r.verdict,
                     }
