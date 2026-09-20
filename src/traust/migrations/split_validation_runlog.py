@@ -69,7 +69,16 @@ RUN_SUMMARY = (
     "recompute",
 )
 RUN_APPROVAL = ("approved_by", "approved_at")
-RUN_FINDING = ("skip_reason", "surface")
+RUN_FINDING = (
+    "skip_reason",
+    "surface",
+    # A manual adjudication note explaining why the tool's verdict was
+    # overridden ("Downgraded per MANUAL-REVIEW-FLAGS.md -- v0.4.3
+    # _verdict() substring FP"). It documents a decision about the RUN, not
+    # a property of the finding, so it travels with the other run detail.
+    # 6 occurrences, all on inconclusive.
+    "verdict_note",
+)
 
 #: What the contract says a validation STEP is. Read from the schema so
 #: the split follows the contract rather than a list that drifts from it.
@@ -138,6 +147,39 @@ def read_log(path: Path) -> dict[str, dict]:
     return log
 
 
+VERDICTS = ("confirmed", "refuted", "inconclusive", "blocked_by_scope", "not_attempted")
+
+
+def recompute_summary(document: dict) -> dict | None:
+    """Derive summary.by_verdict from the findings it summarises.
+
+    The contract requires all five verdicts so that a zero is STATED rather
+    than omitted -- "nothing was refuted" is a claim, and an absent key
+    cannot make it. The producer omits zero counts, which fails validation.
+
+    Filling the gaps with zero would have been wrong: measured across the
+    corpus, by_verdict disagrees with validated_findings in 78 artifacts,
+    and one (hawtio-csrf) omits `refuted` while actually carrying 2. So the
+    rollup is recomputed from the detail, which is the evidence. Two
+    independent counts of one thing is how they drift.
+
+    Returns what changed, for the record.
+    """
+    summary = document.setdefault("summary", {})
+    stated = summary.get("by_verdict") or {}
+    actual = dict.fromkeys(VERDICTS, 0)
+    for finding in document.get("validated_findings") or []:
+        verdict = finding.get("verdict")
+        if verdict in actual:
+            actual[verdict] += 1
+    changed = {v: (stated.get(v), actual[v]) for v in VERDICTS if stated.get(v) != actual[v]}
+    summary["by_verdict"] = actual
+    # novel_findings is required and an absent one means none were found.
+    document.setdefault("novel_findings", [])
+    document.setdefault("attack_chains", [])
+    return changed or None
+
+
 def split(document: dict) -> dict | None:
     """Move run diagnostics out of `document`. Returns the sidecar, or None."""
     runlog: dict = {}
@@ -186,6 +228,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     moved: Counter[str] = Counter()
+    corrections: dict[str, dict] = {}
     touched: list[tuple[Path, dict, dict]] = []
 
     for path in sorted(args.root.rglob("*-validation.json")):
@@ -198,9 +241,14 @@ def main(argv: list[str] | None = None) -> int:
             continue
         log = read_log(path.with_name("validation-audit.jsonl"))
         moved["chain_steps_enriched"] += enrich_chain_steps(document, log)
+        drift = recompute_summary(document)
+        if drift:
+            moved["summaries_corrected"] += 1
+            corrections[path.name] = drift
         runlog = split(document)
-        if runlog is None:
+        if runlog is None and not drift:
             continue
+        runlog = runlog or {}
         runlog["artifact"] = path.name
         for key in runlog:
             if key not in ("artifact",):
@@ -208,6 +256,14 @@ def main(argv: list[str] | None = None) -> int:
         moved["findings_with_diagnostics"] += len(runlog.get("findings") or {})
         touched.append((path, document, runlog))
 
+    if corrections:
+        print(f"summary.by_verdict corrected in {len(corrections)} artifact(s):")
+        for name, drift in list(corrections.items())[:5]:
+            detail = ", ".join(f"{v}: {a}->{b}" for v, (a, b) in drift.items())
+            print(f"  {name[:44]:<46}{detail}")
+        if len(corrections) > 5:
+            print(f"  ... and {len(corrections) - 5} more")
+        print()
     print(f"validation run-log split: {len(touched)} artifact(s)")
     for key, count in moved.most_common():
         print(f"  {count:>8}  {key}")
