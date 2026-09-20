@@ -47,7 +47,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from traust_engine.ledger import (
+    ALGO_VERSION,
     compute_event_id,
+    fingerprint,
 )
 
 from traust.context import (
@@ -153,6 +155,30 @@ def find_reproducers(index: list[tuple[str, str]], target_id: str, repo_url: str
     return sorted(rel for full, rel in index if any(k in full for k in keys))
 
 
+def existing_fingerprint(layers: list[str], finding_ref: str) -> str | None:
+    """The identity an earlier event already gave this finding.
+
+    A fuzz run confirming a finding an audit raised is a SECOND OPINION on
+    one bug, not a new one. Recomputing here would risk a different answer
+    -- the audit knows locations the fuzz target does not -- and two
+    identities for one finding is precisely what distinct-exposure counts
+    wrongly.
+
+    Reads the layer's own event stream, which is where the audit's stamp
+    already lives. Returns None when no earlier event carried one; the
+    event is then emitted unstamped rather than guessing.
+    """
+    for layer_path in layers:
+        try:
+            document = json.loads(Path(layer_path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        for event in reversed(document.get("events") or []):
+            if event.get("finding_ref") == finding_ref and event.get("fingerprint"):
+                return event["fingerprint"]
+    return None
+
+
 def mint_finding(bug: dict, target: dict, fid: str) -> dict:
     """A finding carried on the event, for a crasher no audit had raised.
 
@@ -163,10 +189,19 @@ def mint_finding(bug: dict, target: dict, fid: str) -> dict:
     from the target's own harness declarations, not from a placeholder.
     """
     cwes = [f"CWE-{c.strip()}" for c in str(bug.get("cwe", "")).split("/") if c.strip().isdigit()]
+    harnesses = [h for h in (target.get("harnesses") or []) if h.get("dest")]
+    # THIS bug's harness, not every harness on the target. A target with
+    # several fuzz entry points produced one location set for all of its
+    # bugs, so they hashed to a single identity -- measured, sriov bugs 5
+    # and 6 collided despite being different functions in different files.
+    #
+    # The bug record has no location field, but its title names the
+    # function under test and the harness declares that symbol, so the
+    # match is on real declared data rather than a guess. No match falls
+    # back to every harness on the target, which is what this did before.
+    matched = [h for h in harnesses if _names_function(bug.get("title", ""), h.get("fuzz", ""))]
     locations = [
-        {"path": h["dest"], "symbol": h.get("fuzz", "")}
-        for h in (target.get("harnesses") or [])
-        if h.get("dest")
+        {"path": h["dest"], "symbol": h.get("fuzz", "")} for h in (matched or harnesses)
     ]
     if not locations:
         # The crasher is in this repo but the harness declaration does not say
@@ -193,6 +228,46 @@ def mint_finding(bug: dict, target: dict, fid: str) -> dict:
     }
 
 
+def stamp_identity(finding: dict, repo_url: str) -> str | None:
+    """Stamp the correlation fingerprint, or refuse and say why.
+
+    Without this a fuzz-found bug has no identity: it cannot be counted in
+    distinct exposure, cannot be trended or SLA-clocked, and cannot be
+    recognised when a later audit finds the same crash. Measured before
+    this landed, fuzz_report was the ONLY event source at 0% fingerprint
+    coverage -- every other route, including the same event-carried
+    pattern used by the impact router, was at 81-100%.
+
+    strict=True is deliberate. When a target declares no harness dest the
+    finding's only location is a repo-root marker, and hashing that
+    produces an identity shared by every rootless finding in the repo --
+    measured on the corpus, 433 such fingerprints were shared by 1,397
+    findings. An unstamped finding is honest; a colliding one silently
+    merges unrelated bugs.
+    """
+    try:
+        value = fingerprint(finding, repo_url, strict=True)
+    except Exception:
+        return None
+    finding["fingerprint"] = value
+    finding["fingerprint_algo"] = ALGO_VERSION
+    return value
+
+
+def _names_function(title: str, fuzz_symbol: str) -> bool:
+    """Does this bug's title name the function this harness fuzzes?
+
+    Harness symbols are `Fuzz<Name>`; a title refers to the function as
+    `<Name>` or `<name>`, usually in backticks. Compared case-insensitively
+    on the symbol minus its Fuzz prefix, which is the only part that
+    carries meaning.
+    """
+    name = (fuzz_symbol or "").removeprefix("Fuzz").strip()
+    if not name or not title:
+        return False
+    return name.lower() in title.lower()
+
+
 def _severity_from_cvss(cvss) -> str:
     try:
         score = float(str(cvss).lstrip("~"))
@@ -216,6 +291,7 @@ def build_event(
     carried: dict | None,
     recorded_at: str,
     hv: str,
+    fp: str | None = None,
 ) -> dict:
     # source.ref points at the BUG RECORD, not the summary file. event_id is
     # computed from (source_ref, finding_ref, validity, resolution) alone, so
@@ -254,6 +330,12 @@ def build_event(
     }
     if carried is not None:
         event["finding"] = carried
+    # The event carries the identity too: layer_event projects
+    # event.fingerprint, and a consumer reading the event stream must not
+    # have to open the carried finding to know what this is about.
+    if fp:
+        event["fingerprint"] = fp
+        event["fingerprint_algo"] = ALGO_VERSION
     return event
 
 
@@ -300,10 +382,21 @@ def plan(
         attach = bool(FIND_ID_RE.fullmatch(audit_ref))
         reproducers = find_reproducers(repro_index, tid, repo)
         if attach:
+            # Confirming a finding an audit already raised: its identity is
+            # the AUDIT's, so it is looked up rather than recomputed. A
+            # second opinion on the same bug must not mint a second identity.
             finding_ref, carried = audit_ref, None
+            fp = existing_fingerprint(found, audit_ref)
         else:
             finding_ref = f"FUZZ-{bug['num']:03d}"
             carried = mint_finding(bug, target, finding_ref)
+            fp = stamp_identity(carried, repo)
+            if fp is None:
+                problems.append(
+                    f"bug #{bug['num']}: no declared harness dest for {tid}, so the "
+                    "finding has no identity -- emitted unstamped rather than "
+                    "hashing a repo-root marker that would collide"
+                )
         for layer in found:
             rows.append(
                 {
@@ -315,7 +408,8 @@ def plan(
                     "audit_ref": audit_ref,
                     "reproducers": reproducers,
                     "event": build_event(
-                        bug, target, finding_ref, source_ref, reproducers, carried, recorded_at, hv
+                        bug, target, finding_ref, source_ref, reproducers, carried,
+                        recorded_at, hv, fp
                     ),
                 }
             )
