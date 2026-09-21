@@ -159,7 +159,7 @@ consumable without archaeology:
 | Syntactic-shaped confirmations | `python3 -m traust.cli sweep rule-lane` (rule-expressibility routing) | Draft rules swept corpus-wide; hits enter `/triage` as candidates |
 | Semantic-shaped confirmations (authn/authz/ordering — never rule-expressible) | Precedent cards (python3 -m traust.ops.compile_precedent_cards): predicate over a shipped enumerator's output schema, or REJECTED | The semantic sweep tier — `sweep-candidates-semantic.json` into `/triage` |
 | What the enumerators could NOT cover | Structured `metadata.additional.coverage_gaps` in every report (recording convention in the enumerator pre-scan sections) + skipped `deterministic_steps` | `harnessing/3-audit/secure-code-audit/scripts/build_coverage_gap_rollup.py` → the coverage-gaps rollup under the metrics tree — the repos-affected-ranked enumerator-expansion backlog |
-| Rule-expressible shapes surfaced in benchmark runs | python3 -m traust.migrations.extract_benchmark_rule_candidates (post-scoring) | `benchmark-rule-candidates.{json,md}` under the rule-mining metrics — identity-only pattern exemplars for rule authors |
+| Rule-expressible shapes surfaced in benchmark runs | the benchmark rule-candidate extractor (post-scoring) | `benchmark-rule-candidates.{json,md}` under the rule-mining metrics — identity-only pattern exemplars for rule authors |
 | Missed benchmark/CVE anchors | `fn_cve_replay_missed.jsonl` + the benchmark near-miss tier | Ground-truth queue for match-ladder and technique work |
 
 Two boundary rules keep the loop honest:

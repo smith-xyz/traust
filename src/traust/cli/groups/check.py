@@ -16,6 +16,11 @@ _ENTRIES: tuple[tuple[str, str, str], ...] = (
         "Content-license guard — deterministic enforcement of the two license tables.",
     ),
     (
+        "estate-data",
+        "check_estate_data",
+        "Estate-data guard — keep one deployment's figures and one-shots out of a public repo.",
+    ),
+    (
         "docs-consistency",
         "check_docs_consistency",
         "Doc-consistency checker — catch documentation drift before it ships.",

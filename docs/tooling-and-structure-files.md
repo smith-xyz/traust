@@ -44,7 +44,6 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | `schemas/v1/risk-rating-methodology.schema.json` | JSON Schema for the risk-rating methodology config |
 | python3 -m traust.cli reporting validate | Validates report JSON against schema; supports `--strict` and batch validation |
 | python3 -m traust.cli reporting lint | Deterministic threat-model gate — sections/columns/enums, coverage invariant, ID stability, provenance, evidence hygiene |
-| python3 -m traust.migrations.repair_threat_model | Mechanical threat-model repair — row-fracture pipe escaping, enum synonym remaps; writes only when lint errors strictly decrease |
 | python3 -m traust.cli reporting render | Renders validated JSON reports to Markdown |
 | python3 -m traust.cli reporting sarif | Exports any report (incl. disposition-aware findings-current and cloud-config audits) to SARIF 2.1.0 for any SARIF consumer — a derived projection, dispositions become suppressions; `--results-root` batch sweep |
 | harnessing/4-triage/triage/scripts/render_triage.py | Renders triage reports |
@@ -54,7 +53,6 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | python3 -m traust.cli admin query-index | Queries the symbol index |
 | harnessing/4-triage/track-findings/scripts/baseline_claims.py | Baseline claim extraction |
 | python3 -m traust.cli ledger emit-triage | Emits triage→ledger events from triage output |
-| python3 -m traust.migrations.reemit_legacy_triage | Migrates legacy triage data to current format |
 | python3 -m traust.cli admin countersign | Countersign workflow support |
 | python3 -m traust.cli check docs-consistency | Doc-drift detection for harness docs |
 | python3 -m traust.cli impact cluster-state-diff | P5 discovery sweep 1 — before/after security-state snapshots (RBAC, SCCs, webhooks, NetworkPolicies, Services/Routes) diffed into validation-discovery candidates for /triage |

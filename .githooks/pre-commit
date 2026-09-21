@@ -53,6 +53,22 @@ if ! "$py" "$checker"; then
   exit 1
 fi
 
+estate_checker="$repo_root/src/traust/cli/check_estate_data.py"
+if [ ! -f "$estate_checker" ]; then
+  echo "pre-commit: $estate_checker is MISSING — refusing to commit without" >&2
+  echo "            the estate-data gate (fail-closed)." >&2
+  exit 1
+fi
+if ! "$py" "$estate_checker" --staged --quiet; then
+  echo "" >&2
+  echo "pre-commit: estate-data check FAILED — this repo is PUBLIC." >&2
+  echo "            Red Hat-specific material belongs in traust-internal/," >&2
+  echo "            not here. MOVE it; do not scrub it — the figures are" >&2
+  echo "            the record of what the script did and travel with it." >&2
+  echo "            To bypass: git commit --no-verify" >&2
+  exit 1
+fi
+
 sec_checker="$repo_root/src/traust/cli/check_skill_security.py"
 if [ ! -f "$sec_checker" ]; then
   echo "pre-commit: $sec_checker is MISSING — refusing to commit without" >&2

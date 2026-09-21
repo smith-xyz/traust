@@ -2577,10 +2577,9 @@ def check_ledger_completeness(ws: Path) -> list[dict]:
     Signature coverage is guarded (below) and the findings-db projection is guarded,
     but no check asserted that a ledger EXISTS for each audited repo, or that the
     identity fields it depends on are populated. So every gap had to be discovered by
-    hand, one campaign at a time — 2026-08-20/21 alone turned up 116 audits with no
-    layer, 8,109 layers whose events had no fingerprint, 2,795 findings with a
-    degenerate identity, and 347 colliding layer ids, none of which any check would
-    ever have reported.
+    hand, one campaign at a time — a single sweep turned up audits with no layer,
+    layers whose events had no fingerprint, findings with a degenerate identity,
+    and colliding layer ids, none of which any check would ever have reported.
 
     Each invariant below is one of those, generalised. They are reported, never fixed
     here: drift-watch detects, migrations remediate.
@@ -2673,7 +2672,8 @@ def check_ledger_completeness(ws: Path) -> list[dict]:
             f"{no_digest} of {layers} layers lack audit_report_sha256"
             if no_digest
             else f"all {layers} layers record a report digest",
-            "python3 -m traust.migrations.backfill_report_digest analysis-results --apply"
+            "re-emit the affected layers so each records its report digest "
+            "(deployments carrying legacy layers have a one-shot backfill)"
             if no_digest
             else None,
         )
@@ -2689,8 +2689,8 @@ def check_ledger_completeness(ws: Path) -> list[dict]:
                 f"{no_claims} layers record no claim_hashes and {partial_claims} cover only "
                 f"some of their report's findings — those findings' claims are not "
                 f"tamper-evident",
-                "python3 -m traust.migrations.create_missing_layers "
-                "analysis-results/findings --fill-claims --apply",
+                "create the missing layers so every report's findings are "
+                "claim-pinned and tamper-evident",
             )
         )
     else:
@@ -2860,8 +2860,8 @@ def check_finding_identity(ws: Path) -> list[dict]:
             f"the same repo — the residue blocking the fingerprint(strict=True) flip"
             if degenerate
             else f"no degenerate identities in {total} findings — strict=True is flippable",
-            "classify progress-tracker/tracking/4b-needs-classification.json, then "
-            "python3 -m traust.migrations.repath_repo_root_findings"
+            "classify the degenerate identities, then repath them to the "
+            "artifact that actually carries each finding"
             if degenerate
             else None,
         )
