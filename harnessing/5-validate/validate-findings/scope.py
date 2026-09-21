@@ -433,6 +433,31 @@ class Scope:
 
     # ----- serialization ------------------------------------------------
 
+    def target_environment(self) -> str | None:
+        """What this run executes AGAINST, for the validation artifact.
+
+        NOT `self.environment`, which is the SAFETY class of the
+        engagement (`lab` is what gates --auto). This is the target
+        identity: the bound kubeconfig context(s), e.g. `lab-spoke-1`.
+
+        Two runs of the same finding set against different targets are
+        not re-runs of each other, and storage supersedes on this value.
+        Measured before it existed: a hub run and a spoke run of one
+        subject covered the same findings and disagreed on a material
+        share of the verdicts, some confirmed against one target and
+        refuted against the other.
+
+        None when nothing cluster-shaped was bound -- a container- or
+        image-only run has no cluster target, and None is the honest
+        answer. Sorted and joined so the same binding always yields the
+        same string; a set's iteration order would make one run look
+        like two.
+        """
+        contexts = sorted(self.clusters)
+        if not contexts:
+            return None
+        return ",".join(contexts)
+
     def to_json(self) -> str:
         d = {
             "engagement": self.engagement,

@@ -241,19 +241,23 @@ def build_validation_json(
         # A chain is a PATH: entry point to terminal asset, one step per
         # finding actually attempted along it.
         #
-        # Two filters, both load-bearing, and their absence produced a
-        # 13.6 GB artifact (pipelines.v03: 33,911,376 chain steps across
-        # 9,675 chains -- 3,505 per chain, against 7 in a healthy one):
+        # Two filters, both load-bearing. Their absence once produced a
+        # multi-gigabyte artifact: hundreds of steps per chain where a
+        # healthy chain carries a handful.
         #
         #   GLUE steps are connectors, not path steps. The verdict logic
         #   above already excludes them for exactly this reason; chain
-        #   assembly never applied the same rule. 33,925,626 of those
-        #   33.9M steps were glue, most carrying a single cascaded
-        #   `precondition-failed` and the same finding_ref.
+        #   assembly never applied the same rule. Glue carried the bulk
+        #   of the blowup, most of it a single cascaded
+        #   `precondition-failed` repeated against the same finding_ref.
         #
         #   DE-DUPLICATION by step_id. results_by_fid holds every result
         #   recorded for a finding, so each chain re-appended all of them
         #   -- the cartesian product of chains x findings x results.
+        #
+        # Both are one-line `continue`s that nothing would have caught
+        # being removed, so tests/test_validation_chain_blowup.py now
+        # holds the guard: a comment cannot fail a build.
         seen_steps: set = set()
         for fid in c.finding_ids:
             for r in results_by_fid.get(fid, ()):
@@ -307,6 +311,10 @@ def build_validation_json(
             "authorized_by": scope.authorized_by,
             "expires": scope.expires.isoformat() if scope.expires else None,
             "target_fingerprint": [fp.to_dict() for fp in fingerprints],
+            # What this run executed AGAINST. Storage supersedes
+            # validations on it: two runs of one subject against
+            # different targets are not re-runs of each other.
+            "target_environment": scope.target_environment(),
             "approval": approval,
             "flags": flags,
         },
