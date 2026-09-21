@@ -441,6 +441,17 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
     ): "terminal report of the phased lane; enters the pipeline via /triage generic JSON ingest",
     (
         "A9",
+        "threat-model:*-threat-model.json",
+    ): "the contract artifact, whose consumer is the STORAGE LAYER rather "
+    "than a skill: store_ingest routes it as the `threat-model` family and "
+    "traust_contracts.v1.storage projects it into `threat`, read through "
+    "the `threat_current` / `threat_exposure` views. A9 can only see "
+    "skill-to-skill wiring, and requiring one here would push the estate "
+    "back to re-parsing prose — the thing the schema exists to end. A "
+    "database adopter reads the views with no skill in the path. Delete "
+    "this entry if a skill starts reading the JSON directly",
+    (
+        "A9",
         "vuln-scan:*-vuln-findings.md",
     ): "human companion of *-vuln-findings.json (consumed by /triage and /patch)",
     (

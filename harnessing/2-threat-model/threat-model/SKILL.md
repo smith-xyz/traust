@@ -296,6 +296,32 @@ in this directory. **Read `schema.md` immediately before you write the file**,
 not at routing time; in interview mode the gap between routing and emit can be
 many turns, and an early read will be evicted before it's used.
 
+**Both forms, every time.** A threat model has two forms and they are not
+alternatives: the Markdown is the authored, human-edited prose, and
+`<repo>-threat-model.json` is the contract artifact every consumer reads
+— it is the `threat-model` family in `traust-contracts`, projected into
+the `threat` table and the `threat_current` / `threat_exposure` views.
+Emitting only the Markdown leaves the model invisible to storage, which
+is the state the 2026-09-20 backfill existed to repair. In the same step
+that writes the `.md`, in BOTH locations you write it to:
+
+```bash
+python3 -m traust.cli reporting threat-model-json <model-file>
+```
+
+It derives the JSON from the Markdown you just wrote — one
+implementation, so the two forms cannot disagree — and writes it beside
+the model. Never hand-author the JSON.
+
+**A non-zero exit is a model defect, not a step to skip.** The command
+refuses to write a non-conformant artifact and names what failed:
+usually an off-contract `status`, `likelihood`, `impact` or `actor`
+value, or a section 7 that does not state `mode`, `date` and `target`.
+Fix the Markdown and re-run. Do not work around it, and do not
+hand-write the JSON to get past it — the schema is the authority, and
+an artifact written in a degraded form is one the ingest refuses
+anyway.
+
 **Findings-tree placement (wiring contract, 2026-07-31).** The checkout
 copy alone is invisible to every downstream consumer — `/secure-code-audit`
 (coverage diff), `/vuln-scan`, `/triage`, `/threat-register`, and
@@ -392,11 +418,25 @@ unattributed run is a calibration gap.
 `<repo>-security-audit.json` findings and CVE/pentest reports in
 bootstrap mode; `--context` docs.
 
-**Emits:** `<repo>-threat-model.md` (checkout copy + findings-tree copy
-by contract) — consumed by `/secure-code-audit` (coverage diff),
+**Emits:** `<repo>-threat-model.md` + `<repo>-threat-model.json`
+(checkout copy + findings-tree copy by contract).
+
+The **Markdown** is consumed by `/secure-code-audit` (coverage diff),
 `/vuln-scan` (focus areas), `/triage` (environment context),
 `/threat-register` (portfolio rollup), and `/attack-coverage`
-(attack_refs). Context passes may also emit doc-variance records via
+(attack_refs).
+
+The **JSON** is the contract artifact, and its consumer is the storage
+layer rather than another skill: `traust_engine.corpus.store_ingest`
+routes it as the `threat-model` family, and
+`traust_contracts.v1.storage` projects it into the `threat` table
+behind the `threat_current` and `threat_exposure` views. That is the
+adopter-neutral read surface — a deployment on Postgres gets the same
+rows without any skill in the path, which is the point of emitting it.
+The skills above still read the Markdown; migrating them onto the views
+is dashboard work, not threat-model work.
+
+Context passes may also emit doc-variance records via
 python3 -m traust.cli ledger doc-variance.
 
 **Scheduled by the continuous-operations router** (re-model cadence

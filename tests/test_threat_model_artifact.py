@@ -12,7 +12,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from traust.migrations.emit_threat_model_json import build, main, provenance
+from traust.lib.threat_model_artifact import build, emit, provenance
+from traust.migrations.emit_threat_model_json import main
 
 MODEL = """# Threat model
 
@@ -88,7 +89,8 @@ def test_off_contract_model_is_reported_and_not_written(tmp_path, capsys):
     assert main([str(tmp_path), "--write", "--report", str(report)]) == 0
     assert not list(tmp_path.rglob("*-threat-model.json"))
     rejected = json.loads(report.read_text())["rejected"]
-    assert len(rejected) == 1 and rejected[0]["reason"] == "schema"
+    assert len(rejected) == 1
+    assert any("status" in r for r in rejected[0]["reasons"])
 
 
 def test_conformant_model_is_written(tmp_path):
@@ -96,3 +98,65 @@ def test_conformant_model_is_written(tmp_path):
     assert main([str(tmp_path), "--write"]) == 0
     out = tmp_path / "findings" / "prodA" / "repo" / "repo-threat-model.json"
     assert json.loads(out.read_text())["provenance"]["date"] == "2026-03-04"
+
+
+# ---------------------------------------------------------------------------
+# the skill's per-model path and the backfill share ONE implementation
+# ---------------------------------------------------------------------------
+
+
+def test_emit_writes_the_artifact_beside_the_model(tmp_path):
+    model = _model(tmp_path)
+    target, reasons = emit(model, tmp_path)
+    assert reasons == []
+    assert target == model.with_name("repo-threat-model.json")
+    assert json.loads(target.read_text())["threats"][0]["id"] == "T1"
+
+
+def test_emit_refuses_and_explains_rather_than_degrading(tmp_path):
+    """No artifact is better than one the ingest would refuse."""
+    model = _model(tmp_path, MODEL.replace("| unmitigated |", "| open |"))
+    target, reasons = emit(model, tmp_path)
+    assert target is None
+    assert not model.with_suffix(".json").exists()
+    assert any("status" in r for r in reasons)
+
+
+def test_check_mode_writes_nothing(tmp_path):
+    model = _model(tmp_path)
+    target, reasons = emit(model, tmp_path, write=False)
+    assert reasons == [] and target is not None
+    assert not target.exists()
+
+
+def test_cli_op_emits_for_a_single_model(tmp_path):
+    """The command /threat-model calls in the same step it writes the .md."""
+    from traust.cli.groups import reporting
+
+    model = _model(tmp_path)
+
+    class Args:
+        pass
+
+    args = Args()
+    args.model = [model]
+    args.root = tmp_path
+    args.check = False
+    assert reporting.call_threat_model_json(None, args) == 0
+    assert model.with_name("repo-threat-model.json").is_file()
+
+
+def test_cli_op_exits_nonzero_on_a_non_conformant_model(tmp_path):
+    from traust.cli.groups import reporting
+
+    model = _model(tmp_path, MODEL.replace("| remote_auth |", "| whoever |"))
+
+    class Args:
+        pass
+
+    args = Args()
+    args.model = [model]
+    args.root = tmp_path
+    args.check = False
+    assert reporting.call_threat_model_json(None, args) == 1
+    assert not model.with_name("repo-threat-model.json").exists()

@@ -53,96 +53,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-import jsonschema
-from traust_contracts.paths import schema_path
-
-from traust_engine.corpus.threat_model import parse_threats
-from traust_engine.reporting.lint import parse_provenance, parse_sections
-
-#: Fields the contract keeps on a threat, in schema order. `key`, `model`,
-#: `product`, `linddun` and `score` are parser bookkeeping or derived
-#: values, not contract fields -- `$defs/threat` sets
-#: `additionalProperties: false`, so carrying them would invalidate every
-#: artifact. The projection derives the ones it needs.
-THREAT_FIELDS = (
-    "id",
-    "threat",
-    "surface",
-    "asset",
-    "impact",
-    "likelihood",
-    "status",
-    "controls",
-    "evidence",
-    "attack_refs",
-    "isolation_dimensions",
-)
-
-#: Provenance bullets the contract declares. `owner: unset` is how a
-#: bootstrap model spells "nobody reviewed this", and the schema says the
-#: field must be ABSENT in that case -- "a model nobody reviewed must not
-#: look reviewed" -- so the literal string is dropped rather than carried.
-PROVENANCE_FIELDS = ("mode", "date", "target", "inputs", "owner", "harness_version")
-PROVENANCE_REQUIRED = ("mode", "date", "target")
-UNSET = {"unset", "none", "n/a", "-", ""}
-
-
-def _validator() -> jsonschema.Draft7Validator:
-    schema = json.loads(schema_path("threat-model").read_text(encoding="utf-8"))
-    return jsonschema.Draft7Validator(schema)
-
-
-def provenance(path: Path) -> dict[str, str] | None:
-    """Section 7 as the contract's provenance block, or None.
-
-    None means the section carries none of the three required bullets.
-    That is a model defect, reported rather than papered over: the
-    alternative is writing a `date` nobody recorded.
-    """
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-    sections = dict(parse_sections(text))
-    body = next(
-        (lines for head, lines in sections.items() if "provenance" in head.lower()),
-        None,
-    )
-    if body is None:
-        return None
-    parsed = parse_provenance(body)
-    block = {}
-    for field in PROVENANCE_FIELDS:
-        value = (parsed.get(field) or "").strip()
-        if not value or value.lower() in UNSET:
-            continue
-        block[field] = value
-    if any(field not in block for field in PROVENANCE_REQUIRED):
-        return None
-    return block
-
-
-def build(path: Path, root: Path) -> dict | None:
-    """Shape one parsed model into the contract artifact, or None."""
-    parsed = parse_threats(path, root)
-    if not parsed:
-        return None
-    block = provenance(path)
-    if block is None:
-        return None
-    threats = []
-    for threat in parsed["threats"]:
-        row = {field: threat[field] for field in THREAT_FIELDS if field in threat}
-        row["actor"] = threat["actors"]
-        threats.append(row)
-    # The register's `product` -- the directory that groups a subject's
-    # models -- so the projection's `product` column means the same thing
-    # it has always meant in the threat dashboards.
-    return {
-        "system": parsed["threats"][0]["product"],
-        "provenance": block,
-        "threats": threats,
-    }
+from traust.lib.threat_model_artifact import MODEL_SUFFIX, emit
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -156,69 +67,39 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     root = args.root.resolve()
-    validator = _validator()
 
     tally: Counter[str] = Counter()
     reasons: Counter[str] = Counter()
     rejected: list[dict] = []
-    written: list[tuple[Path, dict]] = []
     seen: set[str] = set()
+    pending: list[Path] = []
 
-    for path in sorted(root.rglob("*-threat-model.md")):
+    for path in sorted(root.rglob(f"*{MODEL_SUFFIX}")):
         real = os.path.realpath(path)
         if real in seen:
             continue  # the same model reached through a symlinked tree
         seen.add(real)
         tally["models"] += 1
-        relative = str(Path(real).relative_to(root))
-        document = build(Path(real), root)
-        if document is None:
-            tally["unusable"] += 1
-            # Distinguish the two ways build() gives up: they are
-            # different defects with different fixes.
-            why = (
-                "no parseable threats table"
-                if parse_threats(Path(real), root) is None
-                else "section 7 provenance missing mode/date/target"
-            )
-            reasons[why] += 1
-            rejected.append({"model": relative, "reason": why})
-            continue
-        errors = sorted(validator.iter_errors(document), key=lambda e: e.json_path)
-        if errors:
-            tally["invalid"] += 1
-            for error in errors:
-                where = "/".join(str(part) for part in error.absolute_schema_path)
-                reasons[where] += 1
+        model = Path(real)
+        # Dry run still derives and validates -- the point of the run is
+        # to learn which models cannot produce an artifact.
+        target, why = emit(model, root, write=args.write)
+        if why:
+            tally["rejected"] += 1
+            reasons[why[0].split(":")[0] if len(why) > 1 else why[0]] += 1
             rejected.append(
-                {
-                    "model": relative,
-                    "reason": "schema",
-                    "errors": [
-                        {"path": e.json_path, "message": e.message[:300]}
-                        for e in errors[:10]
-                    ],
-                }
+                {"model": str(model.relative_to(root)), "reasons": why[:10]}
             )
             continue
-        tally["valid"] += 1
-        tally["threats"] += len(document["threats"])
-        tally["with_attack_refs"] += sum(
-            1 for t in document["threats"] if t.get("attack_refs")
-        )
-        written.append(
-            (Path(real).with_name(Path(real).name[: -len(".md")] + ".json"), document)
-        )
+        tally["conformant"] += 1
+        pending.append(target)
 
     print(
-        f"threat models: {tally['models']} found, {tally['valid']} conformant "
-        f"({tally['threats']} threats)"
+        f"threat models: {tally['models']} found, {tally['conformant']} conformant"
     )
-    print(f"  with attack_refs      {tally['with_attack_refs']}")
-    if tally["unusable"] or tally["invalid"]:
+    if tally["rejected"]:
         print(
-            f"  NOT WRITTEN           {tally['unusable'] + tally['invalid']} "
-            f"({tally['unusable']} unusable, {tally['invalid']} schema-invalid)",
+            f"  NOT WRITTEN           {tally['rejected']} — fix the Markdown",
             file=sys.stderr,
         )
         for reason, count in reasons.most_common(15):
@@ -234,11 +115,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.write:
         print("\ndry run: nothing written. Re-run with --write.")
         return 0
-    for target, document in written:
-        target.write_text(
-            json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
-    print(f"\nwrote {len(written)} artifact(s)")
+    print(f"\nwrote {len(pending)} artifact(s)")
     return 0
 
 

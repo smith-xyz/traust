@@ -9,6 +9,7 @@ from pathlib import Path
 from traust_engine.reporting import validate
 
 from traust.cli.groups._registry import OpSpec
+from traust.lib import threat_model_artifact
 
 
 def add_validate_args(ap) -> None:
@@ -249,4 +250,73 @@ SARIF = OpSpec(
     add_args=add_sarif_args,
     call=call_sarif,
     help="Export harness reports to SARIF 2.1.0",
+)
+
+
+def add_threat_model_json_args(ap) -> None:
+    ap.add_argument(
+        "model",
+        type=Path,
+        nargs="+",
+        help="Path to one or more <repo>-threat-model.md files",
+    )
+    ap.add_argument(
+        "--root",
+        type=Path,
+        default=None,
+        help=(
+            "Tree the model's product/slug identity is relative to "
+            "(default: the model's grandparent, i.e. <product>/<repo>/)"
+        ),
+    )
+    ap.add_argument(
+        "--check",
+        action="store_true",
+        help="Report conformance without writing the artifact",
+    )
+
+
+def call_threat_model_json(engine, args) -> int:
+    """Emit the contract artifact beside an authored threat model.
+
+    /threat-model calls this in the same step that writes the Markdown,
+    the way an audit emits .json and .md together. The backfill in
+    traust.migrations.emit_threat_model_json runs the SAME derivation
+    over a whole tree -- one implementation, so the two cannot drift.
+    """
+    failed = 0
+    for model in args.model:
+        if not model.is_file():
+            print(f"no such model: {model}", file=sys.stderr)
+            failed += 1
+            continue
+        root = args.root or model.parent.parent.parent
+        try:
+            target, reasons = threat_model_artifact.emit(
+                model, root, write=not args.check
+            )
+        except ValueError as error:  # model outside --root
+            print(f"{model}: {error}", file=sys.stderr)
+            failed += 1
+            continue
+        if reasons:
+            failed += 1
+            print(f"NOT CONFORMANT  {model}", file=sys.stderr)
+            for reason in reasons[:10]:
+                print(f"    {reason}", file=sys.stderr)
+            print(
+                "  fix the Markdown — the schema is the authority, and an "
+                "artifact written in a degraded form is one the ingest "
+                "refuses anyway.",
+                file=sys.stderr,
+            )
+            continue
+        print(f"{'would write' if args.check else 'wrote'} {target}")
+    return 1 if failed else 0
+
+
+THREAT_MODEL_JSON = OpSpec(
+    add_args=add_threat_model_json_args,
+    call=call_threat_model_json,
+    help="Emit the contract JSON artifact beside an authored threat model",
 )
