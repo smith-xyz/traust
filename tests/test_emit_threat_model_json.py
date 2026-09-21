@@ -10,10 +10,11 @@ would have been written into 7,482 artifacts.
 from __future__ import annotations
 
 import json
+
+import pytest
 from pathlib import Path
 
-from traust.lib.threat_model_artifact import build, emit, provenance
-from traust.migrations.emit_threat_model_json import main
+from traust.migrations.emit_threat_model_json import build, emit, main, provenance
 
 MODEL = """# Threat model
 
@@ -129,17 +130,21 @@ def test_check_mode_writes_nothing(tmp_path):
     assert not target.exists()
 
 
-def test_the_forward_direction_lives_in_the_engine_not_here(tmp_path):
-    """This module is the LEGACY md -> json backfill and nothing else.
+def test_the_backfill_direction_is_not_importable_as_a_library(tmp_path):
+    """md -> json is a one-shot, not a supported path.
 
-    New models are authored as JSON and rendered by
-    `reporting validate` + `reporting render`. A renderer here would be a
-    second implementation of the direction that matters.
+    It lived briefly in `traust.lib`, which advertises shared, ongoing
+    use — the opposite of what this is. Keeping it in the dated
+    migration means nothing can reach for it as though deriving an
+    artifact from prose were a normal thing to do. Rendering, the
+    direction that matters, belongs to the engine alongside every other
+    artifact's.
     """
-    from traust.lib import threat_model_artifact as lib
+    import importlib
 
-    assert not hasattr(lib, "render"), "rendering belongs to traust_engine.reporting.render"
-    assert not hasattr(lib, "write")
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("traust.lib.threat_model_artifact")
+
     from traust_engine.reporting import render
 
     assert hasattr(render, "render_threat_model")
