@@ -83,7 +83,6 @@ GROUPS: dict[str, dict[str, object]] = {
         "lint": reporting.LINT,
         "render": reporting.RENDER,
         "sarif": reporting.SARIF,
-        "threat-model-json": reporting.THREAT_MODEL_JSON,
     },
     "route": dict(route.ROUTE),
     "sweep": {

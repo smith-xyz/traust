@@ -1,28 +1,31 @@
-"""The contract artifact for one threat model, derived from its Markdown.
+"""The threat-model contract artifact, and the prose rendered from it.
 
-A threat model is authored as prose, because people write and edit it.
-Its structure has always been a contract -- sections, table columns and
-enums -- and `threat-model.schema.json` is that contract made
-machine-readable. So the model has two forms and they are not
-alternatives:
+`threat-model.schema.json` defines the model. The JSON is the artifact:
+it is authored against the schema, validated against it, and projected
+into storage. The Markdown is a RENDERING of that validated document, produced by
+`traust reporting render` -- the same command, and the same
+relationship, as every other artifact family.
 
-    <repo>-threat-model.md      authored, human-edited, canonical prose
-    <repo>-threat-model.json    the contract artifact, projected into
-                                storage and read by every consumer
+    <repo>-threat-model.json    the artifact. Authored, validated, the
+                                source of truth.
+    <repo>-threat-model.md      rendered from it. Never the source.
 
-This module owns the derivation, and is the ONLY implementation of it.
-`/threat-model` calls it on every emission through
-`traust reporting threat-model-json`; the one-shot backfill in
-`traust.migrations.emit_threat_model_json` calls the same functions over
-a whole tree. A second copy of the column list is exactly what having a
-schema was meant to end.
+Deriving the JSON from prose would make an unvalidated Markdown table
+the thing everything downstream depends on, and every consumer would be
+reading a re-parse of a re-parse. Rendering the other way means the
+enums, the required fields and the column set are checked once, at the
+point of authorship, and the prose cannot disagree with the artifact
+because it is generated from it.
 
-THE SCHEMA IS THE AUTHORITY. A model whose prose does not satisfy it
-gets no artifact: an invalid file on disk claims to be a contract
-artifact and is not, and the ingest would refuse it anyway. Nothing here
-is defaulted or inferred -- provenance is read from section 7, and a
-model that does not state it is reported rather than given a date nobody
-recorded.
+Everything in THIS module goes the wrong way, md -> json. It exists
+for ONE reason: 7,660 models were authored as prose before the schema
+existed, and a backfill can only read what is on disk. They are used by
+`traust.migrations.emit_threat_model_json` and by nothing else. Do not
+reach for them in new code.
+
+THE SCHEMA IS THE AUTHORITY. A document that does not satisfy it yields
+no files at all -- there is no degraded form to fall back to, and an
+invalid artifact is one the ingest refuses anyway.
 """
 
 from __future__ import annotations
@@ -107,6 +110,11 @@ def provenance(model: Path) -> dict[str, str] | None:
     if any(field not in block for field in PROVENANCE_REQUIRED):
         return None
     return block
+
+
+# ---------------------------------------------------------------------------
+# LEGACY: Markdown -> JSON. Backfill only. See the module docstring.
+# ---------------------------------------------------------------------------
 
 
 def build(model: Path, root: Path) -> dict | None:

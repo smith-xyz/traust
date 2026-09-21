@@ -129,34 +129,17 @@ def test_check_mode_writes_nothing(tmp_path):
     assert not target.exists()
 
 
-def test_cli_op_emits_for_a_single_model(tmp_path):
-    """The command /threat-model calls in the same step it writes the .md."""
-    from traust.cli.groups import reporting
+def test_the_forward_direction_lives_in_the_engine_not_here(tmp_path):
+    """This module is the LEGACY md -> json backfill and nothing else.
 
-    model = _model(tmp_path)
+    New models are authored as JSON and rendered by
+    `reporting validate` + `reporting render`. A renderer here would be a
+    second implementation of the direction that matters.
+    """
+    from traust.lib import threat_model_artifact as lib
 
-    class Args:
-        pass
+    assert not hasattr(lib, "render"), "rendering belongs to traust_engine.reporting.render"
+    assert not hasattr(lib, "write")
+    from traust_engine.reporting import render
 
-    args = Args()
-    args.model = [model]
-    args.root = tmp_path
-    args.check = False
-    assert reporting.call_threat_model_json(None, args) == 0
-    assert model.with_name("repo-threat-model.json").is_file()
-
-
-def test_cli_op_exits_nonzero_on_a_non_conformant_model(tmp_path):
-    from traust.cli.groups import reporting
-
-    model = _model(tmp_path, MODEL.replace("| remote_auth |", "| whoever |"))
-
-    class Args:
-        pass
-
-    args = Args()
-    args.model = [model]
-    args.root = tmp_path
-    args.check = False
-    assert reporting.call_threat_model_json(None, args) == 1
-    assert not model.with_name("repo-threat-model.json").exists()
+    assert hasattr(render, "render_threat_model")

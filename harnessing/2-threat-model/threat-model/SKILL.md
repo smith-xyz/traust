@@ -64,24 +64,26 @@ threat's likelihood score.
 
 **Invocation:** `/threat-model [bootstrap-then-interview|bootstrap|interview|review|update|pr] <target-dir> [flags]`
 
-**Model filename (`<model-file>`, applies to every mode that writes).**
-The model file is always named after its target:
-`<name>-threat-model.md`, where `<name>` is the repo name from
-`git -C <target-dir> remote get-url origin` (basename, `.git` stripped),
-falling back to `<target-dir>`'s directory basename when there is no
-git remote. Portfolio copies may be branch-suffixed
-(`<name>__release-4.22-threat-model.md`). Resolve `<model-file>` once at
-startup and state it in your first response. `THREAT_MODEL.md` is a
-**legacy** name: still read (resolution below), never written.
+**Artifact filename (`<model-file>`, applies to every mode that writes).**
+The artifact you author is `<name>-threat-model.json`, where `<name>` is
+the repo name from the target checkout's origin URL (basename, `.git`
+stripped), not the local directory name. A branch-specific model carries
+the ref in the name (`<name>__release-4.22-threat-model.json`). Resolve
+`<model-file>` once at routing time and use it for every later step; its
+rendered companion is always the same stem with `.md`.
 
-**Model-file resolution (applies to every mode that reads an existing
-model — review, update, pr cross-reference, `--seed`).** Resolve in
-this order:
+Resolution order for an EXISTING model:
 
-1. The argument is a file path → use it as-is.
-2. Exactly one `*-threat-model.md` exists in `<target-dir>` → use it.
-3. `<target-dir>/THREAT_MODEL.md` exists (legacy name) → use it.
-4. Several `*-threat-model.md` exist (branch variants) → interactive:
+1. `<name>-threat-model.json` exists in `<target-dir>` → that is the
+   artifact; edit it and re-render.
+2. Only `<name>-threat-model.md` exists (authored before the schema, or
+   a legacy `THREAT_MODEL.md`) → you are editing a model that has no
+   artifact yet. Compose the JSON from it against the schema, then
+   render; from that point the JSON is the model and the Markdown is
+   output.
+3. `<target-dir>/THREAT_MODEL.md` exists (legacy name) → as case 2:
+   compose the artifact from it, then render to the modern stem.
+4. Several `*-threat-model.json` exist (branch variants) → interactive:
    ask which one; `--auto`/non-interactive: stop and list them — never
    guess a branch variant.
 5. None → the mode's no-model behavior (review/update stop and suggest
@@ -291,36 +293,54 @@ The same flow is available manually: run `bootstrap` first, then
 
 ## Step 2 — Shared output contract
 
-All modes MUST emit `<target-dir>/<model-file>` conforming to `schema.md`
-in this directory. **Read `schema.md` immediately before you write the file**,
-not at routing time; in interview mode the gap between routing and emit can be
-many turns, and an early read will be evicted before it's used.
+**Author the JSON. The Markdown is rendered from it.**
 
-**Both forms, every time.** A threat model has two forms and they are not
-alternatives: the Markdown is the authored, human-edited prose, and
-`<repo>-threat-model.json` is the contract artifact every consumer reads
-— it is the `threat-model` family in `traust-contracts`, projected into
-the `threat` table and the `threat_current` / `threat_exposure` views.
-Emitting only the Markdown leaves the model invisible to storage, which
-is the state the 2026-09-20 backfill existed to repair. In the same step
-that writes the `.md`, in BOTH locations you write it to:
+This is the precedent every other artifact already follows: there is a
+JSON Schema, the artifact is created as JSON, and the Markdown is
+rendered from it. A security report does exactly this. A threat model is
+not an exception.
+
+`threat-model.schema.json` in `traust-contracts` defines the model. All
+modes MUST compose `<target-dir>/<repo>-threat-model.json` against that
+schema, then validate and render it with the SAME two commands every
+other artifact uses:
 
 ```bash
-python3 -m traust.cli reporting threat-model-json <model-file>
+python3 -m traust.cli reporting validate <repo>-threat-model.json
+python3 -m traust.cli reporting render   <repo>-threat-model.json \
+    -o <repo>-threat-model.md
 ```
 
-It derives the JSON from the Markdown you just wrote — one
-implementation, so the two forms cannot disagree — and writes it beside
-the model. Never hand-author the JSON.
+`validate` auto-detects `threat-model.schema.json` from the filename;
+`render` dispatches on it. Never hand-author the Markdown, and never
+edit it afterwards — it is a rendering, and the next emission
+overwrites it. An `update` or `review` pass edits the JSON and
+re-renders.
 
-**A non-zero exit is a model defect, not a step to skip.** The command
-refuses to write a non-conformant artifact and names what failed:
-usually an off-contract `status`, `likelihood`, `impact` or `actor`
-value, or a section 7 that does not state `mode`, `date` and `target`.
-Fix the Markdown and re-run. Do not work around it, and do not
-hand-write the JSON to get past it — the schema is the authority, and
-an artifact written in a degraded form is one the ingest refuses
-anyway.
+Writing the prose first and parsing it back would make an unvalidated
+Markdown table the thing every consumer depends on: the enums, the
+required fields and the column set would go unchecked until something
+downstream tripped over them. That is the state the 2026-09-20 backfill
+had to repair, and it is not how any other artifact works.
+
+**Read the schema immediately before you compose the document**, not at
+routing time; in interview mode the gap between routing and emit can be
+many turns, and an early read will be evicted before it is used.
+`schema.md` in this directory documents what each section means and the
+scoring guide; the JSON Schema is what your output is checked against.
+
+**A non-zero exit is a defect in the document you just wrote, not a step
+to skip.** The command names every failing path — usually an
+off-contract `status`, `likelihood`, `impact` or `actor` value, a threat
+missing a required field, or a `provenance` block without `mode`, `date`
+and `target`. Fix the JSON and re-run. Nothing is written and no
+Markdown is rendered from an invalid artifact; there is no degraded form
+to fall back to.
+
+New emissions MUST populate `attack_refs` on every threat where a
+technique fits — it is part of the schema and `/attack-coverage` reads
+it as modeled coverage. An empty array is valid when none fits; never
+guess. IDs are validated against the harness's pinned ATT&CK table.
 
 **Findings-tree placement (wiring contract, 2026-07-31).** The checkout
 copy alone is invisible to every downstream consumer — `/secure-code-audit`
@@ -332,16 +352,6 @@ the emitted `<model-file>` there in the same step that writes it. If no
 findings directory exists yet (model built before first audit), say so in
 the summary — the copy happens when the audit creates the directory. The
 checkout copy remains the working copy for `review`/`pr` modes.
-
-New emissions MUST include the `attack_refs` threat-table column — it is
-part of the default schema since harness 0.82.0 and the lint gate errors
-on new models without it (MITRE ATT&CK technique IDs; see `schema.md` for
-the selection rules; IDs are validated against the harness's pinned ATT&CK
-table, and the `/attack-coverage` roll-up reads them as modeled coverage).
-An empty cell is valid when no technique fits — never guess. Legacy
-ten-column models stay valid; in `update`/`review` passes add the column
-only as part of a full re-emission, never by retrofitting rows you did not
-otherwise touch.
 
 **Multi-tenant services only — optional tenant-boundary lens.** When the
 target is a multi-tenant service (distinct customers share running
@@ -362,17 +372,15 @@ referenced **by name/URL only** — never copy or adapt its rubric text
 (python3 -m traust.cli check content-licenses fingerprints re-imported adaptations
 and fails the pre-push hook).
 
-After writing the file, run the deterministic gate and fix every ERROR
-until it passes (same discipline as `validate_report.py` for audit/triage
-artifacts):
-
-```
-python3 -m traust.cli reporting lint <target-dir>/<model-file>
-```
+After writing the artifact, `reporting validate` above IS the gate — fix
+every error until it passes, the same discipline audit and triage
+artifacts follow. `reporting lint` remains for LEGACY prose models that
+have no JSON artifact yet; it checks a rendering, so it can only catch
+what the schema already caught upstream.
 
 Then print to the user:
 
-1. The path to the model file and the linter result line.
+1. The paths to the JSON artifact and its rendered Markdown, and the validate result line.
 2. The top 5 threats by likelihood × impact (id, one-line description, L×I).
 3. For `bootstrap`: any open questions the code could not answer (these seed a
    later `interview` pass).
@@ -418,8 +426,9 @@ unattributed run is a calibration gap.
 `<repo>-security-audit.json` findings and CVE/pentest reports in
 bootstrap mode; `--context` docs.
 
-**Emits:** `<repo>-threat-model.md` + `<repo>-threat-model.json`
-(checkout copy + findings-tree copy by contract).
+**Emits:** `<repo>-threat-model.json` (the artifact) and the
+`<repo>-threat-model.md` rendered from it — checkout copy + findings-tree
+copy by contract, both forms in both places.
 
 The **Markdown** is consumed by `/secure-code-audit` (coverage diff),
 `/vuln-scan` (focus areas), `/triage` (environment context),
