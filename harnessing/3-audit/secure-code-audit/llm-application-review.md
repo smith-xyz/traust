@@ -90,6 +90,7 @@ model tools.
 | 06.3 | Is authorization for a tool action decided by the model, instead of being enforced in the tool or the service behind it on every call? | CWE-862 / CWE-285 |
 | 06.4 | Can the agent take destructive or irreversible actions (delete, pay, send, deploy) with no human approval step? | CWE-862 |
 | 06.5 | Do MCP tool or resource handlers run without checking who the caller is and what they may do? | CWE-862 / CWE-306 |
+| 06.6 | Is an MCP server reachable over HTTP or SSE with no client authentication at the transport (no bearer/OAuth verification, no auth middleware, no authenticating proxy)? | CWE-306 |
 
 ## LLM07 — System prompt leakage
 
@@ -130,6 +131,34 @@ Applies to: every LLM application.
 | 10.3 | Do model calls run with no `max_tokens`, timeout or retry cap? | CWE-400 |
 | 10.4 | Do agent loops run with no step, time or cost ceiling? | CWE-400 / CWE-834 |
 | 10.5 | Are raw model internals (`logprobs`, `logit_bias`, full embeddings) exposed to callers, enabling model extraction? | CWE-200 |
+
+## Rule evidence
+
+The engine's `llm-application` opengrep rules (Python, TypeScript, Go)
+decide the code-level shapes of some checks. Their hits arrive with the
+other opengrep facts, and each fact carries the category in `owasp_llm`.
+A hit is evidence for the check, and you still confirm it in context. A
+promoted fact's `owasp_llm` goes into the finding's
+`owasp_llm_references`. No hit is not a negative, because the rules see
+only the SDK call shapes they name.
+
+| Rule (`traust-<lang>-llm-application-…`) | Check |
+|---|---|
+| `output-to-shell-taint`, `output-to-exec-taint`, `output-to-code-exec-taint` | 05.1 |
+| `output-to-sql-taint` | 05.2 |
+| `output-to-path-taint` | 05.3 |
+| `unpinned-model-download` | 03.1 |
+| `trust-remote-code` | 03.2 |
+| `unsafe-model-deserialization`, `model-load-default-pickle` | 03.3 |
+| `mcp-http-without-auth` | 06.6 |
+| `unbounded-agent-loop` | 10.4 |
+
+`mcp-http-without-auth` is file-scoped: it clears when the same file wires
+authentication. If auth is applied somewhere else, such as a reverse proxy
+or middleware in another module, record where: that is a negative result
+for 06.6, not a finding. Per-tool authorization (06.3, 06.5) has no rule,
+because in MCP it usually lives at the transport or in the service behind
+the tool, so judge it from the code.
 
 ## Recording the review
 
