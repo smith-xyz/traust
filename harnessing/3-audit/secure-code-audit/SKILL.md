@@ -1197,8 +1197,9 @@ python3 -m traust.cli adapters llm-app --repo <local-path> --out /tmp/<repo>-llm
 It reads source imports, direct manifest declarations and prompt-template
 files, and reports `llm_application`, the `kinds` found (`model-sdk`,
 `agent-framework`, `mcp-server`, `vector-store`, `prompt-template`),
-the `signals` with `file:line` evidence, and the tagged `files`. **It is a
-fact, never a finding.**
+the `signals` with `file:line` evidence, and the tagged `files`. Files that
+reach the model through an in-repo wrapper are tagged too and listed in
+`files_via_wrapper`. **It is a fact, never a finding.**
 
 - **When `llm_application: true`:** review the tagged files, and the call
   paths into and out of them, against

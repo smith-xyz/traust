@@ -6,7 +6,7 @@ All notable changes to Traust are documented here.
 
 - **LLM, agent and MCP application review** (deepsec-comparison plan
   v2.1, step 1: workstreams D1 and D2). Pins traust-engine 0.38.0
-  (7eb7058).
+  (9831d02).
   - **`traust adapters llm-app --repo`** runs the engine's deterministic
     detector and writes `<repo>-llm-app.json` (artifact
     `llm-app-detection`). It reports:
@@ -14,7 +14,8 @@ All notable changes to Traust are documented here.
     - the `kinds` found: model SDK, agent framework, MCP server, vector
       store, prompt template;
     - the signals, with `file:line` evidence;
-    - the tagged files.
+    - the tagged files, including files that call the model through an
+      in-repo wrapper (`files_via_wrapper`).
 
     It is a fact, never a finding.
   - **New checklist `secure-code-audit/llm-application-review.md`,**
