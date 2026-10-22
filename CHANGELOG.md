@@ -2,6 +2,21 @@
 
 All notable changes to Traust are documented here.
 
+## [0.37.0]
+
+- **Pins traust-engine 0.39.0 (`0f82562`): the LLM-application rule pack**
+  (plan step D3). These are deterministic opengrep rules for Python,
+  TypeScript and Go:
+  - model output reaching a shell, code evaluation, SQL or a file path
+  - model supply chain (`trust_remote_code`, pickle `torch.load`,
+    unpinned Hub downloads)
+  - MCP servers on HTTP/SSE with no authentication in the file
+  - unbounded agent loops
+- **The LLM application review checklist maps each rule to its check**
+  (new "Rule evidence" section). Check 06.6 is new: an MCP server reachable
+  over HTTP/SSE with no client authentication at the transport (CWE-306).
+  Per-tool authorization (06.3, 06.5) stays a review judgement.
+
 ## [0.36.0]
 
 - **Findings carry the OWASP LLM category in a real field** (owner decision
