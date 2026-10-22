@@ -2,6 +2,18 @@
 
 All notable changes to Traust are documented here.
 
+## [0.35.1]
+
+- **Pins traust-engine 0.38.1 (82e4800): seeded-fixture reports now pass
+  validation.**
+  - **The problem:** recall-benchmark fixtures are local `file://`
+    checkouts, and the scorer matches a run's `metadata.repository`
+    against that URL. The validator rejected anything but `https://`, so a
+    fixture report could not both validate and be scored.
+  - **The fix:** a `file:///…` repository is now a single warning, valid
+    for benchmark and seeded-fixture runs only.
+  - Found by the first audit of the `llm-app` fixture.
+
 ## [0.35.0]
 
 - **LLM, agent and MCP application review** (deepsec-comparison plan
