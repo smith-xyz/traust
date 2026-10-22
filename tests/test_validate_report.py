@@ -1340,7 +1340,7 @@ class TestFindingIdentityStamp:
         # traust-engine 0.7.1 moved to the `python3 -m` module form that
         # AGENTS.md mandates for package modules. What the message owes the
         # reader is a runnable fix, not one particular way of spelling it.
-        assert "finding_identity fingerprint" in e, "must name the fix"
+        assert "finding-identity fingerprint" in e, "must name the fix"
         assert "--write" in e, "the named fix must be runnable"
 
     def test_fabricated_stamp_is_an_error(self):

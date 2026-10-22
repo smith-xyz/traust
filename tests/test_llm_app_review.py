@@ -65,3 +65,12 @@ def test_both_skills_wire_the_pre_scan_and_the_checklist():
         text = (HARNESS_ROOT / "harnessing" / "3-audit" / skill / "SKILL.md").read_text()
         assert "adapters llm-app" in text, skill
         assert "llm-application-review.md" in text, skill
+
+
+def test_the_checklist_records_the_category_in_its_schema_field():
+    from traust_contracts.paths import schema_dir
+
+    assert "`owasp_llm_references`" in CHECKLIST.read_text(encoding="utf-8")
+    report = json.loads((schema_dir() / "report.schema.json").read_text(encoding="utf-8"))
+    field = report["$defs"]["finding"]["properties"]["owasp_llm_references"]
+    assert field["items"]["pattern"] == "^LLM(0[1-9]|10)$"
