@@ -45,6 +45,7 @@ allowed-tools:
   - Bash(python3 *-m traust_engine.adapters.checkov:*)
   - Bash(python3 *-m traust_engine.adapters.gitleaks:*)
   - Bash(python3 *-m traust.cli adapters osv:*)
+  - Bash(python3 *-m traust.cli adapters llm-app:*)
   - Bash(python3 *harnessing/3-audit/secure-code-audit/scripts/run_fork_advisory_lag.py:*)
   - Bash(python3 *harnessing/3-audit/secure-code-audit/scripts/expand_config_matrix.py:*)
   - Bash(python *harnessing/3-audit/secure-code-audit/scripts/expand_config_matrix.py:*)
@@ -273,7 +274,7 @@ default for every repository**, not just high-value targets.
    and the other flagged is a finding, not a negative.
 
 Deterministic pre-scans (opengrep, checkov catalog, syft/grype,
-osv-scanner, fork-advisory-lag, gitleaks) run **once** — their facts
+osv-scanner, llm-app, fork-advisory-lag, gitleaks) run **once** — their facts
 seed both passes.
 Single-pass execution remains acceptable only when the invoker
 explicitly requests it (record `"audit_passes": 1` in
@@ -1184,6 +1185,35 @@ never a second finding). Record the emission count in
 records"` (or omit when none — this step has no skip semantics; it is
 opportunistic by design).
 
+#### Deterministic LLM application pre-scan (`traust adapters llm-app`)
+
+When a local checkout exists, run the LLM, agent and MCP application
+detector:
+
+```bash
+python3 -m traust.cli adapters llm-app --repo <local-path> --out /tmp/<repo>-llm-app.json
+```
+
+It reads source imports, direct manifest declarations and prompt-template
+files, and reports `llm_application`, the `kinds` found (`model-sdk`,
+`agent-framework`, `mcp-server`, `vector-store`, `prompt-template`),
+the `signals` with `file:line` evidence, and the tagged `files`. Files that
+reach the model through an in-repo wrapper are tagged too and listed in
+`files_via_wrapper`. **It is a fact, never a finding.**
+
+- **When `llm_application: true`:** review the tagged files, and the call
+  paths into and out of them, against
+  [`llm-application-review.md`](llm-application-review.md): the sections
+  its `kinds` select, plus those that apply to every LLM application.
+  That file sets the evidence rules, the CWE per check, and how to record
+  the OWASP category, negatives and coverage gaps.
+- **When `llm_application: false`:** the LLM checklist doesn't apply.
+  Say so in `negative_results`, citing the pre-scan.
+- **Record** `"llm-app": "ran: <kinds>"`, or `"ran: none"`, in
+  `metadata.additional.deterministic_steps`. With no local checkout, record
+  `"skipped: no local checkout"`, and a repository that looks like an LLM
+  application is a `coverage_gaps` entry.
+
 #### Deterministic secret pre-scan (gitleaks)
 
 When a local checkout exists **and** `gitleaks` is on `PATH`, seed the
@@ -1626,8 +1656,9 @@ Rules for batch prompts:
 `/add-inputs` (§Input); `<repo>-threat-model.md` from `/threat-model`
 (coverage diff, findings-tree copy); the FP-precedent cache from
 python3 -m traust.cli corpus precedent; deterministic pre-scan outputs
-(opengrep, gitleaks, osv, syft/grype, k8s-hardening) recorded
-under `deterministic_steps`.
+(opengrep, gitleaks, osv, llm-app, syft/grype, k8s-hardening) recorded
+under `deterministic_steps`; `llm-application-review.md` (this skill's
+LLM, agent and MCP checklist, shared with `/vuln-scan`).
 
 **Emits:** `<repo>-security-audit.json` — the campaign's baseline
 report artifact — consumed by `/triage`, `/track-findings`,

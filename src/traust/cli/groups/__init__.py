@@ -30,6 +30,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "checkov": adapters.CHECKOV,
         "gitleaks": adapters.GITLEAKS,
         "osv": adapters.OSV,
+        "llm-app": adapters.LLM_APP,
         "yara": adapters.YARA,
         "joern": adapters.JOERN,
         "crypto-probe": adapters.CRYPTO_PROBE,

@@ -2,6 +2,39 @@
 
 All notable changes to Traust are documented here.
 
+## [0.35.0]
+
+- **LLM, agent and MCP application review** (deepsec-comparison plan
+  v2.1, step 1: workstreams D1 and D2). Pins traust-engine 0.38.0
+  (9831d02).
+  - **`traust adapters llm-app --repo`** runs the engine's deterministic
+    detector and writes `<repo>-llm-app.json` (artifact
+    `llm-app-detection`). It reports:
+    - `llm_application`;
+    - the `kinds` found: model SDK, agent framework, MCP server, vector
+      store, prompt template;
+    - the signals, with `file:line` evidence;
+    - the tagged files, including files that call the model through an
+      in-repo wrapper (`files_via_wrapper`).
+
+    It is a fact, never a finding.
+  - **New checklist `secure-code-audit/llm-application-review.md`,**
+    shared with `/vuln-scan`. It has one section per OWASP Top 10 for LLM
+    Applications 2025 category: 34 statically checkable checks (plus 3 threat-model questions) in
+    Traust's own words, each naming the CWE a confirmed finding files
+    under. Design questions go to the threat model, never to findings.
+    The report schema has no OWASP LLM field, so findings name the
+    category and check number in `description`.
+  - **`/secure-code-audit`:** a new *Deterministic LLM application
+    pre-scan* section. The tagged files are reviewed against the
+    checklist sections their kinds select. It records `"llm-app"` in
+    `deterministic_steps`, and an LLM-free repository is a cited
+    negative.
+  - **`/vuln-scan`:** the pre-scan runs in step 1, and an LLM application
+    gets its own focus area with the checklist.
+  - **Tests:** the command; the checklist covers LLM01–LLM10; every check
+    names a CWE; both skills wire the pre-scan.
+
 ## [0.34.2]
 
 - **Pins traust-engine 0.37.1 (88c8065): `go.mod` `replace` directives

@@ -625,6 +625,56 @@ OSV = OpSpec(
 
 
 # ---------------------------------------------------------------------------
+# llm-app — deterministic LLM, agent and MCP application detection
+# ---------------------------------------------------------------------------
+
+
+def add_llm_app_args(ap) -> None:
+    ap.add_argument("--repo", required=True, type=Path, help="Target checkout")
+    ap.add_argument("--out", type=Path, help="Output JSON (default: <repo>-llm-app.json)")
+
+
+def call_llm_app(_engine, args) -> int:
+    from traust_engine.adapters import llm_app
+
+    repo = args.repo.resolve()
+    if not repo.is_dir():
+        print(f"not a directory: {repo}", file=sys.stderr)
+        return 2
+    body = llm_app.detect(repo)
+    doc = {
+        "metadata": {
+            "artifact": "llm-app-detection",
+            "repository": str(repo),
+            "harness_version": harness_version(),
+            "detected_at": datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            **body["stats"],
+        },
+        "llm_application": body["llm_application"],
+        "kinds": body["kinds"],
+        "signals": body["signals"],
+        "files": body["files"],
+    }
+    out = args.out or Path.cwd() / f"{repo.name}-llm-app.json"
+    out.write_text(json.dumps(doc, indent=2) + "\n", encoding="utf-8")
+    if body["llm_application"]:
+        print(
+            f"llm-app: LLM application ({', '.join(body['kinds'])}); "
+            f"{len(body['files'])} file(s) tagged → {out}"
+        )
+    else:
+        print(f"llm-app: no LLM, agent or MCP signals → {out}")
+    return 0
+
+
+LLM_APP = OpSpec(
+    add_args=add_llm_app_args,
+    call=call_llm_app,
+    help="Deterministic LLM, agent and MCP application detection (gates the LLM review)",
+)
+
+
+# ---------------------------------------------------------------------------
 # yara
 # ---------------------------------------------------------------------------
 
