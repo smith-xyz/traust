@@ -1486,7 +1486,7 @@ wheels = [
 
 [[package]]
 name = "traust"
-version = "0.35.1"
+version = "0.36.0"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
@@ -1529,10 +1529,10 @@ requires-dist = [
     { name = "pyyaml" },
     { name = "referencing" },
     { name = "sigstore", marker = "extra == 'signing'", specifier = ">=4.0,<5.0" },
-    { name = "traust-contracts", git = "https://github.com/traust-security/traust-contracts.git?rev=84bd8e4f6cda7431fb4a1321b1d10715f2220860" },
-    { name = "traust-engine", git = "https://github.com/traust-security/traust-engine.git?rev=82e4800f6458ee2ad819c6a071e2a70916787872" },
-    { name = "traust-ledger", git = "https://github.com/traust-security/traust-ledger.git?rev=c3e6d2ebb1c3105e3ddf9c262198a9514d94291e" },
-    { name = "traust-ledger", extras = ["db"], marker = "extra == 'ledger-db'", git = "https://github.com/traust-security/traust-ledger.git?rev=c3e6d2ebb1c3105e3ddf9c262198a9514d94291e" },
+    { name = "traust-contracts", git = "https://github.com/traust-security/traust-contracts.git?rev=f8c9cbd34d403fba4293eb309202e3fa78d5525e" },
+    { name = "traust-engine", git = "https://github.com/traust-security/traust-engine.git?rev=e7c2ec7ceb0efd7262493100506cfc8e46e70fd7" },
+    { name = "traust-ledger", git = "https://github.com/traust-security/traust-ledger.git?rev=366ccb05de10848a66464c9049508d0156e980d7" },
+    { name = "traust-ledger", extras = ["db"], marker = "extra == 'ledger-db'", git = "https://github.com/traust-security/traust-ledger.git?rev=366ccb05de10848a66464c9049508d0156e980d7" },
     { name = "tree-sitter", marker = "extra == 'graph'" },
     { name = "tree-sitter-go", marker = "extra == 'graph'" },
     { name = "tree-sitter-javascript", marker = "extra == 'graph'" },
@@ -1545,13 +1545,13 @@ provides-extras = ["graph", "signing", "ledger-db"]
 dev = [
     { name = "pytest-xdist", specifier = ">=3" },
     { name = "ruff", specifier = ">=0.6" },
-    { name = "traust-ledger", extras = ["db"], git = "https://github.com/traust-security/traust-ledger.git?rev=c3e6d2ebb1c3105e3ddf9c262198a9514d94291e" },
+    { name = "traust-ledger", extras = ["db"], git = "https://github.com/traust-security/traust-ledger.git?rev=366ccb05de10848a66464c9049508d0156e980d7" },
 ]
 
 [[package]]
 name = "traust-contracts"
-version = "0.60.0"
-source = { git = "https://github.com/traust-security/traust-contracts.git?rev=84bd8e4f6cda7431fb4a1321b1d10715f2220860#84bd8e4f6cda7431fb4a1321b1d10715f2220860" }
+version = "0.62.0"
+source = { git = "https://github.com/traust-security/traust-contracts.git?rev=f8c9cbd34d403fba4293eb309202e3fa78d5525e#f8c9cbd34d403fba4293eb309202e3fa78d5525e" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "pydantic" },
@@ -1560,8 +1560,8 @@ dependencies = [
 
 [[package]]
 name = "traust-engine"
-version = "0.38.1"
-source = { git = "https://github.com/traust-security/traust-engine.git?rev=82e4800f6458ee2ad819c6a071e2a70916787872#82e4800f6458ee2ad819c6a071e2a70916787872" }
+version = "0.38.2"
+source = { git = "https://github.com/traust-security/traust-engine.git?rev=e7c2ec7ceb0efd7262493100506cfc8e46e70fd7#e7c2ec7ceb0efd7262493100506cfc8e46e70fd7" }
 dependencies = [
     { name = "jsonschema" },
     { name = "pyyaml" },
@@ -1572,8 +1572,8 @@ dependencies = [
 
 [[package]]
 name = "traust-ledger"
-version = "0.11.3"
-source = { git = "https://github.com/traust-security/traust-ledger.git?rev=c3e6d2ebb1c3105e3ddf9c262198a9514d94291e#c3e6d2ebb1c3105e3ddf9c262198a9514d94291e" }
+version = "0.11.4"
+source = { git = "https://github.com/traust-security/traust-ledger.git?rev=366ccb05de10848a66464c9049508d0156e980d7#366ccb05de10848a66464c9049508d0156e980d7" }
 dependencies = [
     { name = "jsonschema" },
     { name = "pyjwt", extra = ["crypto"] },

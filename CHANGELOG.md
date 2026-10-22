@@ -2,6 +2,23 @@
 
 All notable changes to Traust are documented here.
 
+## [0.36.0]
+
+- **Findings carry the OWASP LLM category in a real field** (owner decision
+  2026-10-22, option a).
+  - Pins traust-contracts 0.62.0 (`f8c9cbd`), traust-ledger 0.11.4
+    (`366ccb0`) and traust-engine 0.38.2 (`e7c2ec7`). Report findings gain
+    `owasp_llm_references` (`LLM01` to `LLM10`), and storage revision 6
+    keeps it in `report_finding`.
+  - The LLM application review checklist now records the category in
+    `owasp_llm_references`, with the check number in the description.
+    `/vuln-scan`'s `vuln-findings` format has no reference fields, so it
+    keeps naming the category in the description.
+  - `docs/report-structure.md` lists the field.
+- **Engine 0.38.2:** the validator's fingerprint-fix message now names a
+  command that works, `python3 -m traust.cli corpus finding-identity
+  fingerprint … --write`. The old engine module path has no entry point.
+
 ## [0.35.1]
 
 - **Pins traust-engine 0.38.1 (82e4800): seeded-fixture reports now pass

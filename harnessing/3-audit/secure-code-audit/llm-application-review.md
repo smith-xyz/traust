@@ -138,10 +138,16 @@ Applies to: every LLM application.
 - **The tagged files:** list the ones you reviewed. A tagged file you
   didn't review is a `coverage_gaps` entry (`{"tool": "llm-app", "system":
   "<file>", "reason": "tagged, not reviewed"}`).
-- **Findings** carry the check's CWE in `cwes`, and any ASVS requirement
-  they also break in `asvs_references`. The report schema has no field for
-  OWASP LLM categories yet, so name the category and check number in the
-  finding's `description` (for example "OWASP LLM06, check 06.5").
+- **Findings** carry:
+  - the check's CWE in `cwes`;
+  - the OWASP category ID in `owasp_llm_references`, for example
+    `["LLM06"]`;
+  - any ASVS requirement they also break in `asvs_references`.
+
+  Name the check number in the `description`, for example "check 06.5".
+- **`/vuln-scan` findings** (the `vuln-findings` format) have no reference
+  fields, so they name the category and check number in the
+  `description`, for example "OWASP LLM06, check 06.5".
 - **Negative results** state the check number, what was examined and the
   evidence, for example "06.5: every MCP tool handler in `server/tools.py`
   calls `require_scope()` before acting".
