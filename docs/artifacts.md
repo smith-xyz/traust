@@ -8,8 +8,9 @@ See [components.md](components.md) for current ownership and
 
 The hub retired ledger emitters, findings routers and cumulative projection
 builders. Those rows below describe historical or intended interfaces pending
-their skill ports. The active direct human severity writer records a core
-decision and JSON receipt; it does not regenerate legacy files.
+their skill ports. Triage recording, bound machine-validation recording and the
+human countersign workbench now use core and emit JSON receipts; they do not
+regenerate legacy files or infer proof strength from the report kind.
 Historical layer design is in [disposition-ledger.md](disposition-ledger.md)
 and [findings-routing.md](findings-routing.md).
 
@@ -42,9 +43,9 @@ to recreate retired file writers or treat unfinished service ports as available.
 
 ## Artifact and consumer map
 
-Except for the explicitly active severity row, producers and consumers below
-name legacy or intended skill interfaces. Consult each skill's availability
-notice before running it; no retired emitter is an active consumer.
+Active core-backed recording and review rows are identified explicitly below;
+other legacy producers/consumers remain intended interfaces pending their skill
+ports. Read the owning skill's retirement notice; no retired emitter is active.
 
 | Artifact | Schema | Produced by | Consumed by |
 |---|---|---|---|
@@ -53,7 +54,7 @@ notice before running it; no retired emitter is an active consumer.
 | `<image>-container-audit.json` — a baseline for a registry image | `report.schema.json` | `/secure-container-audit` | `/track-findings`, `/verify-remediation`, dashboards |
 | `<repo>-vuln-findings.json` — candidates, not a baseline | `vuln-findings.schema.json` | `/vuln-scan` | `/triage`, `/patch`; in diff mode, verified findings also enter the ledger as events |
 | `<repo>-triage.json` | `triage.schema.json` | `/triage` | `/patch`; `traust triage record` saves core decisions/review items consumed by `/countersign` |
-| `<repo>-validation.json` | `validation.schema.json` | `/validate-findings` (and extension validators) | `/track-findings` via `emit_validation_ledger_events` (execution-verified events); `/findings-db` |
+| `<repo>-validation.json` | `validation.schema.json` | `/validate-findings` (and extension validators) | `traust validation record` with explicit stored source bindings and run provenance; core canonical decisions/reviews feed `/countersign`; `/validation-fuzz-dashboard` reads retained reports |
 | `<rem_id>-remediation.json` | `remediation.schema.json` | `/remediate-finding` | human review (no machine consumer; `/verify-remediation` re-checks the fork or MR, not this JSON); merge events reach the ledger through `/track-findings` |
 | `<repo>-remediation-verification.json` | `verification.schema.json` | `/verify-remediation` | `/track-findings` via `emit_verification_ledger_events` (resolution events); `regressions[]` routed into the ledger by `route_regressions` |
 | `<repo>-findings-layer.json` — legacy ledger | `layer.schema.json` | Historical `/track-findings` output | Historical cumulative/projection inputs only; current countersign reads core findings and attestation, never this file |

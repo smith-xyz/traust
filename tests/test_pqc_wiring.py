@@ -145,7 +145,11 @@ class TestReadinessValidatorNewFields(unittest.TestCase):
     def _base(self):
         return {
             "title": "t",
-            "metadata": {"repository": "https://x/y", "assessment_basis": "source", "tool": {}},
+            "metadata": {
+                "repository": "https://x/y",
+                "assessment_basis": "source",
+                "tool": {"pqc_scan_commit": "fixture", "rules_sha256": "a" * 64},
+            },
             "summary": {"by_rule": {}},
             "status": "ready",
             "who_sets_tls": "this_app",
@@ -153,7 +157,10 @@ class TestReadinessValidatorNewFields(unittest.TestCase):
             "why_not": [],
             "do_next": [],
             "capabilities": {},
-            "scores": {d: {"score": 0, "checks": []} for d in ("VULN", "AGIL", "PQCA", "HNDL")},
+            "scores": {
+                **{d: {"score": 0, "checks": []} for d in ("VULN", "AGIL", "PQCA", "HNDL")},
+                "overall": 0,
+            },
             "flags": {
                 "has_2030_clock_items": False,
                 "hndl_priority": False,
@@ -193,6 +200,18 @@ class TestReadinessValidatorNewFields(unittest.TestCase):
         ]
         doc["fips_interaction"] = {"verdict": "no-penalty", "fact_ids": ["f2"]}
         self.assertEqual(self._run(doc), 0)
+
+    def test_authoritative_readiness_constraints_reach_real_command(self):
+        for change in ("dominant", "overall", "tool"):
+            with self.subTest(change=change):
+                doc = self._base()
+                if change == "dominant":
+                    doc["provenance_summary"]["dominant"] = "invented"
+                elif change == "overall":
+                    doc["scores"]["overall"] = 101
+                else:
+                    doc["metadata"]["tool"].pop("rules_sha256")
+                self.assertEqual(self._run(doc), 1)
 
     def test_bad_bucket_and_effort_fail(self):
         doc = self._base()

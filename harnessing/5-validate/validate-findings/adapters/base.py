@@ -61,6 +61,9 @@ class StepResult:
     duration_ms: int = 0
     finding_ref: str | None = None
     novel_ref: str | None = None
+    controls: list[dict] = field(default_factory=list)
+    differential: dict | None = None
+    replay: dict | None = None
 
     def to_dict(self):
         return {k: v for k, v in asdict(self).items() if v not in (None, "")}

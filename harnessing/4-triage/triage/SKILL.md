@@ -1463,6 +1463,14 @@ covered by their canonical finding. Re-running is idempotent. It refuses
 a triage whose verdicts don't match the assessment's findings (missing
 fingerprints): fix 1b / 6b and re-run.
 
+Retain the JSON receipt when validation follows. `baseline_assessment_id` is
+the actual input; each `records[]` item exposes the native recorded decision,
+triage assessment, triage artifact and core finding IDs. For a validation source
+of kind `triage`, bind those exact assessment/artifact/finding IDs and the stored
+triage finding's original `id`, not a baseline audit label or interpreted UUID.
+Empty/no-decision output has no invented source IDs. See the
+[validation binding protocol](../../../docs/cli-reference.md#machine-validation-recording).
+
 Report its counts in the terminal summary. If any false positives await
 countersign or review items were queued, say that human decisions are
 pending and that `/countersign` presents them as decision cards. For
@@ -1606,5 +1614,7 @@ for environment context; `*-impact-analysis.json` from
 (Phase 2g).
 
 **Emits:** `<repo>-triage.{json,md}` next to the input report —
-consumed by `/patch`; recorded decisions (Phase 6e, `traust triage
-record`) feed `/track-findings` and `/countersign` (review items).
+consumed by `/patch` and as explicitly bound source evidence by
+`traust validation record`; recorded decisions (Phase 6e, `traust triage
+record`) feed `/track-findings` and `/countersign` (review items). The record
+receipt exposes native IDs for that binding handoff without local database discovery.

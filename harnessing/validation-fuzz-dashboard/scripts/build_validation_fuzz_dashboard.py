@@ -88,7 +88,12 @@ def scan_validations(root):
                 continue
             stats["reports"] += 1
             tgt = target_name(rep)
-            stats["needs_credential"] += len(rep.get("needs_credential") or [])
+            producer = ((rep.get("metadata") or {}).get("additional") or {}).get(
+                "validation_producer"
+            ) or {}
+            stats["needs_credential"] += len(
+                producer.get("needs_credential", rep.get("needs_credential")) or []
+            )
             for ch in rep.get("attack_chains") or []:
                 stats["chains_total"] += 1
                 steps = ch.get("steps") or []

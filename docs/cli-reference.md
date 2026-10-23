@@ -16,7 +16,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 
 ## Command groups
 
-18 groups (plus the deprecated `tools` group below).
+19 groups (plus the deprecated `tools` group below).
 
 | Group | Description | Operations |
 |---|---|---|
@@ -38,6 +38,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `sweep` | Class-generalization sweep | `benchmark`, `collect`, `draft`, `emit`, `mine`, `rule-lane`, `sweep` |
 | `triage` | Core-backed triage | `check`, `intake`, `prepare`, `record`, `render` |
 | `util` | Utility commands | `elf`, `redact`, `safe-exec` |
+| `validation` | Core-backed machine validation evidence | `record` |
 
 ### Retired workflow entry points
 
@@ -50,7 +51,7 @@ here so an old runbook cannot be mistaken for an executable fallback:
 | `build cumulative` | Replay legacy layers into findings-current reports | Core finding queries and insight services; report skill port unfinished |
 | `check report-digests` | Verify report/artifact digest bindings | Core artifact publishing/index services; gate skill port unfinished |
 | `feeds reconcile-cve-provenance` | Reconcile advisory provenance on findings | Core exposure service; skill port unfinished |
-| Ledger triage / validation / verification emitters | Convert report verdicts into legacy layer events | `traust triage record` uses core findings; validation/remediation skill ports remain unfinished |
+| Ledger triage / validation / verification emitters | Convert report verdicts into legacy layer events | `traust triage record` and `traust validation record` use core; the verification/remediation service port remains unfinished |
 | `ledger pull` | Ingest external source determinations into the legacy ledger | `traust findings import` uses core attestation and the shared authenticated caller |
 | `corpus` group | Report discovery, identity, projections, summaries and precedents | Core assessment and finding services; corpus skill ports unfinished |
 | `route` group | Admit impact findings and remediation regressions without changing baselines | Core finding intake; routing skill ports unfinished |
@@ -274,3 +275,113 @@ review material, not publication receipts. Reload through
 The [skill](../harnessing/4-triage/countersign/SKILL.md#legacy-parity-and-retirement)
 accounts for retired checkbox/prose approval parsing, scan-ID mapping and
 file-based state; the typed async workbench does not restore those paths.
+
+## Machine validation recording
+
+Record already-produced evidence without executing any probe:
+
+```bash
+traust validation record --report /private/run/app-validation.json \
+  --bindings /private/run/source-bindings.json \
+  --provenance /private/run/run-provenance.json \
+  --target-attestation /private/run/target-attestation.json \
+  --config-home /private/config
+```
+
+Optional `--install-failure /private/run/install-failure.yaml` retains the exact
+supplied text and marks the deployment observation failed. There is no directory
+search or sibling-file fallback. Full attestation may instead be embedded in
+`metadata.target_attestation` or `bindings.target_attestation`; any explicit false
+voids all verdicts. `attested` must be a JSON boolean, not a truthy string/number.
+
+`--bindings` is core's `ValidationRecordInput`. Every report finding needs an
+exact source reference/label binding. Multiple sources/repos are supported:
+
+```json
+{
+  "policy": "current",
+  "sources": [
+    {
+      "source_report": "opaque:original/app-triage",
+      "assessment_id": "2d8834fa-4dcc-4374-a79a-b88d075a9589",
+      "artifact_id": "4e3ce4b9-34ac-4cbf-b47f-b1dd35483b3b",
+      "findings": [
+        {
+          "source_id": "f001",
+          "finding_id": "31dcc9b8-b569-4340-9032-3b335d53a9ef"
+        }
+      ]
+    }
+  ]
+}
+```
+
+UUIDs above are illustrative: supply real stored IDs obtained from core's
+assessment/finding/artifact services. `source_report` is the exact
+`source_reports[].path` / `validated_findings[].source_report` historical
+reference, treated as opaque text, never a filesystem path. `source_id` is the
+original finding label in that stored source report, never a core UUID or a
+basename-derived alias. Core checks source artifact membership, finding
+membership in that source or its immediate baseline, repository/ref and any
+supplied source digest. Unknown, ambiguous or cross-repo mappings refuse without
+aggregate mutation. Extra source reports are not silently narrowed away.
+
+For the ordinary scanner → triage → validation CLI path, capture the receipt:
+
+```bash
+traust triage record <baseline-assessment-UUID> <app-triage.json> \
+  --repo <read-only-checkout> --config-home <private-config>
+```
+
+Its `baseline_assessment_id` is the actual input baseline. Each `records[]` entry
+contains native `decision_id`, `assessment_id`, `artifact_id` and `finding_id`.
+The latter assessment/artifact identify the stored **triage** result, not an
+automatically discovered original audit. Use them for a `kind: "triage"` validation
+source, with the exact stored triage finding's `id` (for example `f001`) as
+`source_id`. Match the finding by its explicit source fingerprint/context; do
+not reinterpret an audit label as a triage label. No-decision triage output has
+an empty `records` list, not fabricated IDs. For other already-stored source
+families, the orchestrator obtains the actual corresponding IDs from core's
+assessment/finding/artifact services before recording.
+
+`--provenance` is the actual producer run's core `Provenance`, for example:
+
+```json
+{
+  "run_id": "707cab6e-eb93-48f3-afb5-2daf746fb0e5",
+  "source": "validation_report",
+  "occurred_at": "2026-10-23T12:00:00Z"
+}
+```
+
+Use the real run UUID/time, retained for replay; this command never invents a run,
+plan, timestamp, human actor or auto-accept flag. `ValidationArtifact.parse`
+validates the exact input bytes; `load_services().validation.record` owns
+assessment/artifact persistence, identity, soundness and machine decisions/review.
+The JSON receipt includes assessment/artifact/evidence IDs and per-finding
+decision/review IDs and flags. Exit 2 means input/config/domain refusal; submitted
+report content is not printed in refusal receipts. Raw report bytes, provenance,
+target context and supplied observations remain core-owned immutable evidence,
+including void/unsound rows without decisions.
+
+**Current versus historical:** `policy` defaults to `current`: target attestation,
+passing refutation controls, authz differential probes and explicit confirmation
+grades are required regardless of the harness's version reset. Only a deliberate
+`historical` replay uses the original 0.176.0/0.177.0/0.178.0/0.179.0 age cutoffs.
+Malformed/unknown versions refuse, not grandfather. Explicit failed attestation,
+failed controls, nondiscriminating probes and error-signature refutations remain
+invalid at every age. Historical absence of a grade remains null, never inferred
+execution proof. E3/current-ungraded confirmations and unsound/inconclusive
+outcomes go to review, not validity conclusions.
+
+Sound refutations record `false_positive` pending verified human signoff, never
+automatic dismissal. Severity proposals are review-only; machines do not write
+severity overrides. Core retains explicit E0 precedence and the two independent
+later E0 human rule. Replays return the same identities; distinct runs/targets
+do not silently supersede each other. OWASP risk rating is unchanged.
+
+The existing [isolated-lab runner](../harnessing/5-validate/validate-findings/SKILL.md#phase-5--report-and-record)
+produces typed report bytes and immediately calls this same door with actual
+run provenance. Prepare/plan/authorize/live execution and novel-finding intake
+remain separate plan24 work; scanner/carried/cumulative families and historical
+deployment mapping certification are not completed by this producer slice.

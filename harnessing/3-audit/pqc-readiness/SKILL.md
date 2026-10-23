@@ -245,6 +245,12 @@ python3 <skill-base>/scripts/pqc_facts.py \
   --validate-readiness <slug>-pqc-readiness.json
 ```
 
+This command evaluates core's installed `PqcReadinessArtifact` schema, then
+retains citation and owner-facing semantic checks. It rejects invalid dominant
+provenance, out-of-range overall scores and incomplete tool provenance; no
+engine configuration is required for validation-only use. The facts-scan
+write gate is unchanged.
+
 One-line recap: status, who sets TLS, quantum_ready, top do_next.
 
 **`remediations` section (mandatory for new reports, harness ≥ 0.153.0)** —

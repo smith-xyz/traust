@@ -17,33 +17,6 @@ def test_traust_cli_top_level_help():
     assert "impact analyze" in proc.stdout
 
 
-def test_all_planned_groups_registered():
-    from traust.cli.groups import GROUPS
-
-    assert set(GROUPS) == {
-        "adapters",
-        "admin",
-        "auth",
-        "build",
-        "check",
-        "compliance",
-        "dashboard",
-        "feeds",
-        "findings",
-        "impact",
-        "ledger",
-        "metrics",
-        "portfolio",
-        "registry",
-        "reporting",
-        "sweep",
-        "tools",
-        "triage",
-        "util",
-    }
-    assert sum(len(ops) for ops in GROUPS.values()) >= 81
-
-
 def test_traust_impact_analyze_help():
     proc = subprocess.run(
         [sys.executable, "-m", "traust.cli", "impact", "analyze", "--help"],

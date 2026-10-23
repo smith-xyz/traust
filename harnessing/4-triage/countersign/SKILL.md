@@ -57,6 +57,10 @@ domain policy or re-query each finding. Each card has:
   Validation documents retain raw observed probe output; inspect that output,
   not merely the machine's summary that a claim was refuted. Authentication or
   authorization errors from a probe are not a refutation of exploitability.
+  Core validation-record reviews also retain the full `target-attestation.json`
+  observations, supplied install-failure text and soundness causes. Inspect these
+  linked documents even when an unsound/void verdict has no decision row; never
+  turn environmental failure into a false-positive signoff.
 
 Use `--finding <UUID>`, `--reason <canonical>` and `--status <canonical>` to
 filter. Defaults are pending status and 100 items. For the next page, repeat
@@ -258,9 +262,11 @@ sensitive and must not be published as a receipt.
 
 ## Integrations
 
-**Consumes:** core pending review items from triage and attestation request/import,
-existing core finding UUIDs, attributed decision history and integrity-checked
-assessment evidence; a human-edited `countersign-queue.md` typed answer block or
+**Consumes:** core pending review items from triage, validation recording and
+attestation request/import; existing core finding UUIDs, attributed decision
+history and integrity-checked assessment evidence (including retained
+`target-attestation.json` observations through core, not local file discovery);
+a human-edited `countersign-queue.md` typed answer block or
 JSON answer file; the human's explicit selected fields/rationale; and the existing
 `traust auth` login or an operator-delivered stdin credential. Core identity owns
 credential storage and verification.

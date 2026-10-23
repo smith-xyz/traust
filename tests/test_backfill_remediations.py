@@ -11,7 +11,8 @@ def _minimal_report(**extra):
     doc = {
         "title": "t",
         "metadata": {
-            **{k: "x" for k in pqc_facts.REQUIRED_META},
+            "repository": "https://github.com/example/pqc-fixture",
+            "tool": {"pqc_scan_commit": "fixture", "rules_sha256": "a" * 64},
             "assessment_basis": "source",
             "commit": "f1b29843254b34f95ee1b36f1accca0380070962",
         },
@@ -24,15 +25,18 @@ def _minimal_report(**extra):
         "capabilities": [],
         "readiness_bucket": "ready",
         "scores": {
-            d: {"checks": [{"id": f"{d}-1", "result": "yes"}]}
-            for d in ("VULN", "AGIL", "PQCA", "HNDL")
+            **{
+                d: {"score": 100, "checks": [{"id": f"{d}-1", "result": "yes"}]}
+                for d in ("VULN", "AGIL", "PQCA", "HNDL")
+            },
+            "overall": 100,
         },
         "flags": {
             "has_2030_clock_items": False,
             "hndl_priority": False,
             "runtime_verification_required": False,
         },
-        "provenance_summary": {},
+        "provenance_summary": {"counts": {}, "dominant": "none"},
     }
     doc.update(extra)
     return doc

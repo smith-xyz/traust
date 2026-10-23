@@ -60,6 +60,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | python3 -m traust.cli impact cluster-state-diff | P5 discovery sweep 1 — before/after security-state snapshots (RBAC, SCCs, webhooks, NetworkPolicies, Services/Routes) diffed into validation-discovery candidates for /triage |
 | python3 -m traust.cli sweep benchmark | P7 validation-lane benchmark — vulnerable/safe-twin fixtures, confirm-recall + refute-precision + severity-accuracy floors, hybrid release-cut/monthly cadence (check-trigger + drift-watch) |
 | python3 -m traust.cli admin attest-target | P2 pre-flight target attestation for validation lanes — fail-closed environment gate (cluster fingerprint, CSV/pod readiness, version-in-range, URL reachability) emitting target-attestation.json |
+| `traust validation record` | Typed machine-report recording via core `ValidationService.record`; explicit stored source bindings/provenance, full target-attestation/install observations, core-owned soundness and canonical decisions or review items |
 | python3 -m traust.cli registry models | Model-registry loader/resolver — role→model resolution with floor enforcement, routing stamps, spend recording (docs/model-routing.md) |
 | python3 -m traust.cli admin checkpoint | Agent checkpoint support |
 | python3 -m traust.cli check fix-propagation | Deterministic cross-repo fix-propagation check — has the original repo consumed the fixed module version (go.mod/vendor, lockfiles, shipped-image SBOMs)? Feeds verify-remediation's two-legged rule |

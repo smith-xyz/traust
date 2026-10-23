@@ -4,6 +4,24 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- Add the machine-validation recording producer: `traust validation record`
+  sends a typed report, explicit stored multi-source bindings and actual run
+  provenance through core's record door. Full target attestation, install-failure
+  text, controls, explicit/null grades and target context stay retained; core
+  gates canonical decisions versus review items. No actor/auto-accept flag,
+  legacy emitter, layer/corpus write or inferred execution proof is restored.
+- Wire the existing isolated-lab runner's report/record handoff; schema-gate
+  final serialized reports before writing, preserve original source labels and
+  move auxiliary surface/credential counters under metadata.additional. Keep
+  bounded chain context without duplicating transcripts. Reuse core soundness
+  observations instead of a second app policy implementation.
+- Evaluate the authoritative installed PQC-readiness schema at the real
+  `pqc_facts.py --validate-readiness` door, retaining citation/owner-facing
+  semantic checks and avoiding engine configuration for validation-only use.
+  This completes this step19 producer/readiness slice, not full plan24
+  preparation/authorization/live execution, novel intake, scanner adapters or
+  historical portfolio certification. OWASP risk rating is unchanged.
+
 - Complete the service-backed countersign workbench: paged/filterable `queue`,
   idempotent `request`, direct canonical validity/severity/resolution `record`,
   and single/bulk `apply` from typed reviewed-answer JSON. Every write uses

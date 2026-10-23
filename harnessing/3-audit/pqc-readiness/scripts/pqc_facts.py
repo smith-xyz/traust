@@ -40,6 +40,8 @@ from typing import Any
 
 import yaml  # PyYAML — already in harness deps
 from traust_contracts.paths import schema_path
+from traust_core.v1.errors import TraustError
+from traust_core.v1.models.artifacts import PqcReadinessArtifact
 
 from traust.context import add_config_home_arg, load_engine
 
@@ -665,38 +667,20 @@ REQUIRED_READINESS = [
     "readiness_bucket",
 ]
 REQUIRED_META = ["repository", "assessment_basis", "tool"]
-VALID_STATUS = ("ready", "needs_work", "blocked", "not_applicable")
-VALID_QR = (
-    "yes_by_default",
-    "yes_if_configured",
-    "no",
-    "only_with_fips_curves",
-    "unknown",
-)
-VALID_WHO = (
-    "this_app",
-    "language_defaults",
-    "platform",
-    "mesh_or_ingress",
-    "external_server",
-    "unknown",
-)
 
 
 def validate_readiness(path: Path) -> int:
-    doc = json.loads(path.read_text())
+    try:
+        artifact = PqcReadinessArtifact.parse(path.read_bytes())
+    except (OSError, TraustError) as error:
+        print(f"INVALID: {error}", file=sys.stderr)
+        return 1
+    doc = json.loads(artifact.payload)
     errs: list[str] = []
 
     for k in REQUIRED_READINESS:
         if k not in doc:
             errs.append(f"missing top-level key: {k}")
-
-    if doc.get("status") not in VALID_STATUS:
-        errs.append(f"bad status {doc.get('status')!r}")
-    if doc.get("quantum_ready") not in VALID_QR:
-        errs.append(f"bad quantum_ready {doc.get('quantum_ready')!r}")
-    if doc.get("who_sets_tls") not in VALID_WHO:
-        errs.append(f"bad who_sets_tls {doc.get('who_sets_tls')!r}")
 
     meta = doc.get("metadata") or {}
     for k in REQUIRED_META:
@@ -710,44 +694,12 @@ def validate_readiness(path: Path) -> int:
             errs.append(f"missing scores.{dom}")
             continue
         for i, c in enumerate(d.get("checks") or []):
-            if c.get("result") not in ("yes", "partial", "no", "na"):
-                errs.append(f"{dom}.checks[{i}]: bad result {c.get('result')!r}")
             if c.get("result") in ("partial", "no") and not c.get("fact_ids"):
                 errs.append(
                     f"{dom}.checks[{i}] ({c.get('id')}): non-yes result requires fact_ids citations"
                 )
 
-    if "readiness_bucket" in doc and doc["readiness_bucket"] not in (
-        "ready",
-        "partial",
-        "not-ready",
-        "blocked-external",
-        "not-applicable",
-    ):
-        errs.append(f"bad readiness_bucket {doc['readiness_bucket']!r}")
-
-    for i, ci in enumerate(doc.get("clock_items") or []):
-        eff = ci.get("remediation_effort")
-        if eff is not None and eff not in (
-            "trivial",
-            "moderate",
-            "significant",
-            "blocked-external",
-        ):
-            errs.append(f"clock_items[{i}]: bad remediation_effort {eff!r}")
-
-    fi = doc.get("fips_interaction")
-    if fi is not None and fi.get("verdict") not in (
-        "pqc-blocked-by-fips-mode",
-        "blocked-by-provider-version",
-        "no-penalty",
-        "fips-validation-gap",
-    ):
-        errs.append(f"bad fips_interaction.verdict {fi.get('verdict')!r}")
-
     basis = meta.get("assessment_basis")
-    if basis not in (None, "source", "sbom-only", "source+runtime"):
-        errs.append(f"bad assessment_basis {basis!r}")
     if basis == "source+runtime":
         re_ = doc.get("runtime_evidence")
         if not re_ or not re_.get("pqc_caps"):
@@ -760,27 +712,14 @@ def validate_readiness(path: Path) -> int:
         if k not in flags:
             errs.append(f"missing flags.{k}")
     # remediations — optional section (harness >= 0.153.0), validated when present
-    _REM_CATS = ("fix-now", "upgrade", "waiting-on-upstream", "deadline")
     rem_ids: set[str] = set()
     for i, r in enumerate(doc.get("remediations") or []):
         rid = r.get("id") or ""
-        if not re.fullmatch(r"[A-Z0-9_]{1,24}-(?:[0-9a-f]{7}|u[0-9a-f]{6})-REM-\d{3}", rid):
-            errs.append(f"remediations[{i}]: bad id {rid!r} (want <SLUG>-<sha7>-REM-NNN)")
         if rid in rem_ids:
             errs.append(f"remediations[{i}]: duplicate id {rid!r}")
         rem_ids.add(rid)
-        if r.get("category") not in _REM_CATS:
-            errs.append(f"remediations[{i}]: bad category {r.get('category')!r}")
         if not (r.get("action") or "").strip():
             errs.append(f"remediations[{i}]: empty action")
-        eff = r.get("remediation_effort")
-        if eff is not None and eff not in (
-            "trivial",
-            "moderate",
-            "significant",
-            "blocked-external",
-        ):
-            errs.append(f"remediations[{i}]: bad remediation_effort {eff!r}")
         if r.get("category") == "waiting-on-upstream" and not r.get("blocked_on"):
             errs.append(f"remediations[{i}]: waiting-on-upstream requires blocked_on")
         if r.get("category") == "deadline" and r.get("deadline") not in (2030, 2035):
@@ -815,7 +754,7 @@ def validate_readiness(path: Path) -> int:
             text = step.get(fld) or ""
             if _FACT_ID_RE.search(text):
                 errs.append(
-                    f"do_next[{i}].{field}: contains fact id — owners use "
+                    f"do_next[{i}].{fld}: contains fact id — owners use "
                     f"locations[]; fact ids stay on scores/clock_items"
                 )
         if step.get("fact_ids"):
@@ -854,7 +793,7 @@ def main():
     ap.add_argument("--validate-readiness")
     ap.add_argument("--validate-facts")
     args = ap.parse_args()
-    load_engine(args.config_home)
+    # Pure report validation needs the installed contract, not engine config.
 
     if args.validate_readiness:
         raise SystemExit(validate_readiness(Path(args.validate_readiness)))
@@ -863,6 +802,7 @@ def main():
         raise SystemExit(min(validate_facts(json.loads(p.read_text()), str(p)), 1))
     if not args.out or not (args.repo_dir or args.from_sbom):
         ap.error("need --out and one of --repo-dir/--from-sbom")
+    load_engine(args.config_home)
 
     doc = build_facts(args)
     serialized = doc.to_dict()

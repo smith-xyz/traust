@@ -106,6 +106,16 @@ def record(argv: list[str] | None = None) -> int:
                 d.validity == "false_positive" and not d.auto_accept_tier for d in made
             ),
             "auto_accepted": sum(d.auto_accept_tier for d in made),
+            "baseline_assessment_id": args.assessment_id,
+            "records": [
+                {
+                    "decision_id": decision.id,
+                    "assessment_id": decision.assessment_id,
+                    "artifact_id": decision.artifact_id,
+                    "finding_id": decision.finding_id,
+                }
+                for decision in made
+            ],
         }
 
     return run(call)

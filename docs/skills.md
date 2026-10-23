@@ -286,7 +286,7 @@ Use when validating browser-exploitable findings such as CSRF, XSS, or clickjack
 
 ## validate-findings
 
-Use when the user asks to validate, reproduce, exploit, red-team, or live-test security findings against a Kubernetes/OpenShift cluster, operator, WASM module, container, pod, or cluster component. Ingests *-security-audit, *-threat-model, and *-triage reports, builds an attack plan (replay + chained + novel), executes it against an authorized live target under a hard scope guard, and emits a schema-validated *-validation.{json,md} report.
+Use when the user asks to validate, reproduce, exploit, red-team, or live-test security findings against a Kubernetes/OpenShift cluster, operator, WASM module, container, pod, or cluster component. Ingests *-security-audit, *-threat-model, and *-triage reports, builds an attack plan (replay + chained + novel), executes it against an authorized live target under a hard scope guard, and emits a schema-validated *-validation.{json,md} report. Records explicitly bound existing findings through core-owned soundness and evidence gates; novel-finding intake remains a separate port.
 
 - **Stage:** ⑤ Validation
 - **Tier:** `primary`

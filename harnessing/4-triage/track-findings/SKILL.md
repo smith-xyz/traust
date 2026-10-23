@@ -214,7 +214,7 @@ first: a `finding` adds its findings (or replaces any other status); a
 | Source | Goes through |
 |---|---|
 | `*-triage.json` | `traust triage record` (the triage skill) |
-| `*-validation.json` (+ `target-attestation.json`) | Intended core validation record door; skill port unfinished, no legacy emitter fallback |
+| `*-validation.json` (+ `target-attestation.json`) | `traust validation record --report … --bindings … --provenance … --target-attestation …`; core owns machine soundness, decisions/review and evidence retention; no legacy emitter fallback |
 | `*-remediation-verification.json` (verdicts, `cross_repo` propagation, `regressions[]`) | Intended core verification/intake doors; skill ports unfinished, no legacy emitter or regression-router fallback |
 | A claim edited after the audit | a rebaseline (core `FindingIntake.rebaseline`), never a decision here |
 

@@ -6,9 +6,10 @@ idempotence and provenance requirements for the core skill ports.
 Core owns finding identity and intake; the ledger supplies proof, not a second
 state writer. Current ownership is in [components.md](components.md).
 
-The active direct human severity action uses core services and does not route
-new findings or recreate layers. The ingestion/router replacements remain
-unported. Legacy shapes below must not be used as active write APIs.
+The active human countersign workbench and machine-validation record door use
+core services; neither routes new findings or recreates layers. See the
+[record protocol](cli-reference.md#machine-validation-recording). Novel/impact/
+regression intake ports remain separate. Legacy shapes below are not write APIs.
 
 ### It is *not* the only kind of routing here
 

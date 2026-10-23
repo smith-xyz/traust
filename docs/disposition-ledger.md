@@ -6,8 +6,10 @@ in §6a, this page is **legacy methodology, not operating instructions**.
 
 The core-hub cutover retired file-based layer ingestion, emitters, finding
 routers and cumulative/projection builders. Core finding, identity and ledger
-services own state. Triaged decisions and the human countersign workbench now
-use core; validation/verification and cumulative-file skill ports are separate.
+services own state. Triage, machine-validation recording and the human
+countersign workbench now use core; verification and cumulative-file skill ports
+remain separate. Validation admission uses explicit grades, never historical
+source-class inference; see [the current protocol](cli-reference.md#machine-validation-recording).
 There is no legacy execution fallback.
 See [components.md](components.md) for component ownership and
 [artifacts.md](artifacts.md) for the artifact map.
