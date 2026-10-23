@@ -59,6 +59,7 @@ from collections import Counter
 from pathlib import Path
 
 from traust_engine.osv import BatchOutcome, OsvClient, Query
+from traust_engine.osv.ranges import containing_span, fixed_for, version_key
 
 from traust.context import add_config_home_arg, resolve_results_root
 from traust.registry.osv_urls import osv_access, osv_query_url
@@ -282,32 +283,6 @@ def is_malicious(vid: str, vuln: dict) -> bool:
     return False
 
 
-def fixed_range(
-    vuln: dict, module: str, ecosystem: str | None = None
-) -> tuple[str | None, str | None]:
-    """(introduced, first fixed version) for the module, when stated.
-
-    When `ecosystem` (an internal tag) is given, the affected package's
-    OSV ecosystem must match too — an OSV record can carry multiple
-    affected packages across ecosystems, and matching on name alone
-    would cross-contaminate a same-named package in another ecosystem."""
-    osv_eco = OSV_ECOSYSTEM.get(ecosystem, ecosystem) if ecosystem else None
-    for aff in vuln.get("affected", []):
-        pkg = aff.get("package") or {}
-        if pkg.get("name") != module:
-            continue
-        if osv_eco and pkg.get("ecosystem") and pkg["ecosystem"] != osv_eco:
-            continue
-        for r in aff.get("ranges", []):
-            intro, fixed = None, None
-            for e in r.get("events", []):
-                intro = e.get("introduced", intro)
-                fixed = e.get("fixed", fixed)
-            if fixed:
-                return intro, fixed
-    return None, None
-
-
 def dedupe_by_cve(details: dict[str, dict]) -> dict[str, tuple[str, dict]]:
     """Advisory dedup keyed by DISPLAY id -> (osv id, detail).
 
@@ -437,13 +412,17 @@ def build_worklist(
                 for repo, paths in eco_prov.get((pn, pv), {}).items():
                     man_by_repo.setdefault(repo, set()).update(paths)
             manifest = {repo: sorted(paths) for repo, paths in man_by_repo.items()}
-            _intro, fixed = fixed_range(d, m, eco)
-            # A CVSS advisory needs a fixed version to build a remediation
-            # command; a malicious package has none (the fix is removal)
-            # yet MUST still produce a row — never drop malware for lacking
-            # a fixed version.
-            if not fixed and not mal:
-                continue
+            # The fix depends on the installed version: a record can hold
+            # several affected spans, each with its own fix. One command
+            # covers every installed version that hit, so it carries the
+            # highest of their fixes; the per-version targets ride along as
+            # metadata. An advisory with no fix still produces a row (no
+            # fix available), as malware always has: never drop it.
+            osv_eco = OSV_ECOSYSTEM.get(eco, eco)
+            versions = sorted({pv for pn, pv in pair_set if pn == m})
+            fixed_by_version = {pv: fixed_for(d, m, osv_eco, pv) for pv in versions}
+            fixes = [f for f in fixed_by_version.values() if f]
+            fixed = max(fixes, key=lambda f: version_key(f, osv_eco) or ()) if fixes else None
             # Charset validation before anything command-shaped exists
             # (assessment 2026-07-31 H1) — tagged with ecosystem so the
             # rejected_inputs row is attributable. A malicious package name
@@ -477,10 +456,24 @@ def build_worklist(
             if fixed:
                 vuln_range = f"< {fixed}"
                 fixed_args = ["--fixed-version", str(fixed)]
-            else:
+            elif mal:
                 # Malware has no fixed version — the whole package is
                 # compromised, so flag every version and carry no target.
                 vuln_range, fixed_args = "*", []
+            else:
+                # No fix: bound the range by the spans' last affected
+                # version when every installed version has one, else flag
+                # every version (impact analysis then decides per repo).
+                lasts = [
+                    span.last_affected
+                    for pv in versions
+                    if (span := containing_span(d, m, osv_eco, pv)) and span.last_affected
+                ]
+                vuln_range, fixed_args = "*", []
+                if versions and len(lasts) == len(versions):
+                    last = max(lasts, key=lambda v: version_key(v, osv_eco) or ())
+                    if _version_ok(eco, last):
+                        vuln_range = f"<= {last}"
             impact_out = impact_dir / f"{disp.lower()}-impact-analysis.json"
             impact_argv = (
                 [
@@ -531,6 +524,9 @@ def build_worklist(
                     "impact_argv": impact_argv,
                     "route_argv": route_argv,
                     "deep": deep,
+                    "fix_available": bool(fixed),
+                    # metadata only — NOT in impact_argv
+                    "fixed_by_version": fixed_by_version,
                     # provenance metadata only — NOT in impact_argv
                     "manifest": manifest,
                 }

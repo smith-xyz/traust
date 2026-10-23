@@ -84,8 +84,13 @@ executive summaries, SCI) already read.
    call per array, no shell string joining, no edits) in order
    (severity, then blast radius). Inputs failing the charset gates are
    listed under `rejected_inputs` — review them, never hand-repair
-   them into commands (assessment 2026-07-31 H1). Commit the sweep
-   artifact.
+   them into commands (assessment 2026-07-31 H1). Each command's
+   `--fixed-version` is the fix for the installed version's own span
+   (the highest across the installed versions it covers; per-version
+   targets are in `fixed_by_version`). An advisory with no fix still
+   gets a row: `fix_available: false`, no `--fixed-version`, and the
+   range bounded by `last_affected` when known, else `*`. Commit the
+   sweep artifact.
 
    **A degraded sweep is not a quiet day.** Exit 3 with
    `status: degraded` means some (name, version) pairs were never
