@@ -246,7 +246,7 @@ Static source-code vulnerability scan. Reads a target directory (and its threat 
 
 ## countersign
 
-Review pending core finding decisions, request human sign-off, and record a verified human's explicit validity, severity or resolution judgement. Supports single and bulk reviewed answers with authenticated attribution, rationale and core evidence admission.
+Review pending core finding decisions, request human sign-off, and record a verified human's explicit validity, severity or resolution judgement. Supports single and bulk reviewed answers using the shared traust auth login or explicit stdin token, with rationale and core evidence admission.
 
 - **Stage:** ④ Triage
 - **Tier:** `primary`
@@ -256,7 +256,7 @@ Review pending core finding decisions, request human sign-off, and record a veri
 
 ## track-findings
 
-Use when the user wants to record human triage feedback or machine validation results against the findings of a *-security-audit, *-cloud-config-audit, or *-container-audit report and produce a cumulative status report — ingesting merge-request comments, commits, Jira tickets, interactive human triage, live-validation reports, and remediation-verification reports into an append-only disposition layer, then generating a schema-conformant *-findings-current.{json,md} showing the current validity and resolution of every finding.
+Use when the user wants to record human triage feedback against audit findings from forge comments, commits, Jira tickets or an interactive session, or asks for current finding state. Uses shared traust auth and core decisions, with genuine judged answers and the reviewer's own rationale for both confirm and reject. Reports validity, resolution, assurance, severity, SLA and review surfaces, and exports SARIF. Machine reports record through their own skills.
 
 - **Stage:** ④ Triage
 - **Tier:** `primary`

@@ -38,12 +38,10 @@ notes.
    find recommended fuzz entry points (findings whose `remediation` mentions
    fuzzing, or the report's remediation-roadmap "add fuzz harness" items).
    **Also check the refuted register** —
-   `<repo>-refuted-register.json` alongside the audit report (a legacy
-   triage-emitter artifact) lists findings dismissed as false positives.
-   Its emitter is **retired, not executable**; core
-   `FindingDecisions.record` owns the unfinished triage-ingestion port,
-   including refuted-register output. Read an existing register; do not
-   attempt to regenerate it or treat its absence as proof of no refutations.
+   `traust findings refuted --repo-url <repository-URL>` returns core's
+   false positives, including human-reviewed dismissals. A retained
+   `<repo>-refuted-register.json` is historical evidence, not a current
+   projection; do not regenerate it or treat absence as no refutations.
    Entries in fuzzable classes (parsers, decoders,
    memory safety, injection) are PRIORITY targets, because a reproducing
    crash overrides the FP assertion via evidence-class precedence
@@ -245,8 +243,9 @@ on its ledger event; the originating audit report is not modified (gate A15).
 
 ## Integrations
 
-- **Inputs:** audit reports' fuzz-worthy entry points, refuted registers
-  (FP falsification targets), and `/impact-analysis` artifacts (form 2b
+- **Inputs:** audit reports' fuzz-worthy entry points, core refuted findings
+  (`traust findings refuted`, maintained by triage and track-findings decisions;
+  FP falsification targets), and `/impact-analysis` artifacts (form 2b
   — the class-3→class-1 promotion path).
 - **Outputs consumed by:** the event-carried follow-up finding
   (with reproducer evidence) flows through `/track-findings` as

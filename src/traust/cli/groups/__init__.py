@@ -5,11 +5,13 @@ from __future__ import annotations
 from traust.cli.groups import (
     adapters,
     admin,
+    auth,
     build,
     check,
     compliance,
     dashboard,
     feeds,
+    findings,
     impact,
     ledger,
     metrics,
@@ -35,6 +37,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "crypto-audit": adapters.CRYPTO_AUDIT,
     },
     "admin": dict(admin.ADMIN),
+    "auth": dict(auth.AUTH),
     "build": dict(build.BUILD),
     "check": dict(check.CHECK),
     "compliance": {
@@ -43,6 +46,7 @@ GROUPS: dict[str, dict[str, object]] = {
     },
     "dashboard": dict(dashboard.DASHBOARD),
     "feeds": dict(feeds.FEEDS),
+    "findings": dict(findings.FINDINGS),
     "impact": {
         "analyze": impact.ANALYZE,
         **impact.IMPACT_OPS,

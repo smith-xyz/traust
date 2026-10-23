@@ -9,39 +9,22 @@ render   a triage as Markdown, a projection of the JSON
 from __future__ import annotations
 
 import argparse
-import json
-import sys
 import uuid
-from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
-from traust_core.v1.errors import TraustError
 from traust_core.v1.models.artifacts import TriageArtifact
 from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.findings import CandidateFormat
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import FindingOrigin, SourceType
 
-from traust.context import add_config_home_arg, load_core
+from traust.cli._doors import parser, run
+from traust.context import load_core
 
 
 def _parser(op: str, about: str) -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog=f"traust triage {op}", description=about)
-    add_config_home_arg(ap)
-    return ap
-
-
-def _run(call: Callable[[], object]) -> int:
-    """Print the door's result as JSON; a refused input is exit 2 with its reason."""
-    try:
-        out = call()
-    except (OSError, TraustError) as e:
-        print(f"ERROR: {e}", file=sys.stderr)
-        return 2
-    if out is not None:
-        print(out if isinstance(out, str) else json.dumps(out, indent=2, default=str))
-    return 0
+    return parser("triage", op, about)
 
 
 def intake(argv: list[str] | None = None) -> int:
@@ -76,7 +59,7 @@ def intake(argv: list[str] | None = None) -> int:
         found, new = len(taken.findings), len(taken.created)
         return {"assessment_id": assessment.id, "findings": found, "new": new}
 
-    return _run(call)
+    return run(call)
 
 
 def prepare(argv: list[str] | None = None) -> int:
@@ -94,7 +77,7 @@ def prepare(argv: list[str] | None = None) -> int:
         args.out.write_text(text + "\n", encoding="utf-8")
         return None
 
-    return _run(call)
+    return run(call)
 
 
 def record(argv: list[str] | None = None) -> int:
@@ -125,7 +108,7 @@ def record(argv: list[str] | None = None) -> int:
             "auto_accepted": sum(d.auto_accept_tier for d in made),
         }
 
-    return _run(call)
+    return run(call)
 
 
 def render(argv: list[str] | None = None) -> int:
@@ -142,4 +125,4 @@ def render(argv: list[str] | None = None) -> int:
         args.out.write_text(markdown, encoding="utf-8")
         return None
 
-    return _run(call)
+    return run(call)

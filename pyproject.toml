@@ -39,8 +39,8 @@ traust = "traust.cli.__main__:main"
 dev = ["ruff>=0.6", "pytest-xdist>=3"]
 
 [tool.uv.sources]
-traust-core = { git = "https://github.com/traust-security/traust-core.git", rev = "e85cb2b9439076665985c22d3691aacc751b1354" }
-traust-engine = { git = "https://github.com/traust-security/traust-engine.git", rev = "38c41738acba32710e4a6d751d8b00629fccbba0" }
+traust-core = { git = "https://github.com/traust-security/traust-core.git", rev = "686317a784aec89a8951fe2b4c920cf481c4fd82" }
+traust-engine = { git = "https://github.com/traust-security/traust-engine.git", rev = "3080c6e4dc83e459cbc0aeb46a5cbae64ee07db0" }
 
 # Multi-skill CLIs live under src/traust/; harnessing/<skill>/ for single-skill
 # scripts. Install for deps + importable path helpers.

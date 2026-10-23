@@ -52,7 +52,7 @@ from traust_core.v1.models.vocabulary import (
 )
 from traust_core.v1.services.artifact_publishing import PublishSpec, PublishSpecs
 
-from traust.context import add_config_home_arg, load_core, load_services
+from traust.context import add_config_home_arg, load_caller, load_core
 
 
 class ReviewedDecision(BaseModel):
@@ -111,7 +111,7 @@ def _receipt(saved, services) -> dict:
             if disposition is not None
             else None
         ),
-        "is_open": disposition.is_open() if disposition is not None else True,
+        "is_open": view.is_open(),
     }
     return receipt
 
@@ -174,8 +174,7 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument(
             "--token-stdin",
             action="store_true",
-            required=True,
-            help="Read the identity token from stdin; never put it in argv.",
+            help="Read an identity token from stdin instead of the stored `traust auth` login.",
         )
     args = parser.parse_args(rest)
     if args.operation == "record":
@@ -193,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     token = None
-    if args.operation != "queue":
+    if args.operation != "queue" and args.token_stdin:
         if sys.stdin.isatty():
             print(
                 "countersign: pipe an identity token on stdin; "
@@ -211,14 +210,13 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     try:
-        core = load_core(config_args.config_home) if args.operation == "queue" else None
-        services = core.services() if core is not None else load_services(config_args.config_home)
+        core = load_core(config_args.config_home)
+        services = core.services()
         if args.operation == "queue":
             page = services.attestation.pending(
                 ReviewFilter(finding_id=args.finding, reason=args.reason, status=args.status),
                 PageRequest(limit=args.limit, cursor=Cursor(args.cursor) if args.cursor else None),
             )
-            assert core is not None
             publisher = core.artifact_publisher(
                 PublishSpecs(
                     *(
@@ -282,10 +280,13 @@ def main(argv: list[str] | None = None) -> int:
                 )
             _emit({"items": cards, "next": page.next})
             return 0
-        if services.identity is None:
-            print("countersign: core identity is not configured in core.yaml.", file=sys.stderr)
-            return 2
-        principal = services.identity.authenticate(Credential(token=token))
+        if token is None:
+            principal = load_caller(core)
+        else:
+            if core.identity is None:
+                print("countersign: core identity is not configured in core.yaml.", file=sys.stderr)
+                return 2
+            principal = core.identity.authenticate(Credential(token=token))
         if not principal.is_verified_human():
             raise ForbiddenError("a verified human is required")
         if args.operation == "request":

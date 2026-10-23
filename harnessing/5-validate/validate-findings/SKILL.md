@@ -29,6 +29,7 @@ allowed-tools:
   - Bash(python3 *credential_liveness.py:*)
   - Bash(python3 *soundness.py:*)
   - Bash(python3 *-m traust.cli reporting validate:*)
+  - Bash(traust findings refuted:*)
 ---
 
 # Validate Findings — Live Validation & Attack-Chain Harness
@@ -60,17 +61,16 @@ Take the static outputs of `secure-code-audit`, `threat-model`, and `triage` and
 | `<slug1>,<slug2>,…` | **Multiple packages** merged into one model — used when a logical product spans several `processed-results` entries (see the Deduplication Map in `progress-tracker/VALIDATION-PRIORITY-LIST.md`, e.g. ODF → 12 packages). Findings are tagged `<package>:<repo>` and de-duplicated by `(repo, id)` so a repo appearing in two packages contributes once. |
 | `all-confirmed` | Every triage-confirmed finding across `../analysis-results/findings/**` (use with `--dry-run` first) |
 
-**Refuted findings stay in scope.** When a `<repo>-refuted-register.json`
-sits next to the audit report (a legacy triage-emitter artifact), its
-entries are candidate targets, not exclusions. That emitter is **retired,
-not executable**; core `FindingDecisions.record` owns the unfinished
-triage-ingestion/refuted-register port. Read an existing register; do not
-regenerate it or treat its absence as proof of no refutations. A finding
-dismissed as a false positive — even human-countersigned — is a falsifiable
-claim: reproducing execution evidence must override the assertion under
-the evidence-class precedence rules (`fp_overridden`, with the countersigner
-attributed) once disposition ingestion is ported. Include register entries
-in attack planning when scope and budget allow.
+**Refuted findings stay in scope.** Read core's current refuted findings with
+`traust findings refuted --repo-url <repository-URL>`. A retained
+`<repo>-refuted-register.json` is historical evidence, not an exclusion or a
+current projection; its emitter is retired. A finding dismissed as a false
+positive — even human-countersigned — remains a falsifiable claim.
+Reproducing execution evidence must override the assertion under the
+evidence-class precedence rules (`fp_overridden`, with the countersigner
+attributed) once the validation record port admits it. Include refuted findings
+in attack planning when scope and budget allow. Never substitute a human
+countersign for the unfinished execution-evidence ingestion.
 
 **Impact-analysis artifacts as target selection.** When
 `analysis-results/impact/<cve>-impact-analysis.json` (from
@@ -524,8 +524,9 @@ Consumed artifacts (producer named per artifact):
 - `targets.yaml` rules-of-engagement — human-authored scope binding.
 - `*-gitleaks.json` — produced by python3 -m traust.cli adapters gitleaks; input to
   the credential-liveness verifier.
-- `*-refuted-register.json` — legacy `/track-findings` output; scopes
-  re-validation of refuted findings when present; regeneration is unported.
+- Core refuted findings (`traust findings refuted`, from triage and
+  track-findings decisions) — targets for re-validation. Retained
+  `*-refuted-register.json` files are historical inputs, not refreshed outputs.
 
 Emitted artifacts:
 

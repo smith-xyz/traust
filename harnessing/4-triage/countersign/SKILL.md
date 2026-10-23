@@ -1,12 +1,13 @@
 ---
 name: countersign
-description: Review pending core finding decisions, request human sign-off, and record a verified human's explicit validity, severity or resolution judgement. Supports single and bulk reviewed answers with authenticated attribution, rationale and core evidence admission.
+description: Review pending core finding decisions, request human sign-off, and record a verified human's explicit validity, severity or resolution judgement. Supports single and bulk reviewed answers using the shared traust auth login or explicit stdin token, with rationale and core evidence admission.
 argument-hint: "[core-finding-UUID | queue | reviewed-answers.json]"
 user-invocable: true
 metadata:
   harness.tier: "primary"
 allowed-tools:
   - Read
+  - Write
   - AskUserQuestion
   - Bash(python3 -m traust.cli admin countersign:*)
 ---
@@ -15,8 +16,13 @@ allowed-tools:
 
 This workbench uses core findings, attestation and identity services in process.
 It does not walk the corpus, edit layers, rebuild cumulative files, or maintain
-another login store. Use the deployment's existing credential delivery: a token
-arrives **only on stdin**, never in agent context, argv, receipts or logs.
+another login store. By default, core verifies the existing `traust auth` login
+through `load_caller(core)`. The operator uses `traust auth login`, or
+`traust auth local --identity you@example.com` on a solo deployment that
+explicitly trusts local tokens. Check `traust auth status`; never log in as
+another person. To use a separate operator-delivered token, pass `--token-stdin`;
+it reads only stdin and never falls back to the stored login on refusal.
+Never read credentials into agent context, argv, receipts or logs.
 `--config-home` selects the private directory containing `core.yaml` (otherwise
 `TRAUST_CONFIG_HOME`); core's `identity:` configuration owns trusted issuers and
 directory verification. No REST server is required.
@@ -101,6 +107,9 @@ attention flags instead of treating an old signature as permanent immunity.
 ## 3. Apply a single or bulk reviewed answer
 
 Use a private JSON file containing **one object or a nonempty array of objects**:
+
+Use Write only for the private reviewed-answer JSON after the human approves
+its fields and rationale; never edit source evidence, credentials or baselines.
 
 ```json
 {
@@ -191,7 +200,7 @@ sensitive and must not be published as a receipt.
 | Needs-review resolution | Selected confirm/reject with a real human decision and rationale, atomically persisted by attestation. |
 | Defer | Omit that item from the answer file; no event or fake resolution. |
 | Rebaseline alias confirm/reject and history transfer | Retired with scan-scoped/file IDs: core findings have stable UUID/fingerprint identity. No layer metadata mapping store or copied history. |
-| SDK auth, employee-directory and local-issuer gates | Core `IdentityService` and deployment trust policy; stdin delivery only, no ledger credential cache or local bypass flag. |
+| SDK auth, employee-directory and local-issuer gates | Core `IdentityService`, shared `traust auth` credentials and deployment trust policy; optional explicit stdin token, no ledger credential cache or local bypass flag. |
 | Local event time, append/sign, cumulative rebuild, FP register files | Core decision clock, admission, ledger and finding projections own state/integrity. No parallel file state or workbench-owned register; downstream targeting reads core findings. |
 | Blank rationale adopting machine text; best-effort queue close after append | Retired: every human answer supplies its own rationale; selected review close and append are atomic. |
 
@@ -199,9 +208,9 @@ sensitive and must not be published as a receipt.
 
 **Consumes:** core pending review items from triage and attestation request/import,
 existing core finding UUIDs, attributed decision history and integrity-checked
-assessment evidence; the human's explicit selected fields/rationale and an
-operator-delivered stdin credential. Core intake owns finding registration and
-core identity owns credential verification.
+assessment evidence; the human's explicit selected fields/rationale and the
+existing `traust auth` login or an operator-delivered stdin credential. Core
+identity owns credential storage and verification.
 
 **Emits:** persisted human decisions through core findings, selected accepted or
 rejected review items through core attestation, and token/rationale-free JSON

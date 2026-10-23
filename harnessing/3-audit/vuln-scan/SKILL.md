@@ -937,14 +937,11 @@ Tell the user:
 
      Mechanics and worked examples: [docs/findings-routing.md](../../../docs/findings-routing.md).
 
-     `/triage` remains the **downstream adjudicator**, but its former
-     ledger emitter and `/track-findings` cumulative rebuild are
-     **retired, not executable**. Core `FindingDecisions.record` owns
-     triage ingestion and `FindingService` owns derived finding state;
-     their record/output ports are unfinished. Retain verdicts and
-     refutations as report artifacts, not hand-written events or claimed
-     cumulative updates. **Never hand-edit `validation_status` on
-     existing baseline findings.**
+     `/triage` remains the **downstream adjudicator**: its verdicts, and
+     any refutations, flow through the disposition ledger
+     (`traust triage record` → `/track-findings`) —
+     **never hand-edit `validation_status` on existing baseline
+     findings.**
    - No baseline? Recommend `/secure-code-audit <target>` to establish
      one; this scan's report then serves as a leads file for it.
    - Remind: to check whether **existing** baseline findings are fixed,

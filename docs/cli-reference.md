@@ -16,19 +16,21 @@ python3 -m traust.cli check skill-alignment      # equivalent
 
 ## Command groups
 
-16 groups (plus the deprecated `tools` group below).
+18 groups (plus the deprecated `tools` group below).
 
 | Group | Description | Operations |
 |---|---|---|
 | `adapters` | Scanner adapters (deterministic pre-scans) | `checkov`, `crypto-audit`, `crypto-probe`, `gitleaks`, `govulncheck`, `joern`, `opengrep`, `osv`, `yara` |
 | `admin` | Operator tooling | `attest-target`, `checkpoint`, `countersign`, `query-index`, `scan-internal-refs`, `toolchain` |
+| `auth` | Who you act as, over traust-core's identity provider | `local`, `login`, `logout`, `refresh`, `service-account`, `status`, `token` |
 | `build` | Deterministic builders | `rescan-worklist`, `skills-reference`, `symbol-index` |
 | `check` | Deterministic gates | `citations`, `content-licenses`, `docs-consistency`, `estate-data`, `drift`, `fix-propagation`, `location-paths`, `reference-integrity`, `skill-alignment`, `skill-security` |
 | `compliance` | Compliance reporting | `dashboard`, `scope` |
 | `dashboard` | Dashboard rebuilds | `refresh` |
 | `feeds` | Feed management | `fetch` |
+| `findings` | track-findings' doors on traust-core | `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `refuted`, `reject`, `sarif`, `status`, `surfaces`, `tickets` |
 | `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `resolve-advisory-symbols`, `sweep` |
-| `ledger` | Documentation-variance tooling | `doc-variance` |
+| `ledger` | Doc-variance register | `doc-variance` |
 | `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `sla`, `spend` |
 | `portfolio` | Portfolio graph | `artifacts`, `build`, `deps-multi`, `freshness`, `interfaces`, `parsers`, `query`, `stats`, `symbols` |
 | `registry` | Model/product registry | `models`, `products` |
@@ -48,8 +50,8 @@ here so an old runbook cannot be mistaken for an executable fallback:
 | `build cumulative` | Replay legacy layers into findings-current reports | Core finding queries and insight services; report skill port unfinished |
 | `check report-digests` | Verify report/artifact digest bindings | Core artifact publishing/index services; gate skill port unfinished |
 | `feeds reconcile-cve-provenance` | Reconcile advisory provenance on findings | Core exposure service; skill port unfinished |
-| Ledger triage / validation / verification emitters | Convert report verdicts into legacy layer events | Core finding decisions, validation and remediation services respectively; skill ports unfinished |
-| `ledger pull` | Ingest external source determinations into the legacy ledger | Core finding intake/decisions; source-ingestion skill port unfinished |
+| Ledger triage / validation / verification emitters | Convert report verdicts into legacy layer events | `traust triage record` uses core findings; validation/remediation skill ports remain unfinished |
+| `ledger pull` | Ingest external source determinations into the legacy ledger | `traust findings import` uses core attestation and the shared authenticated caller |
 | `corpus` group | Report discovery, identity, projections, summaries and precedents | Core assessment and finding services; corpus skill ports unfinished |
 | `route` group | Admit impact findings and remediation regressions without changing baselines | Core finding intake; routing skill ports unfinished |
 
@@ -85,6 +87,38 @@ the docs gate on any dot-separated invocation in `README.md`, `AGENTS.md`,
 
 See [tooling-and-structure-files.md](tooling-and-structure-files.md) for what
 each packaged CLI does, and [skills.md](skills.md) for the skills that call them.
+
+## Authentication and finding statements
+
+`traust auth login` stores a deployment login obtained by device code.
+`traust auth login --token-file /private/token` imports a token without putting
+it on argv. A solo installation may instead use:
+
+```bash
+traust auth local --identity reviewer@example.com --config-home /path/to/private-config
+traust auth status --config-home /path/to/private-config
+```
+
+Local tokens are trusted only when `core.yaml` explicitly sets
+`identity: {trust_local: true}`. `auth service-account` and `auth local --machine`
+are machine sessions, not human approval. `auth refresh` renews a stored login;
+`auth logout` removes it. `auth token` deliberately prints the secret: do not
+run it in an agent-visible capture or log.
+
+The `findings` group reads core state (`baseline`, `find`, `status`, `history`),
+imports forge/Jira statements (`import`), reads queued statements (`queue`),
+and supplies refuted findings, review surfaces, SARIF and ticket links.
+`findings decide FINDING --validity <canonical> --rationale '<own judgement>'`
+records a statement under the stored, verified caller.
+
+Both `findings confirm ITEM FINDING …` and `findings reject ITEM FINDING …`
+require at least one actual `--validity`, `--severity` or `--resolution` and
+the human's own `--rationale`. They atomically append that judgement and settle
+only that review item. Reject never infers an inverse or means "close without
+a decision". No judgement means defer, leaving the item pending.
+`--evidence-grade` is optional and never inferred. Exact replay is idempotent;
+cross-finding answers or altered replay are refused without an orphan decision.
+For full evidence cards, requests and typed single/bulk apply, use countersign.
 
 ## Direct human severity recording
 
@@ -180,9 +214,13 @@ human must review a new pending item. Re-read accepted cards using
 
 `--config-home` (or `TRAUST_CONFIG_HOME`) selects `core.yaml`; its `identity:`
 configuration owns trust and optional directory policy. Every write requires a
-stdin-only token authenticated by core as a verified human; a machine admin does
-not qualify. No second login store, local identity flag or caller actor argument
-is accepted. Use an argv-list API or shell-safe quoting for dynamic arguments;
+verified human; a machine admin does not qualify. Without `--token-stdin`, the
+workbench uses the same stored login verified by `load_caller(core)` as the
+`findings` group. An explicit `--token-stdin` reads only stdin and never falls
+back to a stored login if missing, invalid or unauthorized. Omit that flag and
+the token redirection from the examples to use the stored login.
+No second credential store, local bypass flag or caller actor argument is
+accepted. Use an argv-list API or shell-safe quoting for dynamic arguments;
 never interpolate rationale into shell syntax or put tokens in argv/logs.
 
 For PostgreSQL install the core-owned driver with `uv sync --extra postgres`.

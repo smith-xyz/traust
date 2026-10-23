@@ -27,8 +27,8 @@ quoted here — they live in the dashboards
                                                                    ├─▶ ⑥ Fuzzing          (create-fuzzing)
                                                                    └─▶ ⑦ Remediation      (remediate-finding / patch / verify)
 
-  Stages ③–⑦ produce evidence; former ledger ingestion and cumulative rebuild steps are retired.
-  Their core-service skill ports are unfinished; no direct-entry or validity-write fallback exists.
+  Stages ③–⑦ produce evidence. Triage and human statements record through core findings.
+  Legacy layer/cumulative writers are retired; machine validation/verification skill ports remain incomplete.
 
   Standing loop (daily, after the first pass — docs/continuous-operations.md):
   fleet refresh ─▶ router ─▶ lanes: diff-scan │ deps (/dependency-watch) │ IaC │ verify treadmill │ rule mining (/mine-ledger)
@@ -125,13 +125,14 @@ repository** (see Repository Map).
 Adversarially verify every audit finding: N-vote verification with
 cited evidence, duplicate collapse, derived-exploitability re-ranking,
 and owner tagging. Verdicts land as `<repo>-triage.{json,md}` next to
-the audit report. The former Phase 6e emitter translated confirmations,
-refutations and hardening verdicts into legacy ledger events; that emitter
-and the cumulative rebuild are retired. Core finding intake/decisions own
-their replacement, but the triage skill port is unfinished and there is no
-executable fallback. The historical mapping is preserved in
-[docs/disposition-ledger.md](docs/disposition-ledger.md) §6b; the severity
-writer must not be used to submit triage or validity decisions.
+the audit report; Phase 6e (`traust triage record`) records them through core
+finding decisions. True positives become machine-`confirmed` decisions, false
+positives enter the tiered countersign flow, and hardening findings take the
+`hardening` validity. `/track-findings` reads current state and records human
+source statements through shared `traust auth`; `/countersign` exposes full
+review cards, requests and explicit human single/bulk answers. Neither restores
+the retired layer emitter or cumulative-file rebuild.
+The full contract: [docs/disposition-ledger.md](docs/disposition-ledger.md) §6b.
 
 ---
 
@@ -156,7 +157,7 @@ fail-closed gate stack in
 `<slug>-validation.{json,md}` + `validation-audit.jsonl`. The former validation
 emitter admitted execution-graded evidence into the ledger; it is retired.
 Core validation and finding decisions own the replacement, but the skill port
-is unfinished and there is no executable fallback for validation/validity writes.
+is unfinished and there is no executable fallback for machine validation writes.
 
 ---
 

@@ -53,7 +53,9 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | python3 -m traust.cli admin query-index | Queries the symbol index |
 | Retired baseline-claim workflow | Formerly pinned legacy baseline claim hashes; core finding intake/baseline services own the unfinished skill port, with no executable fallback |
 | python3 -m traust.cli triage record | Records validated triage decisions through core; human review items feed the countersign queue |
-| python3 -m traust.cli admin countersign | Paged core review cards with evidence, review requests, direct validity/severity/resolution judgements, and typed single/bulk review apply (verified human via stdin token) |
+| python3 -m traust.cli admin countersign | Paged core review cards with evidence, review requests, direct validity/severity/resolution judgements, and typed single/bulk review apply (verified human via shared auth login or explicit stdin token) |
+| `traust auth` | Core-owned stored login, local/device-code/token-file authentication, machine service accounts, status, refresh and logout |
+| `traust findings` | Core finding reads, forge/Jira import and explicit human decide/confirm/reject, refuted findings, review surfaces, SARIF and ticket links; both review outcomes require a judged decision and own rationale |
 | python3 -m traust.cli check docs-consistency | Doc-drift detection for harness docs |
 | python3 -m traust.cli impact cluster-state-diff | P5 discovery sweep 1 — before/after security-state snapshots (RBAC, SCCs, webhooks, NetworkPolicies, Services/Routes) diffed into validation-discovery candidates for /triage |
 | python3 -m traust.cli sweep benchmark | P7 validation-lane benchmark — vulnerable/safe-twin fixtures, confirm-recall + refute-precision + severity-accuracy floors, hybrid release-cut/monthly cadence (check-trigger + drift-watch) |

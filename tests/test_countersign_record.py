@@ -260,7 +260,7 @@ def test_bad_values_and_retired_flags_are_parser_errors(monkeypatch, capsys, cha
     def no_services(*args, **kwargs):
         pytest.fail("invalid CLI input must not reach core")
 
-    monkeypatch.setattr(countersign, "load_services", no_services)
+    monkeypatch.setattr(countersign, "load_core", no_services)
     args = [
         "admin",
         "countersign",
@@ -290,9 +290,7 @@ def test_retired_operations_are_strict_errors(operation, capsys):
     assert "invalid choice" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize(
-    "missing", ["--rationale", "--token-stdin", "--decision", "--finding", "--severity"]
-)
+@pytest.mark.parametrize("missing", ["--rationale", "--decision", "--finding", "--severity"])
 def test_required_record_arguments_are_not_optional(missing, capsys):
     args = [
         "--finding",
@@ -306,7 +304,7 @@ def test_required_record_arguments_are_not_optional(missing, capsys):
         "--token-stdin",
     ]
     index = args.index(missing)
-    del args[index : index + (1 if missing == "--token-stdin" else 2)]
+    del args[index : index + 2]
     with pytest.raises(SystemExit) as error:
         main(["admin", "countersign", "record", *args])
     assert error.value.code == 2
@@ -318,7 +316,7 @@ def test_countersign_help_does_not_bootstrap_the_engine(monkeypatch, capsys):
         pytest.fail("help must not require engine or core configuration")
 
     monkeypatch.setattr("traust.cli.__main__.load_engine", no_bootstrap)
-    monkeypatch.setattr(countersign, "load_services", no_bootstrap)
+    monkeypatch.setattr(countersign, "load_core", no_bootstrap)
     with pytest.raises(SystemExit) as error:
         main(["admin", "countersign", "--help"])
     assert error.value.code == 0

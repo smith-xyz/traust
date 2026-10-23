@@ -14,7 +14,8 @@ from pathlib import Path
 from traust_contracts import DeploymentConfigMissing
 from traust_contracts.config import deployment_config_dir
 from traust_core.v1.context import Config, Context, Services
-from traust_core.v1.errors import ConfigError
+from traust_core.v1.errors import AuthenticationError, ConfigError
+from traust_core.v1.models.identity import Credential, Principal
 from traust_engine import HarnessEngine, locations
 
 CORE_CONFIG = "core.yaml"
@@ -23,7 +24,8 @@ CORE_CONFIG = "core.yaml"
 # Sanctioned environment overrides — read ONLY in this module, never in consumers.
 #
 # ``locations.yaml`` owns estate/campaign paths. These three env vars are
-# deliberate escape hatches for layouts that must not live in checked-in config.
+# deliberate escape hatches for layouts that must not live in checked-in config,
+# plus one secret that must never sit in a file or on argv.
 # ---------------------------------------------------------------------------
 #
 # AUDIT_RESULTS_ROOT
@@ -37,6 +39,10 @@ CORE_CONFIG = "core.yaml"
 #   temp dir, or orchestrator-managed path. Feed mirrors are third-party licensed
 #   data — intentionally kept out of ``analysis-results/`` (different provenance
 #   and retention). Consumed by :func:`feeds_cache_dir`.
+#
+# TRAUST_OIDC_CLIENT_SECRET
+#   A service account's client secret for ``traust auth service-account`` when no
+#   ``--client-secret-file`` is given. Consumed by :func:`oidc_client_secret`.
 #
 
 
@@ -85,6 +91,24 @@ def load_core(config_home: Path | None = None) -> Context:
 def load_services(config_home: Path | None = None) -> Services:
     """traust-core's domain services: the one code path for domain state."""
     return load_core(config_home).services()
+
+
+def load_caller(core: Context) -> Principal:
+    """Who is calling: the stored login (``traust auth``), verified by core's identity service."""
+    if core.identity is None:
+        raise ConfigError(
+            "no identity: section in core.yaml; a solo install adds `identity: {trust_local: true}`"
+            " to accept its own `traust auth local` tokens"
+        )
+    login = core.credentials.load()
+    if login is None:
+        raise AuthenticationError("not logged in: run `traust auth login` or `traust auth local`")
+    return core.identity.authenticate(Credential(token=login.grant.access_token))
+
+
+def oidc_client_secret() -> str | None:
+    raw = os.environ.get("TRAUST_OIDC_CLIENT_SECRET", "").strip()
+    return raw or None
 
 
 def add_config_home_arg(parser) -> None:

@@ -1,5 +1,5 @@
 {
-  "$comment": "Category-aware hardening risk weights (lambda). The retired triage-to-ledger emitter resolved and RECORDED the weight into each hardening ledger event at emission time \u2014 replays never re-read this file, so editing it affects only future emissions. Its core-owned finding-decision skill port remains unfinished; there is no executable emitter fallback. Owner-tunable; bump `version` on any change. Rationale: docs/disposition-ledger.md section 7a. Tenancy-load-bearing categories weigh at/near 1.0 on multi-tenant/cloud-hosted products; single-tenant products dampen every weight by `single_tenant_dampening`.",
+  "$comment": "Category-aware hardening risk weights (lambda). The retired triage-to-ledger emitter resolved and RECORDED the weight into each hardening ledger event at emission time \u2014 replays never re-read this file, so editing it affects only future emissions. Current triage decisions use core; this historical weight-file integration must not revive the retired emitter or legacy layers. Owner-tunable; bump `version` on any change. Rationale: docs/disposition-ledger.md section 7a. Tenancy-load-bearing categories weigh at/near 1.0 on multi-tenant/cloud-hosted products; single-tenant products dampen every weight by `single_tenant_dampening`.",
   "version": "1",
   "updated": "2026-07-11",
   "default": 0.3,

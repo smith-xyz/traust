@@ -15,6 +15,11 @@ All notable changes to Traust are documented here.
   Receipts/errors omit credentials and submitted rationale. Legacy Markdown
   answer parsing, scan-ID alias mapping and layer/cumulative writes are retired;
   no alternate state or authentication store is introduced.
+- Reuse the merged `traust auth` login for countersign by default; explicit
+  `--token-stdin` still authenticates only that token without fallback. Machine
+  sessions cannot countersign. Migrate `findings reject` to require the finding
+  UUID, an actual judged decision and the reviewer's own rationale, like confirm;
+  neither outcome can close a review without an atomically recorded decision.
 - Keep the app and engine's core pins aligned so the `postgres` extra installs
   core's PostgreSQL driver; a bare dependency override discarded that extra.
 

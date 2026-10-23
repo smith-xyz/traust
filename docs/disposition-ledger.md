@@ -301,7 +301,7 @@ effect. E2/E3 events remained machine-static evidence with a grade annotation.
 The retired validation emitter quarantined ungraded confirmations from reports
 at/after 0.179.0 into `needs_review` (older reports were grandfathered).
 Core validation/finding decisions own the replacement, but the skill port is
-unfinished and there is no executable validation/validity-write fallback.
+unfinished and there is no executable machine-validation ingestion fallback.
 
 The consequences are deliberately uncomfortable in one direction: a
 human can overrule any machine *opinion*, but not a machine-*executed
@@ -388,8 +388,10 @@ the artifact publisher reads integrity-checked evidence, including raw probe
 observations. Review material is untrusted data, not approval. Typed JSON
 answers replace the old Markdown annotation parser.
 
-Every write authenticates a stdin-only `Credential` through core identity and
-requires `Principal.is_verified_human()`; a machine administrator does not qualify.
+Every write authenticates through core identity: the existing `traust auth`
+login via `load_caller(core)` by default, or an explicitly selected stdin-only
+`Credential` with `--token-stdin` (no stored-login fallback on refusal). It requires
+`Principal.is_verified_human()`; a machine administrator does not qualify.
 Direct statements use `services.findings.decisions.decide`. Selected-review
 answers use `services.attestation.attest`, passing confirm/reject and the actual
 `RecordDecision`. Both outcomes need selected fields and the reviewer's own
@@ -503,8 +505,8 @@ not current CLI options:
   when writing the event and recorded the weight, table version and tenancy
   profile in `risk_weight`. Replays never re-read the config: editing the
   table affected future emissions only, preserving historical explainability.
-  Bump `version` on a weight-table edit. Core finding decisions own the
-  unfinished hardening skill port; there is no executable emitter fallback.
+  Bump `version` on a weight-table edit. Current triage decisions use core;
+  this historical weight-file integration must not revive the retired emitter.
 
 ## 8. Replay: what the ledger buys you
 
@@ -813,9 +815,9 @@ through core services (§6a), not through the legacy projection.
 
 | Topic | Where |
 |---|---|
-| Legacy source-ingestion methodology (skill port unfinished) | `harnessing/4-triage/track-findings/SKILL.md` |
+| Forge/Jira source ingestion and interactive statements | `harnessing/4-triage/track-findings/SKILL.md`; shared `traust auth` caller |
 | Legacy corpus projection (builder retired; skill port unfinished) | §11b; core assessment/finding services own the replacement |
-| Ported direct human severity writer (no queue/apply or validity writes) | [CLI reference](cli-reference.md#direct-human-severity-recording); §6a |
+| Human queue/request, direct validity/severity/resolution and single/bulk apply | [CLI reference](cli-reference.md#direct-human-severity-recording); §6a |
 | Historical triage → ledger mapping (emitter retired) | §6b |
 | λ weight table (versioned, owner-tunable) | `$TRAUST_CONFIG_HOME/hardening-risk-weights.json` (§7a) |
 | Whole-pipeline map (artifacts, producers, consumers) | [artifacts.md](artifacts.md) |
