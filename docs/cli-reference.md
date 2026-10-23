@@ -32,7 +32,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `find`, `sbom`, `symbols` |
 | `ledger` | Doc-variance register | `doc-variance` |
 | `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `sla`, `spend` |
-| `portfolio` | Portfolio graph | `artifacts`, `build`, `deps-multi`, `freshness`, `interfaces`, `parsers`, `query`, `stats`, `symbols` |
+| `portfolio` | Portfolio graph; `observe` is the `repo_state` materializer | `artifacts`, `build`, `deps-multi`, `freshness`, `interfaces`, `observe`, `parsers`, `query`, `stats`, `symbols` |
 | `products` | corpus-intake's doors on traust-core: products and their corpus ownership | `add`, `list`, `update` |
 | `registry` | Model/product registry | `models`, `products` |
 | `reporting` | Report validation & rendering | `lint`, `rate-threats`, `render`, `sarif`, `validate` |
