@@ -1,4 +1,4 @@
-"""`traust impact find|sbom|symbols|analyze` end to end on traust-core, in-process on SQLite."""
+"""`traust impact find|sbom|symbols|analyze|sweep` end to end on traust-core, in-process on SQLite."""
 
 from __future__ import annotations
 
@@ -12,14 +12,18 @@ from typing import Any
 import pytest
 import yaml
 from traust_core.v1.models.dependencies import (
+    AdvisoryHits,
     AdvisoryIdentifier,
     AdvisoryRecord,
     AffectedPackage,
     AffectedSpan,
+    PackageVersion,
     Version,
 )
 from traust_core.v1.models.vocabulary import Ecosystem
-from traust_core.v1.providers.base import Acquisition, Result
+from traust_core.v1.providers.base import Acquisition, Readiness, Result
+from traust_core.v1.providers.osv import OsvAdvisoryLookup
+from traust_core.v1.providers.syft import SyftSbom
 from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
 
 from traust.cli import check_fix_propagation, impact
@@ -43,10 +47,21 @@ LODASH = AdvisoryRecord(
 
 class Lookup:
     name = "osv"
+    ecosystems = OsvAdvisoryLookup.ecosystems
+    hits: dict[str, tuple[str, ...] | None] = {}
+
+    def check(self) -> Readiness:
+        return Readiness(ready=True)
 
     def record(self, identifier: AdvisoryIdentifier) -> Result[AdvisoryRecord | None]:
         found = LODASH if identifier == LODASH.identifier else None
         return Result(found, Acquisition(provider="osv", acquired_at=datetime.now(UTC)))
+
+    def affecting(self, queries: list[PackageVersion]) -> Result[AdvisoryHits]:
+        ids = tuple(self.hits.get(str(q), ()) for q in queries)
+        issues = {"unreachable": sum(i is None for i in ids)} if None in ids else {}
+        hits = AdvisoryHits(ids=ids, issues=issues)
+        return Result(hits, Acquisition(provider="osv", acquired_at=datetime.now(UTC)))
 
 
 @pytest.fixture
@@ -188,3 +203,80 @@ def test_judged_symbols_and_the_feature_description_reach_the_record(
     doc = json.loads((core.config.artifacts_path() / artifact.uri).read_text())
     assert doc["metadata"]["vulnerable_symbols"] == ["lodash.template", "lodash.merge"]
     assert doc["metadata"]["feature_description"] == "templates rendered from user input"
+
+
+@pytest.mark.parametrize(
+    ("hits", "code", "status"),
+    [
+        ({"npm/lodash@4.17.20": (LODASH.identifier,)}, 0, "complete"),
+        ({"npm/lodash@4.17.20": None, "npm/lodash@4.17.21": ()}, 3, "degraded"),
+        ({"npm/lodash@4.17.20": None, "npm/lodash@4.17.21": None}, 2, "failed"),
+    ],
+)
+def test_sweep_lists_advisories_with_their_analyze_argv_and_exits_by_status(
+    home: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    hits: dict[str, tuple[str, ...] | None],
+    code: int,
+    status: str,
+) -> None:
+    monkeypatch.setattr(Lookup, "hits", hits)
+    run(impact.sbom, home, str(sbom(tmp_path, "4.17.20")), "--repo-url", REPO, "--sha", SHA)
+    other = "https://github.com/org/web"
+    run(impact.sbom, home, str(sbom(tmp_path, "4.17.21")), "--repo-url", other, "--sha", "b" * 40)
+    out = tmp_path / "out" / "worklist.json"
+    rc, printed = run(impact.sweep, home, "--min-severity", "high", "--out", str(out))
+    swept = json.loads(printed)
+    assert (rc, swept["status"]) == (code, status)
+    assert json.loads(out.read_text()) == swept
+    if status == "complete":
+        [row] = swept["advisories"]
+        assert (row["identifier"], row["commits"], row["severity"]) == (
+            LODASH.identifier,
+            1,
+            "high",
+        )
+        assert row["impact_argv"] == [
+            "python3",
+            "-m",
+            "traust.cli",
+            "impact",
+            "analyze",
+            LODASH.identifier,
+            "--scan",
+        ]
+
+
+def test_sweep_over_the_cap_is_sbom_only_and_ecosystems_are_checked(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Lookup, "hits", {"npm/lodash@4.17.20": (LODASH.identifier,)})
+    run(impact.sbom, home, str(sbom(tmp_path, "4.17.20")), "--repo-url", REPO, "--sha", SHA)
+    rc, printed = run(impact.sweep, home, "--min-severity", "low", "--deep-scan-cap", "0")
+    [row] = json.loads(printed)["advisories"]
+    assert rc == 0 and row["impact_argv"][-1] == LODASH.identifier
+    assert json.loads(run(impact.sweep, home, "--ecosystem", "Go")[1])["status"] == "failed"
+    with pytest.raises(SystemExit):
+        run(impact.sweep, home, "--ecosystem", "cobol")
+
+
+def test_sbom_without_a_document_reads_the_commits_checkout(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def clone(url: str, sha: str, dest: Path) -> Path:
+        assert (url, sha) == (REPO, SHA)
+        dest.mkdir(parents=True)
+        return dest
+
+    def acquire(self: Any, request: Any) -> Result[bytes]:
+        raw = sbom(tmp_path, "4.17.20").read_bytes()
+        when = datetime.now(UTC)
+        return Result(raw, Acquisition(provider="syft", acquired_at=when, version="1.51.1"))
+
+    monkeypatch.setattr(SyftSbom, "check", lambda self: Readiness(ready=True))
+    monkeypatch.setattr(SyftSbom, "acquire", acquire)
+    monkeypatch.setattr(impact, "clone", clone)
+    rc, out = run(impact.sbom, home, "--repo-url", REPO, "--sha", SHA)
+    done = json.loads(out)
+    assert rc == 0 and done["sbom_id"] and done["tool"] == "syft 1.51.1"

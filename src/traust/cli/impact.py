@@ -1,15 +1,19 @@
-"""``traust impact find|sbom|symbols|analyze``: the impact-analysis skill's doors on traust-core.
+"""``traust impact find|sbom|symbols|analyze|sweep``: the impact-analysis and dependency-watch
+skills' doors on traust-core.
 
 find     an advisory as its source states it now: identity, aliases, affected packages and ranges
-sbom     a commit's manifest SBOM (CycloneDX / SPDX JSON from syft or osv-scanner)
+sbom     a commit's manifest SBOM (CycloneDX / SPDX JSON from syft or osv-scanner), or syft over a
+         checkout of the commit when no document is given
 symbols  the functions the advisory's fix touched: published, or mined from its fix commits
 analyze  every commit the advisory reaches (or one): evidence, classification, an `impact`
          assessment each, and a dependency finding for each `affected` commit
+sweep    which known advisories touch the recorded SBOMs at all, each with its `analyze` argv
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import tempfile
@@ -21,9 +25,18 @@ from pathlib import Path
 from traust_core.v1.context import Context, Services
 from traust_core.v1.errors import NotFoundError, ServiceError
 from traust_core.v1.models.common import Provenance
-from traust_core.v1.models.dependencies import AdvisoryRecord, parse_advisory_identifier
+from traust_core.v1.models.dependencies import (
+    AdvisoryRecord,
+    SweepStatus,
+    parse_advisory_identifier,
+)
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
-from traust_core.v1.models.vocabulary import ImpactClassification, SourceType
+from traust_core.v1.models.vocabulary import (
+    Ecosystem,
+    ImpactClassification,
+    ScannerSeverity,
+    SourceType,
+)
 
 from traust.cli._doors import parser, run
 from traust.context import load_core
@@ -31,6 +44,7 @@ from traust.paths import HARNESS_ROOT
 from traust.registry.feeds_config import registry_path
 
 UNDECIDED = (ImpactClassification.INCONCLUSIVE, ImpactClassification.LIKELY_AFFECTED)
+SWEEP_EXIT = {SweepStatus.COMPLETE: 0, SweepStatus.DEGRADED: 3, SweepStatus.FAILED: 2}
 
 
 def _parser(op: str, about: str) -> argparse.ArgumentParser:
@@ -66,7 +80,9 @@ def find(argv: list[str] | None = None) -> int:
 
 def sbom(argv: list[str] | None = None) -> int:
     ap = _parser("sbom", "Record a commit's manifest SBOM (CycloneDX or SPDX JSON).")
-    ap.add_argument("sbom", type=Path, help="the SBOM document")
+    ap.add_argument(
+        "sbom", type=Path, nargs="?", help="the SBOM document (default: syft over the commit)"
+    )
     ap.add_argument("--repo-url", required=True, help="https URL of the repository")
     ap.add_argument("--sha", required=True, help="the commit the SBOM was read from")
     ap.add_argument("--public", action="store_true", help="the repository is public")
@@ -78,8 +94,17 @@ def sbom(argv: list[str] | None = None) -> int:
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, args.public)
         ref = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None)
-        kept = services.exposure.ingest_sbom(args.sbom.read_bytes(), ref.id)
-        return {"repository_ref_id": ref.id, "sbom_id": kept.id}
+        if args.sbom is not None:
+            kept = services.exposure.ingest_sbom(args.sbom.read_bytes(), ref.id)
+            return {"repository_ref_id": ref.id, "sbom_id": kept.id}
+        with tempfile.TemporaryDirectory(prefix="sbom-") as tmp:
+            checkout = clone(str(url), args.sha, Path(tmp) / "repo")
+            ingest = services.exposure.ingest_dependencies(ref.id, checkout)
+        return {
+            "repository_ref_id": ref.id,
+            "sbom_id": ingest.sbom.id,
+            "tool": f"{ingest.tool} {ingest.tool_version or ''}".strip(),
+        }
 
     return run(call)
 
@@ -168,6 +193,60 @@ def analyze(argv: list[str] | None = None) -> int:
         }
 
     return run(call)
+
+
+def sweep(argv: list[str] | None = None) -> int:
+    ap = _parser(
+        "sweep",
+        "Which known advisories touch the recorded SBOMs, as JSON. Exit 0 complete, "
+        "3 degraded (some package versions or advisories unanswered), 2 failed.",
+    )
+    ap.add_argument(
+        "--min-severity",
+        default="critical",
+        choices=["critical", "high", "medium", "low"],
+        help="the lowest severity listed (malicious packages are critical)",
+    )
+    ap.add_argument(
+        "--deep-scan-cap",
+        type=int,
+        default=100,
+        help="advisories reaching more commits than this get SBOM-only analyze (no --scan)",
+    )
+    ap.add_argument(
+        "--ecosystem",
+        default="all",
+        help="comma list (go,npm,pypi,maven,cargo,ruby,nuget,actions) or 'all'",
+    )
+    ap.add_argument("--out", type=Path, help="also write the result here")
+    args = ap.parse_args(argv)
+    wanted = [] if args.ecosystem == "all" else args.ecosystem.lower().split(",")
+    try:
+        ecosystems = [Ecosystem(e.strip()) for e in wanted]
+    except ValueError as e:
+        ap.error(str(e))
+    status: list[SweepStatus] = []
+
+    def call() -> str:
+        swept = (
+            _core(args.config_home)
+            .services()
+            .exposure.sweep(ScannerSeverity(args.min_severity), args.deep_scan_cap, ecosystems)
+        )
+        status.append(swept.status)
+        doc = swept.model_dump(mode="json")
+        for row in doc["advisories"]:
+            # argv only: run each as given, one call per array, never joined into a shell string
+            row["impact_argv"] = ["python3", "-m", "traust.cli", "impact", "analyze"]
+            row["impact_argv"] += [row["identifier"], *(["--scan"] if row["scan"] else [])]
+        text = json.dumps(doc, indent=2)
+        if args.out:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(text + "\n")
+        return text
+
+    code = run(call)
+    return code or SWEEP_EXIT[status[0]]
 
 
 def clone(url: str, sha: str, dest: Path) -> Path:
