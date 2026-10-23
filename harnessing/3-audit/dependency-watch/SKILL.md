@@ -10,7 +10,6 @@ allowed-tools:
   # Scoped per A11 — exactly the chain's scripts, never a bare interpreter.
   - Bash(python3 *-m traust.cli feeds fetch:*)
   - Bash(python3 *-m traust.cli impact analyze:*)
-  - Bash(python3 *-m traust.cli route impact-findings:*)
   - Bash(python3 *harnessing/3-audit/dependency-watch/scripts/fleet_sweep.py:*)
   - Read
   - Glob
@@ -124,29 +123,30 @@ executive summaries, SCI) already read.
 
 3. **Blast radius + reachability** per advisory affecting a module the
    portfolio uses: run `/impact-analysis` (or its script directly):
-   `python3 -m traust.cli impact analyze <CVE>
-   --module <m> --vulnerable-range '<r>' --fixed-version <v> ...` —
-   writes `analysis-results/impact/<cve>-impact-analysis.json`.
-   **Precondition:** a fresh portfolio graph — the graph is the blast
-   radius; check `/drift-watch`'s `portfolio-graph` item first and say
-   so if stale rather than silently analyzing against old topology.
+   `python3 -m traust.cli impact analyze <CVE> --scan` — records an
+   `impact` assessment per commit in traust-core (*being ported:* the
+   worklist's `impact_argv` rows still carry the old `--module` /
+   `--vulnerable-range` flags; run this per advisory id instead).
+   **Precondition:** current SBOMs for the commits — the SBOMs are the
+   blast radius; say so if they are missing or stale rather than silently
+   analyzing against old topology.
 
 4. **Severity from the advisory, never invented:** take severity from
    the OSV/advisory record (CVSS mapping: 9.0+ critical / 7.0+ high /
    4.0+ medium / else low), noting KEV listing in the rationale if
-   present (KEV escalates dispatch urgency, not severity).
+   present (KEV escalates dispatch urgency, not severity). (`analyze`
+   files with the severity the advisory declares, `unrated` when it
+   declares none; report this mapping alongside.)
 
-5. **File** (deterministic, idempotent):
-   `python3 -m traust.cli route impact-findings
-   analysis-results/impact/<cve>-impact-analysis.json --severity <s>
-   [--include-likely] [--dry-run]` — for every `affected` repo with a
-   baseline: campaign-ID finding carried on its ledger event (`event.finding`, contracts >= 0.4.4; the baseline is never written — gate A15)
-   (`origin: impact-analysis`, `category: supply-chain`,
-   `validation_status: not_verified`), claim hash pinned, ledger birth
-   event (`source.type: impact_report`, machine-static class 3),
-   cumulative `*-findings-current.{json,md}` rebuilt. Repos without a
-   baseline are listed, never silently dropped — they are unaudited
-   inventory, which is a census matter, not a filing one.
+5. **File** (deterministic, idempotent): step 3's `analyze` files them
+   (*was* `route impact-findings`, retired) — for every `affected` commit:
+   a dependency finding through traust-core's intake (the baseline is
+   never written — gate A15) (`origin: impact-analysis`,
+   `category: supply-chain`, `validation_status: not_verified`), keyed by
+   repository + advisory + package so a re-run adds nothing
+   (`source.type: impact_report`, machine-static class 3).
+   `--include-likely` is retired: only `affected` is filed. (*Now:* every
+   affected commit is filed; there is no baseline precondition.)
 
 6. **Report** what was routed: per CVE — affected/filed/already-filed/
    no-baseline counts and the finding IDs, so the run's output is
@@ -167,9 +167,9 @@ executive summaries, SCI) already read.
 ## Integrations
 
 Consumes: advisory feed caches (producer: python3 -m traust.cli feeds fetch);
-`analysis-results/impact/*-impact-analysis.json` (producer:
-`/impact-analysis` — python3 -m traust.cli impact analyze); portfolio graph
-(producer: `/portfolio-graph`; freshness gated via `/drift-watch`);
+`impact` assessments in traust-core (producer: `/impact-analysis` —
+python3 -m traust.cli impact analyze); commits' SBOMs (producer:
+`traust impact sbom`);
 findings.db `repos` baselines (producer: python3 -m traust.cli corpus findings-db).
 
 Produces: `analysis-results/impact/fleet-osv-worklist-<date>.json` —
@@ -178,8 +178,8 @@ run's worklist execution and by operator review of deep-scan staging;
 no downstream skill reads it; carries a `refuted_findings` list of
 malicious hits auto-refuted against their source manifests under
 `--verify`, via `harnessing/3-audit/dependency-watch/scripts/verify_dep_provenance.py`); baseline appends +
-disposition-ledger birth events via
-python3 -m traust.cli route impact-findings (consumers: `/track-findings`
+dependency findings filed in traust-core by
+python3 -m traust.cli impact analyze (consumers: `/track-findings`
 cumulative rebuild, `/triage` adjudication, `/verify-remediation`
 (resolution), owner routing / SLA view / team reports /
 `/executive-summary-findings` / `/file-security-defect`, and any ledger

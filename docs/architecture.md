@@ -171,9 +171,9 @@ item that will remove them. The rules are enumerated in the
 
 ## Impact analysis
 
-`harnessing/3-audit/impact-analysis/` plus python3 -m traust.cli impact analyze answer
-"which repos does this CVE actually affect": a blast-radius query against
-the portfolio graph followed by language-specific affectedness analysis
+`harnessing/3-audit/impact-analysis/` plus `traust impact analyze` (traust-core's
+`ExposureService`) answer "which commits does this advisory actually affect": a
+blast-radius walk over the commits' SBOMs followed by per-ecosystem affectedness analysis
 (for Go: govulncheck source and binary modes, then an ELF string scan of
 shipped images). Artifacts validate against
 `schemas/v1/impact-analysis.schema.json` and feed `/triage` Phase 2f and

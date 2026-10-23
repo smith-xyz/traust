@@ -228,7 +228,7 @@ osv-scanner reports no Go standard-library advisories (measured on etcd,
 run govulncheck, which carries its own database, for Go. The other OSV
 consumers query the API and do not run air-gapped: the fleet sweep
 (`dependency-watch`) writes a `failed` worklist and exits 2, and advisory
-fetches (`fetch_advisory.py`, `resolve-advisory-symbols`, the CVE-replay
+fetches (`traust impact find` / `symbols`, `fetch_advisory.py`, the CVE-replay
 monitor) report their lookups as failed.
 
 ### Container image (CI, platform worker, air gap)

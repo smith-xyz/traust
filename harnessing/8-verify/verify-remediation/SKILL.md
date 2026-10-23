@@ -113,17 +113,18 @@ Three shapes, three treatments:
 
 ```bash
 python3 -m traust.cli check fix-propagation \
-    --repo-dir <original-repo-checkout> \
-    --module <fixed module> --fixed-version <vX.Y.Z> \
-    [--sbom-glob 'analysis-results/graph/sboms/*.cdx.json']
+    --repo-url <original-repo-url> --sha <commit> \
+    --ecosystem <eco> --module <fixed module> --fixed-version <vX.Y.Z> \
+    [--sbom <syft output for the commit's checkout>]
 ```
 
-Checks go.mod + `vendor/modules.txt`, the manifest-ecosystem lockfiles
-(same extractors as `/impact-analysis`), and optionally the shipped-image
-SBOMs. Copy its `propagation` and evidence into the finding's
+Reads the commit's manifest SBOM (record one with `--sbom`, e.g.
+`syft dir:<checkout> -o cyclonedx-json`) and the SBOMs of images built from
+it, on traust-core. Copy its `propagation` and evidence into the finding's
 `cross_repo` block. `module_absent` means the dependency is gone —
 removal usually fixes, but **judge it** (renamed vendor path?) rather
-than auto-resolving.
+than auto-resolving. `not_observed` means the commit has no SBOM yet:
+record one; never read it as consumed.
 
 **Ledger mapping** (consumed by `/track-findings` ingest): `resolved` +
 `consumed` → resolution `resolved`; `partially_resolved` + `pending` →

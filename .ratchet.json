@@ -124,9 +124,6 @@
     "engine-internal": 1,
     "state-file": 5
   },
-  "src/traust/cli/check_fix_propagation.py": {
-    "engine-internal": 1
-  },
   "src/traust/cli/check_skill_alignment.py": {
     "state-file": 1
   },
@@ -172,9 +169,6 @@
   },
   "src/traust/cli/query_index.py": {
     "database": 1
-  },
-  "src/traust/cli/resolve_advisory_symbols.py": {
-    "engine-internal": 1
   },
   "src/traust/cli/toolchain.py": {
     "engine-internal": 1

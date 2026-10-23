@@ -12,7 +12,7 @@ routing + the budget guard inside it), `budget_shadow.py`,
 `route_impact_findings.py`, `/assign-findings-owners` (internal extension),
 `/reassign-findings-owners` (internal extension), `/file-security-defect`,
 `emit_drain_tranche.py`, `build_verify_sweep.py`, `build_pqc_worklist.py`,
-`fleet_sweep.py`, `run_impact_sweep.py`, `fetch_feeds.py`.
+`fleet_sweep.py`, `fetch_feeds.py`.
 
 | Kind | Routes | Implementation | Detail |
 |---|---|---|---|
@@ -36,7 +36,6 @@ work, and none of them authors a finding:
 | `build_verify_sweep.py` | the `/verify-remediation` full-sweep worklist | `harnessing/8-verify/verify-remediation/SKILL.md` |
 | `build_pqc_worklist.py` | one entry per unique repo URL for the PQC sweep | `harnessing/3-audit/pqc-readiness/SKILL.md` |
 | `fleet_sweep.py` | `/dependency-watch`'s bootstrap / full-baseline OSV sweep | `harnessing/3-audit/dependency-watch/SKILL.md` |
-| `run_impact_sweep.py` | executes a fleet-OSV worklist | `harnessing/3-audit/impact-analysis/SKILL.md` |
 
 ---
 
