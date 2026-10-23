@@ -20,6 +20,7 @@ from traust_core.v1.models.dependencies import (
 )
 from traust_core.v1.models.vocabulary import Ecosystem
 from traust_core.v1.providers.base import Acquisition, Result
+from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
 
 from traust.cli import check_fix_propagation, impact
 from traust.context import load_core
@@ -156,3 +157,34 @@ def test_fix_propagation_reads_the_commits_sbom(home: Path, tmp_path: Path) -> N
     assert json.loads(out)["checked"] == [
         {"source": "manifest", "version": "4.17.20", "consumed": False}
     ]
+
+
+def test_judged_symbols_and_the_feature_description_reach_the_record(
+    home: Path, tmp_path: Path
+) -> None:
+    rc, _ = run(
+        impact.analyze,
+        home,
+        LODASH.identifier,
+        "--repo-url",
+        REPO,
+        "--sha",
+        SHA,
+        "--symbols",
+        "lodash.template, lodash.merge",
+        "--feature-desc",
+        "templates rendered from user input",
+    )
+    assert rc == 0
+    core = load_core(home)
+    with SqlTraustUnitOfWork(core.database) as uow:
+        repo = uow.repositories.find_by_url(REPO)
+        assert repo is not None and repo.id is not None
+        [ref] = uow.repository_refs.list_for(repo.id)
+        assert ref.id is not None
+        [assessment] = [a for a in uow.assessments.list_for_ref(ref.id) if a.kind == "impact"]
+        assert assessment.id is not None
+        [artifact] = uow.artifacts.list_for_assessment(assessment.id)
+    doc = json.loads((core.config.artifacts_path() / artifact.uri).read_text())
+    assert doc["metadata"]["vulnerable_symbols"] == ["lodash.template", "lodash.merge"]
+    assert doc["metadata"]["feature_description"] == "templates rendered from user input"

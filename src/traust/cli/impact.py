@@ -108,6 +108,12 @@ def analyze(argv: list[str] | None = None) -> int:
         action="store_true",
         help="clone each commit the SBOMs leave undecided and run the analysis tiers on it",
     )
+    ap.add_argument(
+        "--symbols",
+        default="",
+        help="comma-separated vulnerable symbols read off the fix diff (join any found)",
+    )
+    ap.add_argument("--feature-desc", default=None, help="what capability must be in use")
     args = ap.parse_args(argv)
     if bool(args.repo_url) != bool(args.sha):
         ap.error("--repo-url and --sha go together")
@@ -134,19 +140,21 @@ def analyze(argv: list[str] | None = None) -> int:
                 )
             )
         version = harness_version()
+        judged = [s.strip() for s in args.symbols.split(",") if s.strip()]
         recorded = []
         for ref_id in commits:
-            prepared = exposure.prepare(advisory_id, ref_id)
+            prepared = exposure.prepare(advisory_id, ref_id, judged=judged)
             if args.scan and prepared.evidence.classification() in UNDECIDED:
                 with tempfile.TemporaryDirectory(prefix="impact-") as tmp:
                     subject = prepared.subject
                     checkout = clone(subject.repository_url, subject.sha, Path(tmp) / "repo")
-                    prepared = exposure.prepare(advisory_id, ref_id, checkout)
+                    prepared = exposure.prepare(advisory_id, ref_id, checkout, judged)
             when = datetime.now(UTC)
             source = Provenance(
                 run_id=uuid.uuid4(), source=SourceType.IMPACT_REPORT, occurred_at=when
             )
-            done = exposure.record(ref_id, prepared.document(version), source)
+            doc = prepared.document(version, args.feature_desc)
+            done = exposure.record(ref_id, doc, source)
             recorded.append((prepared.subject.repository_url, prepared.subject.sha, done))
         return {
             "advisory": record.identifier,
