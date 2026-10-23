@@ -19,6 +19,7 @@ import pydantic
 import yaml
 from traust_core.v1.errors import ValidationError
 from traust_core.v1.models.code_facts import ClusterRequest, ImageRequest
+from traust_core.v1.models.common import ToolRequest
 from traust_core.v1.models.dependencies import NoImageSbomError, NoManifestSbomError
 from traust_core.v1.models.validation import (
     ClusterScope,
@@ -27,7 +28,6 @@ from traust_core.v1.models.validation import (
     ValidationScope,
 )
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
-from traust_core.v1.providers.tools import ToolRequest
 
 from traust.cli._doors import parser, run
 from traust.context import load_core, load_services
