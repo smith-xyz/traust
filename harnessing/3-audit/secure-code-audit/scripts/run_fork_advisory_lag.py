@@ -53,6 +53,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from traust_engine.osv.ranges import fixed_for
+
 from traust.paths import HARNESS_ROOT
 from traust.registry.osv_urls import osv_query_url
 
@@ -551,18 +553,6 @@ def _post_json(url: str, payload: dict, timeout: int) -> dict:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def _fixed_version(vuln: dict, pkg_name: str):
-    for aff in vuln.get("affected") or []:
-        p = aff.get("package") or {}
-        if p.get("name") and p["name"].lower() != pkg_name.lower():
-            continue
-        for rng in aff.get("ranges") or []:
-            for ev in rng.get("events") or []:
-                if ev.get("fixed"):
-                    return ev["fixed"]
-    return None
-
-
 def _affected_ranges(vuln: dict, pkg_name: str) -> list[dict]:
     out = []
     for aff in vuln.get("affected") or []:
@@ -574,13 +564,14 @@ def _affected_ranges(vuln: dict, pkg_name: str) -> list[dict]:
     return out
 
 
-def advisory_record(vuln: dict, pkg_name: str) -> dict:
+def advisory_record(vuln: dict, pkg_name: str, tracked_version: str | None = None) -> dict:
     return {
         "id": vuln.get("id"),
         "aliases": vuln.get("aliases") or [],
         "summary": (vuln.get("summary") or (vuln.get("details") or "")[:200]),
         "affected_ranges": _affected_ranges(vuln, pkg_name),
-        "fixed_version": _fixed_version(vuln, pkg_name),
+        # the fix for the tracked version's span, not the record's first fix
+        "fixed_version": fixed_for(vuln, pkg_name, None, tracked_version, ignore_case=True),
         # the OSV /v1/query version parameter already filters to
         # advisories whose affected range contains tracked_version
         "in_range": True,
@@ -617,7 +608,11 @@ def stage2_advisories(upstreams: list[dict], url: str, timeout: int) -> str:
             ValueError,
         ) as exc:
             return f"error: {exc}"
-        up["advisories"] = [advisory_record(v, up["osv_package"]) for v in vulns if v.get("id")]
+        up["advisories"] = [
+            advisory_record(v, up["osv_package"], up["tracked_version"])
+            for v in vulns
+            if v.get("id")
+        ]
     return "ok"
 
 

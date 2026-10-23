@@ -256,3 +256,28 @@ def test_cli_non_fork_writes_negative_result(tmp_path):
 def test_cli_rejects_missing_repo(tmp_path):
     proc = _run_cli(tmp_path / "nope", tmp_path / "out.json", "--offline")
     assert proc.returncode == 1
+
+
+def test_advisory_record_fix_follows_the_tracked_span():
+    vuln = {
+        "id": "GHSA-fork-span-test",
+        "affected": [
+            {
+                "package": {"name": "Example/Upstream", "ecosystem": "Go"},
+                "ranges": [
+                    {
+                        "type": "SEMVER",
+                        "events": [
+                            {"introduced": "0"},
+                            {"fixed": "1.5.0"},
+                            {"introduced": "2.0.0"},
+                            {"fixed": "2.3.0"},
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    # the record's first fix (1.5.0) is below the tracked 2.1.0
+    assert rfl.advisory_record(vuln, "example/upstream", "2.1.0")["fixed_version"] == "2.3.0"
+    assert rfl.advisory_record(vuln, "example/upstream", "1.2.0")["fixed_version"] == "1.5.0"

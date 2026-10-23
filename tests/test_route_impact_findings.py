@@ -532,8 +532,8 @@ class TestFleetSweep:
                 }
             ]
         }
-        assert fs.fixed_range(v, "m") == ("0", "v1.2.3")
-        assert fs.fixed_range(v, "other") == (None, None)
+        assert fs.fixed_for(v, "m", None, "v1.0.0") == "v1.2.3"
+        assert fs.fixed_for(v, "other", None, "v1.0.0") is None
 
     def test_worklist_staging_by_cap(self):
         d = {

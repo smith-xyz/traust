@@ -2,6 +2,31 @@
 
 All notable changes to Traust are documented here.
 
+## [0.38.0]
+
+- **Pins traust-engine 0.40.0 (`ff92eac`): the OSV fixed version now
+  depends on the installed version.** Before this, an OSV record with
+  several affected spans reported its first fix, which could be at or below
+  the installed version. A GIT range could also yield a commit hash.
+  Candidates also carry `osv_ranges` and `fix_references`.
+- **The fleet sweep's fix follows each installed version**
+  (`dependency-watch/scripts/fleet_sweep.py`). `fixed_range` kept only the
+  record's last span, so a 1.x install got a later major's fix as its
+  target. Now:
+  - each installed version gets the fix for its own span;
+  - a command covering several installed versions carries the highest of
+    their fixes;
+  - commands gain `fixed_by_version` and `fix_available`.
+- **Unfixed advisories are no longer dropped** (CVE identification plan
+  D7). An advisory with no fixed version used to produce no fleet-sweep row
+  unless it was malicious. It now produces a row with
+  `fix_available: false` and no `--fixed-version`. The range is bounded by
+  `last_affected` when every installed version has one, and is `*`
+  otherwise.
+- **Fork advisory-lag reports the fix for the tracked version's span**
+  (`secure-code-audit/scripts/run_fork_advisory_lag.py`), not the record's
+  first fix.
+
 ## [0.37.0]
 
 - **Pins traust-engine 0.39.0 (`0f82562`): the LLM-application rule pack**

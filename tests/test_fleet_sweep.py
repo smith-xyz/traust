@@ -806,3 +806,78 @@ def test_a_complete_sweep_says_so(tmp_path):
     doc = json.loads(out.read_text())
     assert doc["status"] == "complete"
     assert doc["pairs_unanswered"] == 0
+
+
+def _spans_vuln(vid, name, *events, severity="HIGH"):
+    return {
+        "id": vid,
+        "aliases": [],
+        "summary": "multi-span flaw",
+        "database_specific": {"severity": severity},
+        "affected": [
+            {
+                "package": {"name": name, "ecosystem": "npm"},
+                "ranges": [{"type": "SEMVER", "events": list(events)}],
+            }
+        ],
+    }
+
+
+def _one_row(vuln, pairs):
+    pairs_by_eco = {"npm": {p: {f"repo:{p[1]}"} for p in pairs}}
+    hits = {vuln["id"]: {"ecosystem": "npm", "pairs": set(pairs)}}
+    rows, rejected = fs.build_worklist(
+        fs.dedupe_by_cve({vuln["id"]: vuln}),
+        hits,
+        pairs_by_eco,
+        min_rank=fs.SEV_RANK["HIGH"],
+        deep_cap=100,
+    )
+    assert rejected == []
+    (row,) = rows
+    (cmd,) = row["commands"]
+    return cmd
+
+
+def test_fix_follows_each_installed_span():
+    vuln = _spans_vuln(
+        "GHSA-span-span-span",
+        "two-lines",
+        {"introduced": "0"},
+        {"fixed": "1.5.0"},
+        {"introduced": "2.0.0"},
+        {"fixed": "2.3.0"},
+    )
+    # only 1.x installed: the 1.x fix, not the record's last one
+    cmd = _one_row(vuln, [("two-lines", "1.2.0")])
+    argv = cmd["impact_argv"]
+    assert argv[argv.index("--fixed-version") + 1] == "1.5.0"
+    assert argv[argv.index("--vulnerable-range") + 1] == "< 1.5.0"
+    assert cmd["fix_available"] is True
+    # 1.x and 2.x installed: one command carrying the highest fix
+    cmd = _one_row(vuln, [("two-lines", "1.2.0"), ("two-lines", "2.1.0")])
+    argv = cmd["impact_argv"]
+    assert argv[argv.index("--fixed-version") + 1] == "2.3.0"
+    assert cmd["fixed_by_version"] == {"1.2.0": "1.5.0", "2.1.0": "2.3.0"}
+
+
+def test_unfixed_advisory_produces_a_no_fix_row():
+    # previously dropped: a CVSS advisory with no fixed version made no row
+    vuln = _spans_vuln(
+        "GHSA-nofx-nofx-nofx", "no-fix-lib", {"introduced": "1.0.0"}, {"last_affected": "1.4.0"}
+    )
+    cmd = _one_row(vuln, [("no-fix-lib", "1.2.0")])
+    argv = cmd["impact_argv"]
+    assert cmd["fix_available"] is False
+    assert cmd["fixed_by_version"] == {"1.2.0": None}
+    assert "--fixed-version" not in argv
+    assert argv[argv.index("--vulnerable-range") + 1] == "<= 1.4.0"
+    assert argv[argv.index("--feature-desc") + 1] == "fleet-osv-sweep"
+
+
+def test_open_ended_unfixed_advisory_flags_every_version():
+    vuln = _spans_vuln("GHSA-open-open-open", "open-lib", {"introduced": "0"})
+    cmd = _one_row(vuln, [("open-lib", "3.0.0")])
+    argv = cmd["impact_argv"]
+    assert cmd["fix_available"] is False
+    assert argv[argv.index("--vulnerable-range") + 1] == "*"
