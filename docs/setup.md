@@ -407,17 +407,20 @@ A local path needs the same protection from the disk it sits on.
 Cached vulnerability data (EPSS, CISA KEV, vendor CVE and VEX feeds) is a
 mirror of third-party licensed data: a different provenance class from the
 findings you author, with opposite retention and redistribution properties, so
-it lives outside the findings tree and is never committed. Set
-`locations.yaml` → `feeds_cache` — there is **no default**; unset, feed fetch
-fails closed. The metrics tree is the conventional place:
+it lives outside the findings tree and is never committed. `traust feeds fetch`
+snapshots it into traust-core's store (`core.yaml`):
+
+```bash
+python3 -m traust.cli feeds fetch --feed all
+```
+
+`locations.yaml` → `feeds_cache` (**no default**) now holds only the
+product-definitions registry (`traust feeds fetch-products`), when the
+deployment configures one:
 
 ```yaml
 # locations.yaml
 feeds_cache: /path/to/progress-tracker/feeds
-```
-
-```bash
-python3 -m traust.cli feeds fetch --feed all
 ```
 
 ## 6. Environment variables

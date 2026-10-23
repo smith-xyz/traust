@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Exploitation-context enrichment for CVE-bearing findings (C8).
 
-Joins every CVE id found in the input artifacts against the cached EPSS
-and CISA KEV feeds (`traust feeds fetch` pull-through cache) and, where
+Joins every CVE id found in the input artifacts against the EPSS and
+CISA KEV feeds (traust-core's latest `traust feeds fetch` snapshots) and, where
 the repository is known to repo-graph, adds deployment-reachability
 context (how many products ship the repo, owning team). Output is an
 ENRICHMENT TAGGER artifact: it routes prioritization and joins evidence —
@@ -23,7 +23,7 @@ Deployment reachability tiers (weakest→strongest):
 
 Usage:
     python3 enrich_findings_cves.py --in <artifact.json> [--in ...]
-        [--cache-dir DIR] [--refresh] [--repo-graph FILE]
+        [--refresh] [--repo-graph FILE]
         [--workloads FILE] [--out FILE]
 """
 
@@ -37,25 +37,20 @@ import subprocess
 import sys
 from pathlib import Path
 
+from traust_core.v1.errors import NotFoundError
+from traust_core.v1.models.dependencies import AdvisoryIdentifier
+
 from traust.context import (
     add_config_home_arg,
     analysis_results_dir,
+    load_core,
     load_engine,
 )
 from traust.paths import HARNESS_ROOT
-from traust.registry.feeds_config import feeds_cache_dir
+from traust.registry.feeds_config import registry_path
 
 CVE_RX = re.compile(r"CVE-\d{4}-\d{4,7}")
 REPO_RX = re.compile(r"github\.com[/:]([\w.-]+/[\w.-]+?)(?:\.git|/|$)")
-
-from traust_engine._util.script_loader import load_script  # noqa: E402
-
-
-def _load(name: str):
-    return load_script(name, HARNESS_ROOT)
-
-
-ff = _load("fetch_feeds")
 
 
 def harness_version():
@@ -168,7 +163,6 @@ def main(argv=None) -> int:
         type=Path,
         help="findings/candidates artifact (repeatable)",
     )
-    ap.add_argument("--cache-dir", type=Path, default=None)
     ap.add_argument(
         "--refresh", action="store_true", help="refresh the feeds cache first (network)"
     )
@@ -187,27 +181,48 @@ def main(argv=None) -> int:
 
     engine = load_engine(args.config_home)
     results_root = analysis_results_dir(engine)
-    cache_dir = args.cache_dir or feeds_cache_dir(engine=engine)
     if args.repo_graph is None:
         args.repo_graph = results_root / "graph" / "repo-graph.json"
-
+    core = load_core(args.config_home)
+    core.register_feeds(registry_path())
+    exposure = core.services().exposure
     if args.refresh:
-        # public_feeds(), not FEEDS: CVE enrichment consumes epss+kev and
-        # has no business pulling an internal VPN-only feed.
-        for feed in ff.public_feeds():
-            _ok, status = ff.fetch(feed, cache_dir, args.max_age_hours)
-            print(f"  {feed}: {status}")
+        for feed in exposure.refresh_feeds():
+            print(f"  {feed.name}: {feed.last_error or 'refreshed'}")
+    docs = []
+    for path in args.inputs:
+        try:
+            docs.append((path, json.loads(path.read_text(encoding="utf-8"))))
+        except (OSError, json.JSONDecodeError) as e:
+            print(f"[!] skipping {path}: {e}", file=sys.stderr)
+    cves = sorted({c for _, doc in docs for c in CVE_RX.findall(json.dumps(doc))})
     try:
-        epss = ff.load_epss(cache_dir)
-        kev = ff.load_kev(cache_dir)
-    except (OSError, json.JSONDecodeError) as e:
-        print(
-            f"ERROR: feeds cache unusable ({e}) — run `traust feeds fetch` first", file=sys.stderr
-        )
+        signals = exposure.exploit_signals([AdvisoryIdentifier(c) for c in cves])
+    except NotFoundError as e:
+        print(f"ERROR: feeds unusable ({e}) — run `traust feeds fetch` first", file=sys.stderr)
         return 1
-    # report only the feeds this enrichment actually used
+    epss = {
+        s.identifier: {"epss": s.epss, "percentile": s.epss_percentile}
+        for s in signals
+        if s.epss is not None
+    }
+    kev = {
+        s.identifier: {
+            "date_added": s.kev_added and s.kev_added.isoformat(),
+            "ransomware": s.kev_ransomware,
+        }
+        for s in signals
+        if s.kev_ransomware is not None
+    }
+    now = datetime.datetime.now(datetime.UTC)
+    max_age = datetime.timedelta(hours=args.max_age_hours)
     status = {
-        k: v for k, v in ff.feed_status(cache_dir, args.max_age_hours).items() if not v["internal"]
+        f.name: {
+            "retrieved_at": f.fetched_at and f.fetched_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "max_age_hours": args.max_age_hours,
+            "stale": f.fetched_at is None or now - f.fetched_at > max_age,
+        }
+        for f in exposure.feed_statuses()
     }
 
     graph = {}
@@ -221,12 +236,7 @@ def main(argv=None) -> int:
         workloads = set(json.loads(args.workloads.read_text(encoding="utf-8")))
 
     sources, totals = [], {"items_with_cves": 0, "kev_hits": 0}
-    for path in args.inputs:
-        try:
-            doc = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as e:
-            print(f"[!] skipping {path}: {e}", file=sys.stderr)
-            continue
+    for path, doc in docs:
         kind, items = items_of(doc)
         enriched = enrich_items(items, epss, kev)
         label = repo_label(doc)

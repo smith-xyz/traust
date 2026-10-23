@@ -82,7 +82,7 @@ def test_traust_feeds_fetch_help():
     )
     assert proc.returncode == 0, proc.stderr
     assert "--config-home" in proc.stdout
-    assert "Pull-through cache for external reference feeds." in proc.stdout
+    assert "Snapshot the security feeds" in proc.stdout
 
 
 def test_traust_tools_fetch_feeds_help():
@@ -94,7 +94,7 @@ def test_traust_tools_fetch_feeds_help():
     )
     assert proc.returncode == 0, proc.stderr
     assert "--config-home" in proc.stdout
-    assert "Pull-through cache for external reference feeds." in proc.stdout
+    assert "Snapshot the security feeds" in proc.stdout
 
 
 def test_legacy_tool_passthrough_does_not_require_config_home(tmp_path):

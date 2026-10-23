@@ -53,8 +53,8 @@ target repos — superseded by Konflux): drift-watch checks the
 
 | Item | Staleness / drift signal |
 |---|---|
-| `feeds:*` | pull-through cache age vs each source's threshold, for every `tier: cached` security source in `config/feeds.yaml`: `epss`, `kev`, `rh-cve`, `vex`. 48h — one missed run of the daily feed router plus slack |
-| `registry:product-definitions` | a reference registry, **not a security feed** — Red Hat Product Security's product/ownership data, absent from `config/feeds.yaml` by design. The `registry:` prefix is derived from that absence, not hardcoded, so the row name follows the category rather than the fetch mechanism. VPN-only and pull-through, so it refreshes at 24h but is only flagged at 168h; never fetched is `pending`, not `unavailable`, so an optional source stays out of `--fail-on` |
+| `feeds:*` | traust-core feed snapshot age, for every `tier: cached` security source in `config/feeds.yaml`: `epss`, `kev`, `rh-cve`, `vex`. 48h — one missed run of the daily feed router plus slack |
+| `registry:product-definitions` | a reference registry, **not a security feed** — Red Hat Product Security's product/ownership data, absent from `config/feeds.yaml` by design. It keeps its own `registry:` row, read from `feeds-meta.json` (`traust feeds fetch-products`). VPN-only and pull-through, so it refreshes at 24h but is only flagged at 168h; never fetched is `pending`, not `unavailable`, so an optional source stays out of `--fail-on` |
 | `findings.db` | `built_at` vs newest ledger/report mtime |
 | `ledger:*` | does the ledger actually COVER the corpus — nothing asked this before. `audits-without-a-layer` (an audited repo with no disposition layer), `layers-without-a-report-digest`, `incomplete-claim-hashes`, and the informational `colliding-layer-ids`. Signature coverage and the findings-db projection were both guarded; whether a ledger EXISTS per audited repo was not |
 | `ledger-signature-coverage` | disposition layers that are Merkle-rooted AND signed vs the total. `pending` when signing is not configured, `drift` when rooted-but-unsigned layers exist — an unsigned layer is a disposition history nothing attests to |

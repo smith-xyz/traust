@@ -43,9 +43,9 @@ executive summaries, SCI) already read.
 ## Procedure
 
 1. **Refresh feeds** (deterministic):
-   `python3 -m traust.cli feeds fetch` — the cached feeds (EPSS, CISA KEV,
-   vendor CVE and VEX data). OSV is not cached: it is queried live
-   through the shared OSV client. A feed the fetch reports `STALE` is
+   `python3 -m traust.cli feeds fetch` — snapshots the feeds (EPSS, CISA KEV,
+   vendor CVE and VEX data) into traust-core. OSV is not cached: it is queried live
+   through the shared OSV client. A feed the fetch reports under `degraded` is
    named in the run's report; `/drift-watch` flags stale caches
    independently.
 
