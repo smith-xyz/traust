@@ -99,11 +99,30 @@ def test_every_ownership_tag_is_accepted(home: Path) -> None:
     }
 
 
-def test_re_adding_a_name_changes_nothing(home: Path) -> None:
+def test_re_adding_a_name_with_the_same_fields_changes_nothing(home: Path) -> None:
     _, first = add(home, "findings", "example-platform", "owned", "Example")
-    rc, again = add(home, "findings", "renamed", "upstream", "Other")
+    rc, again = add(home, "findings", "example-platform", "owned", "Example")
     assert rc == 0
     assert again == first
+    assert listed(home) == {"findings": first}
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        ("renamed", "owned", "Example"),
+        ("example-platform", "upstream", "Example"),
+        ("example-platform", "owned", "Other"),
+    ],
+    ids=["label", "ownership", "business_unit"],
+)
+def test_re_adding_a_name_with_other_fields_is_refused(
+    home: Path, fields: tuple[str, str, str]
+) -> None:
+    _, first = add(home, "findings", "example-platform", "owned", "Example")
+    rc, err = add(home, "findings", *fields)
+    assert rc == 2
+    assert "already registered" in err and "with update" in err
     assert listed(home) == {"findings": first}
 
 
@@ -159,7 +178,10 @@ def test_a_product_without_ownership_needs_both_fields(home: Path) -> None:
 
 def test_add_completes_a_product_registered_without_ownership(home: Path) -> None:
     load_services(home).portfolio.register_product(ProductSlug("findings"), "example-platform")
-    rc, row = add(home, "findings", "ignored", "owned", "Example")
+    rc, err = add(home, "findings", "ignored", "owned", "Example")
+    assert rc == 2
+    assert "with update" in err
+    rc, row = add(home, "findings", "example-platform", "owned", "Example")
     assert (rc, row["label"], row["ownership"]) == (0, "example-platform", "owned")
 
 
