@@ -16,7 +16,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 
 ## Command groups
 
-19 groups (plus the deprecated `tools` group below).
+20 groups (plus the deprecated `tools` group below).
 
 | Group | Description | Operations |
 |---|---|---|
