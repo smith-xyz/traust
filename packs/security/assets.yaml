@@ -1,6 +1,9 @@
 # The security pack's asset graph (contracts config/v1/pack.schema.json), read by traust-engine to
 # plan and admit, and by runners to execute from their pinned copy. Rows come from the
-# standing-jobs table in docs/continuous-operations.md.
+# standing-jobs table in docs/continuous-operations.md; tests/test_security_pack.py maps every
+# row to an asset here or to an exclusion with its reason.
+# PENDING(labels): runner labels are a proposed vocabulary, `deterministic` (a command) and `llm`
+# (a skill session), until the engine's label set is agreed.
 pack: security
 assets:
   feeds_cache:
@@ -8,9 +11,80 @@ assets:
     trigger: {every: 24h}
     priority: 10
     freshness: {fail: 48h}
+    runner: {labels: [deterministic]}
 
   repo_state:  # no `run` yet: its materializer (PortfolioService.record_forge_facts) is still to come
     partitions: dynamic:repo
     trigger: {every: 24h}
     priority: 20
     freshness: {fail: 72h}
+    runner: {labels: [deterministic]}
+
+  release_events:
+    run: [python3, harnessing/2-threat-model/threat-model/scripts/build_release_events.py]
+    trigger: {every: 24h}
+    priority: 30
+    freshness: {fail: 48h}
+    runner: {labels: [deterministic]}
+
+  # PENDING(retired-run): its command went with the hub; no `run` until a port rebuilds it.
+  cve_replay_monitor:
+    trigger: {every: 24h}
+    priority: 40
+    freshness: {fail: 48h}
+    runner: {labels: [deterministic]}
+
+  # PENDING(skill-run): skill sessions have no `run` until their form is agreed; dependency-watch
+  # is also broken until its port lands.
+  dependency_watch:
+    deps: [feeds_cache]
+    trigger: {every: 24h}
+    priority: 40
+    freshness: {fail: 48h}
+    runner: {labels: [llm]}
+
+  rule_mining:  # then the scheduled /mine-ledger session
+    run: [python3, -m, traust.cli, sweep, rule-lane]
+    trigger: {every: 7d}
+    priority: 50
+    freshness: {fail: 14d}
+    runner: {labels: [deterministic]}
+
+  verify_remediation:  # PENDING(skill-run): build_verify_sweep.py → /verify-remediation full-sweep
+    trigger: {every: 7d}
+    priority: 50
+    freshness: {fail: 14d}
+    runner: {labels: [llm]}
+
+  spend_capture:  # PENDING(skill-run): /financial-tracking capture; lossy when late
+    trigger: {every: 7d}
+    priority: 50
+    freshness: {fail: 8d}
+    runner: {labels: [llm]}
+
+  dashboards:  # spend dashboards go stale after 4d, the scoreboard after 7d
+    run: [python3, -m, traust.cli, dashboard, refresh]
+    trigger: {every: 3d}
+    priority: 60
+    freshness: {warn: 4d, fail: 7d}
+    runner: {labels: [deterministic]}
+
+  validation_benchmark:  # the monthly half; the release-cut half has no trigger form yet
+    run: [python3, -m, traust.cli, sweep, benchmark, plan]
+    trigger: {every: 30d}
+    priority: 70
+    freshness: {fail: 35d}
+    runner: {labels: [deterministic]}
+
+  # PENDING(quarterly): `90d` stands for quarterly (durations are minutes, hours or days).
+  recall_benchmark:  # PENDING(skill-run): /recall-benchmark run; release scoring has no trigger form yet
+    trigger: {every: 90d}
+    priority: 70
+    freshness: {fail: 180d}
+    runner: {labels: [llm]}
+
+  class_sweep:  # PENDING(skill-run): targeted class-sweep sessions
+    trigger: {every: 90d}
+    priority: 70
+    freshness: {fail: 180d}
+    runner: {labels: [llm]}
