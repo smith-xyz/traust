@@ -14,7 +14,7 @@ allowed-tools:
   - Bash(ls:*)
   - Bash(git clone:*)
   - Bash(gh repo list:*)
-  - Bash(python3 *traust/harnessing/1-inventory/corpus-intake/scripts/corpus_intake.py:*)
+  - Bash(traust products list:*)
   # Confined 2026-09-07 when the skill returned upstream: the S1/S2 grandfather
   # exemptions it carried are retired in favour of this allowlist.
 ---
@@ -276,11 +276,11 @@ If `owners.csv` already exists, append only rows for newly added repos.
 ## Step 7 — Remind about corpus registration
 
 The inventory is the *input* side; the *output* tree the audits will write
-to must be registered in `$TRAUST_CONFIG_HOME/corpus-config.yaml` or the census flags
+to must be registered in traust-core's corpus registry or the census flags
 it as DRIFT. Check whether the addition is already covered:
 
 ```bash
-python3 <harness>/harnessing/1-inventory/corpus-intake/scripts/corpus_intake.py list
+traust products list
 ```
 
 If no registered tree or engagement covers the results this addition will
@@ -288,15 +288,14 @@ produce (match on the segment name, inventory path, or engagement label),
 remind the user:
 
 ```
-These inputs have no registered output tree in corpus-config.yaml.
+These inputs have no registered output tree in the corpus registry.
 When audit results land, register the engagement:
-  /corpus-intake add <name> ... --inventory <segment CSV path>
+  /corpus-intake add <name> ...
 ```
 
 Skip the reminder when the addition extends an already-registered
-engagement's inventory (its tree is registered) — in that case suggest
-recording the inventory path instead if the registration lacks one:
-`/corpus-intake update <name> --inventory <path>`. This mirrors
+engagement's inventory (its tree is registered) — recording the
+inventory path there is *retired* (core keys the corpus by ids, not paths). This mirrors
 `corpus-intake`'s Step 5, which points back here; the deployment's
 onboarding procedure sequences the two.
 
