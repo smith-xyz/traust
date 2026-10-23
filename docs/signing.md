@@ -49,10 +49,11 @@ Signing a stale root is impossible by construction.
 
 A scan does not sign anything by itself. A finding reaches the ledger as a
 disposition event, and that event causes the write, the stamp, and the
-signature. The writers are the triage and validation event emitters, the
-countersign recorder, the cumulative-report rebuild, and the two findings
-routers. `rebaseline()` is the exception: it re-points a layer's `audit_report`
-and leaves stamping to the next recording write.
+signature. The legacy layer writers are the triage and validation event emitters,
+the cumulative-report rebuild, and the two findings routers. `rebaseline()` is
+the exception: it re-points a layer's `audit_report` and leaves stamping to the
+next recording write. The ported direct severity recorder calls core services;
+it does not serialize, stamp or sign a legacy layer file.
 
 A write that moves the root **drops a signature it cannot renew**. If the
 recomputed root differs and no key is configured, the stale signature and its

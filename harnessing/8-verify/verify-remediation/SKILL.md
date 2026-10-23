@@ -30,8 +30,6 @@ allowed-tools:
   - Bash(python3 *traust* -m traust.cli reporting validate:*)
   - Bash(python3 *traust/harnessing/8-verify/verify-remediation/scripts/build_verify_sweep.py:*)
   - Bash(python3 *traust/harnessing/8-verify/verify-remediation/scripts/scanner_differential.py:*)
-  - Bash(python3 *traust* -m traust.cli.emit_triage_ledger_events:*)
-  - Bash(python3 *traust* -m traust.cli.emit_verification_ledger_events:*)
   - Bash(python3 *traust* -m traust.cli.route_regressions:*)
   # Confinement added 2026-07-31 (P1-W4): S1 exemption retired. Never
   # widen to a bare interpreter — scope scripts individually.
@@ -1018,9 +1016,11 @@ IDs are sha-scoped so collisions cannot occur) — then:
   `verify-remediation`, `disposition: {resolution: "open"}` — validity
   stays the `not_verified` default; the verification report is the
   `evidence_ref`);
-- **rebuilds the cumulative** `*-findings-current.{json,md}` via
-  `build_cumulative.py`, then re-validate the layer and cumulative with
-  `validate_report.py`.
+- **cumulative rebuild — retired, not executable.** The former builder
+  cannot produce `*-findings-current.{json,md}` here; core `FindingService`
+  owns the unfinished derived-state/output port. Preserve the requirement
+  to validate real layer/current outputs once that port exists; do not
+  report a rebuild merely because routing produced a report or event.
 
 Re-running is idempotent (routed_id / source_findings back-references +
 deterministic event_ids). The router routes and records — it never
@@ -1054,22 +1054,21 @@ Present a summary table to the user:
 - REG-001: <title> (Medium)
 ```
 
-After delivering, emit resolution events into the findings ledger so
-the cumulative status reflects verification verdicts:
+**RETIRED — verdict ingestion and cumulative rebuild.** The former
+verification-ledger emitter is **not executable**. Core
+`VerificationService.record` owns the intended ingestion door, but that
+record service is unfinished; `FindingService` owns derived finding state
+and its cumulative output port is also unfinished. Deliver the validated
+verification report and evidence, explicitly report that disposition
+ingestion/rebuild did not run, and do not hand-write ledger events.
 
-```bash
-python3 -m traust.cli ledger emit-verification \
-    <path-to>/<repo>-remediation-verification.json \
-    --results-root analysis-results \
-    --build-cumulative
-```
-
-This maps each verified finding's verdict to a `disposition.resolution`
-event (`resolved`, `partially_resolved`, `fix_in_progress`, `open`,
-`regression_introduced`, `risk_accepted`) or a `disposition.validity`
-event (`false_positive`). Regressions routed in Phase 7a2 are not
-re-emitted (the emitter skips `regressions[]`; `route_regressions` is
-idempotent).
+The port must map each verified verdict to a resolution decision
+(`resolved`, `partially_resolved`, `fix_in_progress`, `open`,
+`regression_introduced`, `risk_accepted`) or a validity decision
+(`false_positive`), with evidence-class/countersign policy governed by
+`docs/disposition-ledger.md`. Regressions from Phase 7a2 must remain
+separate from verified-finding verdict ingestion and must not be
+double-emitted; preserve idempotency and provenance.
 
 #### 7c. Clean up
 
@@ -1236,21 +1235,19 @@ For each worklist entry, in order:
    is the difference between differential evidence and re-reading.
    Write the verification report beside the audit report in the
    findings tree.
-2. Emit resolution events into the ledger:
-   ```bash
-   python3 -m traust.cli ledger emit-verification \
-       <repo>-remediation-verification.json \
-       --results-root analysis-results --build-cumulative
-   ```
-   Verification reports are class-1 evidence, the only sanctioned path
-   to `resolution: resolved`. Phase 7a2 regression routing
-   (`route_regressions`) is idempotent and separate — the emitter
-   skips `regressions[]`.
+2. **RETIRED — resolution-event ingestion/cumulative rebuild.** Retain
+   the validated verification report for core `VerificationService.record`;
+   its record port and the derived output port are unfinished. Do not
+   invoke the former emitter, hand-write events or mark ledger ingestion
+   as complete. Verification reports remain class-1 evidence under the
+   evidence-grade rules and the intended sanctioned path to
+   `resolution: resolved`. Keep Phase 7a2 regression routing separate and
+   idempotent; the verdict-ingestion port must not re-emit `regressions[]`.
 3. If the entry has `duplicate_report_dirs`, do **not** author separate
    reports for them — the canonical verification covers the same repo
-   state. Feed the same verification report into each sibling's ledger
-   (`/track-findings` per sibling filing) so every product tree's
-   cumulative status reflects it.
+   state. Preserve sibling filing references for the unfinished ingestion
+   port so every product tree can eventually reflect the same report;
+   do not claim sibling cumulative status was updated.
 4. Continue to the next entry. The verification report on disk IS the
    checkpoint — an interrupted sweep resumes by re-running Step 1.
 
@@ -1258,9 +1255,10 @@ For each worklist entry, in order:
 
 After the run (or the `--limit` cap), report: repos verified this run,
 findings resolved / partially resolved / unresolved / regressions,
-tiers remaining, and suggest rebuilding the dashboards
-(`/executive-summary-findings`, `/findings-trends`) so the remediation
-sections reflect the new class-1 evidence.
+tiers remaining. These are **verification-report verdict counts**, not
+proof of persisted disposition updates. Dashboard remediation sections
+cannot reflect new ledger state through this retired ingestion/rebuild
+path until the core record/output ports land.
 
 ---
 

@@ -898,9 +898,14 @@ Tell the user:
 2. Top 3 by confidence, one line each.
 3. Next steps — the update path for the **ledger**:
    - Verify: `> /triage <target-dir>/<repo>-vuln-findings.json --repo <target-dir>`
-   - Record new findings as **ledger events — direct entry, no triage
-     precondition** (user directive 2026-07-27; parity with the other
-     scanning skills, whose findings enter the ledger at birth).
+   - **RETIRED — ledger-entry/rebuild workflow.** Preserve the direct-entry
+     requirement (**no triage precondition**, user directive 2026-07-27),
+     but do not execute the legacy layer-writing procedure below.
+     Core finding intake owns new claims and `FindingService` owns derived
+     state; the scan-to-core record/output port is unfinished. Retain the
+     scan report and provenance rather than hand-writing events or
+     claiming cumulative/dashboard updates. The following event shape
+     and replay semantics are requirements for that port.
      **NEVER write the baseline.** Only `/secure-code-audit`,
      `/secure-rpm-audit` and `/secure-container-audit` may write
      `*-{security,rpm,container}-audit.json` — enforced by alignment gate
@@ -932,11 +937,14 @@ Tell the user:
 
      Mechanics and worked examples: [docs/findings-routing.md](../../../docs/findings-routing.md).
 
-     `/triage` remains the **downstream adjudicator**: its verdicts, and
-     any refutations, flow through the disposition ledger
-     (python3 -m traust.cli ledger emit-triage → `/track-findings`) —
-     **never hand-edit `validation_status` on existing baseline
-     findings.**
+     `/triage` remains the **downstream adjudicator**, but its former
+     ledger emitter and `/track-findings` cumulative rebuild are
+     **retired, not executable**. Core `FindingDecisions.record` owns
+     triage ingestion and `FindingService` owns derived finding state;
+     their record/output ports are unfinished. Retain verdicts and
+     refutations as report artifacts, not hand-written events or claimed
+     cumulative updates. **Never hand-edit `validation_status` on
+     existing baseline findings.**
    - No baseline? Recommend `/secure-code-audit <target>` to establish
      one; this scan's report then serves as a leads file for it.
    - Remind: to check whether **existing** baseline findings are fixed,

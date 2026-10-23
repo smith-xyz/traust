@@ -6,6 +6,11 @@ from traust.cli.groups._registry import passthrough_op
 
 _ENTRIES: tuple[tuple[str, str, str], ...] = (
     (
+        "countersign",
+        "countersign",
+        "Record a direct human severity judgement through core (record only).",
+    ),
+    (
         "toolchain",
         "toolchain",
         "Toolchain management — install, check, and populate external tool pins.",

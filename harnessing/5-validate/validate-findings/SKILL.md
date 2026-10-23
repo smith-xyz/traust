@@ -28,7 +28,6 @@ allowed-tools:
   - Bash(python3 *harnessing/5-validate/validate-core-ocp/scripts/gen_targets.py:*)
   - Bash(python3 *credential_liveness.py:*)
   - Bash(python3 *soundness.py:*)
-  - Bash(python3 *-m traust.cli.emit_validation_ledger_events:*)
   - Bash(python3 *-m traust.cli reporting validate:*)
 ---
 
@@ -62,13 +61,16 @@ Take the static outputs of `secure-code-audit`, `threat-model`, and `triage` and
 | `all-confirmed` | Every triage-confirmed finding across `../analysis-results/findings/**` (use with `--dry-run` first) |
 
 **Refuted findings stay in scope.** When a `<repo>-refuted-register.json`
-sits next to the audit report (emitted by
-python3 -m traust.cli ledger emit-triage), its entries are candidate targets,
-not exclusions: a finding dismissed as a false positive — even
-human-countersigned — is a falsifiable claim, and a reproducing exploit
-from this skill overrides the assertion via evidence-class precedence
-(`fp_overridden`, loudly surfaced with the countersigner attributed).
-Include register entries in attack planning when scope and budget allow.
+sits next to the audit report (a legacy triage-emitter artifact), its
+entries are candidate targets, not exclusions. That emitter is **retired,
+not executable**; core `FindingDecisions.record` owns the unfinished
+triage-ingestion/refuted-register port. Read an existing register; do not
+regenerate it or treat its absence as proof of no refutations. A finding
+dismissed as a false positive — even human-countersigned — is a falsifiable
+claim: reproducing execution evidence must override the assertion under
+the evidence-class precedence rules (`fp_overridden`, with the countersigner
+attributed) once disposition ingestion is ported. Include register entries
+in attack planning when scope and budget allow.
 
 **Impact-analysis artifacts as target selection.** When
 `analysis-results/impact/<cve>-impact-analysis.json` (from
@@ -205,9 +207,12 @@ components the exploit ACTUALLY demonstrated (attack vector used,
 privileges the probe identity held at success, user interaction, scope
 crossing observed from the E0 artifact, impact axes evidenced) and the
 signed delta vs the claimed score. When |delta| >= 1.0 **and** the
-evidence grade is E0/E1/E2 (never E3), emit a `proposal` — the emitter
-routes it to the countersign severity decision as a needs_review item;
-machines never write `disposition.severity`. A demonstrated DOWNGRADE
+evidence grade is E0/E1/E2 (never E3), emit a `proposal` in the validation
+artifact. The former emitter's routing to a countersign needs_review item
+is **retired, not executable**; core `ValidationService.record` owns the
+unfinished ingestion port. Preserve proposals for human review, but do
+not claim a queue item was created. Machines never write
+`disposition.severity`. A demonstrated DOWNGRADE
 ("exploitation required cluster-admin") is exactly as valuable as an
 upgrade. Findings that are constituents of a demonstrated attack chain
 also record `chain_context` (chain id, chain severity, role) — chain
@@ -373,7 +378,7 @@ For each step in plan order:
    - Capture stdout/stderr/exit, plus adapter-specific evidence (resource YAML before/after, HTTP response body, WASM trap).
    - Write artifacts to `<out>/artifacts/step-<id>.*` and compute sha256.
    - Compare observed outcome to `step.expected` → `verdict ∈ {confirmed, refuted, inconclusive}`.
-   - **Refutation-soundness gate** (`soundness.py`, applied deterministically by `execute.py` — never bypass it when composing verdicts by hand): `refuted` is **un-emittable** when (a) the probe transcript matches an error signature (`Forbidden`/validator-RBAC denial, `command not found`, jsonpath errors, `NotFound`, `does not exist`, `Could not connect`, an unsubstituted `{ns}`/`{sa}` template), (b) an RBAC-style probe enumerated zero concrete subjects (empty `vf-rbac-tried:` list) or carries a literal `system:serviceaccount:{ns}:{sa}` placeholder, or (c) the run directory contains `install-failure.yaml` (whole run — the operand never deployed). Gated verdicts downgrade to `inconclusive` and carry a machine-readable `soundness_flag` (`error-signature:<name>` | `rbac-zero-subjects` | `rbac-template-placeholder` | `target-not-deployed`). Downstream, flagged findings route to `needs_review` — never to the false-positive/countersign path (`emit_validation_ledger_events.py`).
+   - **Refutation-soundness gate** (`soundness.py`, applied deterministically by `execute.py` — never bypass it when composing verdicts by hand): `refuted` is **un-emittable** when (a) the probe transcript matches an error signature (`Forbidden`/validator-RBAC denial, `command not found`, jsonpath errors, `NotFound`, `does not exist`, `Could not connect`, an unsubstituted `{ns}`/`{sa}` template), (b) an RBAC-style probe enumerated zero concrete subjects (empty `vf-rbac-tried:` list) or carries a literal `system:serviceaccount:{ns}:{sa}` placeholder, or (c) the run directory contains `install-failure.yaml` (whole run — the operand never deployed). Gated verdicts downgrade to `inconclusive` and carry a machine-readable `soundness_flag` (`error-signature:<name>` | `rbac-zero-subjects` | `rbac-template-placeholder` | `target-not-deployed`). The unfinished core ingestion port must route flagged findings to `needs_review` — never to false-positive/countersign determinations.
 4. Append one JSONL line to `<out>/validation-audit.jsonl`:
    ```json
    {"ts":"<iso8601>","step_id":"...","adapter":"...","verb":"...","target":"...","scope_check":"pass","classification":"...","verdict":"...","evidence":["artifacts/step-007.log"],"rollback":"..."}
@@ -415,9 +420,13 @@ baseline — gate A15 reserves that for the three audit skills — with
 validation report's path in `source_findings` — the validation report is
 **class-1 (execution-verified) evidence** for it. The finding enters at
 `validation_status: not_verified` like every routed append; its
-execution-confirmed validity then flows through the standard ledger path
-(python3 -m traust.cli ledger emit-validation / `/track-findings`), where
-the E0/E1 evidence-grade rules decide whether it sets `confirmed`.
+execution-confirmed validity is intended to flow through core
+`ValidationService.record`, with the E0/E1 evidence-grade rules deciding
+whether it sets `confirmed`. The former validation-ledger emitter and
+`/track-findings` cumulative rebuild are **retired, not executable**;
+the record/output ports are unfinished. Retain the report and novel
+finding provenance, do not hand-write ledger events or baseline appends,
+and do not claim that validity or a cumulative report was updated.
 Distinct from the P5 discovery-sweep *candidates* above
 (`origin: validation-discovery`): those are unexecuted hypotheses and
 still go to `/triage` generic ingest first — only executed,
@@ -515,21 +524,24 @@ Consumed artifacts (producer named per artifact):
 - `targets.yaml` rules-of-engagement — human-authored scope binding.
 - `*-gitleaks.json` — produced by python3 -m traust.cli adapters gitleaks; input to
   the credential-liveness verifier.
-- `*-refuted-register.json` — produced by `/track-findings`; scopes
-  re-validation of refuted findings.
+- `*-refuted-register.json` — legacy `/track-findings` output; scopes
+  re-validation of refuted findings when present; regeneration is unported.
 
 Emitted artifacts:
 
-- `*-validation.json` — consumed by `/track-findings` via
-  python3 -m traust.cli ledger emit-validation (execution-verified
-  ledger events) and by `/validation-fuzz-dashboard`; class-1 evidence
-  for routed novel findings (Phase 5 routing statement above).
+- `*-validation.json` — consumed by `/validation-fuzz-dashboard`; intended
+  core `ValidationService.record` ingestion is **unported** (the former
+  validation-ledger emitter is retired). It carries class-1 evidence
+  for executed novel findings subject to the evidence-grade rules;
+  no current ledger ingestion or cumulative rebuild is implied.
 - `*-validation.md`, `validation-audit.jsonl`, `artifacts/` (incl.
-  replay scripts), `target-attestation.json` — human/countersign
-  companions; the attestation gates the ledger emitter.
-- Baseline appends for executed novel findings (campaign IDs at the
-  validated sha, `origin: "validate-findings"`) — consumed by
-  `/track-findings` / `build_cumulative.py` and the dashboards.
+  replay scripts), `target-attestation.json` — human review companions;
+  the unfinished record port must enforce the attestation gate.
+- Executed novel findings (campaign IDs at the validated sha,
+  `origin: "validate-findings"`) — retained in the validation report
+  for the unfinished finding-intake/disposition port, never appended
+  to the immutable baseline by hand. Intended consumers remain
+  `/track-findings` and derived findings/dashboard views.
 - Discovery-sweep candidates (`origin: validation-discovery`) —
   consumed by `/triage` generic ingest.
 

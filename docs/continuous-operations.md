@@ -19,6 +19,15 @@ defaults. A deployment re-derives them from its own router telemetry on a
 quarterly cadence and records the derivation in its own planning documents;
 this page is the operational contract, not the evidence.
 
+**Cutover status.** The cadence and routing methodology below survives the
+core-hub cutover, but the former corpus projection, finding routers, ledger
+emitters and cumulative-report steps are retired. Their core-service skill
+ports remain unfinished; do not schedule them or substitute the severity writer
+for missing finding/validity writes. See [components.md](components.md) for
+ownership and [disposition-ledger.md §6a](disposition-ledger.md#6a-the-countersign-workbench)
+for the only ported human writer. Existing legacy artifacts do not demonstrate
+that the full loop completed on current inputs.
+
 ## The loop
 
 ```
@@ -38,7 +47,7 @@ this page is the operational contract, not the evidence.
                P2 sensi-   escalations major/minor    verify_
                tive        │           release ·      sweep.py)
                monthly     │           calendar pool
-      └───────────┴────────┴──► /triage ──► ledger ──► dashboards
+      └───────────┴────────┴──► /triage ──► evidence artifacts (ledger/dashboard ports unfinished)
 ```
 
 The threat-model lanes are the exception to that last arrow: they refresh the
@@ -80,7 +89,7 @@ dropped.
 
 | Cadence | What runs |
 |---|---|
-| Daily (automated, deterministic) | fleet refresh + router → fresh worklist; `harnessing/2-threat-model/threat-model/scripts/build_release_events.py` — the release/dist-git event feeders (see *Event feeders*); `/dependency-watch` — the advisory-driven deps lane end to end (feeds → `/impact-analysis` → python3 -m traust.cli route impact-findings direct-entry filing) |
+| Daily (automated, deterministic) | fleet refresh + router → fresh worklist; `harnessing/2-threat-model/threat-model/scripts/build_release_events.py` — the release/dist-git event feeders (see *Event feeders*); `/dependency-watch` supplies advisory/impact evidence, but its former direct-entry finding router is retired and the core finding-intake skill port has no executable fallback |
 | Weekly session | dispatch the worklist's full-audit rows as a batch; `/verify-remediation` treadmill sweep (`harnessing/8-verify/verify-remediation/scripts/build_verify_sweep.py`); triage new findings |
 | Monthly | sensitive-change P2 diff scans; validation session (criticals validated-or-blocked inside the SLA window); spend reconcile against the budget policy |
 | Weekly (trickle) | the `diff-scan-quarterly` pool drains as a risk-ordered weekly trickle: dispatch rows with `drain_order < weekly rate` (default ceil(pool/13) — the same quarterly volume as a 90-day batch, but a short stable queue instead of a long tail; external-band rows first, target ≤14 days in-pool). Dispatching the drain is an operator decision informed by the deployment's measured per-run cost (see *The diff lane*); the drain ordering accumulates until scheduled |
@@ -105,21 +114,21 @@ rows named in the last column are the backstop that makes a dead timer visible.
 | Fleet refresh + rescan router | daily | timer | python3 -m traust.cli build rescan-worklist | routes only, never authors findings; drift row `rescan-worklist` flags a worklist >3 days old |
 | **Feed-source liveness** | rides the drift run | probe | `python3 -m traust.cli check drift` (`feed-source:*` rows) | Probes every source in `config/feeds.yaml` carrying a `probe` — both tiers — so a live-tier source that answers with an error is visible. A definitive HTTP error is `drift`; a transport failure is `unavailable`, never `drift`, so an offline workstation does not report every source as broken |
 | Release/dist-git event feeder | daily, beside the router | timer (inventory-CSV diff + dist-git `ls-remote` movement vs the committed seen-set) | `python3 harnessing/2-threat-model/threat-model/scripts/build_release_events.py` | emits events only; the router routes them; dispatch marks `consumed` |
-| `/dependency-watch` (deps lane end to end) | daily | timer (advisory publication) | `/dependency-watch` | findings enter the **ledger** via direct-entry at `not_verified` — the claim rides on the event, the baseline is never written (gate A15); `/triage` adjudicates downstream; severity from the advisory, never invented. See [findings-routing.md](findings-routing.md) |
+| `/dependency-watch` (deps lane) | daily | timer (advisory publication) | advisory/impact evidence only; direct-entry filing is unported | The former router filed advisory-derived findings without rewriting a baseline. Core finding intake owns the replacement; the skill port is unfinished and there is no executable filing fallback. Severity must come from advisory evidence, never be invented. |
 | **Feed router** — security-data refresh (EPSS / KEV / vendor CVE and VEX feeds) | **daily** | timer | `python3 -m traust.cli feeds fetch --feed all` | Orchestrator-neutral ([routers.md](routers.md)), deliberately not bound to a CI pipeline in this repo. Refreshes every `tier: cached` source in `config/feeds.yaml`. A dedicated job exists because consumer-triggered refresh only holds while something runs daily; without one the cache silently ages. Cache location is config-driven (`locations.yaml` → `feeds_cache`; set it explicitly — there is no default) so the fetcher and every consumer resolve the same path. Every source in `config/feeds.yaml` is public. A failed refresh degrades to the stale copy with a loud warning and `stale: true` in the metadata consumers embed. **Backstop:** drift rows `feeds:*` at **48h** — one missed run plus slack; a threshold looser than the cadence it guards is how a dead job stays green |
 | Weekly diff-drain tranche | weekly | timer over the router's drain ordering | `python3 harnessing/2-threat-model/threat-model/scripts/emit_drain_tranche.py`, then one run per tranche row **by lane** (`dispatch_by_lane` in the manifest — see *Standing weekly drain* below) | fail-closed selection (refuses a worklist >48h old or a second tranche per ISO week); dispatching is an operator decision informed by measured cost |
 | Threat-model re-model lanes | rides the router (daily) + the weekly tranche | change (`pr` stamp), major/minor release event, calendar backstop | python3 -m traust.cli build rescan-worklist routes; `harnessing/2-threat-model/threat-model/scripts/emit_drain_tranche.py` schedules; `/threat-model pr\|review` dispatches | **report-only** — no lane auto-applies an `update`. Drift row `threat-model` (held in lockstep with the lane's calendar threshold) is the dead-timer if the quarterly pool stops draining |
-| Verify-remediation treadmill | weekly (worklist rebuilt per sweep) | timer | `harnessing/8-verify/verify-remediation/scripts/build_verify_sweep.py` → `/verify-remediation full-sweep` | verdicts gated by the verification schema + soundness lint; regressions become ledger findings via python3 -m traust.cli route regressions |
+| Verify-remediation treadmill | weekly (worklist rebuilt per sweep) | timer | `harnessing/8-verify/verify-remediation/scripts/build_verify_sweep.py` → `/verify-remediation full-sweep` | verification artifacts remain evidence; the former verification emitter and regression router are retired, and core remediation/finding-intake skill ports remain unfinished with no executable ledger-write fallback |
 | Rule-mining lane | weekly + post-wave | timer + drift row `rule-mining` (ledger changes >7d newer than the artifact) | python3 -m traust.cli sweep rule-lane, then the scheduled `/mine-ledger` session | never auto-files findings; rule promotion sits behind the mechanical test-and-calibrate gate; sweep hits route to `/triage` |
 | CVE-replay FN monitor | daily (cron-able, stdlib-only) | timer; per-ecosystem OSV watermark advances only on success | python3 -m traust.ops.cve_replay_monitor | routes, never concludes (`detected`/`unclear`/`missed`); benchmark ground-truth candidates stay a human-gated queue |
 | `/drift-watch` | on demand; recommended alongside every `/census`; scheduled by the orchestrator | operator / timer | python3 -m traust.cli check drift | routes attention only — never auto-rebuilds, auto-advances a pin, or files a finding |
-| Census + repo-liveness refresh | no fixed timer — run at intake (`/corpus-intake` triggers it), and before denominators are consumed | operator / intake flow | `/census` (runs `harnessing/census/scripts/check_repo_liveness.py` as its Step 2b) | drift rows `repo-liveness` and `corpus-registration` flag age/unregistered trees |
-| FP-precedent cache rebuild | drift-triggered — no timer | drift row `fp-precedent-cache` (new countersign/triage/validation adjudications post-build) | python3 -m traust.cli corpus precedent build | annotation only — a precedent informs a verifier, never dismisses |
+| Census / corpus projection — retired refresh path | formerly at intake and before denominator consumption | operator / intake flow | no executable projection fallback; core assessment/population and finding services own the unfinished census skill port | Existing population and repo-liveness artifacts may be stale; a drift row is not evidence that the retired refresh completed |
+| FP-precedent cache rebuild — retired | formerly drift-triggered, no timer | former `fp-precedent-cache` drift row | no executable runner; core finding precedents own the unfinished skill port | Formerly indexed human-countersigned and sound machine refutations to inform review, never to dismiss automatically. Existing cache artifacts are not a current rebuild. |
 | Validation benchmark | release-cut + monthly hybrid | `run_validation_benchmark.py check-trigger` (exit 10 = benchmark required) + drift row `validation-benchmark` (35d) | python3 -m traust.cli sweep benchmark | below-floor runs exit non-zero; results land in the harness-QA tree, never campaign metrics |
 | Recall benchmark | quarterly, plus release scoring | timer / release cut (`--release` scores held-out targets) | `/recall-benchmark run` | manifest never enters an audited tree; held-out split scored only at release |
 | Class-sweep rotation | quarterly | timer (measured FN classes) | targeted class-sweep sessions (see *Lane weights*) | sweeps produce candidates for `/triage`, never filed findings |
 | Threshold re-derivation | quarterly | timer over router telemetry | re-derivation per the deployment's cadence plan | a human reviews and edits the decision table; the router never self-tunes |
-| Dashboards rebuild (all deterministic dashboards: census + exec summary, trends, insecure-patterns, validation-fuzz, rbac-tenancy, sla, compliance, attack-coverage, loc, spend, scoreboard) | **weekly** (inside the scoreboard's 7d drift threshold), spend rebuild every ≤4d | timer | one command: python3 -m traust.cli dashboard refresh (skill wrapper: `/refresh-dashboards`) — the packaged sequential deterministic job, projections before consumers: `fetch_feeds.py --feed rh-cve` → python3 -m traust.cli feeds reconcile-cve-provenance --apply (both consumer-tier, both BEFORE the projection so it sees stamps written this cycle) → python3 -m traust.cli corpus findings-db → `harnessing/census/scripts/build_census.py`; then the per-dashboard builders (`build_executive_summary.py`, `build_trends.py`, `build_insecure_patterns.py`, `build_validation_fuzz_dashboard.py`, `build_rbac_tenancy_rollup.py`, python3 -m traust.cli metrics sla, python3 -m traust.cli compliance dashboard, `build_attack_coverage.py`, `build_loc_dashboard.py --no-fetch`, python3 -m traust.cli metrics spend) → `collect_harness_metrics.py` last (it harvests the others) — all deterministic, no agent involved; a projection failure aborts the run, consumer failures are collected and reported | drift rows `dashboards:*` remain the dead-timer backstop (scoreboard >7d, spend >4d); the `feeds:rh-cve` row is the backstop for the CVE-provenance leg — its drift threshold is the 168h default, not the feed's own `max_age_hours` (that decides only when a refresh re-downloads), so a single missed weekly run raises it. **Orchestrator prerequisites for this job:** `$TRAUST_CONFIG_HOME/locations.yaml` must set `analysis_results` (and usually `workspace`, `progress_tracker`, `feeds_cache`) — `findings_db` exits 1 without `analysis_results`; egress to the feed hosts; a **persistent** feeds cache, since the incremental watermark lives in `feeds-meta.json` and an ephemeral one re-backfills the whole window every run (correct, just wasteful); and a **write-back path** for `analysis-results` (stamped layers) and `progress-tracker` (the metrics file) — on an ephemeral runner without one, the stamps are computed and then discarded. **Exception that stays operator-side:** the spend-*actuals* leg (python3 -m traust.cli metrics collect-spend --append) reads agent session transcripts on operator workstations — it cannot move to the orchestrator until transcripts are centralized, and its un-appended-actuals >4d drift row exists precisely to keep guarding that leg |
+| Dashboards rebuild (remaining registered stages only) | **weekly** (inside the scoreboard's 7d drift threshold), spend rebuild every ≤4d | timer | python3 -m traust.cli dashboard refresh (skill wrapper: `/refresh-dashboards`) — refreshes the RH CVE feed, then validation-fuzz, SLA, compliance, attack-coverage, LoC, dependency-exposure and spend consumers; scoreboard last. Optional spend-actuals collection stays workstation-bound. Consumer failures are collected and reported. | The old CVE-provenance reconciliation, `findings.db`/census projection, executive summary, trends, insecure-patterns and rbac-tenancy builders are retired and are not rebuilt by this command. Core assessment/findings and insight services own their replacements, but the skill ports are unfinished and there is no executable fallback. Configure deployment paths, persistent feed cache, egress and output persistence through `locations.yaml`; retained `dashboards:*` drift rows flag age, not successful completion of retired stages. |
 | IaC quarterly re-baseline | quarterly — **human-decision, drift-flagged** | rides `checkov-pin` advances (drift row) | `/cloud-config-audit` re-runs against the IaC-bearing targets | pin advances are deliberate toolchain changes — re-verify one known-good target before the sweep |
 | Portfolio-graph heavyweight rebuild | **human-decision, drift-flagged** — after `/repo-graph` refreshes, or when `/impact-analysis` freshness demands it | drift row `portfolio-graph` (build stamp vs inputs HEAD) | `/portfolio-graph` (python3 -m traust.cli portfolio build) | build refuses a stale spine; rebuild timing stays with the operator (clone-sweep cost) |
 | ADR / pin / external-tool advances | **human-decision, drift-flagged** — never automated | drift rows `adr-registry:*`, `checkov-pin`, `external-tools:*` | reviewed commits advancing the pins | no check may auto-advance a pin (drift-watch constraint) |
@@ -190,7 +199,7 @@ table — see *Event injection* below.
 | 1 | inventory repo (portfolio-graph spine, built from the inputs inventory) with **no baseline audit** | **full audit + threat-model bootstrap** (`rule-1-bootstrap`) | new intake is otherwise invisible to the loop until a human notices. Zero API calls — exposure from the curated designation, private default; the first audit self-heals the repo into change detection, the graph, and dependency watch |
 | 2 | `C ≥ 8,000` first-party changed lines, OR `R ≥ 10%` of audited LoC (R only where `lines_reviewed` is recoverable from the baseline report) | **full audit** | above this the old audit's coverage map no longer describes the code — the baseline is *invalid*, not merely stale. The line threshold sits near the upper tail of a typical two-week change; a change that large is a new codebase for coverage purposes, while a smaller one carries little churn-attributable expected yield |
 | 3 | any changed file matches the narrow sensitive-identifier matcher AND ≥200 changed lines in those files | **full audit** (P0/P1), **diff scan** (P2) | error analysis places the audit false-negative pool disproportionately in auth/config paths — sensitive-path change is the highest-yield trigger and is never throttled. The *narrow* matcher discriminates; a broad infrastructure matcher hits almost every changed repo and is useless |
-| 3b | every changed file is a dependency manifest | **deps lane (classification, not a queue)** — the row records that the repo's change is manifest-only and therefore covered by the daily advisory-driven `/dependency-watch` run (feeds → `/impact-analysis` on hits → `route_impact_findings.py` filing). `/dependency-watch` works advisory-first and does **not** read these worklist rows; the rows keep the router's coverage accounting honest and are the hook if a manifest-driven trigger is ever wired | about half of changed repos touch a manifest — agent-scanning that class would swamp everything; reachability is deterministic, and hits become filed findings, not just analysis |
+| 3b | every changed file is a dependency manifest | **deps lane (classification, not a queue)** — the row classifies manifest-only change for advisory-first `/dependency-watch` analysis. The former impact-finding router is retired; core finding intake owns its unfinished filing skill port, with no executable fallback. `/dependency-watch` does not read these worklist rows | manifest-only changes are common and deterministic reachability avoids a full agent scan; analysis is not proof of successful finding admission |
 | 4 | audit age > tier ceiling: **P0 180d / P1 270d / P2 365d** | **full audit** | backstop for slow-drip churn that never crosses rules 2–3, and the re-application vehicle for methodology gains. Every full re-visit recovers some findings from *unchanged* code (run-to-run detection variance) — ceilings are a discovery mechanism, not just hygiene |
 | 5 | any other first-party change (`C > 0`) | **quarterly diff-scan pool** | new crit/highs do **not** scale with churn; the below-threshold pool carries a small, steady expected yield, so a monthly latency costs far more per finding than full-audit visits do — quarterly keeps changed code ≤90 days unexamined at a fraction of the cost |
 | 6 | `pushed_at` moved but 0 commits ahead | none | tag/branch push noise — a noticeable share of stage-1 candidates; the compare, not `pushed_at`, is authoritative |
@@ -272,7 +281,7 @@ in its cost report; what follows is the relative weight and what each lane buys.
 | Container audit (`/secure-container-audit`) | registry artifact: skopeo config/signature posture + syft SBOM + grype CVEs + source-drift check — no source review | medium | shipped-artifact assurance; immutable per digest |
 | RPM audit (`/secure-rpm-audit`) | spec/scriptlets/patches + prepared source tree | medium-heavy | packaging + patched-upstream lens |
 | Targeted class sweep | one weakness class, purpose-built prompt, whole fleet slice | medium | strong standalone recall *inside its class* — the only measured mechanism recovering the configuration-class blind spot that every general scan shares |
-| Verify sweep (`/verify-remediation`) | per-finding targeted re-audit of previously-filed findings only | light | resolves findings; finds nothing new by design |
+| Verify sweep (`/verify-remediation`) | per-finding targeted re-audit of previously-filed findings | light | produces verification evidence; ledger resolution and regression admission remain unported |
 | Threat-model review (`/threat-model review --auto --apply-ratings`) | deterministic `git diff` pre-pass from the model's provenance SHA, then re-scores **only what moved**; writes OWASP ratings for any unrated threat, everything else report-only | light (bounded by what moved) | keeps the audit coverage diff honest — the surface an audit checks itself against |
 | Threat-model pr (`/threat-model pr`) | bounded assessment of one diff, on a clone the diff scan already made | light (bounded by one diff) | flags new entry points / trust boundaries a diff introduced |
 | Deps / routing / Kubernetes-hardening / gitleaks lanes | deterministic tooling | none | rule-pack precision, no judgment |
@@ -343,49 +352,36 @@ the numbers in its calibration report.
 
 ## From signal to accountability — where every lane's output lands
 
-The diagram's `/triage → ledger → dashboards` arrow, spelled out. There is
-exactly **one** accountability surface per repo — no lane gets its own findings
-layer:
+The diagram's final arrow describes the intended accountability chain, not a
+working legacy ingestion path. There is one core-owned finding history; no lane
+may create a competing mutable record or bypass admission policy.
 
 1. **The router never emits findings.** `rescan-worklist.json` rows are routing
-   instructions; tripwire and deps hits are *escalations with evidence
-   attached*, which ride into the dispatched lane's context.
-2. **Agent lanes file findings.** A full audit writes/refreshes the repo's
-   `*-security-audit.json` baseline — **only the three `secure*audit` skills
-   may do that** (gate A15). Every other lane files into the **ledger only**: a
-   diff scan's verified findings enter as events at `not_verified`, carrying
-   their claim on the event (`event.finding`) so `build_cumulative` unions them
-   back at replay. Triage adjudicates downstream — no triage precondition on
-   entry. Mechanics: [findings-routing.md](findings-routing.md).
-3. **The ledger is the accountability record.** `/track-findings` appends
-   disposition events to the append-only `*-findings-layer.json` and
-   regenerates `*-findings-current.{json,md}` — the artifact owner routing,
-   team reports, the SLA view, and issue-tracker filing consume. `findings.db`
-   is a rebuildable projection of it; dashboards read the projection.
-4. **Deterministic dependency outputs land as artifacts, not findings:**
-   `fetch_feeds.py` refreshes the advisory caches; `run_osv_scanner.py` matches
-   emit escalations (changed-manifest path) or feed `/impact-analysis`;
-   `/impact-analysis` writes `analysis-results/impact/<cve>-impact-analysis.json`,
-   consumed by `/verify-remediation full-sweep --impact-filter <artifact>`, the
-   patch lane, and the findings.db `impact` table (queryable affectedness). A
-   deterministic hit becomes a ledger finding **only after an agent lane
-   verifies and files it** — the no-verdict doctrine
-   (`docs/deterministic-inferential-mix.md`) applied end-to-end.
+   instructions. Tripwire and dependency hits are escalations with evidence
+   attached, not verdicts.
+2. **Agent lanes produce assessment evidence.** Audits, triage, validation and
+   remediation verification retain their report contracts. The old direct-entry
+   routers transcribed between-audit findings into legacy layer events rather
+   than appending to baselines. Those routers and their cumulative union/replay
+   builder are retired. Core finding intake owns the replacement; the skill
+   ports are unfinished and there is no executable fallback.
+3. **Report evidence is not a saved decision.** The former `/track-findings`
+   ingestion, validation/verification emitters, countersign queue/apply and
+   cumulative builders are retired. Core finding decisions and ledger services
+   own persistence and integrity. Only direct verified-human severity recording
+   is exposed by the ported CLI; it cannot file findings, adjudicate validity,
+   resolve a finding or refresh legacy reports.
+4. **Dependency analysis is not filing.** Feed refresh, OSV matches and
+   `/impact-analysis` artifacts provide advisory and reachability evidence.
+   The former impact router filed advisory-derived claims idempotently without
+   changing a baseline. Its core finding-intake skill port is unfinished; no
+   current executable fallback files or SLA-clocks those findings. Preserve
+   advisory provenance and do not invent severity.
 
-   **Filing:** `/dependency-watch` runs the whole advisory chain daily (feeds →
-   impact-analysis → `route_impact_findings.py`); each `affected` repo's
-   dependency finding enters its **disposition ledger** at `not_verified` via
-   the direct-entry convention — the claim rides on the event, never appended
-   to the baseline (gate A15). Idempotent per repo+module+CVE — dedupe reads
-   event-carried findings as well as the baseline, or a daily re-run would
-   re-file. Severity from the advisory, never invented — an owned, SLA-clocked
-   finding the day the advisory lands. The executive summary carries the
-   per-CVE fleet cut (affected vs filed vs resolved).
-
-So: "will people know to address the issues?" — yes, through the same
-`findings-current` → owner-routing → issue-tracker path as every audit finding;
-the continuous loop changes *when* and *why* scans run, never where
-accountability lives.
+The old `findings-current` → owner-routing → issue-tracker chain remains
+historical context until its producing service and skill ports are complete.
+Do not report end-to-end accountability from a successful scan or dashboard
+consumer run alone.
 
 ## Event injection
 
@@ -402,7 +398,7 @@ line:
 `source` is one of `external-report` (→ immediate `full-audit+validate` row),
 `methodology` (→ full audit for P0-tier repos; P1+ catch up via the rule-4
 ceiling), `cve` (→ impact lane, consumed by the daily `/dependency-watch` run —
-analysis AND filing), `release` (→ passthrough note to the branch/container/rpm
+analysis; the former filing step is retired), `release` (→ passthrough note to the branch/container/rpm
 audit lanes). Event rows queue AHEAD of the decision table and are never dropped
 by the budget guard. The router is read-only over the file: it lists what it
 honored in `events_honored` and marks nothing consumed — flip `consumed` to

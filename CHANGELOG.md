@@ -4,6 +4,16 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- Rebuild the existing direct human severity writer as
+  `traust admin countersign record --finding <UUID> --decision severity
+  --severity <canonical> --rationale <text> --token-stdin [--evidence-grade
+  <canonical>] [--config-home <directory>]`. It authenticates through core
+  identity, requires a verified human, and persists through core findings
+  decisions using core-owned enums, actor, clock and evidence admission.
+  Reruns return the saved statement; the JSON receipt omits credentials and
+  rationale. No legacy layer-file fallback or cumulative rebuild is restored.
+  Queue/apply, bulk review, validity overrides and mapping review remain unported.
+
 - **Breaking: traust-core is the hub.** traust depends on traust-core and
   traust-engine only; traust-contracts and traust-ledger come through core's
   pins. Domain state goes through core's services:
@@ -12,7 +22,8 @@ All notable changes to Traust are documented here.
 - **Retired, to be rebuilt per skill on core's services** (progress-tracker
   skill ports): the code that ran on the old ledger and corpus.
   - Commands: `traust corpus …`, `traust route …`, `traust ledger emit-*` /
-    `pull`, `admin countersign`, `build cumulative`, `check report-digests`,
+    `pull`, `admin countersign` (except the rebuilt direct severity record above),
+    `build cumulative`, `check report-digests`,
     `feeds reconcile-cve-provenance`; `check drift` loses its findings.db,
     ledger, signature, identity and corpus-registration checks.
   - Skill scripts: census, compliance-check scope intake, secure-code-audit

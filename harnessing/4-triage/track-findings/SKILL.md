@@ -21,19 +21,15 @@ allowed-tools:
   - Bash(rg:*)
   - Bash(grep:*)
   - Bash(head:*)
-  - Bash(python3 -m traust.cli build cumulative:*)
-  - Bash(python3 *-m traust.cli.countersign:*)
+  - Bash(python3 -m traust.cli admin countersign record:*)
   - Bash(python3 *-m traust.cli corpus finding-identity:*)
   - Bash(python3 *-m traust.cli reporting validate:*)
-  - Bash(python3 *-m traust.cli.emit_triage_ledger_events:*)
-  - Bash(python3 *-m traust.cli.emit_validation_ledger_events:*)
-  - Bash(python3 *-m traust.cli.emit_verification_ledger_events:*)
   - Bash(python3 *-m traust.cli.route_regressions:*)
 ---
 
 # Track Findings
 
-> **Being ported to traust-core** (progress-tracker skill port 02, track-findings): baseline_claims.py retired with the traust-core hub (it ran on the old ledger / corpus code). The steps marked RETIRED don't run until the port lands.
+> **Being ported to traust-core** (progress-tracker skill port 02, track-findings): the former baseline, ledger-ingestion, queue/apply, validity-record and cumulative-output flows are **retired, not executable**. The procedure below preserves their port requirements, not runnable instructions. Core `FindingDecisions.record`, `ValidationService.record` and `VerificationService.record` own machine-report ingestion; their record ports remain unfinished. `FindingService` owns baseline/derived finding state; its cumulative read/output port is also unfinished. Do not hand-write legacy layer events or claim cumulative/report-queue updates. The sole ported action is the **human severity-only** writer described under Interactive.
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in
@@ -173,12 +169,15 @@ in the new per-finding `disposition` block.
 
 ### Source vocabulary mapping
 
+The following is the retained mapping contract for the unfinished ports,
+not a claim that ingestion, review queues or derived outputs currently run.
+
 | Source | Feeds | Mapping |
 |---|---|---|
-| `*-validation.json` verdicts (via python3 -m traust.cli ledger emit-validation) | validity | `confirmed` → confirmed (class-1 execution-verified — outranks every static determination); `refuted` → machine false_positive event (see countersign rule) + `*-refuted-register.json` merge-append; `inconclusive`/`blocked_by_scope`/`not_attempted` → no event. One validation report fans out across every repo ledger its `source_reports` cover; baselines resolve by direct path, content sha256, or claim-hash match (claim-identical alias trees all receive the event), and a direct-path baseline whose sha changed since validation queues a `stale_baseline` review item. `--manifest` batch mode replays a whole validation campaign idempotently. |
-| `*-triage.json` verdicts (via python3 -m traust.cli ledger emit-triage) | validity | `true_positive` → confirmed (skipped when needs_manual_test); `hardening` → hardening with category-aware λ recorded at emission; `false_positive` → machine FP event — auto-accept tier (`auto_accept_tier: true`: unanimous + lint-clean + confidence ≥ 8 + low/informational-claimed) sets validity directly with a 10% audit-valve sample queued, everything else countersign-gated; `undetermined` → needs_review item (`undetermined_finding`); `duplicate` → nothing. Every FP also lands in `*-refuted-register.json` (fuzzing/live-validation targeting input). Auto-discover `*-triage.json` next to the audit report. |
+| `*-validation.json` verdicts (retired emitter; intended owner: `ValidationService.record`, unported) | validity | `confirmed` → confirmed (class-1 execution-verified — outranks every static determination); `refuted` → machine false_positive event (see countersign rule) + `*-refuted-register.json` merge-append; `inconclusive`/`blocked_by_scope`/`not_attempted` → no event. One validation report fans out across every repo ledger its `source_reports` cover; baselines resolve by direct path, content sha256, or claim-hash match (claim-identical alias trees all receive the event), and a direct-path baseline whose sha changed since validation queues a `stale_baseline` review item. Campaign batch replay must remain idempotent. |
+| `*-triage.json` verdicts (retired emitter; intended owner: `FindingDecisions.record`, unported) | validity | `true_positive` → confirmed (skipped when needs_manual_test); `hardening` → hardening with category-aware λ recorded at emission; `false_positive` → machine FP event — auto-accept tier (`auto_accept_tier: true`: unanimous + lint-clean + confidence ≥ 8 + low/informational-claimed) sets validity directly with a 10% audit-valve sample queued, everything else countersign-gated; `undetermined` → needs_review item (`undetermined_finding`); `duplicate` → nothing. Every FP also lands in `*-refuted-register.json` (fuzzing/live-validation targeting input). Auto-discover `*-triage.json` next to the audit report. |
 | validation runs' `target-attestation.json` (P2) | both | read by the ledger emitter beside each validation report: `attested: false` (or a missing artifact on post-0.176.0 reports) voids every verdict in that run — all findings route to needs_review as `environment_invalid`/`attestation_missing`, never to FP/confirmed events; countersign cards render the attestation status |
-| `*-remediation-verification.json` verdicts (via python3 -m traust.cli ledger emit-verification) | both | `resolved` → resolved; `partially_resolved` → partially_resolved (override: `fix_in_progress` when `cross_repo.propagation == pending`); `unresolved` → open; `new_approach` → resolved; `regression` → regression_introduced; `false_positive` → machine false_positive (countersign-gated); `risk_accepted` → risk_accepted. Class-1 evidence, tier-0 resolution authority. |
+| `*-remediation-verification.json` verdicts (retired emitter; intended owner: `VerificationService.record`, unported) | both | `resolved` → resolved; `partially_resolved` → partially_resolved (override: `fix_in_progress` when `cross_repo.propagation == pending`); `unresolved` → open; `new_approach` → resolved; `regression` → regression_introduced; `false_positive` → machine false_positive (countersign-gated); `risk_accepted` → risk_accepted. Class-1 evidence, tier-0 resolution authority. |
 | `*-remediation-verification.json` `regressions[]` (via python3 -m traust.cli route regressions) | new findings | Phase-5 regressions become **first-class ledger findings directly — no `/triage` precondition** (user directive 2026-07-27; parity with the scanning skills). The router carries each regression on its ledger event (never the baseline — gate A15) audit as a campaign-ID finding (`{REPO_SLUG}-{PATCHED_SHA7}-{NNN}`, numbering continuing at the patched sha), `validation_status: not_verified`, `origin: verify-remediation`, script-computed fingerprint, REG id + report path in `source_findings` (and `routed_id` back on the regression entry); pins the claim hash (add-only) and appends a machine birth event (`resolution: open`, verification report as `evidence_ref` — validity is never set at birth). Idempotent; triage/validation adjudicate downstream like any claimed finding. |
 | `*-remediation-verification.json` `cross_repo` blocks | resolution | overrides the verdict row above when present: `partially_resolved` + `propagation: pending` → **fix_in_progress** (the upstream fix exists but the original repo has not consumed it — `evidence_refs` must carry the fix repo commit and the verification report; re-ingest after the next propagation check and promote to resolved on `consumed`); `resolved` + `consumed` → resolved; `propagation: not_applicable` → follow the verdict row (fix legitimately lives in the other repo); `module_absent` → follow the verdict, citing the verifier's removal judgment |
 | Jira | both | Done/Fixed → resolved; Won't Do with risk language → risk_accepted; Not a Bug → false_positive (attributed to the **resolving user** from the ticket changelog, never the bare status); In Progress → fix_in_progress. Ambiguous resolutions are queued, never guessed. |
@@ -241,11 +240,11 @@ state. The skill only auto-records what needs zero interpretation.
    `fix-in-progress`, `resolved`) or an unambiguous declarative sentence
    ("SG_CORE-abcdef0-001 is a false positive: the value is validated in
    the CRD webhook before this path").
-2. **Verified identity**: the author's forge username maps to an employee
-   by the ledger identity layer: `python3 -m traust.cli admin countersign` requires a
-   cryptographically verified human OIDC token and cross-checks the holder
-   against the deployment's employee directory (`ledger.yaml` `identity.directory_command`),
-   refusing to record otherwise.
+2. **Verified identity**: core identity owns token verification and the
+   deployment's optional directory check (`core.yaml` → `identity:`).
+   The ported `admin countersign record` operation is severity-only; it
+   cannot ingest MR/Jira validity determinations. That writer remains
+   unported here; do not substitute its severity door for validity writes.
 3. **Authority**: the author is one of the findings package's assigned
    owners (owners.csv / assign-findings-owners output) or a project
    Maintainer+ (forge members API). An **escalation contact**
@@ -273,7 +272,7 @@ events, which need none.
 
 ## Procedure
 
-### Phase 1 — Resolve and load
+### Phase 1 — RETIRED: resolve and load (port requirements)
 
 1. Resolve the audit report; load findings and `metadata.commit`.
 2. Load `<repo>-findings-layer.json` if present; otherwise initialize it:
@@ -283,25 +282,18 @@ events, which need none.
     "events": [], "needs_review": []}
    ```
 3. Build the set of valid finding IDs. Every event must reference one.
-4. **Baseline the claims** (tamper-evidence for the audit report):
-   ```
-   python3 <harness>RETIRED:baseline_claims.py record <audit.json> <layer.json>
-   ```
-   This pins each finding's canonical claim fields into
-   `metadata.claim_hashes` — new findings (sanctioned appends from
-   `/create-fuzzing`, `/vuln-scan`, `/validate-findings` novel findings,
-   or `/verify-remediation` regression routing) get added; already-baselined hashes
-   are never overwritten. **If `record` refuses** (hash mismatch), the
-   audit report was edited in place: stop and surface it to the user —
-   either the report must be restored from git, or, for a finding
-   legitimately revised under `validation_status: corrected`, the **user**
-   re-runs with `--rebaseline <id> --ticket <change record> --rationale
-   "<why the claim changed>"`. It is a human decision recorded under their
-   identity, so never supply a ticket or rationale on their behalf. Do not
-   proceed to ingestion over a tampered baseline; `build_cumulative.py`
-   would refuse anyway.
+4. **Baseline the claims — retired, not executable.** Core
+   `FindingService.baseline` owns the intended baseline door; it is
+   unfinished. The former baseline writer pinned canonical claim fields
+   into `metadata.claim_hashes`, adding new routed findings without
+   overwriting existing hashes. Preserve this tamper-evidence requirement:
+   a hash mismatch must stop ingestion and be surfaced to the user.
+   Restore an in-place edited audit from git, or require the **user's**
+   explicit corrected-finding restatement with a change-record ticket and
+   rationale; never supply either on their behalf. There is no runnable
+   rebaseline or cumulative rebuild step here until the port lands.
 
-### Phase 2 — Ingest each source
+### Phase 2 — RETIRED: ingest each source (port requirements)
 
 Classify each argument and run the matching adapter. For every candidate
 event, compute the idempotency key **before** appending:
@@ -348,80 +340,55 @@ finding verdict, `actor.kind: machine`,
 `actor.identity: "<skill-name>"`, `source.ref` = report path,
 `rationale` = the report's explanation for that finding.
 
-For a **remediation-verification report**, use the dedicated emitter
-and (separately) the regression router:
+For a **remediation-verification report**, the former verdict emitter
+is **retired, not executable**. Core `VerificationService.record` owns
+the intended ingestion door, but it remains unfinished. Retain the
+validated report and its provenance; do not hand-write resolution or
+validity events and do not claim a cumulative rebuild. The separate
+regression-routing requirement remains:
 
 ```bash
-python3 -m traust.cli ledger emit-verification \
-    <path>/<repo>-remediation-verification.json \
-    --results-root analysis-results --build-cumulative
-
 python3 -m traust.cli route regressions \
     <path>/<repo>-remediation-verification.json
 ```
 
-The emitter maps each `verified_findings[]` verdict to a resolution (or
-validity for `false_positive`) event per the mapping table above,
-including the `cross_repo.propagation` override. It skips `regressions[]`
-— those go through `route_regressions` (idempotent, order-independent).
-`route_regressions` carries each regression on its ledger event (never
-the baseline — gate A15). `build_cumulative` unions event-carried
-findings back at replay.
+The port must map each `verified_findings[]` verdict to a resolution (or
+validity for `false_positive`) decision per the mapping table above,
+including the `cross_repo.propagation` override. It must keep verdict
+ingestion separate from `regressions[]` routing (idempotent,
+order-independent), preserve event-carried findings rather than editing
+the baseline (gate A15), and include those findings in derived state.
 Mechanics: [docs/findings-routing.md](../../../docs/findings-routing.md).
 
-**Interactive** — use the countersign workbench
-(python3 -m traust.cli admin countersign); never hand-assemble interactive events.
+**Interactive** — the former inbox, queue/apply and validity-record workflow
+is **unported**. Do not call retired commands or hand-assemble layer events.
+For a human **severity-only** change on an existing core finding UUID, follow
+`/countersign`: `python3 -m traust.cli admin countersign record` with
+`--finding <UUID> --decision severity --severity <canonical> --rationale <text>
+--token-stdin --config-home <config-directory>`. Use the user's own rationale
+and shell-safe argument quoting. The operator delivers the token only on stdin;
+core authenticates a verified human and owns actor attribution, clock time,
+deduplication and evidence-grade admission. An optional `--evidence-grade`
+requires an explicit strength judgement; no grade is inferred from identity.
+This operation records a core decision and prints a token/rationale-free JSON
+receipt, not a legacy layer or cumulative report. Other interactive requests
+must be deferred until their core-service port lands.
 
-1. **Build the inbox:**
-   `python3 -m traust.cli admin countersign queue --root <findings-tree>`
-   (or `--repo-dir <one repo>`). This derives every
-   `refuted_awaiting_signoff` finding and pending `needs_review` item and
-   renders one self-contained DECISION CARD each — the audit claim, the
-   machine refutation with lint-verified evidence, and what signing
-   records — so the reviewer never needs the original report open.
-2. **Present ONE card per question.** Show the card as the question's
-   preview; options: *Confirm false positive* / *Keep open (reject the
-   refutation)* / *Defer*. A blank rationale on false_positive adopts
-   the machine rationale, explicitly framed as the signer's adopted
-   determination; `keep_open` REQUIRES the human's own rationale —
-   "false positive" (or its rejection) without a why is not recordable.
-3. **Record through the tool:**
-   `countersign.py record --layer <ledger> --finding <ref> --decision
-   ... [--rationale ...]` — the signer is the ledger identity token
-   holder (`ledger auth login` / `ledger auth local`; recording is
-   REFUSED without a verifiable token); the events go through the ledger
-   SDK, which stamps the token-verified actor on each
-   (`source.ref = interactive:<ISO date>:<signer>`, `identity_verified:
-   true`), then it rebuilds the cumulative pair and prints a receipt.
-4. **Asynchronous alternative:** hand the reviewer the annotatable
-   `countersign-queue.md`; they mark `[x]` decisions and rationales in an
-   editor, then `countersign.py apply countersign-queue.md` ingests the
-   whole batch under the reviewer's own ledger token.
-5. Pending `needs_review` items appear at the end of the queue file —
-   confirm/reject each interactively (rejections get a
-   `resolution_note`).
+### Phase 3 — RETIRED: deterministic merge (port requirements)
 
-Append events in `recorded_at` order (the layer must stay chronological);
-update `metadata.updated`.
+Never hand-compute cumulative state. The former cumulative builder is
+**retired, not executable**. Core `FindingService` owns derived finding
+reads/replay, but its cumulative read/output port is unfinished; no
+replacement command or current-file renderer is available here.
 
-### Phase 3 — Merge deterministically
+The port must apply the evidence-class precedence and countersign rules
+in `docs/disposition-ledger.md`, recency within a class, resolution-source
+precedence, and conflict detection (`confirmed` + `false_positive` →
+`conflict: true`, surfaced for re-review, never silently resolved).
+It must derive `<repo>-findings-current.{json,md}` without modifying the
+baseline or hand-written state.
 
-Never hand-compute the cumulative state. Run the merge engine (from the
-workspace root):
-
-```bash
-python traust/traust.cli.build_cumulative \
-  <audit.json> <layer.json>
-```
-
-It applies the precedence rules (human > machine on validity;
-verification_report > jira > other on resolution; latest within a tier),
-the countersign gate, and conflict detection
-(`confirmed` + `false_positive` both present → `conflict: true`,
-surfaced in a "needs re-review" section, never silently resolved), and
-writes `<repo>-findings-current.{json,md}`.
-
-It also merges the **review-surface coverage** recorded by later scans.
+It must also merge the **review-surface coverage** recorded by later scans.
 It finds `/vuln-scan` and `/verify-remediation` reports through the
 `source.ref` of the events it replays, and as the repo's own
 `<repo>-vuln-findings.json` and `<repo>-remediation-verification.json` beside
@@ -431,7 +398,11 @@ In short, a newer `negative` never hides an open finding, and a scan's
 `out_of_scope` never overwrites the audit's record. When no scan carries a
 record, the audit's own record (or its absence) passes through unchanged.
 
-### Phase 4 — Validate and deliver
+### Phase 4 — RETIRED: validate and deliver (output-port requirements)
+
+These checks and the delivery shape apply only once the output port
+produces real layer/current artifacts. Do not run them as a substitute
+for the missing ingestion/rebuild or present the sample delta as a result.
 
 ```bash
 python python3 -m traust.cli reporting validate --schema layer.schema.json <repo>-findings-layer.json
@@ -471,39 +442,38 @@ python python3 -m traust.cli reporting sarif <repo>-findings-current.json
 
 ## Integrations
 
-Consumed artifacts (producer named per artifact):
+Historical inputs and requirements for the unfinished port:
 
 - Baseline reports — `*-security-audit.json` (`/secure-code-audit`),
   `*-cloud-config-audit.json` (`/cloud-config-audit`),
   `*-container-audit.json` (`/secure-container-audit`).
-- `*-triage.json` — produced by `/triage`; verdicts enter via
-  python3 -m traust.cli ledger emit-triage.
-- `*-validation.json` (+ `target-attestation.json`) — produced by
-  `/validate-findings` / `/validate-operator-live` /
-  `/validate-browser-finding`; verdicts enter via
-  python3 -m traust.cli ledger emit-validation.
-- `*-remediation-verification.json` — produced by `/verify-remediation`;
-  verdicts emitted via python3 -m traust.cli ledger emit-verification
-  as resolution events (class-1 evidence, tier-0 resolution authority), and its
-  `regressions[]` are routed into the **ledger** by
-  python3 -m traust.cli route regressions as findings-carrying
-  events — never into the baseline (gate A15; see the mapping table).
+- `*-triage.json` — produced by `/triage`; its core decision-recording port is
+  unfinished. The old triage emitter is retired, not an ingestion path.
+- `*-validation.json` (+ `target-attestation.json`) — validator outputs whose
+  core recording/attestation ports must replace the retired validation emitter.
+- `*-remediation-verification.json` — verification results and regressions need
+  their core record/intake ports. Neither the retired verification emitter nor
+  regression router is callable; never append these findings into a baseline.
 - Forge/Jira sources (MR comments, commits, tickets) — tier-policed
   human statements.
 
-Emitted artifacts:
+Historical outputs, not artifacts this unfinished workflow currently regenerates:
 
-- `*-findings-layer.json` — the append-only authority; consumed by
-  `build_cumulative.py`, `/findings-trends`, `/countersign`,
-  `/mine-ledger`, `/sla-view`, `/verify-remediation` sweep tiering, and
-  python3 -m traust.cli corpus findings-db.
+- `*-findings-layer.json` — the former append-only exchange artifact and its
+  legacy projection consumers. Core decisions now own finding state; do not
+  recreate the removed cumulative/database pipeline or use severity receipts
+  as layer input.
 - `*-findings-current.{json,md}` — derived cumulative view; consumed by
   `/findings-trends`, `/generate-team-report`, `/sla-view`,
   python3 -m traust.cli reporting sarif handovers, and the census/dashboard layer.
 - `*-refuted-register.json` — FP register feeding `/create-fuzzing`
   target selection and `/validate-findings` scoping.
 
-## Options
+## Historical legacy options
+
+These describe the retired layer pipeline, not the service-backed severity
+writer. Its identity and optional ledger policy belong in `core.yaml`; do not
+use old environment switches to bypass core verification.
 
 | Variable | Default | Effect |
 |----------|---------|--------|

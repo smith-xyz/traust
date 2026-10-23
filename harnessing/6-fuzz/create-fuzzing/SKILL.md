@@ -38,9 +38,13 @@ notes.
    find recommended fuzz entry points (findings whose `remediation` mentions
    fuzzing, or the report's remediation-roadmap "add fuzz harness" items).
    **Also check the refuted register** —
-   `<repo>-refuted-register.json` alongside the audit report (emitted by
-   python3 -m traust.cli ledger emit-triage) lists findings dismissed as
-   false positives; entries in fuzzable classes (parsers, decoders,
+   `<repo>-refuted-register.json` alongside the audit report (a legacy
+   triage-emitter artifact) lists findings dismissed as false positives.
+   Its emitter is **retired, not executable**; core
+   `FindingDecisions.record` owns the unfinished triage-ingestion port,
+   including refuted-register output. Read an existing register; do not
+   attempt to regenerate it or treat its absence as proof of no refutations.
+   Entries in fuzzable classes (parsers, decoders,
    memory safety, injection) are PRIORITY targets, because a reproducing
    crash overrides the FP assertion via evidence-class precedence
    (`fp_overridden`). An FP is a falsifiable claim, not an exclusion.

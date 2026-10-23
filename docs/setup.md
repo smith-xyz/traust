@@ -38,14 +38,12 @@ contract: [config/README.md](../config/README.md).
 - Git access to this repository and, for the multi-repository pipeline, the
   sibling data repositories (§3)
 - Network access to the forge holding the repositories you audit
-- A ledger identity for anyone who countersigns: `ledger auth login`
-  against your OIDC provider, or `ledger auth local` where there is none
-  (local tokens countersign only with `HARNESS_COUNTERSIGN_ALLOW_LOCAL=1`
-  — see the countersign skill). Optionally an employee-directory command
-  (`ledger.yaml` → `identity.directory_command`) the ledger runs to confirm a
-  signer is a current member of your organisation. Signing and the optional
-  Ledger database are also `ledger.yaml` (copy `config/ledger.example.yaml`);
-  no `LAAS_*` variable configures a harness run.
+- For direct human severity recording, a bearer token accepted by the trusted
+  issuers in `core.yaml`'s `identity:` section. Core verifies the signature,
+  caller and any configured directory policy; the command reads the token only
+  from stdin. Local identity is trusted only when core explicitly enables it.
+  Retired `ledger auth` commands and `HARNESS_COUNTERSIGN_ALLOW_LOCAL` do not
+  configure this writer. See [the command contract](cli-reference.md#direct-human-severity-recording).
 
 Scanner tools are per capability, not global: nothing beyond the baseline is
 needed until a skill calls for it. What each capability needs is the table in
@@ -75,18 +73,16 @@ cd traust && uv sync
 
 No `uv`? `pip install --require-hashes -r requirements.lock`.
 
-`uv sync` installs the code dependencies selected by commit `rev` in
-`pyproject.toml` and resolved in `uv.lock`: `traust-engine` (scanner adapters,
-corpus, metrics, reporting, and the ledger gateway), `traust-ledger` (finding
-identity, Merkle integrity, and signing), and `traust-contracts` (schemas, enums,
-shared bindings, and database DDL). Clone those repositories only to change them.
+`uv sync` installs `traust-core` and `traust-engine` at the commits selected in
+`pyproject.toml` and resolved in `uv.lock`. Contracts and ledger come through
+core's pins, rather than direct imports into the harness.
 
-[traust-core](https://github.com/traust-security/traust-core) is the shared
-platform API being adopted by the ecosystem. It is not yet a declared dependency
-of the harness, engine, or ledger, so this quick start neither installs core nor
-requires a sibling core checkout. Core's `traust.yaml` configuration and planned
-REST API do not replace this harness's `TRAUST_CONFIG_HOME` setup. Core adoption
-requires a separate, tested implementation and dependency migration.
+Local domain operations call core's services through the app composition root.
+`core.yaml` in `TRAUST_CONFIG_HOME` selects core's database, identity and optional
+ledger policy; a REST deployment is not required for the local CLI.
+For PostgreSQL, use `uv sync --extra postgres`; SQLite needs no driver extra.
+Core's platform configuration is documented in its
+[development README](https://github.com/traust-security/traust-core/blob/development/README.md).
 
 What each component owns, which repo to change, and how source conflicts and
 commit updates work: [components.md](components.md). `/check-drift` reports an

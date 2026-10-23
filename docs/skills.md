@@ -246,11 +246,11 @@ Static source-code vulnerability scan. Reads a target directory (and its threat 
 
 ## countersign
 
-Review and sign off pending human decisions in the findings disposition ledger — machine-refuted false positives awaiting an identity-verified countersignature, and queued needs-review items — and record human overrides on any finding, including severity upgrades/downgrades and validity flips in both directions (false positive to true positive via reopen, true positive to false positive via override). Renders each pending decision as a self-contained card (claim + refutation + evidence) so nothing needs to be remembered from the original reports, records decisions through the countersign workbench, and rebuilds the cumulative reports. Use when asked to "countersign findings", "sign off false positives", "review pending refutations", "what's waiting for my signature", "clear the disposition queue", "downgrade/upgrade this finding's severity", "reclassify this finding", or "this finding is actually a false positive / actually real".
+Record a verified human's direct severity judgement on an existing core finding UUID. Only severity recording is ported to core services; the pending-decision inbox, bulk apply, validity overrides and mapping review remain unavailable. Use when asked to upgrade, downgrade or reclassify a finding's severity.
 
 - **Stage:** ④ Triage
 - **Tier:** `primary`
-- **Invoke:** `/countersign` — arguments: `[<findings-root>|<product>/<repo>]`
+- **Invoke:** `/countersign` — arguments: `<finding-UUID>`
 - **Skill:** [harnessing/4-triage/countersign/SKILL.md](../harnessing/4-triage/countersign/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/4-triage/countersign/SKILL.md#integrations)
 

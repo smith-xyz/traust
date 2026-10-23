@@ -582,19 +582,22 @@ Do not begin the next image until the current report passes.
 
 The report is an **immutable baseline**, and this skill never writes
 disposition state — the same invariant as every audit profile. Post-audit
-truth flows through the disposition ledger
-([`docs/disposition-ledger.md`](../../../docs/disposition-ledger.md)):
-`/triage` and `/validate-findings` verdicts reach the ledger via
-python3 -m traust.cli ledger emit-triage /
-python3 -m traust.cli ledger emit-validation, and `/track-findings`
-regenerates the cumulative view. Container-specific rules:
+truth is intended to flow through the disposition ledger
+([`docs/disposition-ledger.md`](../../../docs/disposition-ledger.md)).
+The former triage/validation emitters and `/track-findings` cumulative
+rebuild are **retired, not executable**. Core `FindingDecisions.record`
+and `ValidationService.record` own the respective ingestion ports;
+`FindingService` owns derived finding state. Those record/output ports
+are unfinished: retain the verdict reports, do not hand-write events,
+and do not claim a regenerated cumulative view. Container-specific
+requirements for the port:
 
 - **Naming.** The report shares its directory with the source repo's
   code audit, so ledger artifacts keep the full report stem:
   `<image>-container-audit-findings-layer.json` and
   `<image>-container-audit-findings-current.{json,md}` — never the
   short `<image>-findings-*` names, which belong to the code audit.
-  The ledger tooling derives this naming by default.
+  The port must preserve this naming; retired tooling is not a current writer.
 - **Identity across rebuilds.** Finding IDs are digest-keyed; a fixed
   image rebuild is a **new digest → new report → new finding IDs**.
   Dispositions do not carry forward by editing the old report: re-audit

@@ -1,12 +1,16 @@
 # The Disposition Ledger — Design and Rationale
 
-**Audience.** Anyone trying to understand how the harness remembers what
-it believes. This document explains the *why* behind the disposition
-ledger — the reasoning that produced the design — rather than operating
-instructions ([track-findings SKILL.md](../harnessing/4-triage/track-findings/SKILL.md));
-the triage-to-ledger wiring is §6b.
-For the full pipeline picture, start with
-[artifacts.md](artifacts.md).
+**Audience.** Anyone trying to understand the historical disposition-ledger
+design and the reasoning behind it. Except for the direct severity writer in
+§6a, this page is **legacy methodology, not operating instructions**.
+
+The core-hub cutover retired layer ingestion, triage/validation/verification
+emitters, finding routers, countersign queue/apply and cumulative/projection
+builders. Core finding, identity and ledger services own the replacement;
+their skill ports remain unfinished and there is no executable fallback.
+In particular, severity recording is not a validity, triage or validation door.
+See [components.md](components.md) for component ownership and
+[artifacts.md](artifacts.md) for the artifact map.
 
 ---
 
@@ -39,12 +43,12 @@ Everything else in this document follows from six decisions:
    visible), and time travel (any past state reconstructs by replaying
    only the events before a date).
 
-2. **Events, not state.** The ledger stores *what happened*; the current
-   disposition is computed by pure code
-   (build_cumulative.py (retired with the traust-core hub)). The model gathers
-   and interprets sources; deterministic code decides state. Ten reruns
-   give ten identical outputs, so dashboards are reproducible and
-   arguments about "what the number was" have a mechanical answer.
+2. **Events, not state.** The legacy ledger stored *what happened*;
+   `build_cumulative.py` derived current disposition deterministically.
+   That builder is retired; core finding decisions/queries own its
+   replacement, and the cumulative-report skill port is unfinished.
+   The design principle remains: models interpret sources, deterministic
+   services admit decisions and derive state.
 
 3. **Attribution always.** Every event names its actor — a human
    (identity-verified where it matters) or a machine (`triage/0.27.0`,
@@ -149,12 +153,11 @@ Three things that are deliberately *not* ledgers:
   and the thing the claim hashes protect (§10); the markdown is
   regenerated from it.
 
-Ledgers are created **lazily** — a repo gets its layer on its first
-`track-findings` run — or in bulk:
-`python3 harnessing/4-triage/track-findings/scripts/baseline_claims.py sweep analysis-results/findings`
-creates a minimal layer (and pins all claim hashes) for every canonical
-audit report that lacks one, so baselines are tamper-evident *before*
-any triage feedback arrives.
+Legacy ledgers were created lazily by `track-findings` or initialized in bulk
+by the baseline-claim tooling, pinning audit claims before triage feedback.
+Those layer-initialization workflows are historical, not current setup steps.
+Core finding intake/baseline services own their unfinished skill ports; there
+is no executable fallback.
 
 ### The event record
 
@@ -202,17 +205,16 @@ verdict signed in March still attaches to the same finding in August. Only the
 *first* CWE enters identity. A moved file or a re-tagged primary CWE produces a
 **new** identity — which is what rebaseline alias events exist to bridge.
 
-**The harness computes it; nothing else does** (ledger plan decision D7). The
-recipe has exactly one implementation, in `traust_ledger/_internal/identity.py`, and one
-prose contract, `traust-ledger/docs/finding-identity.md`. Report writing stamps the value as
-a required post-validation step (python3 -m traust.cli corpus finding-identity
-fingerprint `<report>` --write; see [report-structure.md](report-structure.md)),
-and the report validator's `check_finding_identity` then **recomputes every stamp
-and compares** — an absent fingerprint is an error (2026-08-13, once the corpus
-reached 100% stamped) and so is one that does not reproduce, which is what makes a
-forged stamp fail validation rather than propagate. A producer that mints findings
-without routing through the harness submits **unstamped** rather than inventing an
-identity.
+**Historical fingerprinting ownership.** Under ledger plan decision D7 the
+harness computed the legacy recipe implemented in
+`traust_ledger/_internal/identity.py`, with its prose contract in
+`traust-ledger/docs/finding-identity.md`. Report writing stamped fingerprints
+and validation recomputed them to reject absent or forged stamps. The corpus
+identity CLI is retired; core finding identity/intake owns the replacement,
+but the report-writing skill port is unfinished and has no executable fallback.
+A producer must not invent an identity stamp. The ported severity writer
+instead requires an existing **core finding UUID**, not a fingerprint or
+legacy scan-scoped finding ID.
 
 **Two fields, different provenance, routinely conflated.** `findings[].fingerprint`
 in the audit report is the wire format — plain JSON, protected only by the
@@ -293,14 +295,13 @@ proof. (Before this rule, human FPs recorded on verification events
 classed 1 and `exec_decisive` discarded them — the finding pended
 forever.) Actor beats source; grade beats both.
 
-Class 1 is conditional, not automatic (v0.179): an execution *source*
-earns execution-class rank only when its evidence grade shows something
-actually happened — E0/E1. An E2/E3-graded event from a validation or
-verification report is machine static evidence with a grade annotation
-(`build_cumulative.py` `event_class`), and ungraded confirmations from
-reports at/after 0.179.0 never become events at all — the emitter
-(python3 -m traust.cli ledger emit-validation) quarantines them into
-`needs_review` until graded (pre-0.179.0 reports are grandfathered).
+In the legacy methodology, class 1 was conditional, not automatic (v0.179):
+an execution source earned that rank only with E0/E1 evidence of an observed
+effect. E2/E3 events remained machine-static evidence with a grade annotation.
+The retired validation emitter quarantined ungraded confirmations from reports
+at/after 0.179.0 into `needs_review` (older reports were grandfathered).
+Core validation/finding decisions own the replacement, but the skill port is
+unfinished and there is no executable validation/validity-write fallback.
 
 The consequences are deliberately uncomfortable in one direction: a
 human can overrule any machine *opinion*, but not a machine-*executed
@@ -315,16 +316,14 @@ the one that removes risk from the record. The ledger therefore treats
 every FP as a **falsifiable claim under standing scrutiny**, through
 six stacked controls:
 
-1. **The soundness gate.** A machine refutation that rests on an
-   unsound probe — an error-signature transcript, a zero-subject RBAC
-   probe, a target that never deployed — never enters as FP evidence at
-   all: the verdict is downgraded to `inconclusive` with a
-   machine-readable `soundness_flag`, and the emitter queues an
-   `unsound_refutation` needs_review item instead
-   (`harnessing/5-validate/validate-findings/SKILL.md`,
-   python3 -m traust.cli ledger emit-validation; legacy reports are
-   linted retroactively by python3 -m traust.ops.lint_refutation_soundness). A
-   probe that never soundly tested the claim proves nothing either way.
+1. **The soundness gate.** In the legacy flow, a machine refutation resting
+   on an unsound probe — an error-signature transcript, zero-subject RBAC
+   probe or target that never deployed — was downgraded to `inconclusive`
+   with a `soundness_flag`. The validation emitter queued an
+   `unsound_refutation` review item instead of admitting FP evidence.
+   That emitter is retired; core validation/finding decisions own its
+   unfinished skill port. A probe that never soundly tested the claim
+   proves nothing either way; the severity writer is not a substitute.
 2. **Machine FPs pend by default (countersign rule).** A machine
    refutation — triage vote or live-validation `refuted` — enters as
    *evidence* and shows as "refuted, awaiting human sign-off" until an
@@ -377,75 +376,49 @@ visible, stay testable, and lose to evidence.
 
 ### 6a. The countersign workbench
 
-"Awaiting sign-off" is derived state, not a stored queue — so
-python3 -m traust.cli admin countersign provides the human inbox over it:
+Only the direct human severity writer is currently ported:
+`python3 -m traust.cli admin countersign record --decision severity`.
+It accepts a core finding UUID, an exact canonical severity, the reviewer's
+required rationale, and an optional explicit evidence grade. See the
+[CLI reference](cli-reference.md#direct-human-severity-recording) for an invocation.
 
-- **`queue`** walks a findings tree, derives every pending decision
-  (awaiting-signoff findings + pending `needs_review` items), and
-  renders one **decision card** per item: the audit claim, the machine
-  refutation with its lint-verified evidence and vote data, and exactly
-  what signing records. A card is self-contained by design — the
-  reviewer decides without opening any report.
-- **`apply` / `record`** turn decisions into ledger events: the
-  signer's identity is verified before anything is recorded — the
-  signer is the holder of the ledger identity token, the SDK verifies
-  the token and stamps that identity on every event it writes, and
-  nothing the CLI asserts about the signer reaches the layer. Machine
-  tokens cannot countersign. Self-minted local tokens
-  (`identity_provider: local`) verify against a key in the signer's own
-  config directory, so any code executor could mint "human, verified"
-  events for two names and defeat the two-person rule; countersign
-  refuses them unless the deployment sets
-  `HARNESS_COUNTERSIGN_ALLOW_LOCAL=1` (adopters with no identity
-  provider). An employee-directory cross-check ("is this account
-  current") is a deployment command the ledger runs
-  (`ledger.yaml` → `identity.directory_command`),
-  applied on every write path; it is not part of the identity proof. Mechanism and
-  variables: the identity-verification section of
-  [countersign SKILL.md](../harnessing/4-triage/countersign/SKILL.md). A blank
-  rationale on a countersign adopts the machine rationale *explicitly
-  framed as the signer's adopted determination*, rejecting a refutation
-  (`keep_open` → human `confirmed`) requires the reviewer's own words,
-  events get canonical ids (idempotent per signer-day-and-level), and the
-  cumulative report is rebuilt deterministically with a printed receipt.
-- The annotatable `countersign-queue.md` also works asynchronously —
-  mark decisions in an editor or an MR, apply later.
-- **Human overrides** extend the workbench beyond the queue —
-  a finding need not be pending to act on it, and all three demand a
-  rationale in the signer's own words: `reopen` flips a false positive
-  back to confirmed (a human `confirmed` event);
-  `override_false_positive` flips a confirmed/open finding to FP, with
-  evidence-class precedence still applying (over an executed proof a
-  second independent signer must concur); `severity=<level>` records an
-  upgrade or downgrade — the audit report's severity is never
-  rewritten, the cumulative report carries it as `effective_severity`
-  plus a `severity_overrides` table (python3 -m traust.cli admin countersign).
+The command uses `traust.context.load_services(config_home)`, authenticates a
+stdin-only `Credential` through core identity, requires a verified human, and
+calls `services.findings.decisions.decide(RecordDecision(...), principal)`.
+Core owns actor attribution, clock time, deduplication and admission policy.
+Interactive provenance is not evidence strength: omitted grades remain ungraded,
+and weaker/ungraded conflicting severity claims cannot replace stronger proof.
+Severity and evidence-grade vocabularies are imported from core, never copied
+into the CLI. Repeating the same judged statement returns the saved decision.
 
-None of the §6 safeguards are relaxed: the workbench removes the memory
-burden and the ceremony, not the verification, the rationale
-requirement, or the override machinery.
+The JSON receipt includes the saved decision UUID and stable metadata, never
+token or rationale. The command neither reads/writes legacy layer files nor
+rebuilds cumulative reports or rewrites audit severity. Reload decisions through
+`services.findings.history(finding_id)`.
+
+The rest of the former workbench remains **unported**: pending-decision inbox,
+annotated queue-file apply, bulk review, false-positive countersigning,
+reopen/validity overrides and mapping decisions. Their retired operations are
+strict CLI errors, not an empty queue or a compatibility shim. The port does not
+relax core's verified-human, independent-human, future-time or restatement
+authority protections; it exposes only the severity operation.
 
 ### 6b. How triage verdicts become events
 
-`/triage` Phase 6e runs the emitter and then rebuilds the cumulative
-report; both are deterministic and can be re-run by hand:
+The former Phase 6e emitter translated triage output into legacy layer events;
+the cumulative builder then replayed them over the baseline. **Both steps are
+retired.** Core finding intake/decisions own admission and core finding queries
+own derived state. The triage-to-core and cumulative-report skill ports remain
+unfinished, and there is **no executable fallback**. Do not hand-write layers
+or use the severity writer to submit a triage or validity decision.
 
-```bash
-python3 -m traust.cli ledger emit-triage \
-    <repo>-triage.json --audit <repo>-security-audit.json \
-    --lint .triage-state/verdict-lint.json   # --layer, --weights, --tenancy-profile optional
-python3 -m traust.cli build cumulative \
-    <repo>-security-audit.json <repo>-findings-layer.json
-```
+The mapping below records the former behavior, not a currently executable
+workflow. The old emitter routed and gated evidence; the merge/countersign
+rules decided effective validity. Only canonical `orig_id` references joined
+events to the legacy audit baseline; scanner batches lacking one skipped
+emission with a warning. New core decisions identify findings by UUID.
 
-The emitter routes and gates only. It never flips validity itself; the
-merge engine and the countersign rule decide. Only findings with a
-canonical `orig_id` (`{REPO_SLUG}-{SHORTSHA}-{NNN}`) emit events,
-because `finding_ref` must join back to the audit report; a batch
-without one (third-party scanner input) skips emission with a logged
-warning.
-
-| Triage verdict | Ledger effect |
+| Triage verdict | Historical ledger effect |
 |---|---|
 | `true_positive` | validity `confirmed`, machine actor. Confirmation is the low-risk direction, so it stands without countersign; the resolution axis is untouched. |
 | `true_positive` with `verify_verdict: needs_manual_test` | no validity event; a `needs_manual_test` needs_review item, so the unconfident confirmation reaches the countersign inbox instead of evaporating. |
@@ -469,13 +442,12 @@ the cross-commit identity handling of §3 applies unchanged. A verdict
 that changes between runs appends a new event; last-wins-per-axis takes
 the newer `recorded_at`, and both events stay visible.
 
-**Who computes what.** The emitter produces events, the refuted
-register and queue items. `build_cumulative.py` derives the
-evidence-class merge, `fp_overridden`, the two-person state and the
-`assurance` grade. `build_trends.py` derives the assurance views and
-their deltas, FP-override rates, the hardening burndown and the
-blast-radius annotation. The executive summary computes none of those;
-it reports severity, credential and ledger-coverage headlines only.
+**Historical division of labor.** The emitter produced events, the refuted
+register and queue items. The cumulative builder derived evidence-class merge,
+`fp_overridden`, two-person state and `assurance`; the trends builder derived
+assurance deltas, FP-override rates, hardening burndown and blast-radius
+annotations. These retired builders are not executable alternatives to the
+unfinished core finding/insight skill ports.
 
 ## 7. Hardening: real risk that isn't a vulnerability
 
@@ -513,24 +485,21 @@ authorization) sit at or near 1.0; observability gaps sit at the floor,
 which is also the `default` for any unlisted category. The current
 values are in the file; this page does not duplicate them.
 
-Two modifiers complete the resolution:
+The legacy emitter applied two modifiers; these describe the retired method,
+not current CLI options:
 
-- **Tenancy profile and dampening.** The profile is derived from exactly
-  one artifact: the audit report's `peach_isolation_review.applicable`
-  flag (`true` → `multi_tenant`), or an explicit `--tenancy-profile`
-  override on the emitter. No threat-model or repo-graph leg exists.
-  With neither present the profile defaults to `single_tenant`, which
-  multiplies every weight by `single_tenant_dampening` (0.5 by default),
-  because the tenancy-load-bearing categories are weighted for exactly
-  the blast radius a single-tenant deployment doesn't have — so emit
-  PEACH blocks rather than trusting the default.
-- **Emission-time recording (tenet 6).** `emit_triage_ledger_events.py`
-  resolves λ *when the event is written* and records the weight, the
-  table version, and the tenancy profile into the event's `risk_weight`
-  field. Replays never re-read the config — editing the table affects
-  only future emissions, so `findings-trends` stays deterministic under
-  weight changes, and every historical risk number remains explainable
-  by the version stamped on its events. Bump `version` on any edit.
+- **Tenancy profile and dampening.** The profile came from the audit report's
+  `peach_isolation_review.applicable` flag (`true` → `multi_tenant`), or an
+  explicit emitter override. No threat-model or repo-graph leg existed.
+  With neither present it defaulted to `single_tenant`, multiplying every
+  weight by `single_tenant_dampening` (0.5 by default). The model therefore
+  depended on explicit PEACH context rather than assuming multi-tenancy.
+- **Emission-time recording (tenet 6).** The retired triage emitter resolved λ
+  when writing the event and recorded the weight, table version and tenancy
+  profile in `risk_weight`. Replays never re-read the config: editing the
+  table affected future emissions only, preserving historical explainability.
+  Bump `version` on a weight-table edit. Core finding decisions own the
+  unfinished hardening skill port; there is no executable emitter fallback.
 
 ## 8. Replay: what the ledger buys you
 
@@ -628,24 +597,19 @@ audit report the ledger annotates was protected only by convention
 edit to a finding's description or severity would flow silently into the
 derived cumulative report rather than conflict with it.
 
-`metadata.claim_hashes` in the layer closes that gap. At every
-track-findings run, `harnessing/4-triage/track-findings/scripts/baseline_claims.py record` pins a sha256 of
-each finding's **canonical claim fields** — id, title, severity, cwes,
-locations, description, remediation — from the **`*-security-audit.json`**
-(the JSON is the original; the `.md` is a rendering of it and is not
-hashed). Three properties follow:
+The legacy layer's `metadata.claim_hashes` closed that gap. Baseline-claim
+recording pinned a sha256 of each finding's **canonical claim fields** — id,
+title, severity, cwes, locations, description, remediation — from the audit JSON.
+The JSON was original; its Markdown rendering was not hashed. The historical
+contract had three properties:
 
-1. **Add-only.** New findings (sanctioned appends from `/create-fuzzing`
-   follow-ups, `/vuln-scan` supplements, `/validate-findings` novel
-   findings, or `/verify-remediation` regression routing —
-   python3 -m traust.cli route regressions) get pinned on the next run; an existing
-   hash is never overwritten — except for a finding explicitly named with
-   `--rebaseline` whose `validation_status` is `corrected`, the one
-   sanctioned in-place revision path. It needs `--ticket` and
-   `--rationale` and is written as a ledger restatement (`reason:
-   baseline_rewrite`) carrying the prior hash, the verified actor and the
-   ticket (the report digest is restated with it when the report changed),
-   so the revision is visible and attributable instead of silent.
+1. **Add-only.** The legacy baseline-claim workflow pinned new findings
+   without overwriting an existing hash. Its explicit corrected-finding
+   rebaseline path required a ticket and rationale and recorded the prior
+   hash, verified actor and report digest in an attributable restatement.
+   The regression router and baseline restatement workflow are retired;
+   core finding intake/decisions own their unfinished skill ports, with no
+   executable fallback.
 2. **`validation_status` is deliberately excluded** from the hash: it
    changes via the sanctioned human/execution paths, and the ledger —
    not the file — is the authority on current belief anyway.
@@ -662,13 +626,13 @@ The two hashes above protect content — `event_id` breaks when an event's
 canonical disposition fields are edited, claim hashes break when a
 baseline finding's claim is edited. Neither notices an event being
 **deleted, inserted with internally-consistent hashes, or reordered**.
-Since harness v0.66 (feat/merkle-tree-hashing), every write path
-(`emit_triage_ledger_events`, `emit_validation_ledger_events`,
-countersign recording, `build_cumulative`) re-stamps the layer with an
-RFC 9162 SHA-256 Merkle root (`metadata.merkle_root` / `merkle_size` /
-`merkle_epoch`; pre-epoch events on layers adopted mid-history are
-pinned by `pre_merkle_checkpoint`). The validator recomputes it on
-every pass.
+Since harness v0.66 (feat/merkle-tree-hashing), legacy layer write paths
+(`emit_triage_ledger_events`, `emit_validation_ledger_events`, `build_cumulative`)
+re-stamp the layer with an RFC 9162 SHA-256 Merkle root (`metadata.merkle_root` /
+`merkle_size` / `merkle_epoch`; pre-epoch events on layers adopted mid-history
+are pinned by `pre_merkle_checkpoint`). The validator recomputes it on every
+pass. The rebuilt direct severity writer persists through core services instead
+of writing these legacy files.
 
 **Leaf format 2 (v0.200.0, self-audit `-001`):** leaves are the
 canonical JSON of the FULL event object (sorted keys, `merkle_*` fields
@@ -733,7 +697,10 @@ history — applies to legacy format-1 stamps only).
 
 ## 10c. Data flow: how an event reaches the ledger, and what gets signed
 
-Every path below converges on one function. There is no second way in.
+This is the **historical file-writing flow**, not a current execution path.
+The named emitters, cumulative builder and full countersign workbench are
+retired. The severity-only writer in §6a persists through core services and
+does not enter this diagram.
 
 ```
   EVIDENCE PRODUCERS                    LEDGER WRITERS                      ARTIFACT
@@ -746,7 +713,7 @@ Every path below converges on one function. There is no second way in.
    *-validation.json   ├─► emit_validation_ledger_events ────┤
                        │        (append events)              │
   human decision    ───┤                                     ├─► traust-ledger stamp_and_sign(layer)
-   (identity-verified) ├─► countersign (workbench / CLI)     │      │
+   (identity-verified) ├─► retired legacy countersign          │      │
                        │        (append events)              │      ├─ 1. stamp_merkle_metadata()
   /track-findings    ──┤                                     │      │     recompute merkle_root
    MR/commit/tracker   └─► build_cumulative ─────────────────┘      │     over ALL events
@@ -763,7 +730,7 @@ Every path below converges on one function. There is no second way in.
                                                       events[…]
 ```
 
-**Read it as four claims.**
+**Read the historical design as four claims.**
 
 1. **A scan does not sign anything.** Producing a finding writes an audit report, not a ledger
    event. A finding reaches the ledger only as a *disposition event* — and it is the event that
@@ -782,10 +749,10 @@ Every path below converges on one function. There is no second way in.
    `leaf_format`/`merkle_epoch` beneath it, or kept valid while the annotated report or a sibling
    artifact is swapped.
 
-4. **One signature per layer file — not per event, not per checkpoint.** A layer with 163 events has
-   one signature, replaced wholesale on the next write. Checkpoint signing
-   (`merkle_epoch` + `pre_merkle_checkpoint`) belongs to the future single-event-store design and is
-   **unused today**: every layer sits at `merkle_epoch: 0`.
+4. **One signature per legacy layer file — not per event, not per checkpoint.**
+   A layer with 163 events had one signature, replaced on the next file write.
+   Legacy layers used `merkle_epoch: 0`. This is historical file-format behavior,
+   not a statement that core's current ledger service lacks checkpoint storage.
 
 **Failure modes, none of them silent:**
 
@@ -816,52 +783,38 @@ only the three `secure*audit` skills may write a baseline:
 - **Not a place for prose.** Rationales are verbatim quotes of the
   determining statement — the ledger preserves evidence; it does not
   editorialize.
-- **Not a database.** The ledger of record is the per-repo append-only
-  JSON files — deliberately, because the entire tamper-evidence stack
-  (canonical event ids, claim hashes, content-bound Merkle roots,
-  signatures, git history) is built on immutable files; a mutable
-  store would undermine exactly those properties. See §11b for the SQL
-  window that exists *over* it.
+- **The legacy file ledger was not a database.** Per-repo append-only JSON
+  files were its record, protected by event IDs, claim hashes, content-bound
+  Merkle roots, signatures and git history. This is not the current
+  persistence contract: the ported severity writer uses core services and
+  core-owned storage, not those files.
 
 ## 11b. findings.db — the SQL window, never the ledger
 
-There **is** a single place to query every finding with SQL:
-`analysis-results/graph/findings.db`, a SQLite **projection** built by
-python3 -m traust.cli corpus findings-db (the `/findings-db` skill) over all the
-per-repo ledgers and reports, rebuilt by `/census`. It answers
-corpus-shaped questions ("open criticals by business unit", "distinct
-CWE-1104 exposure") in one query instead of walking ~8k JSON files,
-and several harness tools use it as an accelerator (diff-mode baseline
-resolution, sweep scoping, dashboards).
+The former `findings.db` was a rebuildable SQLite projection of per-repo
+reports and legacy layers, used for corpus queries, baseline resolution,
+sweep scoping and dashboards. It was not the legacy ledger of record.
+The corpus projection builder is **retired**, not a current census step.
 
-Two rules keep the record/projection relationship honest:
-
-1. **Projection, never authority.** The DB can be one census behind —
-   including behind events a sweep itself just emitted. Anything
-   consequential (a verdict, a resolution, a countersign) confirms
-   against the live `*-findings-layer.json` before acting; "the DB
-   lists candidates; the ledger decides."
-2. **Writes never go to the DB.** Every mutation path in the harness
-   appends events to the layer files through the recording tools;
-   `findings.db` is regenerated from them, read-only, and none of the
-   integrity machinery (§10–10b) applies to it — deleting or editing
-   the DB destroys nothing and proves nothing.
-
-The full consumer roster — which skills read the DB and at what
-touchpoint — lives in the `## Integrations` section of
-`harnessing/findings-db/SKILL.md`.
+Core assessment/population and finding services own the replacement. The
+corpus/projection skill ports remain unfinished and there is **no executable
+fallback**. Existing `findings.db` files may be historical inputs; their
+presence does not demonstrate current data or an operational refresh path.
+Do not create a second mutable authority or manually write decisions into
+that projection. The severity-only CLI uses core persistence and reloads
+history through core services (§6a), not through the legacy projection.
 
 ## 12. Pointers
 
 | Topic | Where |
 |---|---|
-| Operating the ledger (ingest sources, tiers, interactive countersign) | `harnessing/4-triage/track-findings/SKILL.md` |
-| Querying the corpus via the SQLite projection (`findings.db`) | `harnessing/findings-db/SKILL.md` |
-| Countersign workbench (decision cards, apply/record) | python3 -m traust.cli admin countersign (§6a) |
-| Triage → ledger wiring (verdict → event mapping, emitter) | §6b; `src/traust/cli/emit_triage_ledger_events.py` |
+| Legacy source-ingestion methodology (skill port unfinished) | `harnessing/4-triage/track-findings/SKILL.md` |
+| Legacy corpus projection (builder retired; skill port unfinished) | §11b; core assessment/finding services own the replacement |
+| Ported direct human severity writer (no queue/apply or validity writes) | [CLI reference](cli-reference.md#direct-human-severity-recording); §6a |
+| Historical triage → ledger mapping (emitter retired) | §6b |
 | λ weight table (versioned, owner-tunable) | `$TRAUST_CONFIG_HOME/hardening-risk-weights.json` (§7a) |
 | Whole-pipeline map (artifacts, producers, consumers) | [artifacts.md](artifacts.md) |
-| Merge engine (the derivation code) | build_cumulative.py (retired with the traust-core hub) |
-| Trend replay | `harnessing/findings-trends/scripts/build_trends.py` |
-| Fingerprint recipe, `ALGO_VERSION`, strict mode, what identity is *not* | `traust-ledger/docs/finding-identity.md` (beside `traust_ledger/_internal/identity.py`) |
+| Legacy merge derivation (builder retired) | §8; core finding/insight skill ports remain unfinished |
+| Historical trend replay | §8; former `build_trends.py` is retired, not an executable fallback |
+| Current finding identity recipe/version attribution | `traust_core.v1.services.findings.identity.IdentityPolicy`; §3 records the historical recipe, not a second implementation |
 | Schemas | `schemas/v1/layer.schema.json`, `schemas/v1/report.schema.json` |

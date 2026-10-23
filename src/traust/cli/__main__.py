@@ -21,10 +21,6 @@ def _split(argv: list[str] | None) -> tuple[str | None, str | None, list[str]]:
     return rest[0], rest[1], rest[2:]
 
 
-def _help_only(rest: list[str]) -> bool:
-    return rest in (["-h"], ["--help"])
-
-
 def _print_top_help() -> None:
     lines = [
         "usage: traust <group> <op> [args...]",
@@ -62,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
 
     spec = group_ops[op]
 
-    if getattr(spec, "passthrough_argv", False) and not _help_only(rest):
+    if getattr(spec, "passthrough_argv", False):
         pre = argparse.ArgumentParser(
             prog=f"traust {group} {op}",
             add_help=False,

@@ -36,7 +36,6 @@ allowed-tools:
   - Bash(python3 *traust/harnessing/4-triage/triage/scripts/lint_verdict_citations.py:*)
   - Bash(python3 *traust* -m traust.cli reporting validate:*)
   - Bash(python3 *traust/harnessing/4-triage/triage/scripts/render_triage.py:*)
-  - Bash(python3 *traust* -m traust.cli.emit_triage_ledger_events:*)
   - Bash(python3 *traust* -m traust.cli corpus precedent:*)
 ---
 
@@ -1119,8 +1118,9 @@ overrides a fresh code-level determination — and prefix the finding's
 rationale with `"PRECEDENT DISAGREEMENT:"` naming the precedent
 (source repo, date, countersigner/adjudicator, strength). For
 `human_countersigned` precedents, additionally surface it in the
-terminal summary as pending human adjudication via `/countersign`: a
-verifier disagreeing with a countersigned precedent escalates to a
+terminal summary as pending human adjudication; the `/countersign`
+validity/queue workflow is unported (its current writer is severity-only).
+A verifier disagreeing with a countersigned precedent escalates to a
 human, it neither silently follows the precedent nor silently
 overrides the countersigner. For `machine_refuted_sound` precedents
 the rationale prefix suffices — two machine opinions disagreeing is
@@ -1461,32 +1461,30 @@ findings and duplicates only). If the renderer errors, fix `<repo>-triage.json`
 and re-run 6c rather than writing the Markdown by hand — divergent
 hand-built reports are exactly what the renderer exists to prevent.
 
-### 6e. Emit disposition-ledger events (harness-audit input only)
+### 6e. RETIRED — disposition-ledger emission (harness-audit input only)
 
-When the input was a harness `*-security-audit.json` (canonical orig_ids)
-and the audit report is available, feed the verdicts into the
-track-findings ledger. Bash:
+The former triage-ledger emitter is **not executable**. Core
+`FindingDecisions.record` owns the intended triage-ingestion door, but
+that record service and its refuted-register/review-queue output port
+are unfinished. For harness `*-security-audit.json` input with canonical
+orig_ids, retain the validated triage report, audit reference and
+`.triage-state/verdict-lint.json` for the port. Do not hand-assemble layer
+events or claim ingestion, cumulative updates or queued decision cards.
+For non-harness scanner input, no canonical-ledger ingestion is required.
 
-```
-python3 -m traust.cli ledger emit-triage ./<repo>-triage.json \
-    --audit {audit report path} \
-    --lint ./.triage-state/verdict-lint.json
-```
+The mapping requirements remain: true_positive → `confirmed`;
+hardening → `hardening` with the category-aware λ recorded at emission;
+false_positive → machine FP evidence (auto-accept tier only when
+unanimous + lint-clean + confidence ≥ 8 + low/informational-claimed;
+everything else awaits human sign-off); undetermined → needs_review.
+Every FP must remain available in the refuted register for fuzzing and
+live validation, and replay must be idempotent. State derivation and
+countersign policy remain governed by `docs/disposition-ledger.md`,
+not by the model writing the triage report.
 
-Mapping (deterministic; the merge engine and countersign rules decide
-state, never this step): true_positive → `confirmed`; hardening →
-`hardening` with the category-aware λ recorded at emission;
-false_positive → machine FP event (auto-accept tier only when unanimous +
-lint-clean + confidence ≥ 8 + low/informational-claimed; everything else
-awaits human countersign); undetermined → needs_review queue item. Every
-FP also lands in `*-refuted-register.json`, keeping it in scope for
-fuzzing and live validation. Re-running is idempotent. Skip this step for
-non-harness scanner input (non-canonical orig_ids) — the emitter skips
-those findings anyway, with warnings.
-
-If the emitter reports countersign-gated false positives or queued
-review items, tell the user in the terminal summary that human decisions
-are pending and that `/countersign` presents them as decision cards.
+Tell the user which human determinations remain pending and that the
+validity/queue workflow is unported. The severity-only countersign writer
+cannot record these validity determinations.
 
 **Checkpoint (final):** Bash:
 `python3 -m traust.cli admin checkpoint done ./.triage-state 6`
@@ -1625,7 +1623,7 @@ for environment context; `*-impact-analysis.json` from
 (Phase 2g).
 
 **Emits:** `<repo>-triage.{json,md}` next to the input report —
-consumed by `/patch`, `/track-findings` (via Phase 6e's automatic
-python3 -m traust.cli ledger emit-triage run, which also emits the
-`*-refuted-register.json`), and `/countersign` (queue items). Contract:
-docs/disposition-ledger.md §6b.
+consumed by `/patch`; intended `/track-findings` ingestion, refuted-register
+generation and `/countersign` review-queue consumption remain **unported**
+(Phase 6e, core `FindingDecisions.record`). Do not report those artifacts
+or queue items as produced. Contract: docs/disposition-ledger.md §6b.
