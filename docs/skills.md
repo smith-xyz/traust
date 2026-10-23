@@ -92,7 +92,7 @@ Use when the user asks to add one or more GitHub/GitLab repositories or an entir
 
 ## corpus-intake
 
-Use when the user wants to register, update, or review a corpus tree or scan engagement — "add a new BU engagement", "register this tree", "onboard <name> scanning work", "why is this tree unregistered", "update the ownership of X" — or when any census/dashboard run reports an unregistered-tree drift warning. Interactively interviews for the registration fields (or takes them as arguments), validates and updates $TRAUST_CONFIG_HOME/corpus-config.yaml through corpus_intake.py (never hand-edited), then re-runs /census so the corpus manifest reflects the change immediately.
+Use when the user wants to register, update, or review a corpus tree or scan engagement — "add a new BU engagement", "register this tree", "onboard <name> scanning work", "why is this tree unregistered", "update the ownership of X" — or when any census/dashboard run reports an unregistered-tree drift warning. Interactively interviews for the registration fields (or takes them as arguments), validates and records them in traust-core (products and the corpus registry) through `traust products`, then re-runs /census so the corpus manifest reflects the change immediately.
 
 - **Stage:** ① Inventory
 - **Tier:** `secondary`

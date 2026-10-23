@@ -1,8 +1,4 @@
 {
-  "harnessing/1-inventory/corpus-intake/scripts/corpus_intake.py": {
-    "contracts": 1,
-    "engine-internal": 1
-  },
   "harnessing/3-audit/cloud-config-audit/scripts/run_checkov.py": {
     "contracts": 1
   },

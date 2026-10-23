@@ -62,8 +62,8 @@ Legacy placement (pre-C8):
 
 ### Metrics consistency layer
 
-`$TRAUST_CONFIG_HOME/corpus-config.yaml` (ownership tags per output tree; write only
-via `/corpus-intake`) + `traust_engine.corpus.resolver` (shared discovery/identity/
+`$TRAUST_CONFIG_HOME/corpus-config.yaml` (ownership tags per output tree; `/corpus-intake`
+now writes traust-core's corpus registry, which `/census` reads once ported) + `traust_engine.corpus.resolver` (shared discovery/identity/
 dedup resolver) + `/census` (denominator authority: population,
 duplication vectors, distinct-vulnerabilities headline, repo liveness)
 keep every dashboard's numbers reconcilable. Dashboards embed a standard

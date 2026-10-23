@@ -57,7 +57,7 @@ For repos or whole orgs outside those discovery paths, `add-inputs`
 appends them (plus `owners.csv` rows) to a segment CSV directly —
 default segment `adhoc/`. When the addition is a new scan engagement,
 `corpus-intake` registers the matching *output* tree in
-`$TRAUST_CONFIG_HOME/corpus-config.yaml` and records the inventory path, linking the
+traust-core's corpus registry, linking the
 two sides. The full sequence — both registrations, census confirmation,
 repo-graph rebuild — is a deployment procedure; each step is its own skill
 (`/add-inputs`, `/corpus-intake`, `/census`, `/repo-graph`).
@@ -305,8 +305,8 @@ Every campaign number flows through one consistency spine
   ownership tag — `owned` (`findings/`, Hybrid Platforms), `upstream`
   (`oss-findings/`, community code HP depends on; reported adjacent,
   never folded into the owned headline), `external-bu` (scan engagements
-  for other business units; work-performed only). Updated only via
-  `/corpus-intake`.
+  for other business units; work-performed only). `/corpus-intake`
+  writes traust-core's corpus registry instead; `/census` reads it once ported.
 - **python3 -m traust.cli corpus** is the one implementation of report discovery,
   identity (branch-ref stripping, symlink aliasing), and dedup that every
   dashboard builder uses; **`/census`** publishes the resolved population,

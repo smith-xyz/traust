@@ -33,6 +33,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `ledger` | Doc-variance register | `doc-variance` |
 | `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `sla`, `spend` |
 | `portfolio` | Portfolio graph | `artifacts`, `build`, `deps-multi`, `freshness`, `interfaces`, `parsers`, `query`, `stats`, `symbols` |
+| `products` | corpus-intake's doors on traust-core: products and their corpus ownership | `add`, `list`, `update` |
 | `registry` | Model/product registry | `models`, `products` |
 | `reporting` | Report validation & rendering | `lint`, `rate-threats`, `render`, `sarif`, `validate` |
 | `triage` | The triage skill's doors on traust-core | `check`, `intake`, `prepare`, `record`, `render` |
