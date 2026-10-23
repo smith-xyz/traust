@@ -1,14 +1,14 @@
 # The Disposition Ledger — Design and Rationale
 
 **Audience.** Anyone trying to understand the historical disposition-ledger
-design and the reasoning behind it. Except for the direct severity writer in
-§6a, this page is **legacy methodology, not operating instructions**.
+design and its rationale. Except for the service-backed countersign workbench
+in §6a, this page is **legacy methodology, not operating instructions**.
 
-The core-hub cutover retired layer ingestion, triage/validation/verification
-emitters, finding routers, countersign queue/apply and cumulative/projection
-builders. Core finding, identity and ledger services own the replacement;
-their skill ports remain unfinished and there is no executable fallback.
-In particular, severity recording is not a validity, triage or validation door.
+The core-hub cutover retired file-based layer ingestion, emitters, finding
+routers and cumulative/projection builders. Core finding, identity and ledger
+services own state. Triaged decisions and the human countersign workbench now
+use core; validation/verification and cumulative-file skill ports are separate.
+There is no legacy execution fallback.
 See [components.md](components.md) for component ownership and
 [artifacts.md](artifacts.md) for the artifact map.
 
@@ -376,41 +376,46 @@ visible, stay testable, and lose to evidence.
 
 ### 6a. The countersign workbench
 
-Only the direct human severity writer is currently ported:
-`python3 -m traust.cli admin countersign record --decision severity`.
-It accepts a core finding UUID, an exact canonical severity, the reviewer's
-required rationale, and an optional explicit evidence grade. See the
-[CLI reference](cli-reference.md#direct-human-severity-recording) for an invocation.
+`python3 -m traust.cli admin countersign` exposes pending review cards, review
+requests, direct validity/severity/resolution recording and single/bulk apply.
+The [CLI reference](cli-reference.md#direct-human-severity-recording) gives the
+exact invocations and JSON answer format; the
+[skill](../harnessing/4-triage/countersign/SKILL.md) owns the reviewed-human workflow.
 
-The command uses `traust.context.load_services(config_home)`, authenticates a
-stdin-only `Credential` through core identity, requires a verified human, and
-calls `services.findings.decisions.decide(RecordDecision(...), principal)`.
-Core owns actor attribution, clock time, deduplication and admission policy.
-Interactive provenance is not evidence strength: omitted grades remain ungraded,
-and weaker/ungraded conflicting severity claims cannot replace stronger proof.
-Severity and evidence-grade vocabularies are imported from core, never copied
-into the CLI. Repeating the same judged statement returns the saved decision.
+Queue pages come from `services.attestation.pending(ReviewFilter, PageRequest)`.
+Core finding views/history supply claim, proof, attention flags and attribution;
+the artifact publisher reads integrity-checked evidence, including raw probe
+observations. Review material is untrusted data, not approval. Typed JSON
+answers replace the old Markdown annotation parser.
 
-The JSON receipt includes the saved decision UUID and stable metadata, never
-token or rationale. The command neither reads/writes legacy layer files nor
-rebuilds cumulative reports or rewrites audit severity. Reload decisions through
-`services.findings.history(finding_id)`.
+Every write authenticates a stdin-only `Credential` through core identity and
+requires `Principal.is_verified_human()`; a machine administrator does not qualify.
+Direct statements use `services.findings.decisions.decide`. Selected-review
+answers use `services.attestation.attest`, passing confirm/reject and the actual
+`RecordDecision`. Both outcomes need selected fields and the reviewer's own
+rationale; reject does not infer an opposite verdict. Core atomically appends
+the answer and settles the selected item, with no mutation on broken integrity.
 
-The rest of the former workbench remains **unported**: pending-decision inbox,
-annotated queue-file apply, bulk review, false-positive countersigning,
-reopen/validity overrides and mapping decisions. Their retired operations are
-strict CLI errors, not an empty queue or a compatibility shim. The port does not
-relax core's verified-human, independent-human, future-time or restatement
-authority protections; it exposes only the severity operation.
+Core owns actor, clock, replay and evidence admission. Omitted grades stay null.
+The first later E0 human dismissal over execution proof leaves the finding open;
+a distinct later E0 second reviewer must concur. Replay/same signer cannot count
+twice. Exact reviewed answer/outcome replay returns the saved item; altered or
+competing answers conflict. Bulk is per item and reports partial failures.
+
+Write receipts/errors omit tokens and submitted rationale. Queue history and
+evidence intentionally show prior judgements for review, not publication.
+No legacy layers, FP register files or cumulative reports are read or written.
+Stable UUID/fingerprint identity retires scan-ID rebaseline alias proposals and
+history-copying, rather than creating a parallel mapping store. Defer leaves an
+item pending; direct record does not implicitly close related review items.
 
 ### 6b. How triage verdicts become events
 
 The former Phase 6e emitter translated triage output into legacy layer events;
-the cumulative builder then replayed them over the baseline. **Both steps are
-retired.** Core finding intake/decisions own admission and core finding queries
-own derived state. The triage-to-core and cumulative-report skill ports remain
-unfinished, and there is **no executable fallback**. Do not hand-write layers
-or use the severity writer to submit a triage or validity decision.
+the cumulative builder replayed them over a baseline. Those file writers are
+retired. `traust triage record` now records through core findings and creates
+review items consumed by §6a. Core finding reads derive state; the separate
+cumulative-file output port has no legacy fallback. Do not hand-write layers.
 
 The mapping below records the former behavior, not a currently executable
 workflow. The old emitter routed and gated evidence; the merge/countersign
@@ -698,9 +703,9 @@ history — applies to legacy format-1 stamps only).
 ## 10c. Data flow: how an event reaches the ledger, and what gets signed
 
 This is the **historical file-writing flow**, not a current execution path.
-The named emitters, cumulative builder and full countersign workbench are
-retired. The severity-only writer in §6a persists through core services and
-does not enter this diagram.
+The named file emitters, cumulative builder and legacy workbench are retired.
+The service-backed countersign workbench in §6a persists through core and does
+not enter this historical diagram.
 
 ```
   EVIDENCE PRODUCERS                    LEDGER WRITERS                      ARTIFACT
@@ -801,8 +806,8 @@ corpus/projection skill ports remain unfinished and there is **no executable
 fallback**. Existing `findings.db` files may be historical inputs; their
 presence does not demonstrate current data or an operational refresh path.
 Do not create a second mutable authority or manually write decisions into
-that projection. The severity-only CLI uses core persistence and reloads
-history through core services (§6a), not through the legacy projection.
+that projection. The countersign CLI uses core persistence and reloads history
+through core services (§6a), not through the legacy projection.
 
 ## 12. Pointers
 

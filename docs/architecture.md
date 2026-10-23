@@ -146,9 +146,9 @@ ladder: [model-routing.md](model-routing.md). Gate: alignment rule A12.
 
 Findings cross the harness boundary as SARIF 2.1.0, the standard JSON format
 for static-analysis results, in both directions. The **importer**
-(`harnessing/4-triage/triage/scripts/normalize_input.py`) turns SARIF from any
-scanner into the findings container `/triage` verifies, so third-party results
-enter the same adversarial pipeline as audit-born ones. The **emitter**
+(`traust triage intake`, on traust-core) records SARIF from any scanner as an
+assessment of the commit and its findings, which `/triage` then verifies, so
+third-party results enter the same adversarial pipeline as audit-born ones. The **emitter**
 (python3 -m traust.cli reporting sarif) projects any harness report,
 dispositions included, into SARIF for whatever dashboard, viewer or aggregator
 the adopter runs. Neither is a store: the harness report and the disposition

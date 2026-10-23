@@ -4,15 +4,19 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
-- Rebuild the existing direct human severity writer as
-  `traust admin countersign record --finding <UUID> --decision severity
-  --severity <canonical> --rationale <text> --token-stdin [--evidence-grade
-  <canonical>] [--config-home <directory>]`. It authenticates through core
-  identity, requires a verified human, and persists through core findings
-  decisions using core-owned enums, actor, clock and evidence admission.
-  Reruns return the saved statement; the JSON receipt omits credentials and
-  rationale. No legacy layer-file fallback or cumulative rebuild is restored.
-  Queue/apply, bulk review, validity overrides and mapping review remain unported.
+- Complete the service-backed countersign workbench: paged/filterable `queue`,
+  idempotent `request`, direct canonical validity/severity/resolution `record`,
+  and single/bulk `apply` from typed reviewed-answer JSON. Every write uses
+  core identity and requires a verified human; both review outcomes append the
+  person's explicit judgement and rationale atomically with queue resolution.
+  Queue cards include finding state, attributed history and integrity-checked
+  evidence documents, including raw probe observations. Core owns proof
+  precedence, independent reviewers, actor, clock, replay and ledger integrity.
+  Receipts/errors omit credentials and submitted rationale. Legacy Markdown
+  answer parsing, scan-ID alias mapping and layer/cumulative writes are retired;
+  no alternate state or authentication store is introduced.
+- Keep the app and engine's core pins aligned so the `postgres` extra installs
+  core's PostgreSQL driver; a bare dependency override discarded that extra.
 
 - **Breaking: traust-core is the hub.** traust depends on traust-core and
   traust-engine only; traust-contracts and traust-ledger come through core's
@@ -22,7 +26,7 @@ All notable changes to Traust are documented here.
 - **Retired, to be rebuilt per skill on core's services** (progress-tracker
   skill ports): the code that ran on the old ledger and corpus.
   - Commands: `traust corpus …`, `traust route …`, `traust ledger emit-*` /
-    `pull`, `admin countersign` (except the rebuilt direct severity record above),
+    `pull`,
     `build cumulative`, `check report-digests`,
     `feeds reconcile-cve-provenance`; `check drift` loses its findings.db,
     ledger, signature, identity and corpus-registration checks.

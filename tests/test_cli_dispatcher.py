@@ -36,6 +36,7 @@ def test_all_planned_groups_registered():
         "reporting",
         "sweep",
         "tools",
+        "triage",
         "util",
     }
     assert sum(len(ops) for ops in GROUPS.values()) >= 81

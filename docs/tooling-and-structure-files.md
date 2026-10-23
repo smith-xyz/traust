@@ -2,7 +2,7 @@
 
 The schemas, packaged CLIs and key scripts that make up the harness's deterministic tooling.
 
-The schemas below (from the installed `traust-contracts` package) are the complete set; the scripts listed are the key entry points — packaged CLIs live under `src/traust/`, and skill-specific tooling lives alongside each skill in its own `scripts/` — under a stage directory for workflow skills (`harnessing/4-triage/triage/scripts/`), at the `harnessing/` root for the rest.
+The schemas below (from the installed `traust-contracts` package) are the complete set; the scripts listed are the key entry points — packaged CLIs live under `src/traust/`, and skill-specific tooling lives alongside each skill in its own `scripts/` — under a stage directory for workflow skills (`harnessing/3-audit/vuln-scan/scripts/`), at the `harnessing/` root for the rest.
 
 | Component | Purpose |
 |---|---|
@@ -13,6 +13,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | `schemas/v1/triage.schema.json` | JSON Schema for TRIAGE.json validation |
 | `schemas/v1/vuln-findings.schema.json` | JSON Schema for vuln-scan candidate reports (`<repo>-vuln-findings.json`) |
 | `schemas/v1/adapter-result.schema.json` | JSON Schema for traust-engine scanner adapter `scan()` return values (distinct from skill-level vuln-findings output) |
+| `traust-contracts/artifacts_schema/v1/code-facts.schema.json` | Recorded symbols and measured language statistics on a `tool_scan` assessment; read through core's artifact and code-facts services |
 | `schemas/v1/validation.schema.json` | JSON Schema for live-validation reports |
 | `schemas/v1/remediation.schema.json` | JSON Schema for remediation patches |
 | `schemas/v1/verification.schema.json` | JSON Schema for remediation-verification reports |
@@ -47,14 +48,12 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | python3 -m traust.cli reporting lint | Deterministic threat-model gate — sections/columns/enums, coverage invariant, ID stability, provenance, evidence hygiene |
 | python3 -m traust.cli reporting render | Renders validated JSON reports to Markdown |
 | python3 -m traust.cli reporting sarif | Exports any report (incl. disposition-aware findings-current and cloud-config audits) to SARIF 2.1.0 for any SARIF consumer — a derived projection, dispositions become suppressions; `--results-root` batch sweep |
-| harnessing/4-triage/triage/scripts/render_triage.py | Renders triage reports |
 | python3 -m traust.cli check citations | Citation verification gate for findings |
-| harnessing/4-triage/triage/scripts/lint_verdict_citations.py | Verdict citation linter |
 | python3 -m traust.cli build symbol-index | Builds symbol index for triage acceleration |
 | python3 -m traust.cli admin query-index | Queries the symbol index |
 | Retired baseline-claim workflow | Formerly pinned legacy baseline claim hashes; core finding intake/baseline services own the unfinished skill port, with no executable fallback |
-| Retired triage-to-ledger emitter | Formerly converted triage verdicts into legacy layer events; core finding intake/decisions own the replacement, but the skill port is unfinished and has no executable fallback — see [disposition-ledger.md §6b](disposition-ledger.md#6b-how-triage-verdicts-become-events) |
-| python3 -m traust.cli admin countersign record | Direct verified-human severity recording through core services (UUID + stdin token); other countersign workflows remain unported |
+| python3 -m traust.cli triage record | Records validated triage decisions through core; human review items feed the countersign queue |
+| python3 -m traust.cli admin countersign | Paged core review cards with evidence, review requests, direct validity/severity/resolution judgements, and typed single/bulk review apply (verified human via stdin token) |
 | python3 -m traust.cli check docs-consistency | Doc-drift detection for harness docs |
 | python3 -m traust.cli impact cluster-state-diff | P5 discovery sweep 1 — before/after security-state snapshots (RBAC, SCCs, webhooks, NetworkPolicies, Services/Routes) diffed into validation-discovery candidates for /triage |
 | python3 -m traust.cli sweep benchmark | P7 validation-lane benchmark — vulnerable/safe-twin fixtures, confirm-recall + refute-precision + severity-accuracy floors, hybrid release-cut/monthly cadence (check-trigger + drift-watch) |

@@ -481,12 +481,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
         "harnessing/drift-watch/SKILL.md",
     ): "names run_checkov.py only as the checkov-pin check target; "
     "runs no scan and writes no report",
-    (
-        "A8",
-        "harnessing/triage/SKILL.md",
-    ): "names run_checkov.py only in the deterministic-tooling coverage "
-    "map (which path each scanner's output takes into triage); "
-    "runs no scan and writes no cloud-config report",
     # (A11 grandfather set RETIRED 2026-07-31 P1-W4: census,
     # corpus-intake, insecure-patterns and repo-graph now carry
     # per-script anchored grants.)

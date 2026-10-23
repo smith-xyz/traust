@@ -33,10 +33,12 @@ allowed-tools:
   - Bash(python3 *traust* -m traust.cli.checkpoint:*)
   - Bash(python3 *traust* -m traust.cli.check_citations:*)
   - Bash(python3 *traust* -m traust.cli.query_index:*)
-  - Bash(python3 *traust/harnessing/4-triage/triage/scripts/lint_verdict_citations.py:*)
+  - Bash(python3 *traust* -m traust.cli triage check:*)
   - Bash(python3 *traust* -m traust.cli reporting validate:*)
-  - Bash(python3 *traust/harnessing/4-triage/triage/scripts/render_triage.py:*)
-  - Bash(python3 *traust* -m traust.cli corpus precedent:*)
+  - Bash(python3 *traust* -m traust.cli triage intake:*)
+  - Bash(python3 *traust* -m traust.cli triage prepare:*)
+  - Bash(python3 *traust* -m traust.cli triage record:*)
+  - Bash(python3 *traust* -m traust.cli triage render:*)
 ---
 
 # triage
@@ -87,10 +89,11 @@ permitted only for `git`, `wc`, `ls`, `jq` (`find` is NOT permitted —
 `python3 -m traust.cli admin checkpoint` (checkpoint I/O), and these
 harness scripts: `check_citations.py` (pre-vote gate, 2c),
 `query_index.py` (symbol index, 2d + verifiers),
-`lint_verdict_citations.py` (post-vote evidence lint, 3d),
-`validate_report.py` (output-contract gate, 6c), `render_triage.py`
-(deterministic Markdown, 6d), and `build_fp_precedent_cache.py match`
-(shared-component precedent annotation, 2g). The deterministic tools
+`traust triage check` (post-vote evidence lint on traust-core, 6b2),
+`validate_report.py` (output-contract gate, 6c), and traust-core's triage
+doors: `traust triage intake` (scanner output in, 1a), `traust triage
+prepare` (the input with precedents, 1a and 2g), `traust triage render`
+(deterministic Markdown, 6d) and `traust triage record` (decisions, 6e). The deterministic tools
 route, gate, index, lint, annotate, and render; they never author a
 verdict.
 
@@ -246,57 +249,42 @@ source format.
 
 ### 1a. Detect input shape
 
-**Deterministic normalizer first (SARIF plan P1).** Three
-formats are normalized by `harnessing/4-triage/triage/scripts/normalize_input.py` — run
-it and ingest its `findings[]` output (fields already canonical); never
-hand-parse these:
+**traust-core first: these inputs are recorded, so the verdicts can be (6e).**
 
-- **SARIF 2.x** — a `*.sarif` file, or JSON whose top level has
-  `version: "2.x"` + a `runs` array. Covers ANY producer: CodeQL,
-  Semgrep, Snyk, Trivy, Bandit, Coverity 2023+, and the harness's own
-  deterministic tools run standalone with SARIF output (opengrep
-  `--sarif`, gitleaks `-f sarif`,
-  checkov `-o sarif`, grype `-o sarif`, govulncheck `-format sarif`),
-  plus the harness's own `export_sarif.py` artifacts.
-- **Dependabot alerts** — a JSON array of alert objects carrying
-  `security_advisory` (the GitHub REST
-  `/repos/{o}/{r}/dependabot/alerts` export).
-- **govulncheck native `-json` stream** — concatenated JSON records
-  with `config`/`osv`/`finding` keys. (Reminder: never run govulncheck
-  from inside triage — Phase 2e rule; this arm only *reads* streams
-  the user supplies.)
+- **(A) A traust-core assessment** (an audit or scan already recorded;
+  you're given its id): Bash
+  `python3 -m traust.cli triage prepare <assessment-id> -o ./.triage-state/input.json`.
+  Its `items[]` are the findings to judge (1b maps them), each with its
+  `locations` and `precedents` (2g); `subject` names the repository URL
+  and commit (`sha`) to check out.
+- **(B) Third-party scanner output** — SARIF 2.x (CodeQL, Semgrep, Snyk,
+  Trivy, Bandit, Coverity 2023+, and the harness's own tools run with
+  SARIF output: opengrep `--sarif`, gitleaks `-f sarif`, checkov
+  `-o sarif`, grype `-o sarif`, govulncheck `-format sarif`), a
+  Dependabot alerts JSON export, or a govulncheck `-json` stream (never
+  run govulncheck from inside triage, Phase 2e; this only *reads* a
+  stream the user supplies). Record it, then continue as (A) with the
+  printed `assessment_id`:
 
-```bash
-python3 <harness>/harnessing/4-triage/triage/scripts/normalize_input.py <input> \
-    [-o <out>.json] [--include-suppressed]
-```
+  ```bash
+  python3 -m traust.cli triage intake <file> --format sarif|dependabot|govulncheck \
+      --repo-url <https URL> --sha <scanned commit> --origin vuln-scan [--public]
+  ```
 
-Suppressed SARIF results are skipped (and counted) by default. All
-three arms produce machine-static CLAIMS under the track-findings
-trust policy — the producing tool's asserted level never bypasses the
+  Never hand-parse these formats. Suppressed SARIF results are skipped.
+  A scanner that gives no severity reports `unrated`.
+- **(C) Anything else** (the formats below): triage it with the generic
+  rules. There are no recorded findings to attach verdicts to, so 6e
+  doesn't apply; say so in the terminal summary.
+
+All of these are machine-static CLAIMS under the track-findings trust
+policy: the producing tool's asserted level never bypasses the
 adversarial verification below.
-
-**Deterministic-tooling coverage map** — every harness scanner has a
-path into triage; if an input matches none of these, fall through to
-the generic rules below:
-
-| Tool | Path into triage |
-|---|---|
-| opengrep (`run_opengrep.py`) | audit-flow native JSON via the audit report; standalone `--sarif` → normalizer |
-| gitleaks (`run_gitleaks.py`) | audit-flow native; standalone `-f sarif` → normalizer, or native JSON array → generic rules |
-| osv (`traust adapters osv`, OSV API) | audit-flow native candidates JSON via the audit report; an external osv-scanner `--format sarif` file → normalizer |
-| govulncheck (`run_govulncheck.py`) | wrapper's reduced JSON → generic rules; native `-json` stream or `-format sarif` → normalizer |
-| checkov (`run_checkov.py`) | /cloud-config-audit report (own schema); standalone `-o sarif` → normalizer |
-| grype | /secure-container-audit report; standalone `-o sarif` → normalizer |
-| scan_k8s_hardening.py / pqc-scan | audit-flow facts artifacts (feed audits, not raw triage) |
-| Dependabot | alerts JSON export → normalizer |
-| CodeQL / Semgrep / Snyk / Trivy / Bandit / Coverity 2023+ | SARIF → normalizer |
 
 Then inspect the findings path:
 
 - **Directory**: Glob for `**/*.json` and `**/*.jsonl`. Recognized
-  containers, in priority order (`*-normalized-findings.json` from the
-  normalizer above is the generic findings-container shape):
+  containers, in priority order:
   - `*-vuln-findings.json` or legacy `VULN-FINDINGS.json` (`/vuln-scan`
     output, a `{findings: [...]}` container): read `.findings[]`.
     Findings carry campaign ids (`{REPO_SLUG}-{SHORTSHA}-{NNN}`) —
@@ -320,8 +308,17 @@ If nothing parseable is found, stop and report what was seen.
 
 ### 1b. Normalize fields
 
-For each raw record, build a finding dict. **Pull what's present; never
-guess what's absent.** Field map (source-key aliases → canonical):
+For input (A)/(B), each `prepare` item becomes a finding: `title` =
+`finding.title`; `file` / `line` = the first location's `path` /
+`line_start`; `severity` = `occurrence.severity` (`unrated` = the scanner
+gave none); `category` = `occurrence.rule`; and **`fingerprint` +
+`fingerprint_algo` copied from `finding`, unchanged, onto the triage
+finding** (6e matches verdicts to recorded findings by them). Keep the
+item's `precedents` for 2g.
+
+For (C), build a finding dict from each raw record. **Pull what's
+present; never guess what's absent.** Field map (source-key aliases →
+canonical):
 
 | Canonical       | Also accept                                              |
 |-----------------|----------------------------------------------------------|
@@ -641,58 +638,32 @@ or unreadable, skip silently. Record
 `{impact_analysis_artifact: <path or none>, cve: <id or none>, repo_match: <classification or none>}`
 in the Phase 2 checkpoint delta.
 
-### 2g. Shared-component FP-precedent annotation (deterministic, no subagent, optional)
+### 2g. Shared-component FP-precedent annotation (deterministic, no subagent)
 
-Shared/vendored components get the same false positive re-litigated in
-every repo that ships them (the measured 949-event re-refutation
-treadmill). The portfolio precedent cache — `fp-precedent-cache.json`
-under `analysis-results/graph/`, generated by
-python3 -m traust.cli corpus precedent out-of-band — carries adjudicated
-FP/hardening precedents in two strength tiers (each match reports
-`max_strength`):
+Shared and vendored code gets the same false positive re-litigated in
+every repo that ships it. For input (A)/(B), each `prepare` item already
+carries its `precedents`: prior verdicts on **the same function in the
+same file** (vendor roots stripped, so `vendor/x/p.go` matches
+`third_party/x/p.go`), in any repository, with a shared CWE, strongest
+first. Each has a `reason.strength`:
 
-- **`human_countersigned`** — LDAP-verified human adjudications
-  (interactive countersign events or Jira-harvest decision-maker
-  events), guarded so a reopened/overridden verdict never propagates.
-- **`machine_refuted_sound`** — machine adjudications from the triage /
-  remediation-verification protocols, plus live-validation refutations
-  that PASS the Phase-1 soundness gate. Machine-refuted-UNSOUND
-  refutations (the measured ~70%-unsound class) are excluded at build
-  time and never appear in the cache.
+- **`human_countersigned`** — a person's false positive / hardening verdict
+  that still stands. **Reduced vote tier:** the finding gets **1 verifier
+  vote** instead of N (same mechanism as 2c's `anchor_absent`): a
+  person's verdict on the same function justifies spending less
+  verification, not skipping it.
+- **`machine_refuted_sound`** — a triage or remediation-verification
+  refutation nobody has contested. **Annotation only, full votes:** a
+  machine precedent never reduces verification spend.
 
-If the cache file is absent, unreadable, or has
-`metadata.entries == 0`, skip this step silently: an empty or missing
-cache is a clean no-op by contract. Bash:
+Either way the precedent is passed to the verifier as the FP-PRECEDENT
+block in Phase 3b (the decision's rationale, its date and its strength).
+It NEVER auto-refutes: the verifier still re-derives the claim from this
+repo's code, and the normal countersign discipline governs any resulting
+false positive (6e). Input (C) has no precedents; skip this step.
 
-```
-python3 -m traust.cli corpus precedent match \
-    --cache <harness>/../analysis-results/graph/fp-precedent-cache.json \
-    --findings ./.triage-state/phase2.json \
-    --json-out ./.triage-state/precedent-matches.json
-```
-
-Apply the resulting matches to surviving `candidates[]` only (ignore
-matches on duplicates). Routing is by the match's `max_strength`:
-
-- **`human_countersigned` match — reduced vote tier** (same mechanism
-  as the 2c citation gate's `anchor_absent` routing): the finding gets
-  **1 verifier vote** instead of N — a countersigned precedent on the
-  identical shared component justifies spending less verification, not
-  skipping it.
-- **`machine_refuted_sound` match — annotation only, full votes**: the
-  finding keeps its normal N votes; the precedent rides along as
-  citeable prior adjudication in the FP-PRECEDENT block. A machine
-  precedent never reduces verification spend — only human signature
-  earns that.
-- **Annotation, never a verdict** (both tiers): the match is passed to
-  the verifier as the FP-PRECEDENT block in Phase 3b. It NEVER
-  auto-refutes — the verifier still re-derives the claim from this
-  repo's code, and the normal countersign discipline still governs any
-  resulting FP event (6e). A precedent is context with provenance, not
-  a determination.
-
-Record `{precedent_cache: <path or none>, entries: <N>, matched: <N>,
-matched_human_tier: <N>}` in the Phase 2 checkpoint delta.
+Record `{precedents_matched: <N>, matched_human_tier: <N>}` in the Phase 2
+checkpoint delta.
 
 ---
 
@@ -1118,8 +1089,8 @@ overrides a fresh code-level determination — and prefix the finding's
 rationale with `"PRECEDENT DISAGREEMENT:"` naming the precedent
 (source repo, date, countersigner/adjudicator, strength). For
 `human_countersigned` precedents, additionally surface it in the
-terminal summary as pending human adjudication; the `/countersign`
-validity/queue workflow is unported (its current writer is severity-only).
+terminal summary as pending human adjudication; request a core review item with
+`admin countersign request` for the finding UUID and use `/countersign` to review it.
 A verifier disagreeing with a countersigned precedent escalates to a
 human, it neither silently follows the precedent nor silently
 overrides the countersigner. For `machine_refuted_sound` precedents
@@ -1131,32 +1102,9 @@ flows through the normal countersign-gated ledger path in 6e.
 Build `confirmed[]` = candidates with `verdict == true_positive`, and
 `hardening[]` = candidates with `verdict == hardening`.
 
-### 3d. Lint verifier citations (deterministic, no subagent)
+### 3d. Verifier citations
 
-Verifier evidence is itself checkable. Write the tallied findings to
-`./.triage-state/_chunk.tmp` (as `{"findings": [...]}`), then Bash:
-
-```
-python3 <harness>/harnessing/4-triage/triage/scripts/lint_verdict_citations.py ./.triage-state/_chunk.tmp \
-    --repo {REPO_PATH} --json-out ./.triage-state/verdict-lint.json
-```
-
-The lint confirms every file:line cited in `first_links` and `rationale`
-resolves under the repo and is in range. It routes; it never concludes:
-
-- `re_vote_recommended` (a `false_positive` or `hardening` verdict cites
-  broken evidence): a dismissal resting on evidence that does not exist is
-  the most dangerous triage failure mode — a hallucinated refutation.
-  Spawn ONE fresh verifier vote for that finding and re-tally (the broken
-  vote's citations are noted in the re-vote prompt as "previously cited
-  evidence that does not exist"). One re-vote per finding.
-- `review_recommended` (a `true_positive` cites broken evidence): keep the
-  verdict, set `verify_verdict: needs_manual_test`, and note the broken
-  citation in rationale — the finding stays on the action list but a human
-  re-checks the evidence.
-
-If the script errors, skip this step — the lint is an accelerator, never a
-prerequisite.
+Linted on the written triage in 6b2 (traust-core's door needs the whole document).
 
 **Checkpoint:** Write tool → `./.triage-state/_chunk.tmp`:
 
@@ -1360,6 +1308,10 @@ census, and every dashboard (docs-verification 2026-07-31, wiring
 F10). A bare `TRIAGE.json` is equally invisible (legacy bare names are
 still read by the validator and `/patch`, never written).
 
+For input (A)/(B), every non-duplicate finding keeps the `fingerprint`
+and `fingerprint_algo` copied in 1b: `record` (6e) refuses a triage whose
+verdicts it can't match to the assessment's findings.
+
 The output contract is `<harness>/contracts/schemas/triage.schema.json` — shared
 vocabulary with `report.schema.json` (identical severity enum, canonical
 `orig_id` pattern, ISO dates). Severity values are LOWERCASE
@@ -1427,6 +1379,34 @@ Every input finding appears exactly once (duplicates reference their
 canonical via `duplicate_of`). Do not silently drop anything. Do not print
 this JSON to the terminal; write to file only.
 
+### 6b2. Lint verifier citations (deterministic, no subagent)
+
+Verifier evidence is itself checkable. Bash:
+
+```
+python3 -m traust.cli triage check <findings-dir>/<repo>-triage.json --repo {REPO_PATH}
+```
+
+traust-core confirms every file:line cited in `first_links` and
+`rationale` resolves under the repo and is in range. It routes; it never
+concludes:
+
+- `re_vote` (a `false_positive` or `hardening` verdict cites broken
+  evidence): a dismissal resting on evidence that does not exist is the
+  most dangerous triage failure mode — a hallucinated refutation. Spawn
+  ONE fresh verifier vote for that finding (note the broken citations in
+  the prompt as "previously cited evidence that does not exist") and
+  re-tally it. If the verdict changes, update that finding (a new
+  `true_positive` gets its Phase 4a severity) and the summary, rewrite
+  the JSON and run the check once more. One re-vote per finding.
+- `review` (any other verdict cites broken evidence): keep the verdict,
+  set `verify_verdict: needs_manual_test`, and note the broken citation in
+  the rationale — the finding stays on the action list but a human
+  re-checks the evidence.
+
+If the check errors, say so in the terminal summary and continue: the lint
+is an accelerator, never a prerequisite.
+
 ### 6c. Validate <repo>-triage.json
 
 Bash:
@@ -1449,10 +1429,10 @@ The Markdown is a deterministic projection of the validated JSON — never
 hand-assemble it. Bash:
 
 ```
-python3 <harness>/harnessing/4-triage/triage/scripts/render_triage.py ./<repo>-triage.json -o ./<repo>-triage.md
+python3 -m traust.cli triage render <findings-dir>/<repo>-triage.json -o ./<repo>-triage.md
 ```
 
-The renderer emits, in order: header + summary line, `## Act on these`
+traust-core's renderer emits, in order: summary and context, `## Act on these`
 (one section per true positive in severity order, with owner, votes,
 preconditions, rationale, and reachability evidence), `## Hardening
 backlog` (compact table; explicitly labeled NOT false positives),
@@ -1461,30 +1441,33 @@ findings and duplicates only). If the renderer errors, fix `<repo>-triage.json`
 and re-run 6c rather than writing the Markdown by hand — divergent
 hand-built reports are exactly what the renderer exists to prevent.
 
-### 6e. RETIRED — disposition-ledger emission (harness-audit input only)
+### 6e. Record the verdicts (input A/B only)
 
-The former triage-ledger emitter is **not executable**. Core
-`FindingDecisions.record` owns the intended triage-ingestion door, but
-that record service and its refuted-register/review-queue output port
-are unfinished. For harness `*-security-audit.json` input with canonical
-orig_ids, retain the validated triage report, audit reference and
-`.triage-state/verdict-lint.json` for the port. Do not hand-assemble layer
-events or claim ingestion, cumulative updates or queued decision cards.
-For non-harness scanner input, no canonical-ledger ingestion is required.
+Bash:
 
-The mapping requirements remain: true_positive → `confirmed`;
-hardening → `hardening` with the category-aware λ recorded at emission;
-false_positive → machine FP evidence (auto-accept tier only when
-unanimous + lint-clean + confidence ≥ 8 + low/informational-claimed;
-everything else awaits human sign-off); undetermined → needs_review.
-Every FP must remain available in the refuted register for fuzzing and
-live validation, and replay must be idempotent. State derivation and
-countersign policy remain governed by `docs/disposition-ledger.md`,
-not by the model writing the triage report.
+```
+python3 -m traust.cli triage record <assessment-id> <findings-dir>/<repo>-triage.json --repo {REPO_PATH}
+```
 
-Tell the user which human determinations remain pending and that the
-validity/queue workflow is unported. The severity-only countersign writer
-cannot record these validity determinations.
+traust-core records the triage as an assessment with its JSON, then one
+decision per verdict, each appended to the ledger (deterministic; the
+disposition rules and countersign decide state, never this step):
+`true_positive` → `confirmed` (with its severity); `hardening` →
+`hardening`; `false_positive` → a machine false positive, auto-accepted
+only when ≥2 concurring FP votes with no dissent, a clean citation lint,
+confidence ≥ 8 and a low / informational claimed severity (a sample of
+auto-accepted ones goes to a person); everything else awaits human
+countersign. `undetermined`, and a confirmation marked
+`needs_manual_test`, become review items, not decisions; duplicates are
+covered by their canonical finding. Re-running is idempotent. It refuses
+a triage whose verdicts don't match the assessment's findings (missing
+fingerprints): fix 1b / 6b and re-run.
+
+Report its counts in the terminal summary. If any false positives await
+countersign or review items were queued, say that human decisions are
+pending and that `/countersign` presents them as decision cards. For
+input (C), skip this step and say the verdicts are in
+`<repo>-triage.json` only.
 
 **Checkpoint (final):** Bash:
 `python3 -m traust.cli admin checkpoint done ./.triage-state 6`
@@ -1619,11 +1602,9 @@ unattributed run is a calibration gap.
 **Consumes:** `<repo>-security-audit.json` (or `*-vuln-findings.json` /
 generic scanner JSON) as the finding source; `<repo>-threat-model.md`
 for environment context; `*-impact-analysis.json` from
-`analysis-results/impact/` (Phase 2f); the FP-precedent cache
+`analysis-results/impact/` (Phase 2f); precedents from `traust triage prepare`
 (Phase 2g).
 
 **Emits:** `<repo>-triage.{json,md}` next to the input report —
-consumed by `/patch`; intended `/track-findings` ingestion, refuted-register
-generation and `/countersign` review-queue consumption remain **unported**
-(Phase 6e, core `FindingDecisions.record`). Do not report those artifacts
-or queue items as produced. Contract: docs/disposition-ledger.md §6b.
+consumed by `/patch`; recorded decisions (Phase 6e, `traust triage
+record`) feed `/track-findings` and `/countersign` (review items).

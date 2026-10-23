@@ -21,7 +21,7 @@ allowed-tools:
   - Bash(rg:*)
   - Bash(grep:*)
   - Bash(head:*)
-  - Bash(python3 -m traust.cli admin countersign record:*)
+  - Bash(python3 -m traust.cli admin countersign:*)
   - Bash(python3 *-m traust.cli corpus finding-identity:*)
   - Bash(python3 *-m traust.cli reporting validate:*)
   - Bash(python3 *-m traust.cli.route_regressions:*)
@@ -29,7 +29,7 @@ allowed-tools:
 
 # Track Findings
 
-> **Being ported to traust-core** (progress-tracker skill port 02, track-findings): the former baseline, ledger-ingestion, queue/apply, validity-record and cumulative-output flows are **retired, not executable**. The procedure below preserves their port requirements, not runnable instructions. Core `FindingDecisions.record`, `ValidationService.record` and `VerificationService.record` own machine-report ingestion; their record ports remain unfinished. `FindingService` owns baseline/derived finding state; its cumulative read/output port is also unfinished. Do not hand-write legacy layer events or claim cumulative/report-queue updates. The sole ported action is the **human severity-only** writer described under Interactive.
+> **Being ported to traust-core** (progress-tracker skill port 02, track-findings): the former baseline, legacy-ledger ingestion and cumulative-output flows are retired. Core owns their replacement; validation/verification intake and this skill's cumulative-output port remain separate work. Triaged decisions now use `traust triage record`. Human queue/request/direct validity-severity-resolution/selected-review apply use the completed `/countersign` service-backed workflow described under Interactive. Never hand-write layers or substitute a human judgement for machine-report intake.
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in
@@ -242,9 +242,9 @@ state. The skill only auto-records what needs zero interpretation.
    the CRD webhook before this path").
 2. **Verified identity**: core identity owns token verification and the
    deployment's optional directory check (`core.yaml` → `identity:`).
-   The ported `admin countersign record` operation is severity-only; it
-   cannot ingest MR/Jira validity determinations. That writer remains
-   unported here; do not substitute its severity door for validity writes.
+   `admin countersign record` authenticates the reviewing human, not the
+   original MR/Jira author. Use `/countersign` for an explicit new human
+   judgement; do not impersonate an external commenter or silently infer intent.
 3. **Authority**: the author is one of the findings package's assigned
    owners (owners.csv / assign-findings-owners output) or a project
    Maintainer+ (forge members API). An **escalation contact**
@@ -360,19 +360,19 @@ order-independent), preserve event-carried findings rather than editing
 the baseline (gate A15), and include those findings in derived state.
 Mechanics: [docs/findings-routing.md](../../../docs/findings-routing.md).
 
-**Interactive** — the former inbox, queue/apply and validity-record workflow
-is **unported**. Do not call retired commands or hand-assemble layer events.
-For a human **severity-only** change on an existing core finding UUID, follow
-`/countersign`: `python3 -m traust.cli admin countersign record` with
-`--finding <UUID> --decision severity --severity <canonical> --rationale <text>
---token-stdin --config-home <config-directory>`. Use the user's own rationale
-and shell-safe argument quoting. The operator delivers the token only on stdin;
-core authenticates a verified human and owns actor attribution, clock time,
-deduplication and evidence-grade admission. An optional `--evidence-grade`
-requires an explicit strength judgement; no grade is inferred from identity.
-This operation records a core decision and prints a token/rationale-free JSON
-receipt, not a legacy layer or cumulative report. Other interactive requests
-must be deferred until their core-service port lands.
+**Interactive** — follow `/countersign` for the completed core-backed workbench.
+Read `admin countersign queue` with filters and cursor paging; cards include
+finding state, prior decisions and integrity-checked evidence documents.
+Request review with `admin countersign request` when an existing core finding
+needs a pending item. The human selects actual canonical validity/severity/
+resolution fields and provides their own rationale. Single/bulk
+`admin countersign apply <reviewed-answers.json> --token-stdin` records that
+answer and settles its selected item atomically; both confirm and reject need
+a real judgement. Direct `admin countersign record --decision <axis>` records
+a judgement without automatically closing review items. The credential arrives
+only on stdin; core verifies a human and owns actor, clock, admission, replay
+and persistence. No grade is inferred from identity. Receipts omit tokens and
+rationale. These commands do not ingest legacy reports or rebuild files.
 
 ### Phase 3 — RETIRED: deterministic merge (port requirements)
 

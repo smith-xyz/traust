@@ -8,7 +8,7 @@ _ENTRIES: tuple[tuple[str, str, str], ...] = (
     (
         "countersign",
         "countersign",
-        "Record a direct human severity judgement through core (record only).",
+        "Review pending findings and record verified-human judgements through core.",
     ),
     (
         "toolchain",

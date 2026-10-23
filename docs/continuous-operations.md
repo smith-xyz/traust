@@ -22,10 +22,11 @@ this page is the operational contract, not the evidence.
 **Cutover status.** The cadence and routing methodology below survives the
 core-hub cutover, but the former corpus projection, finding routers, ledger
 emitters and cumulative-report steps are retired. Their core-service skill
-ports remain unfinished; do not schedule them or substitute the severity writer
-for missing finding/validity writes. See [components.md](components.md) for
-ownership and [disposition-ledger.md §6a](disposition-ledger.md#6a-the-countersign-workbench)
-for the only ported human writer. Existing legacy artifacts do not demonstrate
+ports are separate from the completed triage and human countersign ports; do not
+substitute a human judgement for a missing machine-report intake. See
+[components.md](components.md) for ownership and
+[disposition-ledger.md §6a](disposition-ledger.md#6a-the-countersign-workbench)
+for the reviewed-human workbench. Existing legacy artifacts do not demonstrate
 that the full loop completed on current inputs.
 
 ## The loop
@@ -366,11 +367,11 @@ may create a competing mutable record or bypass admission policy.
    builder are retired. Core finding intake owns the replacement; the skill
    ports are unfinished and there is no executable fallback.
 3. **Report evidence is not a saved decision.** The former `/track-findings`
-   ingestion, validation/verification emitters, countersign queue/apply and
-   cumulative builders are retired. Core finding decisions and ledger services
-   own persistence and integrity. Only direct verified-human severity recording
-   is exposed by the ported CLI; it cannot file findings, adjudicate validity,
-   resolve a finding or refresh legacy reports.
+   ingestion, validation/verification emitters and cumulative builders are
+   retired. Core finding decisions and ledger services own persistence and
+   integrity. The countersign CLI exposes verified-human validity/severity/
+   resolution recording and selected review apply; it does not file findings,
+   ingest machine reports or refresh legacy files.
 4. **Dependency analysis is not filing.** Feed refresh, OSV matches and
    `/impact-analysis` artifacts provide advisory and reachability evidence.
    The former impact router filed advisory-derived claims idempotently without

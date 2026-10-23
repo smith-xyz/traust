@@ -18,6 +18,7 @@ from traust.cli.groups import (
     reporting,
     sweep,
     tools,
+    triage,
     util,
 )
 
@@ -86,6 +87,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "mine": sweep.MINE,
     },
     "tools": tools.TOOLS,
+    "triage": dict(triage.TRIAGE),
     "util": {
         "redact": util.REDACT,
         "elf": util.ELF,

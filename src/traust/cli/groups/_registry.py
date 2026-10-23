@@ -27,8 +27,8 @@ class OpSpec:
     passthrough_argv: bool = False
 
 
-def passthrough_op(module: str, help: str) -> OpSpec:
-    """Forward argv to ``traust.cli.<module>.main(argv)``; prepend ``--config-home`` when set."""
+def passthrough_op(module: str, help: str, entry: str = "main") -> OpSpec:
+    """Forward argv to ``traust.cli.<module>.<entry>(argv)``; prepend ``--config-home`` when set."""
 
     def add_args(ap) -> None:
         ap.add_argument("argv", nargs=argparse.REMAINDER, default=[])
@@ -39,6 +39,6 @@ def passthrough_op(module: str, help: str) -> OpSpec:
         if getattr(args, "config_home", None):
             argv.extend(["--config-home", str(args.config_home)])
         argv.extend(args.argv or [])
-        return mod.main(argv)
+        return getattr(mod, entry)(argv)
 
     return OpSpec(add_args=add_args, call=call, help=help, passthrough_argv=True)

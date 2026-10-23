@@ -49,11 +49,11 @@ The app's composition root is `src/traust/context.py`. It loads core's
 work, and loads the engine separately for executors. A Python caller does not
 need a REST service or a legacy ledger client/login to record a decision.
 
-Ownership does **not** imply every door or skill port is implemented. The
-ported countersign action is direct verified-human **severity** recording only;
-queue/apply, validity overrides, triage/validation/verification ingestion and
-cumulative/projection workflows remain unported. Their old entry points are
-retired, not fallbacks. See the [CLI reference](cli-reference.md#direct-human-severity-recording)
+Ownership does **not** imply every door or skill port is implemented. Countersign
+now supports pending cards, review requests, single/bulk apply and direct human
+validity/severity/resolution judgements; triage's core record port also exists.
+Validation/verification ingestion and cumulative/projection skill ports remain
+separate work, with no legacy fallback. See the [CLI reference](cli-reference.md#direct-human-severity-recording)
 and core's [implementation status](https://github.com/traust-security/traust-core)
 before wiring a caller. Do not create a second domain implementation or claim
 that a stub is an available integration. The core REST route for non-Python
@@ -197,7 +197,7 @@ existing findings.
 Historical ledger fixture vectors and prose describe the earlier owner; they
 are not an independent current identity contract. Contracts owns shared shapes
 and vocabularies, not a second fingerprint implementation. Core finding intake
-and decisions own admission and persistence. The severity-only app command
+and decisions own admission and persistence. The countersign workbench
 requires an existing core finding **UUID**: a fingerprint or legacy scan-scoped
 ID is not a substitute. A current implementation of the recipe does not imply
 that identity-move, rebaseline or every finding-intake skill port is complete.

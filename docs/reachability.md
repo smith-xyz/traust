@@ -75,8 +75,8 @@ nothing in the impact pipeline invokes it, for the reason in the note above.
 - **`/triage`** — two paths: a SHA-matched `<repo>-govulncheck.json` beside
   the baseline feeds matched findings a `DEPENDENCY-REACHABILITY` block as
   **annotation-only** verifier context (no vote-count changes); and
-  `normalize_input.py` ingests govulncheck native `-json` streams as
-  candidates with their reachability classes preserved.
+  `traust triage intake` records govulncheck native `-json` streams as
+  findings, the reachability class kept in each finding's description.
 - **`/verify-remediation`** — `--impact-filter` scopes full sweeps to repos
   an impact analysis classified `affected`/`likely_affected`.
 - **The assurance promotion ladder** — `affected` is machine-static (ledger

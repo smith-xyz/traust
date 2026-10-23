@@ -79,9 +79,9 @@ independent producer logic.
 | `route_impact_findings.py` | `/dependency-watch`, `/impact-analysis` | Record advisory-impact findings |
 | `rebaseline()` | re-audit | Link a replacement baseline without rewriting history |
 
-The current severity action is documented in the
-[CLI reference](cli-reference.md#direct-human-severity-recording); it is not a
-layer writer and does not restore the retired countersign queue/apply paths.
+The current reviewed-human countersign workbench is documented in the
+[CLI reference](cli-reference.md#direct-human-severity-recording). Its queue,
+request, record and apply use core services, never retired layer-writing paths.
 
 ---
 

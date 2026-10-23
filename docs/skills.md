@@ -246,11 +246,11 @@ Static source-code vulnerability scan. Reads a target directory (and its threat 
 
 ## countersign
 
-Record a verified human's direct severity judgement on an existing core finding UUID. Only severity recording is ported to core services; the pending-decision inbox, bulk apply, validity overrides and mapping review remain unavailable. Use when asked to upgrade, downgrade or reclassify a finding's severity.
+Review pending core finding decisions, request human sign-off, and record a verified human's explicit validity, severity or resolution judgement. Supports single and bulk reviewed answers with authenticated attribution, rationale and core evidence admission.
 
 - **Stage:** ④ Triage
 - **Tier:** `primary`
-- **Invoke:** `/countersign` — arguments: `<finding-UUID>`
+- **Invoke:** `/countersign` — arguments: `[core-finding-UUID | queue | reviewed-answers.json]`
 - **Skill:** [harnessing/4-triage/countersign/SKILL.md](../harnessing/4-triage/countersign/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/4-triage/countersign/SKILL.md#integrations)
 

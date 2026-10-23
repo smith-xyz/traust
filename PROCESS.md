@@ -41,9 +41,9 @@ all of them.
 
 The arrows describe the assessment methodology, not a claim that every service
 port is complete. Core owns finding intake, decisions, identity and persistence;
-the retired layer emitters, finding routers, countersign queue/apply and cumulative
-builders have no executable fallback. Only direct verified-human severity recording
-is ported; see [docs/cli-reference.md](docs/cli-reference.md#direct-human-severity-recording).
+the retired layer emitters, finding routers and cumulative builders have no
+executable fallback. Triaged decisions and verified-human countersign queue,
+request, record and apply now use core; see [docs/cli-reference.md](docs/cli-reference.md#direct-human-severity-recording).
 Component ownership is documented in [docs/components.md](docs/components.md).
 
 > **Model routing & spend:** every stage's model comes from
@@ -283,15 +283,16 @@ Historically, stages ③–⑦ fed one append-only evidence stream per repo
 (`<repo>-findings-layer.json`), replayed into
 `<repo>-findings-current.{json,md}`. Machine refutations normally required
 verified-human countersign, and refuted-register artifacts fed fuzzing and
-live-validation target selection. Those legacy ingestion, queue/apply,
-validity-countersign and cumulative workflows are retired, not executable
-steps. Core owns their replacement; the skill ports remain unfinished and
-there is no fallback.
+live-validation target selection. Those legacy ingestion and cumulative-file
+workflows remain retired, with no file fallback. Core owns finding state.
 
-The one ported writer records a verified human's **severity** decision against
-an existing core finding UUID using a stdin-only token. It neither changes
-validity nor reads/writes legacy layers or rebuilds reports. Invocation and
-identity/secret guidance: [CLI reference](docs/cli-reference.md#direct-human-severity-recording).
+The countersign workbench reads paged core review cards and evidence, requests
+sign-off, and records explicit verified-human validity/severity/resolution
+judgements. Single/bulk reviewed apply atomically appends the actual answer and
+settles the selected item. Every write authenticates a stdin-only credential;
+core owns proof precedence, independent reviewers and integrity. No legacy
+layers or cumulative reports are changed. Invocation and identity/secret
+guidance: [CLI reference](docs/cli-reference.md#direct-human-severity-recording).
 Historical design rationale: [disposition ledger](docs/disposition-ledger.md);
 artifact chain: [artifacts](docs/artifacts.md);
 error doctrine: [error model](docs/error-model.md).
