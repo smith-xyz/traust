@@ -276,6 +276,22 @@ The [skill](../harnessing/4-triage/countersign/SKILL.md#legacy-parity-and-retire
 accounts for retired checkbox/prose approval parsing, scan-ID mapping and
 file-based state; the typed async workbench does not restore those paths.
 
+## Scanner intake
+
+`traust triage intake <scan> --format sarif|dependabot|govulncheck --repo-url <url>
+--sha <commit> --origin <skill> --config-home <private-config>` uses
+`Context.services().assessment.record_scan`. Core parses the original scanner
+output and validates the complete finding batch, including nested locations,
+before committing the assessment and intake together. A malformed batch leaves
+no partial assessment, occurrence or finding rows. Scanner claims do not create
+disposition decisions.
+
+Service callers replay using the original provenance timestamp; lookup uses the
+database's existing timestamp precision. The CLI records each actual invocation
+as its own run. Native scanner evidence is not automatically a complete
+`AdapterResultArtifact`: the full artifact schema still applies, and missing
+CWEs/remediation are not invented to pass it.
+
 ## Machine validation recording
 
 Record already-produced evidence without executing any probe:

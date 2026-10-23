@@ -4,6 +4,13 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- Consume atomic scanner intake and finding DTO corrections: malformed scanner
+  batches leave no partial assessment, copied candidates/nested locations are
+  revalidated, and replay uses database-native timestamp precision. Scanner tool
+  names/native fingerprints are not emitted as finding origin/domain identity.
+  Declared classifier/dependency provenance and unknown effort remain intact;
+  sparse raw scanner claims are not padded into full audit artifacts.
+
 - Add the machine-validation recording producer: `traust validation record`
   sends a typed report, explicit stored multi-source bindings and actual run
   provenance through core's record door. Full target attestation, install-failure
