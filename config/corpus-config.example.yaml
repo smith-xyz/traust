@@ -2,8 +2,8 @@
 # Register which trees under analysis-results/ belong to the report corpus.
 # install_traust --doctor fails while trees is empty.
 #
-# Consumed by python3 -m traust.cli corpus (every dashboard builder). Prefer
-# updating through /corpus-intake rather than by hand.
+# Consumed by python3 -m traust.cli corpus (every dashboard builder). Edit by
+# hand: /corpus-intake records products in traust-core, not this file.
 #
 # Ownership tags:
 #   owned       — your business unit's backlog

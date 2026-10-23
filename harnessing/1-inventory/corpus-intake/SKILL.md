@@ -25,7 +25,7 @@ allowed-tools:
 traust-core's products and corpus registry are the single source of truth for which trees
 under `analysis-results/` are in the report corpus and who owns them.
 This skill is its only supported write path: interview → validate →
-recorded in one transaction → census refresh.
+recorded (product, then registry) → census refresh.
 
 ## Input
 
@@ -54,7 +54,7 @@ Collect, one question at a time, anything not already provided:
 2. **Name** — the config key (engagement codename or tree directory
    name). Letters/digits/`._-` only.
 3. **Tree** — *retired*: the name is the tree.
-   Convention: `<name>-findings/`, one tree per engagement.
+   Convention: name it `<engagement>-findings`, one tree per engagement.
 4. **Ownership tag** — exactly one of:
    - `owned` — Hybrid Platforms BU backlog (Lens 2 headline);
    - `upstream` — community code HP relies on; adjacent line, never
@@ -74,13 +74,13 @@ Collect, one question at a time, anything not already provided:
    dashboards.
 6. **Inventory** (*retired*: core keys the corpus by ids, not paths) — path to the input inventory CSV in
    the inputs inventory (`locations.inputs`) if one exists.
-7. **Notes** (*retired*: core has no notes field) — anything non-obvious, especially product-vs-BU
+7. **Notes** (NEED(corpus-registry: subject note): the registry subject has no notes field yet, so nothing records them) — anything non-obvious, especially product-vs-BU
    dualities (see the `ansible` entry: catalog operators inside
    `findings/` stay owned while the BU engagement is external).
 
 If the answers reveal a BU boundary cutting through an existing tree
 (some products owned, some not), do NOT force a tree-level tag — flag it
-to the user; per-product `overrides`
+to the user (recording the exception in notes: NEED(corpus-registry: subject note), flag only until then); per-product `overrides`
 support lands with a later phase.
 
 ### Step 3 — Apply
@@ -94,8 +94,8 @@ traust products update \
 ```
 
 The tool validates before writing (ownership enum, name syntax) and
-records in one transaction; adding a registered name changes nothing,
-and a concurrent edit is refused rather than overwritten. Exit 2 = validation
+records the product, then the registry; adding a registered name with the same fields changes nothing,
+with different fields is refused (use `update`), and a concurrent edit is refused rather than overwritten. Exit 2 = validation
 error: relay the message, fix the field, retry.
 
 ### Step 4 — Refresh the census
@@ -104,7 +104,9 @@ error: relay the message, fix the field, retry.
 python3 RETIRED:build_census.py
 ```
 
-Confirm the new entry appears.
+Confirm the new entry appears (engagements show "registered, no output"
+until their tree exists) and that no unexpected DRIFT warnings remain
+(DRIFT warnings *retired*: status derives from assessments).
 
 ### Step 5 — Remind about inventory
 
@@ -115,7 +117,7 @@ the user to run `/add-inputs` to add them to the inputs inventory.
 
 ## Outputs
 
-- Products and the corpus registry in traust-core (one transaction, validated).
+- Products and the corpus registry in traust-core (validated).
 - Refreshed `census.{json,md,html}` under
   `progress-tracker/metrics/dashboards/census/`. (`corpus-manifest.json` was
   retired 2026-08-20; the resolved record list lives in findings.db `repos`.)
@@ -124,5 +126,5 @@ the user to run `/add-inputs` to add them to the inputs inventory.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `add` returns an entry unchanged | The name is already registered | Update the existing entry instead. |
-| `ConflictError` | Another edit landed between read and write | Re-run `traust products list`, then retry; nothing was written. |
+| `ConflictError: '<name>' is already registered` | The name is registered with other fields | Update the existing entry instead. |
+| `ConflictError` | Another edit landed between read and write | Re-run `traust products list`, then retry. |
