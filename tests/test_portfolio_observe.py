@@ -118,6 +118,11 @@ def test_a_repository_on_an_unknown_host_is_a_bad_request(home: Path) -> None:
     assert (rc, result["outcome"]) == (1, "failed")
 
 
+class Services:
+    def __init__(self, portfolio: Portfolio) -> None:
+        self.portfolio = portfolio
+
+
 class Portfolio:
     def __init__(self, outcome: ComparisonStatus | Exception) -> None:
         self.outcome = outcome
@@ -130,7 +135,7 @@ class Portfolio:
 
 @pytest.mark.parametrize("status", list(ComparisonStatus))
 def test_every_status_is_succeeded_or_a_named_gap(status: ComparisonStatus) -> None:
-    result = RepoStateMaterializer(Portfolio(status), HOSTS).materialize(  # type: ignore[arg-type]
+    result = RepoStateMaterializer(Services(Portfolio(status)), HOSTS).materialize(  # type: ignore[arg-type]
         AssetRequest(asset="repo_state", run_id="t", partition=REPO)
     )
     answered = status in ("ok", "no-pinned-sha", "never-audited")
@@ -139,7 +144,7 @@ def test_every_status_is_succeeded_or_a_named_gap(status: ComparisonStatus) -> N
 
 def test_a_repository_core_doesnt_know_is_refused_with_its_reason() -> None:
     portfolio = Portfolio(NotFoundError("repository not in inventory: x"))
-    result = RepoStateMaterializer(portfolio, HOSTS).materialize(  # type: ignore[arg-type]
+    result = RepoStateMaterializer(Services(portfolio), HOSTS).materialize(  # type: ignore[arg-type]
         AssetRequest(asset="repo_state", run_id="t", partition=REPO)
     )
     assert result == JobResult.refused("repository not in inventory: x")

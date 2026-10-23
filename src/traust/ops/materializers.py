@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from traust_core.v1.context import Services
 from traust_core.v1.errors import NotFoundError, ValidationError
 from traust_core.v1.models.observation import ComparisonStatus
 from traust_core.v1.models.operations import AssetRequest, JobResult
 from traust_core.v1.models.values import HttpsRepoUrl
-from traust_core.v1.services.portfolio import PortfolioService
 
 # The forge answered, or there was nothing to ask; any other status is a gap, never green.
 ANSWERED = frozenset(
@@ -21,8 +21,8 @@ class RepoStateMaterializer:
 
     asset = "repo_state"
 
-    def __init__(self, portfolio: PortfolioService, hosts: Iterable[str]) -> None:
-        self._portfolio = portfolio
+    def __init__(self, services: Services, hosts: Iterable[str]) -> None:
+        self._portfolio = services.portfolio
         self._hosts = tuple(hosts)
 
     def materialize(self, request: AssetRequest) -> JobResult:
