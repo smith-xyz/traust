@@ -15,11 +15,9 @@ from pathlib import Path
 
 from traust_core.v1.models.artifacts import CloudConfigAuditArtifact
 from traust_core.v1.models.cloud_config import CHECKOV, CloudConfigFacts
-from traust_core.v1.models.common import ArtifactRef, Provenance
-from traust_core.v1.models.integrity import sha256_hex
+from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import SourceType
-from traust_core.v1.services.artifact_publishing import PublishSpec, PublishSpecs
 from traust_engine.adapters.cloud_config import register_checkov
 
 from traust.cli._doors import parser, run
@@ -98,21 +96,11 @@ def record(argv: list[str] | None = None) -> int:
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, args.public)
         ref = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None)
-        publisher = core.artifact_publisher(PublishSpecs(PublishSpec(CloudConfigAuditArtifact)))
-        published = publisher.publish_artifact(doc)
-        artifact = ArtifactRef(
-            id=published.artifact_id, name=doc.name, digest=sha256_hex(doc.payload)
-        )
         when = datetime.now(UTC)
         assessment, decisions = services.assessment.record_audit(
             doc,
             ref.id,
-            Provenance(
-                run_id=uuid.uuid4(),
-                artifact=artifact,
-                source=SourceType.VULN_SCAN_REPORT,
-                occurred_at=when,
-            ),
+            Provenance(run_id=uuid.uuid4(), source=SourceType.VULN_SCAN_REPORT, occurred_at=when),
         )
         return {
             "assessment_id": assessment.id,
