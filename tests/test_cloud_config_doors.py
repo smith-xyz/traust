@@ -190,6 +190,27 @@ def test_run_framework_filter_keeps_only_those_frameworks(
     assert len(facts["facts"]) == 14
 
 
+def test_run_refuses_an_unknown_framework_writing_nothing(
+    sqlite_home: Path, checkout: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    a_checkov(tmp_path, monkeypatch)
+    out = tmp_path / "facts.json"
+
+    rc, _, err = run(
+        cloud_config.run_,
+        sqlite_home,
+        "--target-dir",
+        str(checkout),
+        "--framework",
+        "terraform,not-a-framework",
+        "--out",
+        str(out),
+    )
+
+    assert rc == 2 and "unknown checkov framework(s): not-a-framework" in err
+    assert not out.exists()
+
+
 def test_run_refuses_a_checkov_other_than_the_pin(
     sqlite_home: Path, checkout: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
