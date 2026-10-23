@@ -46,7 +46,6 @@ field on every skill.
 | [secure-rpm-audit](#secure-rpm-audit) | ③ Audit | `primary` | `/secure-rpm-audit` |
 | [security-audit-phased](#security-audit-phased) | ③ Audit | `primary` | `/security-audit-cvss`, `/security-audit-follow-up-seeds`, `/security-audit-init`, `/security-audit-p2`, `/security-audit-p3`, `/security-audit-p4`, `/security-audit-p6`, `/security-audit-review` |
 | [vuln-scan](#vuln-scan) | ③ Audit | `primary` | `/vuln-scan` |
-| [countersign](#countersign) | ④ Triage | `primary` | `/countersign` |
 | [track-findings](#track-findings) | ④ Triage | `primary` | `/track-findings` |
 | [triage](#triage) | ④ Triage | `primary` | `/triage` |
 | [validate-browser-finding](#validate-browser-finding) | ⑤ Validation | `primary` | `/validate-browser-finding` |
@@ -243,16 +242,6 @@ Static source-code vulnerability scan. Reads a target directory (and its threat 
 - **Invoke:** `/vuln-scan` — arguments: `<target-dir> [--diff [--since <commit>]] [--baseline <audit.json>] [--focus <area>] [--single] [--extra <file>] [--no-score]`
 - **Skill:** [harnessing/3-audit/vuln-scan/SKILL.md](../harnessing/3-audit/vuln-scan/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/3-audit/vuln-scan/SKILL.md#integrations)
-
-## countersign
-
-Review and sign off pending human decisions in the findings disposition ledger — machine-refuted false positives awaiting an identity-verified countersignature, and queued needs-review items — and record human overrides on any finding, including severity upgrades/downgrades and validity flips in both directions (false positive to true positive via reopen, true positive to false positive via override). Renders each pending decision as a self-contained card (claim + refutation + evidence) so nothing needs to be remembered from the original reports, records decisions through the countersign workbench, and rebuilds the cumulative reports. Use when asked to "countersign findings", "sign off false positives", "review pending refutations", "what's waiting for my signature", "clear the disposition queue", "downgrade/upgrade this finding's severity", "reclassify this finding", or "this finding is actually a false positive / actually real".
-
-- **Stage:** ④ Triage
-- **Tier:** `primary`
-- **Invoke:** `/countersign` — arguments: `[<findings-root>|<product>/<repo>]`
-- **Skill:** [harnessing/4-triage/countersign/SKILL.md](../harnessing/4-triage/countersign/SKILL.md)
-- **Produces / consumes:** [Integrations](../harnessing/4-triage/countersign/SKILL.md#integrations)
 
 ## track-findings
 

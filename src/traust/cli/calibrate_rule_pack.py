@@ -20,7 +20,7 @@ exactly in the gap between the two.
 
 NOBODY HAND-CONFIRMS THESE, AND THAT IS THE DESIGN. Confirmation comes
 from /triage's judge and from live validation, not from a person signing
-off each finding — /countersign is the FALSE-positive path (contested
+off each finding — the human countersign is the FALSE-positive path (contested
 machine refutations), so the confirmed set is overwhelmingly
 machine_verified plus execution_proven, hand review is a rounding error,
 and false_positive stays small by construction. Ground truth here is a

@@ -141,8 +141,8 @@ Three things that are deliberately *not* ledgers:
   that glob `*security-audit.*` cannot double-count it.
 - **There is no fleet-wide cumulative ledger.** Portfolio state is
   always derived by replay, never stored: `findings-trends` replays
-  every repo's ledger against time buckets, `countersign` sweeps all
-  ledgers for pending human decisions, and the executive-summary
+  every repo's ledger against time buckets, `traust findings queue` lists
+  every pending human decision, and the executive-summary
   aggregates the per-repo reports. A global mutable roll-up file would
   be exactly the kind of editable state the design refuses (tenet 2).
 - **The `.md` files are renderings.** The JSON report is the original
@@ -354,8 +354,8 @@ six stacked controls:
    leaves verification scope because someone said "false positive";
    dismissal buys an entry on the falsification worklist, not immunity.
    **Known limit:**
-   `/countersign` writes no register entries, so a *human-only* FP —
-   one first asserted at the workbench rather than by triage — never
+   A human decision writes no register entry, so a *human-only* FP —
+   one first asserted by a person rather than by triage — never
    reaches the register today; register entries carry the machine
    `asserted_by`, not the countersigner.
 5. **Execution override, loudly.** If fuzzing or live validation later
@@ -377,49 +377,35 @@ visible, stay testable, and lose to evidence.
 
 ### 6a. The countersign workbench
 
-"Awaiting sign-off" is derived state, not a stored queue — so
-the retired `admin countersign` (the review queue is traust-core's now) provides the human inbox over it:
+"Awaiting sign-off" is derived state, not a stored queue. The human
+inbox is traust-core's review queue, through `traust findings` on a
+laptop or headless, and the SCI console where traust is deployed:
 
-- **`queue`** walks a findings tree, derives every pending decision
-  (awaiting-signoff findings + pending `needs_review` items), and
-  renders one **decision card** per item: the audit claim, the machine
-  refutation with its lint-verified evidence and vote data, and exactly
-  what signing records. A card is self-contained by design — the
-  reviewer decides without opening any report.
-- **`apply` / `record`** turn decisions into ledger events: the
-  signer's identity is verified before anything is recorded — the
-  signer is the holder of the ledger identity token, the SDK verifies
-  the token and stamps that identity on every event it writes, and
+- **`queue`** lists the pending `review_item` rows (needs-review items,
+  statements imported from MRs, commits and Jira). Each item's statement
+  is re-read from its source when you look at it; traust stores no copy
+  of what was said.
+- **`confirm` / `reject` / `decide`** record decisions as `decision`
+  rows, which `LedgerService` appends to the repo's layer. The signer is
+  the verified caller (`traust auth`): the token is checked by
+  `IdentityService` and its principal is stamped on the decision;
   nothing the CLI asserts about the signer reaches the layer. Machine
-  tokens cannot countersign. Self-minted local tokens
-  (`identity_provider: local`) verify against a key in the signer's own
-  config directory, so any code executor could mint "human, verified"
-  events for two names and defeat the two-person rule; countersign
-  refuses them unless the deployment sets
-  `HARNESS_COUNTERSIGN_ALLOW_LOCAL=1` (adopters with no identity
-  provider). An employee-directory cross-check ("is this account
-  current") is a deployment command the ledger runs
-  (`ledger.yaml` → `identity.directory_command`),
-  applied on every write path; it is not part of the identity proof. Mechanism and
-  variables: the identity-verification section of
-  [countersign SKILL.md](../harnessing/4-triage/countersign/SKILL.md). A blank
-  rationale on a countersign adopts the machine rationale *explicitly
-  framed as the signer's adopted determination*, rejecting a refutation
-  (`keep_open` → human `confirmed`) requires the reviewer's own words,
-  events get canonical ids (idempotent per signer-day-and-level), and the
-  cumulative report is rebuilt deterministically with a printed receipt.
-- The annotatable `countersign-queue.md` also works asynchronously —
-  mark decisions in an editor or an MR, apply later.
-- **Human overrides** extend the workbench beyond the queue —
-  a finding need not be pending to act on it, and all three demand a
-  rationale in the signer's own words: `reopen` flips a false positive
-  back to confirmed (a human `confirmed` event);
-  `override_false_positive` flips a confirmed/open finding to FP, with
+  principals cannot record a false positive. Self-minted local tokens
+  (`traust auth local`) would let any code executor mint "human,
+  verified" decisions for two names and defeat the two-person rule, so
+  core trusts them only when `core.yaml` sets `identity: {trust_local:
+  true}` (adopters with no identity provider). An employee-directory
+  cross-check ("is this account current") is a deployment `Directory`,
+  applied on every write; it is not part of the identity proof. Every
+  decision needs a rationale in the signer's own words, and recording
+  the same statement twice adds nothing (`statement_key`).
+- **Human overrides** don't need a pending item: `decide` with
+  `validity=confirmed` flips a false positive back (reopen);
+  `validity=false_positive` flips a confirmed or open finding, with
   evidence-class precedence still applying (over an executed proof a
   second independent signer must concur); `severity=<level>` records an
   upgrade or downgrade — the audit report's severity is never
-  rewritten, the cumulative report carries it as `effective_severity`
-  plus a `severity_overrides` table (the retired `admin countersign` (the review queue is traust-core's now)).
+  rewritten, the finding's effective severity carries it.
 
 None of the §6 safeguards are relaxed: the workbench removes the memory
 burden and the ceremony, not the verification, the rationale
