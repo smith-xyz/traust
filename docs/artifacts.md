@@ -59,7 +59,7 @@ notice before running it; no retired emitter is an active consumer.
 | `<repo>-findings-layer.json` — legacy ledger | `layer.schema.json` | Historical `/track-findings` output | Historical cumulative/projection inputs only; current countersign reads core findings and attestation, never this file |
 | `<repo>-findings-current.{json,md}` — derived, regenerable | `report.schema.json` | `build_cumulative` (replay of the ledger over the baseline) | owner routing, team reports, `/file-security-defect`, dashboards, SARIF export |
 | `PATCHES/` packet | — | `/patch` | **terminal by design**: a human-review packet; nothing consumes it automatically |
-| Human judgement / reviewed answer / JSON receipt | Core `RecordDecision` and review service models | `traust admin countersign record` / `apply` | Core finding history/disposition and attestation queue; token/rationale-free write receipt for the human |
+| Private `countersign-queue.md` / human answer / JSON receipt | Core `ReviewCase`, `RecordDecision` and review service models | `traust admin countersign queue --output` / `record` / `apply` | Human reviews escaped cards and edits only the typed JSON answer block; apply records through core history/disposition/attestation, never imports workbench state; token/rationale-free write receipt |
 
 The baseline-only boundary remains a guardrail, not an exception to core
 ownership. New findings and decisions go through their domain record doors.

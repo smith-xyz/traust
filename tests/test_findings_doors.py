@@ -564,3 +564,54 @@ def test_findings_review_refusal_preserves_pending_item(
     assert why not in capsys.readouterr().err
     assert services.findings.history(UUID(finding_id)) == []
     assert services.attestation.for_finding(UUID(finding_id)) == [item]
+
+
+def test_async_workbench_uses_stored_login_without_stdin(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tests.test_countersign_record import edit_workbench_answers
+
+    finding_id = scanned(home, tmp_path)
+    services = load_core(home).services()
+    item = services.attestation.request(UUID(finding_id), None, ReviewReason.AMBIGUOUS_STATEMENT)
+    assert registered(home, "auth", "local", "--identity", "alice@example.com")[0] == 0
+
+    class NoTokenInput(io.StringIO):
+        def read(self, *args: Any, **kwargs: Any) -> str:
+            pytest.fail("stored login must not read stdin for a Markdown workbench")
+
+    monkeypatch.setattr("sys.stdin", NoTokenInput())
+    path = tmp_path / "countersign-queue.md"
+    rc, receipt = registered(home, "admin", "countersign", "queue", "--output", str(path))
+    assert (rc, receipt["items"]) == (0, 1)
+    assert registered(home, "admin", "countersign", "apply", str(path)) == (
+        0,
+        {"results": [], "deferred": True},
+    )
+    assert services.findings.history(UUID(finding_id)) == []
+    rationale = "I followed the concrete call path and confirmed the reviewed finding."
+    edit_workbench_answers(
+        path,
+        [
+            {
+                "review_item_id": str(item.id),
+                "decision": "confirm",
+                "answer": {
+                    "finding_id": finding_id,
+                    "validity": "confirmed",
+                    "rationale": rationale,
+                },
+            }
+        ],
+    )
+    rc, applied = registered(home, "admin", "countersign", "apply", str(path))
+    assert rc == 0 and applied["results"][0]["review_item"]["status"] == "accepted"
+    [decision] = services.findings.history(UUID(finding_id))
+    assert (decision.actor, decision.rationale, decision.evidence_grade) == (
+        "human:alice@example.com",
+        rationale,
+        None,
+    )
+    assert (
+        services.attestation.for_finding(UUID(finding_id))[0].resolved_by_decision_id == decision.id
+    )

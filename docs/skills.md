@@ -246,11 +246,11 @@ Static source-code vulnerability scan. Reads a target directory (and its threat 
 
 ## countersign
 
-Review pending core finding decisions, request human sign-off, and record a verified human's explicit validity, severity or resolution judgement. Supports single and bulk reviewed answers using the shared traust auth login or explicit stdin token, with rationale and core evidence admission.
+Review core finding decision cards and record verified-human judgements. Supports a private asynchronous countersign-queue.md round trip and single or bulk JSON answers using shared traust auth or explicit stdin tokens, with rationale and core evidence admission.
 
 - **Stage:** ④ Triage
 - **Tier:** `primary`
-- **Invoke:** `/countersign` — arguments: `[core-finding-UUID | queue | reviewed-answers.json]`
+- **Invoke:** `/countersign` — arguments: `[core-finding-UUID | queue | countersign-queue.md | reviewed-answers.json]`
 - **Skill:** [harnessing/4-triage/countersign/SKILL.md](../harnessing/4-triage/countersign/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/4-triage/countersign/SKILL.md#integrations)
 

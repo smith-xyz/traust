@@ -148,19 +148,29 @@ Core owns evidence precedence, actor, clock, admission, persistence and replay.
 ```bash
 traust admin countersign queue --limit 25 --config-home /path/to/private-config
 traust admin countersign queue --finding 31dcc9b8-b569-4340-9032-3b335d53a9ef
+traust admin countersign queue --limit 25 \
+    --output /path/to/private-review/countersign-queue.md
 traust admin countersign request \
     --finding 31dcc9b8-b569-4340-9032-3b335d53a9ef \
     --reason ambiguous_statement --token-stdin \
     < /path/to/private-identity-token
 ```
 
-Queue returns JSON `{"items":[...],"next":null-or-cursor}`. Cards contain
-`review_item`, `finding`, `history` and `evidence` (integrity-checked artifact
+Without `--output`, queue returns JSON `{"items":[...],"next":null-or-cursor}`.
+Core `ReviewCase` provides `review_item`, rich `finding` and attributed `history`;
+the client adds `evidence` (integrity-checked artifact
 documents, including raw probe observations). `--finding`, `--reason` and
 `--status` filter the read; status defaults to pending, limit to 100. Resume with
 `--cursor <returned-next>` and unchanged filters/limit until next is null.
 Invalid cursors or nonpositive limits fail, not an empty queue. Canonical reason
 and status choices come from `queue --help`.
+
+`--output` explicitly creates a new Markdown workbench with permissions 0600;
+existing files and symlinks are refused, never overwritten. It includes the same
+decision cards/evidence, page filters and next cursor. Stdout is a receipt
+`{"written":"path","items":count,"next":null-or-cursor}` without evidence or
+submitted rationale. Use a new file per page. The file is intentionally
+sensitive, untrusted review material, not authoritative state.
 
 Request optionally takes `--decision <UUID>` for the proposal being reviewed.
 The same pending request is idempotent; a cross-finding proposal is refused.
@@ -191,6 +201,35 @@ The nested answer allows only `finding_id`, `rationale`, optional `validity`,
 `severity`, `resolution`, `evidence_grade`; core requires at least one judged
 field. Actor/source/time/restatement/auto-accept fields are forbidden.
 Omit deferred items instead of creating a fake answer.
+
+For the async round trip, the human edits **only** the generated Markdown file's
+single marked typed JSON block, adding the above answer objects to `answers`:
+
+````markdown
+<!-- traust:countersign-answers:v1:begin -->
+```json
+{
+  "type": "traust.countersign.answers.v1",
+  "answers": []
+}
+```
+<!-- traust:countersign-answers:v1:end -->
+````
+
+Then run `traust admin countersign apply /path/to/private-review/countersign-queue.md`
+(optionally `--token-stdin`). The exact markers, JSON fence and type are required;
+the payload is limited to one MiB. Missing, duplicate or malformed controls,
+duplicate JSON fields and invalid rows fail rather than being silently ignored.
+Cards escape HTML/comment markers and use safe fences; evidence cannot forge
+the answer block. Checkboxes, prose, copied report JSON and `DECISION:` lines are
+never interpreted as approval. Do not populate answers from machine text.
+
+An unchanged Markdown `answers: []` is an explicit **defer**: verified-human
+authentication is still required, but no decision or review is changed. Exit 0
+returns `{"results":[],"deferred":true}`. Omitted items remain pending. A plain
+JSON empty array still fails; existing JSON object/nonempty-array behavior is
+unchanged. All answers use the same strict core service calls regardless of file
+format.
 
 Each answer atomically records the human decision and settles that review item.
 Exact replay returns the saved item; a changed answer/outcome conflicts without
@@ -230,6 +269,8 @@ the connection directly.
 Write receipts/errors omit submitted rationale and tokens. Queue history and
 evidence deliberately expose prior judgements for review: they are sensitive
 review material, not publication receipts. Reload through
-`services.findings.history/get` and `services.attestation.pending/for_finding`.
+`services.findings.history/get`, core `ReviewCase` queues and
+`services.attestation.for_finding`.
 The [skill](../harnessing/4-triage/countersign/SKILL.md#legacy-parity-and-retirement)
-accounts for retired Markdown parsing, scan-ID mapping and file-based state.
+accounts for retired checkbox/prose approval parsing, scan-ID mapping and
+file-based state; the typed async workbench does not restore those paths.

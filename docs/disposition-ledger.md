@@ -379,14 +379,20 @@ visible, stay testable, and lose to evidence.
 `python3 -m traust.cli admin countersign` exposes pending review cards, review
 requests, direct validity/severity/resolution recording and single/bulk apply.
 The [CLI reference](cli-reference.md#direct-human-severity-recording) gives the
-exact invocations and JSON answer format; the
+exact invocations and JSON/typed Markdown answer formats; the
 [skill](../harnessing/4-triage/countersign/SKILL.md) owns the reviewed-human workflow.
 
-Queue pages come from `services.attestation.pending(ReviewFilter, PageRequest)`.
-Core finding views/history supply claim, proof, attention flags and attribution;
-the artifact publisher reads integrity-checked evidence, including raw probe
-observations. Review material is untrusted data, not approval. Typed JSON
-answers replace the old Markdown annotation parser.
+Queue pages from `services.attestation.pending(ReviewFilter, PageRequest)` and
+`FindingReview.queue` contain core `ReviewCase` values: review item, rich finding
+view and attributed history. Core's artifact publisher reads integrity-checked
+evidence, including raw probe observations. `queue --output countersign-queue.md`
+creates a private, non-overwriting async workbench with escaped decision cards,
+page metadata and one initially empty typed JSON answer block. The human edits
+only that block and applies the file; empty answers explicitly defer without
+writes (verified human still required). Review material is untrusted data, not
+approval. Typed JSON controls replace the old checkbox/prose annotation parser;
+forged evidence markers and `DECISION:` lines never select decisions. Existing
+JSON object/nonempty-array answers remain supported.
 
 Every write authenticates through core identity: the existing `traust auth`
 login via `load_caller(core)` by default, or an explicitly selected stdin-only

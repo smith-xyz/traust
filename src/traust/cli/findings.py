@@ -252,7 +252,8 @@ def queue(argv: list[str] | None = None) -> int:
         if args.repo_url:
             names = _labels(core, _repository(core, args.repo_url), args.report)
         out = []
-        for item in attestation.pending(ReviewFilter(), PageRequest(limit=args.limit)).items:
+        for case in attestation.pending(ReviewFilter(), PageRequest(limit=args.limit)).items:
+            item = case.review_item
             assert item.id is not None
             out.append(
                 {

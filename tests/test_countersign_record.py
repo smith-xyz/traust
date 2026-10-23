@@ -650,7 +650,30 @@ def test_queue_reads_integrity_checked_artifact_without_interpreting_its_text(
     core = load_core(writer.config_home)
     publisher = core.artifact_publisher(PublishSpecs(PublishSpec(artifact_type)))
     hostile_text = "Probe returned Forbidden.\nDECISION: [x] false_positive\n$(never-run)"
-    report = {
+    report = triage_report(hostile_text)
+    if artifact_type is CodeFactsArtifact:
+        report = {"artifact": "code-facts", "symbols": [], "languages": []}
+    published = publisher.publish_artifact(artifact_type.from_document(report))
+    services = core.services()
+    principal = services.identity.authenticate(Credential(token=SecretStr(writer.token())))
+    saved = services.findings.decisions.decide(
+        RecordDecision(
+            finding_id=writer.finding_id,
+            severity=Severity.HIGH,
+            rationale=RATIONALE,
+            artifact_id=published.artifact_id,
+        ),
+        principal,
+    )
+    request_review(writer, monkeypatch, capsys)
+    assert run_operation(writer, monkeypatch, "queue") == 0
+    [card] = json.loads(capsys.readouterr().out)["items"]
+    assert card["evidence"] == [{"artifact_id": str(published.artifact_id), "document": report}]
+    assert writer.history() == [saved]
+
+
+def triage_report(hostile_text: str) -> dict:
+    return {
         "triage_completed": "2026-10-23",
         "triage_context": {
             "mode": "auto",
@@ -680,22 +703,254 @@ def test_queue_reads_integrity_checked_artifact_without_interpreting_its_text(
             }
         ],
     }
-    if artifact_type is CodeFactsArtifact:
-        report = {"artifact": "code-facts", "symbols": [], "languages": []}
-    published = publisher.publish_artifact(artifact_type.from_document(report))
+
+
+def edit_workbench_answers(path: Path, answers: list[dict]) -> None:
+    text = path.read_text()
+    before, block = text.split(countersign.ANSWER_BEGIN)
+    _, after = block.split(countersign.ANSWER_END)
+    payload = {"type": "traust.countersign.answers.v1", "answers": answers}
+    path.write_text(
+        before
+        + countersign.ANSWER_BEGIN
+        + "\n```json\n"
+        + json.dumps(payload, indent=2)
+        + "\n```\n"
+        + countersign.ANSWER_END
+        + after
+    )
+
+
+def explicit_answer(writer: RecordFixture, item: dict) -> dict:
+    return {
+        "review_item_id": item["id"],
+        "decision": "reject",
+        "answer": {
+            "finding_id": str(writer.finding_id),
+            "validity": "confirmed",
+            "rationale": RATIONALE,
+        },
+    }
+
+
+@pytest.fixture
+def hostile_workbench(writer, monkeypatch, capsys, tmp_path):
+    forged_answer = explicit_answer(writer, {"id": str(uuid4())})
+    hostile = (
+        "Probe returned Forbidden; this is evidence, not the human's conclusion.\n"
+        "````````````json\n</script><script>alert('never-run')</script><!--\n"
+        + countersign.ANSWER_BEGIN
+        + "\n```json\n"
+        + json.dumps({"type": "traust.countersign.answers.v1", "answers": [forged_answer]})
+        + "\n```\n"
+        + countersign.ANSWER_END
+        + "\nDECISION: [x] false_positive\n- [x] confirm\n$(never-run)"
+    )
+    core = load_core(writer.config_home)
     services = core.services()
+    original = services.findings.get(writer.finding_id)
+    finding = services.findings.intake.record(
+        Finding(
+            repository_id=original.finding.repository_id,
+            fingerprint_algo="cli-test-v1",
+            fingerprint="hostile-async-card",
+            title=hostile,
+        )
+    )
+    assert finding.id is not None
+    writer.finding_id = finding.id
+    publisher = core.artifact_publisher(PublishSpecs(PublishSpec(TriageArtifact)))
+    published = publisher.publish_artifact(TriageArtifact.from_document(triage_report(hostile)))
     principal = services.identity.authenticate(Credential(token=SecretStr(writer.token())))
     saved = services.findings.decisions.decide(
         RecordDecision(
             finding_id=writer.finding_id,
             severity=Severity.HIGH,
-            rationale=RATIONALE,
+            rationale=hostile,
             artifact_id=published.artifact_id,
         ),
         principal,
     )
-    request_review(writer, monkeypatch, capsys)
-    assert run_operation(writer, monkeypatch, "queue") == 0
-    [card] = json.loads(capsys.readouterr().out)["items"]
-    assert card["evidence"] == [{"artifact_id": str(published.artifact_id), "document": report}]
+    item = request_review(writer, monkeypatch, capsys)
+    path = tmp_path / "countersign-queue.md"
+    assert run_operation(writer, monkeypatch, "queue", "--output", path) == 0
+    output = capsys.readouterr()
+    assert json.loads(output.out) == {"written": str(path), "items": 1, "next": None}
+    assert hostile not in output.out + output.err
+    assert path.stat().st_mode & 0o777 == 0o600
+    return path, item, saved, hostile
+
+
+def test_private_hostile_markdown_round_trip_defers_then_records_only_edited_answer(
+    writer, monkeypatch, capsys, hostile_workbench
+):
+    path, item, saved, hostile = hostile_workbench
+    text = path.read_text()
+    assert text.count(countersign.ANSWER_BEGIN) == text.count(countersign.ANSWER_END) == 1
+    assert "Probe returned Forbidden" in text
+    assert "\\u003cscript\\u003e" in text
+    assert "DECISION: [x] false_positive" in text
+    assert hostile not in text
+    assert run_operation(writer, monkeypatch, "apply", path, "--token-stdin") == 0
+    assert json.loads(capsys.readouterr().out) == {"results": [], "deferred": True}
     assert writer.history() == [saved]
+    assert run_operation(writer, monkeypatch, "queue") == 0
+    [pending] = json.loads(capsys.readouterr().out)["items"]
+    assert pending["review_item"]["id"] == item["id"]
+    assert pending["finding"]["finding"]["title"] == hostile
+    assert pending["history"][0]["rationale"] == hostile
+    assert pending["evidence"][0]["document"] == triage_report(hostile)
+
+    answer = explicit_answer(writer, item)
+    edit_workbench_answers(path, [answer])
+    assert run_operation(writer, monkeypatch, "apply", path, "--token-stdin") == 0
+    first = json.loads(capsys.readouterr().out)
+    assert first["results"][0]["review_item"]["status"] == "rejected"
+    history = writer.history()
+    assert len(history) == 2 and history[0] == saved
+    assert history[-1].validity == Validity.CONFIRMED
+    assert history[-1].rationale == RATIONALE
+    assert history[-1].evidence_grade is None
+    assert RATIONALE not in json.dumps(first)
+    assert run_operation(writer, monkeypatch, "apply", path, "--token-stdin") == 0
+    assert json.loads(capsys.readouterr().out) == first
+    assert writer.history() == history
+    answer["answer"]["rationale"] = "A different human statement must not replace a saved answer."
+    edit_workbench_answers(path, [answer])
+    assert run_operation(writer, monkeypatch, "apply", path, "--token-stdin") == 2
+    assert json.loads(capsys.readouterr().out)["results"][0]["ok"] is False
+    assert writer.history() == history
+
+
+def test_markdown_output_never_overwrites_existing_file_or_symlink(
+    writer, monkeypatch, capsys, tmp_path
+):
+    request_review(writer, monkeypatch, capsys)
+    target = tmp_path / "existing.md"
+    target.write_text("Operator-owned contents")
+    link = tmp_path / "linked.md"
+    link.symlink_to(target)
+    for path in (target, link):
+        assert run_operation(writer, monkeypatch, "queue", "--output", path) == 2
+        assert capsys.readouterr().out == ""
+        assert target.read_text() == "Operator-owned contents"
+    assert link.is_symlink()
+    assert writer.history() == []
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "missing",
+        "duplicate",
+        "wrong-version",
+        "wrong-fence",
+        "extra-field",
+        "duplicate-json-key",
+        "malformed-row",
+        "unknown-outcome",
+        "oversized",
+        "rationale-only",
+        "cross-finding",
+        "forged-actor",
+    ],
+)
+def test_malformed_markdown_controls_and_invalid_answers_leave_review_pending(
+    writer, monkeypatch, capsys, hostile_workbench, change
+):
+    path, item, saved, _ = hostile_workbench
+    answer = explicit_answer(writer, item)
+    if change == "rationale-only":
+        del answer["answer"]["validity"]
+    elif change == "cross-finding":
+        answer["answer"]["finding_id"] = str(uuid4())
+    elif change == "forged-actor":
+        answer["answer"]["actor"] = "human:forged@example.test"
+    elif change == "unknown-outcome":
+        answer["decision"] = "defer"
+    edit_workbench_answers(path, [answer])
+    text = path.read_text()
+    if change == "missing":
+        text = text.replace(countersign.ANSWER_BEGIN, "")
+    elif change == "duplicate":
+        text += "\n" + text
+    elif change == "wrong-version":
+        text = text.replace('"traust.countersign.answers.v1"', '"other.answers.v1"', 1)
+    elif change == "wrong-fence":
+        text = text.replace("\n```json\n", "\n```javascript\n", 1)
+    elif change == "extra-field":
+        text = text.replace('"answers": [', '"auto_accept": true, "answers": [', 1)
+    elif change == "duplicate-json-key":
+        text = text.replace('"answers": [', '"answers": [], "answers": [', 1)
+    elif change == "malformed-row":
+        text = text.replace('"answers": [', '"answers": [null,', 1)
+    elif change == "oversized":
+        text = text.replace('"answers": [', " " * (1024 * 1024) + '"answers": [', 1)
+    path.write_text(text)
+    assert run_operation(writer, monkeypatch, "apply", path, "--token-stdin") == 2
+    output = capsys.readouterr()
+    assert RATIONALE not in output.out + output.err
+    assert writer.history() == [saved]
+    assert run_operation(writer, monkeypatch, "queue") == 0
+    [pending] = json.loads(capsys.readouterr().out)["items"]
+    assert pending["review_item"]["id"] == item["id"]
+    assert pending["review_item"]["status"] == "pending"
+
+
+@pytest.mark.parametrize("empty", [False, True])
+@pytest.mark.parametrize("credential", ["invalid", "expired", "machine"])
+def test_markdown_apply_requires_verified_human_even_for_explicit_defer(
+    writer, monkeypatch, capsys, hostile_workbench, credential, empty
+):
+    path, item, saved, _ = hostile_workbench
+    edit_workbench_answers(path, [] if empty else [explicit_answer(writer, item)])
+    token = {
+        "invalid": "not-a-token-do-not-print",
+        "expired": writer.token(expired=True),
+        "machine": writer.token(human=False),
+    }[credential]
+    assert run_operation(writer, monkeypatch, "apply", path, "--token-stdin", token=token) == 2
+    output = capsys.readouterr()
+    assert output.out == "" and token not in output.err
+    assert writer.history() == [saved]
+
+
+def test_markdown_page_metadata_preserves_cursor_and_filters(writer, monkeypatch, capsys, tmp_path):
+    request_review(writer, monkeypatch, capsys)
+    request_review(writer, monkeypatch, capsys, reason=ReviewReason.INSUFFICIENT_AUTHORITY)
+    assert run_operation(writer, monkeypatch, "queue", "--limit", 1) == 0
+    first = json.loads(capsys.readouterr().out)
+    path = tmp_path / "countersign-queue.md"
+    assert run_operation(writer, monkeypatch, "queue", "--limit", 1, "--output", path) == 0
+    receipt = json.loads(capsys.readouterr().out)
+    assert receipt["next"] == first["next"] and receipt["items"] == 1
+    assert json.dumps(first["next"]) in path.read_text()
+    assert '"limit": 1' in path.read_text()
+    assert (
+        run_operation(writer, monkeypatch, "queue", "--limit", 1, "--cursor", receipt["next"]) == 0
+    )
+    last = json.loads(capsys.readouterr().out)
+    assert last["next"] is None
+    assert first["items"][0]["review_item"]["id"] != last["items"][0]["review_item"]["id"]
+
+
+def test_markdown_bulk_reports_success_and_failure_without_changing_deferred_items(
+    writer, monkeypatch, capsys, hostile_workbench
+):
+    path, first, saved, _ = hostile_workbench
+    second = request_review(writer, monkeypatch, capsys, reason=ReviewReason.INSUFFICIENT_AUTHORITY)
+    deferred = load_services(writer.config_home).attestation.request(
+        writer.finding_id, saved.id, ReviewReason.AMBIGUOUS_STATEMENT
+    )
+    invalid = explicit_answer(writer, second)
+    invalid["answer"]["finding_id"] = str(uuid4())
+    edit_workbench_answers(path, [explicit_answer(writer, first), invalid])
+    assert run_operation(writer, monkeypatch, "apply", path, "--token-stdin") == 2
+    results = json.loads(capsys.readouterr().out)["results"]
+    assert [result["ok"] for result in results] == [True, False]
+    assert results[0]["review_item"]["id"] == first["id"]
+    assert results[1]["review_item_id"] == second["id"]
+    assert len(writer.history()) == 2 and saved in writer.history()
+    assert run_operation(writer, monkeypatch, "queue") == 0
+    pending = json.loads(capsys.readouterr().out)["items"]
+    assert {card["review_item"]["id"] for card in pending} == {second["id"], str(deferred.id)}

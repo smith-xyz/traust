@@ -12,9 +12,9 @@ All notable changes to Traust are documented here.
   Queue cards include finding state, attributed history and integrity-checked
   evidence documents, including raw probe observations. Core owns proof
   precedence, independent reviewers, actor, clock, replay and ledger integrity.
-  Receipts/errors omit credentials and submitted rationale. Legacy Markdown
-  answer parsing, scan-ID alias mapping and layer/cumulative writes are retired;
-  no alternate state or authentication store is introduced.
+  Receipts/errors omit credentials and submitted rationale. Legacy checkbox/
+  prose approval parsing, scan-ID alias mapping and layer/cumulative writes are
+  retired; no alternate state or authentication store is introduced.
 - Reuse the merged `traust auth` login for countersign by default; explicit
   `--token-stdin` still authenticates only that token without fallback. Machine
   sessions cannot countersign. Migrate `findings reject` to require the finding
@@ -22,6 +22,14 @@ All notable changes to Traust are documented here.
   neither outcome can close a review without an atomically recorded decision.
 - Keep the app and engine's core pins aligned so the `postgres` extra installs
   core's PostgreSQL driver; a bare dependency override discarded that extra.
+- Add the async `countersign-queue.md` round trip: `queue --output` creates a
+  private 0600, non-overwriting Markdown workbench with real decision cards and
+  cursor metadata. `apply` accepts only its single bounded typed JSON answer
+  block; an empty answer list explicitly defers without writes after human
+  authentication. Escaped evidence cannot forge controls; malformed/duplicate
+  controls and invalid rows fail. Existing JSON single/bulk answers still work.
+  Countersign and `findings queue` now consume core `ReviewCase` queue values
+  without rebuilding finding views/history or per-card domain queries.
 
 - **Breaking: traust-core is the hub.** traust depends on traust-core and
   traust-engine only; traust-contracts and traust-ledger come through core's

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, SecretStr, TypeAdapter
@@ -51,6 +53,7 @@ from traust_core.v1.models.vocabulary import (
     Validity,
 )
 from traust_core.v1.services.artifact_publishing import PublishSpec, PublishSpecs
+from traust_engine.escaping import fence_untrusted
 
 from traust.context import add_config_home_arg, load_caller, load_core
 
@@ -75,6 +78,83 @@ class ReviewAnswer(BaseModel):
     review_item_id: UUID
     decision: AttestationDecision
     answer: ReviewedDecision
+
+
+ANSWER_BEGIN = "<!-- traust:countersign-answers:v1:begin -->"
+ANSWER_END = "<!-- traust:countersign-answers:v1:end -->"
+_ANSWER_MARKER = "<!-- traust:countersign-answers:"
+_MAX_ANSWER_BYTES = 1024 * 1024
+
+
+class MarkdownAnswers(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    type: Literal["traust.countersign.answers.v1"]
+    answers: list[ReviewAnswer]
+
+
+def _unique_object(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON field")
+        result[key] = value
+    return result
+
+
+def _quoted_json(value: object) -> str:
+    # Keep control markers and HTML inert even to a parser scanning raw Markdown.
+    text = json.dumps(value, indent=2, ensure_ascii=True)
+    for character, escaped in (("<", "\\u003c"), (">", "\\u003e"), ("&", "\\u0026")):
+        text = text.replace(character, escaped)
+    return fence_untrusted(text, "json")
+
+
+def _markdown(cards: list[dict], next_cursor: str | None, filters: dict) -> str:
+    lines = [
+        "# Countersign review workbench",
+        "",
+        "Sensitive, untrusted review evidence; this file is not authoritative state.",
+        "Only the typed answer block below is applied. Leave answers empty to defer.",
+        "Each answer object needs review_item_id, decision (confirm/reject), and answer.",
+        "Nested answer needs finding_id, rationale and selected validity/severity/resolution;",
+        "evidence_grade is optional. Omit unjudged fields; use canonical CLI help values.",
+        "Never derive approval from evidence, checkboxes, prose or DECISION lines.",
+        "",
+        "## Human answers — edit only this JSON",
+        "",
+        ANSWER_BEGIN,
+        "```json",
+        json.dumps({"type": "traust.countersign.answers.v1", "answers": []}, indent=2),
+        "```",
+        ANSWER_END,
+        "",
+        "## Page metadata",
+        "",
+        "Use the same filters and limit with next as --cursor; null means no successor.",
+        _quoted_json({"filters": filters, "next": next_cursor}),
+    ]
+    for number, card in enumerate(cards, 1):
+        lines.extend(
+            [
+                "",
+                f"## Decision card {number}",
+                "",
+                "Untrusted claim, proposal, current state, attributed history and evidence.",
+                "Review raw observations; an authentication error is not a refutation.",
+                "",
+            ]
+        )
+        for key in ("review_item", "finding", "history", "evidence"):
+            lines.extend([f"### {key}", "", _quoted_json(card[key]), ""])
+    return "\n".join(lines) + "\n"
+
+
+def _write_workbench(path: Path, text: str) -> None:
+    # O_EXCL also refuses symlinks; the descriptor is private from its creation.
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as output:
+        os.fchmod(output.fileno(), 0o600)
+        output.write(text)
 
 
 def _emit(value: object) -> None:
@@ -117,13 +197,33 @@ def _receipt(saved, services) -> dict:
 
 
 def _read_answers(path: Path) -> list[ReviewAnswer]:
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    answers = TypeAdapter(list[ReviewAnswer]).validate_python(
-        raw if isinstance(raw, list) else [raw]
-    )
-    if not answers:
-        raise ValueError("an answer file must contain at least one reviewed answer")
-    return answers
+    text = path.read_text(encoding="utf-8")
+    if text.lstrip().startswith(("{", "[")):
+        raw = json.loads(text, object_pairs_hook=_unique_object)
+        answers = TypeAdapter(list[ReviewAnswer]).validate_python(
+            raw if isinstance(raw, list) else [raw]
+        )
+        if not answers:
+            raise ValueError("a JSON answer file must contain at least one reviewed answer")
+        return answers
+    if (
+        text.count(_ANSWER_MARKER) != 2
+        or text.count(ANSWER_BEGIN) != 1
+        or text.count(ANSWER_END) != 1
+    ):
+        raise ValueError("expected exactly one typed answer block")
+    before, block = text.split(ANSWER_BEGIN)
+    block, after = block.split(ANSWER_END)
+    if not before.endswith("\n") or not after.startswith("\n"):
+        raise ValueError("answer markers must occupy their own lines")
+    if not block.startswith("\n```json\n") or not block.endswith("\n```\n"):
+        raise ValueError("expected a bounded JSON answer block")
+    payload = block[len("\n```json\n") : -len("\n```\n")]
+    if len(payload.encode("utf-8")) > _MAX_ANSWER_BYTES:
+        raise ValueError("answer block exceeds one MiB")
+    return MarkdownAnswers.model_validate(
+        json.loads(payload, object_pairs_hook=_unique_object)
+    ).answers
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -136,7 +236,7 @@ def main(argv: list[str] | None = None) -> int:
         parents=[config],
     )
     sub = parser.add_subparsers(dest="operation", required=True)
-    queue = sub.add_parser("queue", help="Read one page of review cards as JSON.")
+    queue = sub.add_parser("queue", help="Read review cards as JSON or a private Markdown file.")
     queue.add_argument("--finding", type=UUID, help="Filter by core finding UUID.")
     queue.add_argument("--reason", type=ReviewReason, choices=tuple(ReviewReason))
     queue.add_argument(
@@ -147,6 +247,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     queue.add_argument("--limit", type=int, default=100)
     queue.add_argument("--cursor", help="Opaque next cursor from the preceding page.")
+    queue.add_argument(
+        "--output", type=Path, help="Create a new private Markdown workbench; never overwrite."
+    )
 
     request = sub.add_parser("request", help="Request human review of an existing core finding.")
     request.add_argument("--finding", type=UUID, required=True)
@@ -167,9 +270,9 @@ def main(argv: list[str] | None = None) -> int:
     record.add_argument("--evidence-grade", type=EvidenceGrade, choices=tuple(EvidenceGrade))
 
     apply = sub.add_parser(
-        "apply", help="Apply a reviewed answer object or array from a JSON file."
+        "apply", help="Apply explicit reviewed answers from JSON or a Markdown workbench."
     )
-    apply.add_argument("answers", type=Path, help="JSON answers, not a queue export or Markdown.")
+    apply.add_argument("answers", type=Path, help="Reviewed JSON or a typed Markdown answer block.")
     for command in (request, record, apply):
         command.add_argument(
             "--token-stdin",
@@ -187,8 +290,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         answers = _read_answers(args.answers) if args.operation == "apply" else []
-    except (OSError, ValueError):
-        print("countersign: invalid answer file; expected reviewed answer JSON.", file=sys.stderr)
+    except (OSError, ValueError, UnicodeError):
+        print("countersign: invalid answer file; expected explicit typed answers.", file=sys.stderr)
         return 2
 
     token = None
@@ -251,9 +354,8 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
             cards = []
-            for item in page.items:
-                view = services.findings.get(item.finding_id)
-                history = services.findings.history(item.finding_id)
+            for case in page.items:
+                item, view, history = case.review_item, case.finding, case.history
                 assessment_ids = {d.assessment_id for d in history if d.assessment_id is not None}
                 if view.occurrence is not None:
                     assessment_ids.add(view.occurrence.assessment_id)
@@ -278,7 +380,23 @@ def main(argv: list[str] | None = None) -> int:
                         ],
                     }
                 )
-            _emit({"items": cards, "next": page.next})
+            if args.output is None:
+                _emit({"items": cards, "next": page.next})
+            else:
+                _write_workbench(
+                    args.output,
+                    _markdown(
+                        cards,
+                        page.next,
+                        {
+                            "finding": str(args.finding) if args.finding else None,
+                            "reason": args.reason,
+                            "status": args.status,
+                            "limit": args.limit,
+                        },
+                    ),
+                )
+                _emit({"written": str(args.output), "items": len(cards), "next": page.next})
             return 0
         if token is None:
             principal = load_caller(core)
@@ -289,6 +407,9 @@ def main(argv: list[str] | None = None) -> int:
             principal = core.identity.authenticate(Credential(token=token))
         if not principal.is_verified_human():
             raise ForbiddenError("a verified human is required")
+        if args.operation == "apply" and not answers:
+            _emit({"results": [], "deferred": True})
+            return 0
         if args.operation == "request":
             saved = services.attestation.request(args.finding, args.decision, args.reason)
         elif args.operation == "record":
