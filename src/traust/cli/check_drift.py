@@ -42,6 +42,7 @@ import tempfile
 from pathlib import Path
 
 from traust_contracts.paths import schema_dir
+from traust_core.v1.models.cloud_config import CHECKOV_VERSION
 from traust_engine.assets import compliance_data_dir
 
 from traust.context import (
@@ -707,21 +708,7 @@ def check_checkov_pin(ws: Path) -> list[dict]:
     that is the drift this check makes visible. Checkov ships several
     patch releases a week, so the signal is the AGE of the pinned
     release, not version lag."""
-    runner = skill_dir("cloud-config-audit") / "run_checkov.py"
-    if not runner.is_file():
-        return [item("checkov-pin", "pending", "cloud-config-audit runner not in tree")]
-    import re
-
-    m = re.search(r'PINNED_CHECKOV_VERSION\s*=\s*"([^"]+)"', runner.read_text(encoding="utf-8"))
-    if not m:
-        return [
-            item(
-                "checkov-pin",
-                "unavailable",
-                "cannot parse PINNED_CHECKOV_VERSION from run_checkov.py",
-            )
-        ]
-    pinned = m.group(1)
+    pinned = CHECKOV_VERSION
     try:
         import urllib.request
 
@@ -735,8 +722,8 @@ def check_checkov_pin(ws: Path) -> list[dict]:
         _parse_iso((uploads[0].get("upload_time_iso_8601") or "")[:19] + "Z") if uploads else None
     )
     refresh = (
-        "review release notes; bump PINNED_CHECKOV_VERSION in "
-        "harnessing/3-audit/cloud-config-audit/scripts/run_checkov.py; update "
+        "review release notes; bump CHECKOV_VERSION in traust-core's "
+        "models/cloud_config.py (then the traust-core pin); update "
         "the docs/external-dependencies.md verified date; "
         "re-baseline one known IaC tree before a sweep "
         "(deliberate config change)"

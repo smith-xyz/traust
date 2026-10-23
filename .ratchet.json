@@ -1,7 +1,4 @@
 {
-  "harnessing/3-audit/cloud-config-audit/scripts/run_checkov.py": {
-    "contracts": 1
-  },
   "harnessing/3-audit/compliance-check/scripts/collect_cloud_inventory.py": {
     "engine-internal": 1
   },

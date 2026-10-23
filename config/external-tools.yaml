@@ -14,8 +14,8 @@
 #     "Credentials & service accounts for autonomous runs"). Rows with
 #     `provided_by: adopter` are the exception: never installed.
 #
-# Deliberately absent: checkov + bicep (hard-pinned in
-# harnessing/3-audit/cloud-config-audit/scripts/run_checkov.py, watched by the
+# Deliberately absent: checkov + bicep (hard-pinned in traust-core's
+# models/cloud_config.py and traust-engine's adapters/cloud_config.py, watched by the
 # `checkov-pin` drift row) and pqc-scan (commit-pinned in
 # harnessing/3-audit/pqc-readiness/scripts/pqc_facts.py, watched by `pqc-facts-stamps`).
 #
