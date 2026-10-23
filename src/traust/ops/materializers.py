@@ -67,9 +67,11 @@ class FeedsCacheMaterializer:
             statuses = self._exposure.refresh_feeds(feeds, order)
         except ConfigError as e:
             return JobResult.failed(f"bad request: {e}")
-        if unusable := [s.name for s in statuses if s.last_error and s.fetched_at is None]:
-            return JobResult.failed(f"no usable snapshot of {', '.join(unusable)}")
-        return JobResult.partly({s.name: 1 for s in statuses if s.last_error})
+        failed = [s for s in statuses if s.last_error]
+        reason = "; ".join(f"{s.name}: {s.last_error}" for s in failed) or None
+        if any(s.fetched_at is None for s in failed):
+            return JobResult.failed(f"no usable snapshot: {reason}")
+        return JobResult.partly({s.name: 1 for s in failed}).model_copy(update={"reason": reason})
 
 
 class LedgerAuditMaterializer:

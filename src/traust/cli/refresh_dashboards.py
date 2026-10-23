@@ -70,15 +70,6 @@ def build_stages(
     path_args = _engine_path_args(config_home, results_root)
     cfg = _config_home_arg(config_home)
     stages = [
-        # Both run BEFORE findings-db so the projection picks up stamps
-        # written this cycle. Consumer tier deliberately: a network blip
-        # or an off-VPN run must not abort the dashboard rebuild — the
-        # reconciler is idempotent and simply catches up next week.
-        (
-            "cve-feed",
-            "consumer",
-            [PYTHON, "-m", "traust.cli", "feeds", "fetch", *cfg, "--feed", "rh-cve"],
-        ),
         (
             "validation-fuzz",
             "consumer",

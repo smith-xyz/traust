@@ -41,8 +41,7 @@ en = _load("enrich_findings_cves")
 def _product_definitions_configured(monkeypatch):
     """product-definitions is config-gated (locations.product_definitions) since it
     targets a deployment-specific registry. The suite exercises it as a configured
-    estate would; the lazy feeds cache is reset so the gate is re-evaluated per
-    test. Tests that want the open-source default (absent) override it."""
+    estate would. Tests that want the open-source default (absent) override it."""
     monkeypatch.setattr(
         ff.locations,
         "configured_locations",

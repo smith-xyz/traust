@@ -133,8 +133,9 @@ specific tracker project is an internal-extension skill, not part of the harness
 
 **Decides which external sources to pull, and when.** Reads
 `config/feeds.yaml` — the registry covering both the cached tier this
-refreshes and the live tier `fetch_advisory.py` queries — and re-downloads
-every source whose cached copy has aged past its declared `max_age_hours`.
+snapshots and the live tier `fetch_advisory.py` queries — and snapshots
+every cached source through traust-core (`ExposureService.refresh_feeds`);
+the pack's `feeds_cache` cadence decides when.
 
 **Why it is a router and not a pipeline job:** the same reason every other
 runner here is one. A router is the orchestrator-neutral seam — the same
@@ -144,9 +145,9 @@ to a CI pipeline in this repository would couple it to one orchestrator and
 break that property, which is precisely what the abstraction exists to
 prevent.
 
-**Writes:** the feed cache (`locations.feeds_cache`; no engine default — the
-deployment sets it in `locations.yaml`) and `feeds-meta.json` — retrieval
-timestamp, sha256, and per-source watermarks. **Never a finding, never a
+**Writes:** a traust-core `feed_snapshot` per source, its bytes in core's
+object store (the `rh-cve` snapshot is what its next run builds on).
+**Never a finding, never a
 baseline, never a worklist.** Read-only over its registry; it does not
 self-tune and cannot advance a pin.
 

@@ -3,7 +3,7 @@
 Every consumer of an external vulnerability source goes through here
 rather than hardcoding an endpoint. The registry covers BOTH tiers:
 
-``cached``  pulled to a local cache on a cadence (``fetch_feeds``)
+``cached``  snapshotted into traust-core on a cadence (``traust feeds fetch``)
 ``live``    queried per run, never cached (``fetch_advisory``)
 
 Keeping them in one file is the point. When live sources lived as

@@ -2020,7 +2020,6 @@ def _check_each_builder(metrics: Path) -> list[dict]:
         consumers
         - covered
         - {
-            "cve-feed",
             "spend",
             "dependency-exposure",
             "scoreboard",

@@ -272,22 +272,44 @@ def test_provenance_review_due(tmp_path):
     assert items["provenance:sla-policy"]["status"] == "review_due"
 
 
+def _core_snapshots(tmp_path, ages):
+    """Feed snapshots in a core store under the test's config home, `ages` hours old."""
+    from traust_core.v1.providers.base import Acquisition, Readiness, Result
+
+    from traust.context import load_core
+
+    (_home() / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    core = load_core(_home())
+
+    class Feed:
+        filename, max_age = "payload.json", datetime.timedelta(hours=24)
+
+        def __init__(self, name, hours):
+            self.name, self.at = name, cd._now() - datetime.timedelta(hours=hours)
+
+        def check(self):
+            return Readiness(ready=True)
+
+        def fetch(self, previous=lambda: None):
+            return Result(b"{}", Acquisition(provider=self.name, acquired_at=self.at))
+
+    for name, hours in ages.items():
+        feed = Feed(name, hours)
+        core.feeds.register(name, lambda feed=feed: feed)
+    core.services().exposure.refresh_feeds()
+
+
 def test_main_writes_report_and_fail_on(tmp_path, monkeypatch):
     ws = _mk_ws(tmp_path)
-    now = cd._now()
-    (ws / "progress-tracker/feeds/feeds-meta.json").write_text(
-        json.dumps(
-            {
-                "epss": {"retrieved_at": _iso(now)},
-                "kev": {"retrieved_at": _iso(now - datetime.timedelta(hours=999))},
-            }
-        )
-    )
+    _core_snapshots(tmp_path, {"epss": 0, "kev": 999})
     rc = cd.main(["--workspace", str(ws)])
     assert rc == 0
     report = json.loads((ws / "progress-tracker/metrics/drift/drift-report.json").read_text())
     assert report["metadata"]["artifact"] == "staleness-drift-report"
     assert report["summary"].get("stale", 0) >= 1
+    rows = {i["item"]: i["status"] for i in report["items"]}
+    assert (rows["feeds:epss"], rows["feeds:kev"]) == ("fresh", "stale")
+    assert {f"feeds:{n}" for n in ("rh-cve", "vex")} <= set(rows)
     md = (ws / "progress-tracker/metrics/drift/drift-report.md").read_text()
     assert "Refresh queue" in md and "never concludes" in md
     assert cd.main(["--workspace", str(ws), "--fail-on", "stale"]) == 1

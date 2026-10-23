@@ -110,6 +110,7 @@ def test_a_source_that_fails_after_a_good_run_degrades_and_keeps_its_snapshot(
     hosts["https://www.cisa.gov/"] = ServiceError("https://www.cisa.gov/...: HTTP 503")
     rc, result = fetch(home)
     assert (rc, result["outcome"], result["degraded"]) == (4, "degraded", {"kev": 1})
+    assert result["reason"] == "kev: https://www.cisa.gov/...: HTTP 503"
     assert payload(home, "kev") == kept
 
 
@@ -117,7 +118,7 @@ def test_a_source_with_no_snapshot_at_all_fails_the_run(home: Path, hosts: dict)
     hosts["https://epss.cyentia.com/"] = b"not a gzip payload"
     rc, result = fetch(home)
     assert (rc, result["outcome"]) == (1, "failed")
-    assert "epss" in result["reason"]
+    assert result["reason"].startswith("no usable snapshot: epss: ")
     assert payload(home, "kev") is not None
 
 
@@ -147,3 +148,9 @@ def test_a_run_id_that_is_not_an_order_is_a_bad_request(
     rc, result = fetch(home, "--run-id", run_id)
     assert (rc, result["outcome"]) == (1, "failed")
     assert hosts["asked"] == []
+
+
+def test_the_product_registry_is_pointed_at_its_own_command(home: Path, hosts: dict) -> None:
+    with pytest.raises(SystemExit) as exit_:
+        feeds_fetch.main(["--config-home", str(home), "--feed", "product-definitions"])
+    assert exit_.value.code == 2 and hosts["asked"] == []
