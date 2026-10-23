@@ -40,7 +40,7 @@ Exit `0` = aligned. Exit `1` prints each misalignment with its rule id:
 | A5 | A skill consuming repo liveness names the census artifact (`repo-liveness.json`) as its source |
 | A6 | SKILL.md frontmatter `name:` equals the directory name |
 | A7 | Discovery wiring complete: `.claude/skills/<name>`, `.crush/skills/<name>`, `.claude/commands/<name>.md` |
-| A8 | A skill that runs `run_checkov.py` carries `deterministic_steps` recording plus declared-configuration labeling (a declared-only assessment never claims observation) |
+| A8 | A skill that runs `traust cloud-config run` carries `deterministic_steps` recording plus declared-configuration labeling (a declared-only assessment never claims observation) |
 | A9 | Every hyphenated data artifact a skill emits has a consumer in some other skill, is terminal-classed (dashboard/rollup/summary/tracker), or carries a reviewed exemption — catches under-wired new skills (the operator-priv-profile / impact-analysis gap) |
 | A10 | A skill emitting non-terminal artifacts documents its consumers in an `## Integrations` / Downstream section |
 | A11 | No allowed-tools entry grants a whole interpreter or shell (`Bash(python3:*)`, `Bash(bash:*)`, `Bash(*)`) — an unscoped interpreter is arbitrary code execution, and a skill reading untrusted target checkouts can be steered into running it. Scope each script the skill runs (`Bash(python3 *<script>.py:*)`). Pre-A11 harness-internal skills are grandfathered via printed exemptions; never add a new exemption for a target-facing skill |

@@ -16,7 +16,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 
 ## Command groups
 
-18 groups (plus the deprecated `tools` group below).
+20 groups (plus the deprecated `tools` group below).
 
 | Group | Description | Operations |
 |---|---|---|
@@ -25,6 +25,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `auth` | Who you act as, over traust-core's identity provider | `local`, `login`, `logout`, `refresh`, `service-account`, `status`, `token` |
 | `build` | Deterministic builders | `rescan-worklist`, `skills-reference`, `symbol-index` |
 | `check` | Deterministic gates | `citations`, `content-licenses`, `docs-consistency`, `estate-data`, `drift`, `fix-propagation`, `location-paths`, `reference-integrity`, `skill-alignment`, `skill-security` |
+| `cloud-config` | The cloud-config-audit skill's doors on traust-core | `check`, `record`, `run` |
 | `compliance` | Compliance reporting | `dashboard`, `scope` |
 | `dashboard` | Dashboard rebuilds | `refresh` |
 | `feeds` | Feed management | `fetch` |

@@ -335,7 +335,7 @@ install_tool() {
     yara)        install_yara ;;
     pip-audit)   install_pip_audit ;;
     joern)       install_joern ;;
-    # checkov handled separately (pinned version in run_checkov.py)
+    # checkov handled separately (pinned in traust-core's models/cloud_config.py)
     *)           ;;
   esac
 }

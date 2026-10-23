@@ -948,7 +948,7 @@ def cli_reference_failures(repo: Path = REPO) -> list[str]:
     failures = []
     documented = {
         m.group(1): {o.strip(" `") for o in m.group(2).split(",")}
-        for m in re.finditer(r"^\| `([a-z]+)` \| [^|]* \| (.+?) \|$", text, re.MULTILINE)
+        for m in re.finditer(r"^\| `([a-z][a-z-]*)` \| [^|]* \| (.+?) \|$", text, re.MULTILINE)
     }
     for group, ops in GROUPS.items():
         if group == "tools":  # deprecated; listed prose-side, not in the table

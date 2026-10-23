@@ -139,7 +139,7 @@ Tools with no standalone upstream binary come from a package manager:
 | `skopeo` | `brew install skopeo` (macOS), `dnf install skopeo` (Fedora/RHEL) |
 | `yara` | `brew install yara`, or build from the [yara release](https://github.com/VirusTotal/yara/releases) |
 | `pip-audit` | `pipx install pip-audit` |
-| `checkov` | `pipx install checkov==<pin>` — the pin is `PINNED_CHECKOV_VERSION` in `harnessing/3-audit/cloud-config-audit/scripts/run_checkov.py`, which hard-fails on a mismatch |
+| `checkov` | `pipx install checkov==<pin>` — the pin is `CHECKOV_VERSION` in traust-core's `models/cloud_config.py`; `traust cloud-config run` hard-fails on a mismatch |
 
 Vulnerability databases (grype, govulncheck) are populated by `setup`; to
 refresh them, or to bundle them for an air-gapped host:
