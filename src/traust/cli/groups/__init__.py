@@ -8,6 +8,7 @@ from traust.cli.groups import (
     auth,
     build,
     check,
+    cloud_config,
     compliance,
     dashboard,
     feeds,
@@ -44,6 +45,7 @@ GROUPS: dict[str, dict[str, object]] = {
     "auth": dict(auth.AUTH),
     "build": dict(build.BUILD),
     "check": dict(check.CHECK),
+    "cloud-config": dict(cloud_config.CLOUD_CONFIG),
     "compliance": {
         "dashboard": compliance.DASHBOARD,
         "scope": compliance.SCOPE,

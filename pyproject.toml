@@ -35,7 +35,7 @@ signing = ["sigstore>=4.0,<5.0"]
 traust = "traust.cli.__main__:main"
 
 [dependency-groups]
-dev = ["ruff>=0.6", "pytest-xdist>=3"]
+dev = ["ruff>=0.6", "pytest-xdist>=3", "psycopg[binary]>=3.1"]
 
 # traust's traust-core pin wins over the engine's, so a core bump needs no engine PR.
 [tool.uv]

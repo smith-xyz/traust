@@ -26,6 +26,7 @@ def test_all_planned_groups_registered():
         "auth",
         "build",
         "check",
+        "cloud-config",
         "compliance",
         "dashboard",
         "feeds",
