@@ -1,16 +1,19 @@
 """``traust products list|add|update``: corpus-intake's doors on traust-core.
 
 list    every product with its corpus ownership and business unit
-add     register a product (name = slug, label = display name) with its ownership
+add     register a product (name = slug, label = display name) with its ownership;
+        the same fields again is a no-op, different fields a ConflictError (use update)
 update  change a registered product's label, ownership or business unit
+
+The label lives on the product row (products.name); the registry subject's label stays unset.
+NEED(corpus-registry: subject note): the subject has no notes field, so a BU boundary cutting
+through a tree is flagged by the skill, not recorded.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from traust_core.v1.errors import NotFoundError, ValidationError
-from traust_core.v1.models.artifacts import CorpusRegistryArtifact
 from traust_core.v1.models.common import PageRequest
 from traust_core.v1.models.corpus import CorpusRegistry, CorpusSubject
 from traust_core.v1.models.inventory import Product
@@ -21,14 +24,6 @@ from traust.cli._doors import parser, run
 from traust.context import load_services
 
 OWNERSHIP = [o.value for o in OwnershipClass]
-
-
-def _registry(doc: CorpusRegistryArtifact | None) -> CorpusRegistry:
-    return CorpusRegistry() if doc is None else CorpusRegistry.of(doc)
-
-
-def _subject(doc: CorpusRegistryArtifact | None, product: Product) -> CorpusSubject | None:
-    return _registry(doc).subject(str(product.id))
 
 
 def _row(product: Product, subject: CorpusSubject | None) -> dict[str, Any]:
@@ -46,7 +41,8 @@ def list_(argv: list[str] | None = None) -> int:
 
     def call() -> list[dict[str, Any]]:
         portfolio = load_services(args.config_home).portfolio
-        registry = _registry(portfolio.corpus_registry())
+        doc = portfolio.corpus_registry()
+        registry = CorpusRegistry() if doc is None else CorpusRegistry.of(doc)
         out, page = [], PageRequest()
         while True:
             got = portfolio.list_products(page)
@@ -67,13 +63,14 @@ def add(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
-        portfolio = load_services(args.config_home).portfolio
-        product = portfolio.register_product(ProductSlug.parse(args.name), args.label)
-        if (subject := _subject(portfolio.corpus_registry(), product)) is not None:
-            return _row(product, subject)  # registered already: unchanged, changes go by update
-        owned = OwnershipClass(args.ownership)
-        doc = portfolio.set_corpus_ownership(product.id, owned, args.business_unit)
-        return _row(product, _subject(doc, product))
+        return _row(
+            *load_services(args.config_home).portfolio.register_corpus_product(
+                ProductSlug.parse(args.name),
+                args.label,
+                OwnershipClass(args.ownership),
+                args.business_unit,
+            )
+        )
 
     return run(call)
 
@@ -87,20 +84,13 @@ def update(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
-        portfolio = load_services(args.config_home).portfolio
-        product = portfolio.find_product(ProductSlug.parse(args.name))
-        if product is None:
-            raise NotFoundError(f"no product named {args.name!r}")
-        if args.label is not None:
-            product = portfolio.update_product(product.id, args.label)
-        subject = _subject(portfolio.corpus_registry(), product)
-        if args.ownership is None and args.business_unit is None:
-            return _row(product, subject)
-        if subject is None and None in (args.ownership, args.business_unit):
-            raise ValidationError(f"{args.name!r} has no ownership yet: give both fields")
-        ownership = OwnershipClass(args.ownership or subject.ownership)
-        business_unit = args.business_unit or subject.business_unit
-        doc = portfolio.set_corpus_ownership(product.id, ownership, business_unit)
-        return _row(product, _subject(doc, product))
+        return _row(
+            *load_services(args.config_home).portfolio.update_corpus_product(
+                ProductSlug.parse(args.name),
+                label=args.label,
+                ownership=None if args.ownership is None else OwnershipClass(args.ownership),
+                business_unit=args.business_unit,
+            )
+        )
 
     return run(call)

@@ -276,8 +276,8 @@ If `owners.csv` already exists, append only rows for newly added repos.
 ## Step 7 — Remind about corpus registration
 
 The inventory is the *input* side; the *output* tree the audits will write
-to must be registered in traust-core's corpus registry or the census flags
-it as DRIFT. Check whether the addition is already covered:
+to must be registered in traust-core's corpus registry (DRIFT flagging
+*retired*: status derives from assessments). Check whether the addition is already covered:
 
 ```bash
 traust products list
