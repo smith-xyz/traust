@@ -70,8 +70,8 @@ the gate could be introduced at all, not as a pattern to follow.
 ## When the gate fires on your skill
 
 - **S1**: add `allowed-tools` frontmatter scoped to the scripts and
-  read-only tools the skill actually needs (model: `vuln-scan`,
-  `countersign`, or this skill's own frontmatter).
+  read-only tools the skill actually needs (model: `vuln-scan`
+  or this skill's own frontmatter).
 - **S2**: add the adversarial-content doctrine block (model:
   `secure-code-audit` §Adversarial Repository Content) — or, once the
   shared doctrine include from plan P1.6 exists, reference it.

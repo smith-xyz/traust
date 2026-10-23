@@ -265,7 +265,7 @@ ARTIFACT_SKIP_RE = re.compile(
 # machine consumer
 # Shrunk 2026-07-31 (wiring F1): `-plan\.`, `queue`, `owners`,
 # `-repos\.` and `manifest` auto-exempted real pipeline artifacts
-# (attack-plan.yaml, countersign-queue, owners.csv, *-repos.csv,
+# (attack-plan.yaml, owners.csv, *-repos.csv,
 # findings.db) that all HAVE consumers — they must prove their
 # wiring like everything else.
 ARTIFACT_TERMINAL_RE = re.compile(
@@ -509,10 +509,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
     (
         "A14",
         "harnessing/check-skill-security/SKILL.md",
-    ): "P1-W4 anchor queue — verify invocation shapes, then anchor",
-    (
-        "A14",
-        "harnessing/countersign/SKILL.md",
     ): "P1-W4 anchor queue — verify invocation shapes, then anchor",
     (
         "A14",

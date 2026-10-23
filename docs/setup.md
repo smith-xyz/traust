@@ -39,9 +39,9 @@ contract: [config/README.md](../config/README.md).
   sibling data repositories (§3)
 - Network access to the forge holding the repositories you audit
 - A ledger identity for anyone who countersigns: `ledger auth login`
-  against your OIDC provider, or `ledger auth local` where there is none
-  (local tokens countersign only with `HARNESS_COUNTERSIGN_ALLOW_LOCAL=1`
-  — see the countersign skill). Optionally an employee-directory command
+  against your OIDC provider, or `traust auth local` where there is none
+  (local tokens record decisions only with `identity: {trust_local: true}`
+  in `core.yaml`). Optionally an employee-directory command
   (`ledger.yaml` → `identity.directory_command`) the ledger runs to confirm a
   signer is a current member of your organisation. Signing and the optional
   Ledger database are also `ledger.yaml` (copy `config/ledger.example.yaml`);

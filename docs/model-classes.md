@@ -202,7 +202,7 @@ own:
 - [campaign-workflow.md](campaign-workflow.md) — 21 skills, the pipeline lanes
 - [standalone-usage.md](standalone-usage.md) — 27 skills, invocable on any checkout
 
-Between them they cover 48 of the 52 skills. The lists below are extracted
+Between them they cover 47 of the 51 skills. The lists below are extracted
 from those two tables rather than maintained separately, so they cannot
 disagree with them; a docs-gate check enforces that. The four skills with no
 documented class are listed at the end with the role that governs them.
@@ -217,7 +217,7 @@ Audits, threat models, triage, validation, remediation, verification — the rol
 
 Orchestration, inventory, graphs, dashboards and rollups: work whose failure mode is a rerun, not a bad security decision.
 
-`add-inputs` · `attack-coverage` · `census` · `cloud-config-audit` · `corpus-intake` · `countersign` · `dependency-watch` · `financial-tracking` · `findings-db` · `fleet-fix` · `generate-team-report` · `impact-analysis` · `inventory-repositories` · `mine-ledger` · `operator-priv-profile` · `portfolio-graph` · `property-test` · `rbac-tenancy-rollup` · `repo-graph` · `secure-container-audit` · `sla-view` · `threat-register` · `track-findings` · `traust-metrics` · `validation-fuzz-dashboard` · `vuln-scan`
+`add-inputs` · `attack-coverage` · `census` · `cloud-config-audit` · `corpus-intake` · `dependency-watch` · `financial-tracking` · `findings-db` · `fleet-fix` · `generate-team-report` · `impact-analysis` · `inventory-repositories` · `mine-ledger` · `operator-priv-profile` · `portfolio-graph` · `property-test` · `rbac-tenancy-rollup` · `repo-graph` · `secure-container-audit` · `sla-view` · `threat-register` · `track-findings` · `traust-metrics` · `validation-fuzz-dashboard` · `vuln-scan`
 
 ### `sonnet-class` — 6 skill(s)
 
@@ -242,5 +242,5 @@ answer for them anyway, since that is what actually decides the floor:
 The honest fix is for each skill to declare the role(s) it resolves in its own
 frontmatter, so this index can be generated the way
 [skills.md](skills.md) is and drift becomes impossible rather than merely
-correctable. That is a change to 52 skills and a new alignment rule, so it is
+correctable. That is a change to 51 skills and a new alignment rule, so it is
 recorded here as the known gap rather than done quietly.

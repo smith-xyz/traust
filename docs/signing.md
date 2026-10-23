@@ -8,7 +8,7 @@ documentation (`traust-ledger/docs/auth.md` and `traust-ledger/docs/ledger-integ
 
 Signing proves the **ledger's** integrity. It is distinct from verifying **who
 a human signer is** at countersign time; that is authentication, documented
-with the countersign skill.
+with `traust auth` ([setup](setup.md)).
 
 ## What is signed
 

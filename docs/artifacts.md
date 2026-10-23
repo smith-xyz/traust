@@ -51,11 +51,11 @@ unexplained.
 | `<repo>-security-audit.json` — the **baseline** | `report.schema.json` | `/secure-code-audit`, `/secure-rpm-audit` | `/triage`, `/track-findings`, `/verify-remediation`, `/patch`, `/vuln-scan` (dedup), `/threat-model` bootstrap, `/create-fuzzing`, `/file-security-defect`, every dashboard via the corpus resolver |
 | `<image>-container-audit.json` — a baseline for a registry image | `report.schema.json` | `/secure-container-audit` | `/track-findings`, `/verify-remediation`, dashboards |
 | `<repo>-vuln-findings.json` — candidates, not a baseline | `vuln-findings.schema.json` | `/vuln-scan` | `/triage`, `/patch`; in diff mode, verified findings also enter the ledger as events |
-| `<repo>-triage.json` | `triage.schema.json` | `/triage` | `/patch`; `/track-findings` via `emit_triage_ledger_events` (which also emits the needs-review queue items `/countersign` later reads from the ledger) |
+| `<repo>-triage.json` | `triage.schema.json` | `/triage` | `/patch`; `/track-findings` via `emit_triage_ledger_events` (which also emits the needs-review queue items `traust findings queue` later reads) |
 | `<repo>-validation.json` | `validation.schema.json` | `/validate-findings` (and extension validators) | `/track-findings` via `emit_validation_ledger_events` (execution-verified events); `/findings-db` |
 | `<rem_id>-remediation.json` | `remediation.schema.json` | `/remediate-finding` | human review (no machine consumer; `/verify-remediation` re-checks the fork or MR, not this JSON); merge events reach the ledger through `/track-findings` |
 | `<repo>-remediation-verification.json` | `verification.schema.json` | `/verify-remediation` | `/track-findings` via `emit_verification_ledger_events` (resolution events); `regressions[]` routed into the ledger by `route_regressions` |
-| `<repo>-findings-layer.json` — **the ledger** | `layer.schema.json` | `/track-findings` (every ledger writer appends here) | `build_cumulative` (derives findings-current), `findings.db` (and through it `/sla-view`), `/findings-trends`, `/countersign`, `/verify-remediation` sweep tiering |
+| `<repo>-findings-layer.json` — **the ledger** | `layer.schema.json` | `/track-findings` (every ledger writer appends here) | `build_cumulative` (derives findings-current), `findings.db` (and through it `/sla-view`), `/findings-trends`, `/verify-remediation` sweep tiering |
 | `<repo>-findings-current.{json,md}` — derived, regenerable | `report.schema.json` | `build_cumulative` (replay of the ledger over the baseline) | owner routing, team reports, `/file-security-defect`, dashboards, SARIF export |
 | `PATCHES/` packet | — | `/patch` | **terminal by design**: a human-review packet; nothing consumes it automatically |
 

@@ -1089,7 +1089,7 @@ overrides a fresh code-level determination — and prefix the finding's
 rationale with `"PRECEDENT DISAGREEMENT:"` naming the precedent
 (source repo, date, countersigner/adjudicator, strength). For
 `human_countersigned` precedents, additionally surface it in the
-terminal summary as pending human adjudication via `/countersign`: a
+terminal summary as pending human adjudication via `traust findings queue`: a
 verifier disagreeing with a countersigned precedent escalates to a
 human, it neither silently follows the precedent nor silently
 overrides the countersigner. For `machine_refuted_sound` precedents
@@ -1464,7 +1464,7 @@ fingerprints): fix 1b / 6b and re-run.
 
 Report its counts in the terminal summary. If any false positives await
 countersign or review items were queued, say that human decisions are
-pending and that `/countersign` presents them as decision cards. For
+pending and that `traust findings queue` lists them for a person to decide. For
 input (C), skip this step and say the verdicts are in
 `<repo>-triage.json` only.
 
@@ -1606,4 +1606,4 @@ for environment context; `*-impact-analysis.json` from
 
 **Emits:** `<repo>-triage.{json,md}` next to the input report —
 consumed by `/patch`; recorded decisions (Phase 6e, `traust triage
-record`) feed `/track-findings` and `/countersign` (review items).
+record`) feed `/track-findings` and `traust findings queue` (review items).

@@ -72,7 +72,7 @@ migration — the event stays in history, the baseline takes over.
 |---|---|---|---|
 | `emit_triage_ledger_events.py` | `/triage` | triage verdicts → validity events | ✅ `:362` |
 | `emit_validation_ledger_events.py` | `/validate-findings` | live-validation verdicts (class-1 evidence) | ✅ `:555` |
-| `countersign.py` | `/countersign` | human decisions, overrides, severity changes | ✅ `:910` |
+| `traust findings decide` / `confirm` / `reject` | a person | human decisions, overrides, severity changes: `decision` rows, appended to the layer by `LedgerService` | ✅ |
 | `build_cumulative.py` | `/track-findings` | rebuilds `*-findings-current.{json,md}`; re-stamps | ✅ `:689` |
 | `route_regressions.py` | `/verify-remediation`, `/track-findings` | `regressions[]` → findings-carrying events | ✅ `:338` |
 | `route_impact_findings.py` | `/dependency-watch`, `/impact-analysis` | reachable dependency CVEs → findings-carrying events | ✅ |

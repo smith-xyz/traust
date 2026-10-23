@@ -34,7 +34,7 @@ link here rather than restating it.
 | 0d | **Evidence grades** (`validated_finding.evidence_grade`) | *How strong is a confirmation?* E0 observed effect · E1 authenticated success on the exploit action · E2 strong inference · E3 error-message inference. Only E0/E1 are execution-class evidence with override power over human FP signatures; E2 records as machine-static with a grade annotation; E3 never auto-confirms. | `weak_confirmation` (E3, any age); `ungraded_confirmation` |
 | 1 | **Soundness signatures** (`soundness.py`) | *Does the transcript actually test the claim?* Error-signature transcripts, zero-subject RBAC enumerations, template placeholders, install-failure runs. | `unsound_refutation` |
 | 1b | **Conflict routing** (`derive_disposition`) | *Do the lanes agree?* Confirmed and false_positive both in evidence (fuzz confirms, live refutes) adjudicates as a CONFLICT card carrying both transcripts and DECISION markers — never as an unopposed FP countersign. | — (card type, not a quarantine) |
-| 2 | **Ledger discipline** (`emit_validation_ledger_events.py`) | Machine `refuted` → countersign queue (humans dismiss); machine `confirmed` → class-1 evidence (machines confirm); quarantined items → `needs_review` with the flag and transcript on the countersign card. | — |
+| 2 | **Ledger discipline** (`emit_validation_ledger_events.py`) | Machine `refuted` → review queue (humans dismiss); machine `confirmed` → class-1 evidence (machines confirm); quarantined items → `needs_review` with the flag and transcript on the review card. | — |
 
 **Grandfathering.** Gates that require *new* artifacts apply only to
 reports at or after the harness version that introduced the artifact
@@ -65,7 +65,7 @@ emit_validation_ledger_events.py      gates 0/0b/0c/0d/1 re-checked at
 disposition ledger (per-finding)      confirmed = class-1 execution
         │                             evidence; refuted = pending human
         ▼                             countersign — never auto-FP
-countersign cards                     attestation status, transcripts,
+review cards                          attestation status, transcripts,
                                       control results on every card
 ```
 
@@ -80,7 +80,7 @@ Every confirmation records the CVSS v3.1 components the exploit
 **demonstrated** — vector used, privileges actually held, interaction,
 scope crossing, impact axes evidenced — plus the signed delta against
 the claimed score. Material deltas (|delta| ≥ 1.0) from E0/E1/E2
-evidence become machine severity **proposals** in the countersign queue
+evidence become machine severity **proposals** in the review queue
 (`severity_proposal`); E3 never proposes. Machines never write
 `disposition.severity` — the layer validator rejects a machine actor
 carrying one — so severity stays human-decided. Chain membership

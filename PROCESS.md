@@ -271,8 +271,8 @@ Everything from ③ on feeds one append-only evidence stream per repo
 (`<repo>-findings-layer.json`), merged deterministically into
 `<repo>-findings-current.{json,md}` by
 [`track-findings`](.claude/skills/track-findings/SKILL.md). Machine
-refutations pend until an LDAP-verified human signs them at the
-[`countersign`](.claude/skills/countersign/SKILL.md) workbench
+refutations pend until an identity-verified human signs them with
+`traust findings queue` / `confirm`
 (two-person rule against execution proof; salted audit valve on the
 auto-accept tier); every false positive enters a refuted register that
 feeds ⑥ Fuzzing and ⑤ Live-validation target selection. Design
