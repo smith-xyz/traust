@@ -288,13 +288,12 @@ disposition decisions.
 
 Service callers replay using the original provenance timestamp; lookup uses the
 database's existing timestamp precision. The CLI records each actual invocation
-as its own run. Native scanner evidence is not automatically a complete
-`AdapterResultArtifact`: the full artifact schema still applies, and missing
-CWEs/remediation are not invented to pass it.
-The actual native Gitleaks scan-to-`AdapterResultArtifact` schema acceptance
-remains **open**: its empty CWE list and remediation violate the required
-finding constraints. Passing SARIF intake is a separate path and does not
-establish native adapter-output conformance.
+as its own run. `AdapterResultArtifact` uses the scanner-observation contract:
+unreported CWEs/description/remediation remain unreported rather than invented.
+The real native Gitleaks scan-to-artifact regression now passes without
+hand-completing fields. Authored audit reports keep their stricter finding
+requirements; artifact admission does not confer validity or evidence strength.
+Passing native-format SARIF intake remains a separate recorded path.
 
 ## Machine validation recording
 

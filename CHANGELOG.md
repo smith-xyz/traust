@@ -4,6 +4,10 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- Repair native scanner artifact admission through the adapter-specific
+  observation contract. The unchanged real scan-to-artifact regression passes
+  without invented CWE/remediation; authored report constraints remain strict.
+
 - Consume atomic scanner intake and finding DTO corrections: malformed scanner
   batches leave no partial assessment, copied candidates/nested locations are
   revalidated, and replay uses database-native timestamp precision. Scanner tool
