@@ -18,7 +18,7 @@ from traust_engine.adapters.govulncheck import (
 )
 from traust_engine.adapters.opengrep import _execute_opengrep_scan, resolve_rule_pack_dir
 
-from traust.cli.groups._registry import OpSpec
+from traust.cli.groups._registry import OpSpec, passthrough_op
 
 
 def add_opengrep_args(ap) -> None:
@@ -859,4 +859,12 @@ CRYPTO_AUDIT = OpSpec(
     add_args=add_crypto_audit_args,
     call=call_crypto_audit,
     help="Crypto data collector (source | image | cluster)",
+)
+
+
+# crypto-analysis's doors on traust-core (traust.cli.crypto)
+CRYPTO_SOURCE = passthrough_op("crypto", "A commit's crypto census (checkout + SBOM).", "source")
+CRYPTO_IMAGE = passthrough_op("crypto", "An image's crypto census, by digest.", "image")
+CRYPTO_CLUSTER = passthrough_op(
+    "crypto", "A cluster's runtime crypto census, scope-gated.", "cluster"
 )
