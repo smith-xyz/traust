@@ -77,7 +77,7 @@ def build_stages(
         (
             "cve-feed",
             "consumer",
-            [PYTHON, "-m", "traust.cli.fetch_feeds", "--feed", "rh-cve", *cfg],
+            [PYTHON, "-m", "traust.cli", "feeds", "fetch", *cfg, "--feed", "rh-cve"],
         ),
         (
             "validation-fuzz",

@@ -199,7 +199,7 @@ def call_products(engine, args) -> int:
         warnings.append(
             f"cache is {source.get('age_hours')}h old (threshold "
             f"{source.get('max_age_hours')}h) — refresh with "
-            f"traust feeds fetch --feed product-definitions"
+            f"traust feeds fetch-products"
         )
     if warnings:
         out["warnings"] = warnings

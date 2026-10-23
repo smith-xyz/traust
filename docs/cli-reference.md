@@ -28,10 +28,10 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `cloud-config` | The cloud-config-audit skill's doors on traust-core | `check`, `record`, `run` |
 | `compliance` | Compliance reporting | `dashboard`, `scope` |
 | `dashboard` | Dashboard rebuilds | `refresh` |
-| `feeds` | Feed management | `fetch` |
+| `feeds` | Security feed snapshots (traust-core) and the product-definitions cache | `fetch`, `fetch-products` |
 | `findings` | track-findings' doors on traust-core | `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `refuted`, `reject`, `sarif`, `status`, `surfaces`, `tickets` |
 | `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `find`, `sbom`, `symbols` |
-| `ledger` | Doc-variance register | `doc-variance` |
+| `ledger` | Ledger audit (traust-core) and the doc-variance register | `audit`, `doc-variance` |
 | `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `sla`, `spend` |
 | `portfolio` | Portfolio graph; `observe` is the `repo_state` materializer | `artifacts`, `build`, `deps-multi`, `freshness`, `interfaces`, `observe`, `parsers`, `query`, `stats`, `symbols` |
 | `products` | corpus-intake's doors on traust-core: products and their corpus ownership | `add`, `list`, `update` |

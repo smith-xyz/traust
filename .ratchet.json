@@ -48,7 +48,6 @@
     "state-file": 1
   },
   "harnessing/3-audit/secure-code-audit/scripts/enrich_findings_cves.py": {
-    "engine-internal": 1,
     "state-file": 1
   },
   "harnessing/3-audit/secure-code-audit/scripts/enumerate_route_guards.py": {

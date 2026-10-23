@@ -12,7 +12,7 @@ routing + the budget guard inside it), `budget_shadow.py`,
 `route_impact_findings.py`, `/assign-findings-owners` (internal extension),
 `/reassign-findings-owners` (internal extension), `/file-security-defect`,
 `emit_drain_tranche.py`, `build_verify_sweep.py`, `build_pqc_worklist.py`,
-`fleet_sweep.py`, `fetch_feeds.py`.
+`fleet_sweep.py`, `traust feeds fetch` (`feeds_fetch.py`).
 
 | Kind | Routes | Implementation | Detail |
 |---|---|---|---|
@@ -22,7 +22,7 @@ routing + the budget guard inside it), `budget_shadow.py`,
 | **Findings routing** | a producer's findings → ledger events | `route_regressions.py`, `route_impact_findings.py` | [findings-routing.md](findings-routing.md) |
 | **Owner routing** | findings packages → teams and named maintainers | `/assign-findings-owners` (internal extension), `/reassign-findings-owners` | those skills' `SKILL.md` |
 | **Defect routing** | findings → Jira issues | `/file-security-defect` (internal extension) | those skills' `SKILL.md` |
-| **Feed routing** — *the security-data refresh* | external sources → the local feed cache | `fetch_feeds.py`, `config/feeds.yaml` | [continuous-operations.md](continuous-operations.md) |
+| **Feed routing** — *the security-data refresh* | external sources → traust-core feed snapshots | `traust feeds fetch` (`ExposureService.refresh_feeds`), `config/feeds.yaml` | [continuous-operations.md](continuous-operations.md) |
 
 ### Worklist builders — routing's other half
 

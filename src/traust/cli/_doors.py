@@ -8,6 +8,7 @@ import sys
 from collections.abc import Callable
 
 from traust_core.v1.errors import TraustError
+from traust_core.v1.models.operations import JobResult, Outcome
 
 from traust.context import add_config_home_arg
 
@@ -28,3 +29,12 @@ def run(call: Callable[[], object]) -> int:
     if out is not None:
         print(out if isinstance(out, str) else json.dumps(out, indent=2, default=str))
     return 0
+
+
+EXIT_CODES = {Outcome.SUCCEEDED: 0, Outcome.FAILED: 1, Outcome.DEGRADED: 4, Outcome.REFUSED: 5}
+
+
+def answer(result: JobResult) -> int:
+    """A materializer's door: print the JobResult; the exit code is its outcome."""
+    print(result.model_dump_json())
+    return EXIT_CODES[result.outcome]
