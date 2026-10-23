@@ -15,7 +15,7 @@ from traust_engine.portfolio.graph import (
     UNIVERSAL_ECOSYSTEMS,
 )
 
-from traust.cli.groups._registry import OpSpec
+from traust.cli.groups._registry import OpSpec, passthrough_op
 
 
 def _resolve_spine_db(engine, spine: str | None, db: str | None) -> tuple[Path, Path] | None:
@@ -495,4 +495,8 @@ PARSERS = OpSpec(
     add_args=add_parsers_args,
     call=call_parsers,
     help="Parse dependency manifests (portfolio L1 parsers)",
+)
+
+OBSERVE = passthrough_op(
+    "portfolio_observe", "Observe one repository at its forge; keep what it answered.", "main"
 )

@@ -13,7 +13,9 @@ assets:
     freshness: {fail: 48h}
     runner: {labels: [deterministic]}
 
-  repo_state:  # no `run` yet: its materializer (PortfolioService.record_forge_facts) is still to come
+  repo_state:  # PortfolioService.record_forge_facts through traust.ops.materializers
+    run: [python3, -m, traust.cli, portfolio, observe, --repo, "{repo_url}"]
+    params: {repo_url: HttpsRepoUrl}
     partitions: dynamic:repo
     trigger: {every: 24h}
     priority: 20
