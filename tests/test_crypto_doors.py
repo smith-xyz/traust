@@ -250,3 +250,17 @@ def test_engagement_scope_keeps_off_limits_and_explicit_control_plane(tmp_path: 
         for ns in ("openshift-kube-apiserver", "app", "other")
     }
     assert allowed == {"openshift-kube-apiserver": True, "app": False, "other": False}
+
+
+def test_engagement_scope_reads_the_validate_findings_example() -> None:
+    example = (
+        Path(__file__).parents[1] / "harnessing/5-validate/validate-findings/targets.example.yaml"
+    )
+    scope = crypto.engagement_scope(example)
+    exec_ = ValidationAction(kind=ValidationActionKind.K8S, verb="exec")
+    on = ValidationTarget(context="lab-hub", namespace="ramen-ops")
+    assert scope.expires == date(2026, 7, 1)
+    assert scope.permits(exec_, on, as_of=date(2026, 6, 30))
+    assert not scope.permits(
+        exec_, on.model_copy(update={"namespace": "openshift-etcd"}), as_of=date(2026, 6, 30)
+    )

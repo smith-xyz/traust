@@ -139,7 +139,7 @@ Use when the user asks to assess compliance of a product or deployed cloud envir
 
 ## crypto-analysis
 
-Use when you need to understand a crypto decision point — probe what crypto is configured, trace who owns the decision (governance chain), and confirm with runtime evidence. Probe-driven via python3 -m traust.cli adapters crypto-audit.
+Use when you need to understand a crypto decision point — probe what crypto is configured, trace who owns the decision (governance chain), and confirm with runtime evidence. Probe-driven via python3 -m traust.cli adapters crypto-source|crypto-image|crypto-cluster.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
