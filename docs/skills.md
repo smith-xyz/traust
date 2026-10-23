@@ -159,11 +159,11 @@ Use on the daily continuous-operations cadence, or when the user asks to "check 
 
 ## impact-analysis
 
-Use when determining which portfolio repositories are affected by an advisory (CVE, GHSA, MAL-/malicious-package, or another OSV-native id). Queries the portfolio graph for blast radius, then runs language-specific analysis (govulncheck + ELF reachability for Go, the strongest tier; manifest-level analyzers for npm, PyPI, Maven, Cargo, RubyGems, and NuGet; a manifest-level SurfaceAnalyzer for the universal Docker/GitHub Actions/Helm surfaces) to classify every importing repo. Emits a schema-validated artifact consumed by /triage and /verify-remediation.
+Use when determining which portfolio commits are affected by an advisory (CVE, GHSA, MAL-/malicious-package, or another OSV-native id). Fetches the advisory from its source, walks the blast radius over the commits' SBOMs (through base images and internal libraries), classifies every commit it reaches (govulncheck symbol reachability for Go, the strongest tier; the SBOM pin plus source scans for npm, PyPI, Maven, Cargo, RubyGems, NuGet and C libraries; manifest-level for Actions/Docker/Helm) and records an `impact` assessment per commit in traust-core, with a dependency finding for each `affected` commit.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
-- **Invoke:** `/impact-analysis` — arguments: `<advisory-id> --module <mod> [--ecosystem go|npm|pypi|maven|cargo|ruby|nuget|actions|docker|helm] [--packages <p1,p2>] [--vulnerable-range '<v'] [--fixed-version v1.0.1] [--feature-desc '...'] [--skip-scan] [--jobs N]`
+- **Invoke:** `/impact-analysis` — arguments: `<advisory-id> [--repo-url <url> --sha <commit>] [--scan]`
 - **Skill:** [harnessing/3-audit/impact-analysis/SKILL.md](../harnessing/3-audit/impact-analysis/SKILL.md)
 
 ## isolation-review

@@ -29,7 +29,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `dashboard` | Dashboard rebuilds | `refresh` |
 | `feeds` | Feed management | `fetch` |
 | `findings` | track-findings' doors on traust-core | `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `refuted`, `reject`, `sarif`, `status`, `surfaces`, `tickets` |
-| `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `resolve-advisory-symbols`, `sweep` |
+| `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `find`, `sbom`, `symbols` |
 | `ledger` | Doc-variance register | `doc-variance` |
 | `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `sla`, `spend` |
 | `portfolio` | Portfolio graph | `artifacts`, `build`, `deps-multi`, `freshness`, `interfaces`, `parsers`, `query`, `stats`, `symbols` |

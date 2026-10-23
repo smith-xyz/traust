@@ -7,7 +7,7 @@ from traust.cli.groups.build import BUILD
 from traust.cli.groups.check import CHECK
 from traust.cli.groups.dashboard import DASHBOARD
 from traust.cli.groups.feeds import FEEDS
-from traust.cli.groups.impact import IMPACT_OPS
+from traust.cli.groups.impact import IMPACT
 from traust.cli.groups.ledger import LEDGER
 
 TOOLS: dict[str, object] = {
@@ -15,7 +15,7 @@ TOOLS: dict[str, object] = {
     "build-rescan-worklist": BUILD["rescan-worklist"],
     "build-skills-reference": BUILD["skills-reference"],
     "build-symbol-index": BUILD["symbol-index"],
-    "calibrate-rule-pack": IMPACT_OPS["calibrate-rule-pack"],
+    "calibrate-rule-pack": IMPACT["calibrate-rule-pack"],
     "check-citations": CHECK["citations"],
     "check-content-licenses": CHECK["content-licenses"],
     "check-docs-consistency": CHECK["docs-consistency"],
@@ -26,13 +26,11 @@ TOOLS: dict[str, object] = {
     "check-skill-alignment": CHECK["skill-alignment"],
     "check-skill-security": CHECK["skill-security"],
     "checkpoint": ADMIN["checkpoint"],
-    "cluster-state-diff": IMPACT_OPS["cluster-state-diff"],
+    "cluster-state-diff": IMPACT["cluster-state-diff"],
     "emit-doc-variance": LEDGER["doc-variance"],
     "fetch-feeds": FEEDS["fetch"],
     "query-index": ADMIN["query-index"],
     "refresh-dashboards": DASHBOARD["refresh"],
-    "resolve-advisory-symbols": IMPACT_OPS["resolve-advisory-symbols"],
-    "run-impact-sweep": IMPACT_OPS["sweep"],
     "scan-internal-refs": ADMIN["scan-internal-refs"],
     "toolchain": ADMIN["toolchain"],
 }

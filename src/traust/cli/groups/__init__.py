@@ -47,10 +47,7 @@ GROUPS: dict[str, dict[str, object]] = {
     "dashboard": dict(dashboard.DASHBOARD),
     "feeds": dict(feeds.FEEDS),
     "findings": dict(findings.FINDINGS),
-    "impact": {
-        "analyze": impact.ANALYZE,
-        **impact.IMPACT_OPS,
-    },
+    "impact": dict(impact.IMPACT),
     "ledger": dict(ledger.LEDGER),
     "metrics": {
         "history": metrics.HISTORY,

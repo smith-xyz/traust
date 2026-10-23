@@ -198,7 +198,7 @@ sources:
       - harnessing/3-audit/dependency-watch/scripts/fleet_sweep.py
       - harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py
       - harnessing/3-audit/secure-code-audit/scripts/run_fork_advisory_lag.py
-      - traust.cli.resolve_advisory_symbols
+      - traust.cli.impact
       - traust.ops.cve_replay_monitor
       - traust.cli adapters osv (traust_engine.adapters.osv, the dependency pre-scan)
     license:
