@@ -57,7 +57,7 @@ Record each profile as a priv-profile assessment of the profiled commit
 ```bash
 python3 -m traust.cli reporting record \
     analysis-results/findings/<product>/<repo>/<repo>-priv-profile.json \
-    --kind priv-profile --repo-url <url> --sha <commit>
+    --kind priv-profile --repo-url <url> --sha <commit> --branch <branch>
 ```
 
 Fleet rollup (after recording a set; each repository's latest recorded
