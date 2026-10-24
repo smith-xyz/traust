@@ -9,6 +9,7 @@
     "checkov_version": "3.3.6",
     "facts_ref": "myrepo-cloud-facts.json",
     "facts_snapshot_id": "68045f8c22717898437d7e35ce61990aa0685350b9fd118fab27fecdc85f0dea",
+    "generated_at": "2026-10-20T09:00:00Z",
     "frameworks": [
       "dockerfile",
       "kubernetes",

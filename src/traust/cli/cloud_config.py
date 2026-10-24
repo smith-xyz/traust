@@ -20,6 +20,7 @@ from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import SourceType
 from traust_engine.adapters.cloud_config import register_checkov
 
+from traust.cli import _doors
 from traust.cli._doors import parser, run
 from traust.context import load_core, load_services
 
@@ -96,7 +97,8 @@ def record(argv: list[str] | None = None) -> int:
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, args.public)
         ref = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None)
-        when = datetime.now(UTC)
+        # The audit's run time makes a re-record the same run; a report without one is a new run.
+        when = _doors.when(doc.metadata.generated_at) or datetime.now(UTC)
         assessment, decisions = services.assessment.record_audit(
             doc,
             ref.id,
