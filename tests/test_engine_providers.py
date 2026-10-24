@@ -45,3 +45,45 @@ def test_canary_sources_are_the_named_recall_benchmark_dir(home: Path) -> None:
 def test_plain_core_still_raises_the_need(home: Path) -> None:
     with pytest.raises(ConfigError, match="NEED"):
         load_core(home).services().detection_quality.rule_packs()
+
+
+def test_the_scanner_tools_and_their_inspector_are_wired(home: Path) -> None:
+    core = load_engine_core(home)
+    assert set(core.tools.names()) >= {
+        "checkov",
+        "gitleaks",
+        "gitleaks-history",
+        "govulncheck",
+        "grype",
+        "opengrep",
+        "osv",
+        "yara",
+    }
+    assert core.tool_inspector is not None
+    assert core.tool_floors.get("gitleaks")  # external-tools.yaml pins are the floors
+
+
+def test_the_catalog_answers_readiness_for_every_registered_tool(home: Path) -> None:
+    catalog = load_engine_core(home).services().catalog
+    names = {b.capability.name for b in catalog.readiness(None)}
+    assert {"gitleaks", "grype", "opengrep", "checkov"} <= names
+
+
+def test_run_tools_reaches_an_engine_adapter_through_core(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from traust_contracts.models import AdapterResult
+    from traust_core.v1.models.assessment import ToolName
+    from traust_core.v1.providers.base import Readiness
+    from traust_engine.adapters import grype
+    from traust_engine.adapters._contract_bridge import build_scan_result
+    from traust_engine.adapters.tools import AdapterTool
+
+    monkeypatch.setattr(AdapterTool, "check", lambda self: Readiness(ready=True))
+    monkeypatch.setattr(grype, "scan", lambda t, **_: build_scan_result(str(t), "grype", []))
+    run = load_engine_core(home).services().assessment.run_tools(tmp_path, [ToolName("grype")])
+    assert run.data("grype", AdapterResult).metadata.tool == "grype"
+
+
+def test_plain_core_registers_no_engine_tools(home: Path) -> None:
+    assert load_core(home).tools.names() == []

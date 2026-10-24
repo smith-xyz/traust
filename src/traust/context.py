@@ -22,6 +22,7 @@ from traust_engine.adapters.compliance_sources import register_compliance_source
 from traust_engine.adapters.detection_quality import register_detection_quality
 from traust_engine.adapters.fleet_fix import register_fleet_fix
 from traust_engine.adapters.opengrep import load_supplemental_packs
+from traust_engine.adapters.tools import register_tools
 
 CORE_CONFIG = "core.yaml"
 SLA_POLICY = "sla-policy.yaml"
@@ -115,7 +116,8 @@ def load_insight_core(config_home: Path | None = None, sla_policy: Path | None =
 def load_engine_core(config_home: Path | None = None, *, canaries: str = "canaries") -> Context:
     """traust-core with traust-engine's providers for its protocols: ADR and docs sources, the
     rule-pack source and canary materialiser (``canaries``: the ``recall-benchmark/<canaries>``
-    source dir), the fleet-fix applier and golden runner."""
+    source dir), the fleet-fix applier and golden runner, and the scanner tool providers with the
+    toolchain inspector (``ProviderCatalog`` stamps and database freshness)."""
     core, engine = load_core(config_home), load_engine(config_home)
     home = config_home or deployment_config_dir()
     assert home is not None  # load_engine exits when there is no config home
@@ -135,6 +137,14 @@ def load_engine_core(config_home: Path | None = None, *, canaries: str = "canari
         canary_repos=cache / canaries,
     )
     register_fleet_fix(core)
+    register_tools(
+        core,
+        loc=engine.ctx.locations,
+        profile_map=engine.adapters.safe_exec_profile_map(),
+        pins=engine.toolchain.pins(),
+        rule_pack=pack,
+        allowlist=engine.adapters.allowlist_for_opengrep(),
+    )
     return core
 
 
