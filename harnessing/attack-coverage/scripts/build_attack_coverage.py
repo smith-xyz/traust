@@ -37,6 +37,7 @@ from traust_core.v1.models.inventory import RepositoryFilter
 
 from traust.context import (
     add_config_home_arg,
+    load_core,
     load_engine,
     load_services,
     progress_tracker_dir,
@@ -173,8 +174,12 @@ def main():
     if args.out_dir:
         out_dir = Path(args.out_dir).resolve()
     else:
-        engine = load_engine(args.config_home)
-        out_dir = progress_tracker_dir(engine) / "metrics" / "dashboards" / "attack-coverage"
+        out_dir = (
+            progress_tracker_dir(load_core(args.config_home))
+            / "metrics"
+            / "dashboards"
+            / "attack-coverage"
+        )
     out_dir.mkdir(parents=True, exist_ok=True)
     today = datetime.date.today().isoformat()
 

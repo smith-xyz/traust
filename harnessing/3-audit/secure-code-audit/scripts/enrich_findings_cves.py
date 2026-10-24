@@ -44,7 +44,6 @@ from traust.context import (
     add_config_home_arg,
     analysis_results_dir,
     load_core,
-    load_engine,
 )
 from traust.paths import HARNESS_ROOT
 from traust.registry.feeds_config import registry_path
@@ -179,8 +178,8 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args(argv)
 
-    engine = load_engine(args.config_home)
-    results_root = analysis_results_dir(engine)
+    core = load_core(args.config_home)
+    results_root = analysis_results_dir(core)
     if args.repo_graph is None:
         args.repo_graph = results_root / "graph" / "repo-graph.json"
     core = load_core(args.config_home)

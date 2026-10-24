@@ -40,7 +40,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from traust.context import add_config_home_arg, load_engine, progress_tracker_dir
+from traust.context import add_config_home_arg, load_core, progress_tracker_dir
 from traust.paths import config_path
 
 try:
@@ -153,8 +153,8 @@ def main(argv=None) -> int:
     ap.add_argument("--register", default=None, help="index just one register by name")
     args = ap.parse_args(argv)
 
-    engine = load_engine(args.config_home)
-    tracker = progress_tracker_dir(engine)
+    core = load_core(args.config_home)
+    tracker = progress_tracker_dir(core)
     registry_path = args.registry or config_path("adr-registry.yaml")
     out_path = args.out or (tracker / "metrics" / "adr" / "adr-index.json")
     if yaml is None:

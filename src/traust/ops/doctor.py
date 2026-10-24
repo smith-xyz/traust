@@ -24,9 +24,7 @@ import socket
 import subprocess
 import sys
 
-from traust_contracts import DeploymentConfigMissing
-
-from traust.context import add_config_home_arg, load_engine, workspace_dir
+from traust.context import DeploymentConfigMissing, add_config_home_arg, load_core, workspace_dir
 from traust.paths import HARNESS_ROOT, skill_dir
 
 HARNESS = HARNESS_ROOT
@@ -85,9 +83,9 @@ def _run(argv, timeout=30):
         return None
 
 
-def check_workspace(results, engine):
+def check_workspace(results, core):
     try:
-        workspace = workspace_dir(engine)
+        workspace = workspace_dir(core)
     except DeploymentConfigMissing as e:
         results.append((FAIL, f"workspace not resolvable — {e}"))
         return
@@ -232,9 +230,9 @@ def main(argv=None) -> int:
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
-    engine = load_engine(args.config_home)
+    core = load_core(args.config_home)
     results: list[tuple[str, str]] = []
-    check_workspace(results, engine)
+    check_workspace(results, core)
     check_python(results)
     check_tools(results)
     if not args.quick:

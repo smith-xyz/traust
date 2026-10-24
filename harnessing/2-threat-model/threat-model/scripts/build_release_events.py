@@ -87,7 +87,7 @@ from traust.context import (
     add_config_home_arg,
     analysis_results_dir,
     inputs_dir,
-    load_engine,
+    load_core,
 )
 from traust.paths import optional_config_path
 
@@ -466,10 +466,10 @@ def main(argv=None) -> int:
     )
     args = ap.parse_args(argv)
 
-    engine = load_engine(args.config_home)
-    results_root = analysis_results_dir(engine)
+    core = load_core(args.config_home)
+    results_root = analysis_results_dir(core)
     manifest = results_root / "findings" / "_manifest"
-    args.inputs = args.inputs or inputs_dir(engine)
+    args.inputs = args.inputs or inputs_dir(core)
     args.events = args.events or manifest / "rescan-events.jsonl"
     args.state = args.state or manifest / "release-events-state.json"
 

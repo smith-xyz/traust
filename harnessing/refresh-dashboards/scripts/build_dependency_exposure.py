@@ -52,7 +52,7 @@ from traust_engine.escaping import esc_html, md_cell
 
 from traust.context import (
     add_config_home_arg,
-    load_engine,
+    load_core,
     progress_tracker_dir,
     resolve_results_root,
 )
@@ -952,9 +952,9 @@ def main(argv=None) -> int:
     )
     args = ap.parse_args(argv)
 
-    engine = load_engine(args.config_home)
+    core = load_core(args.config_home)
     results = resolve_results_root(args)
-    pt = progress_tracker_dir(engine)
+    pt = progress_tracker_dir(core)
     args.db = args.db or (results / "graph" / "portfolio-graph.db")
     args.impact_dir = args.impact_dir or (results / "impact")
     args.out_dir = args.out_dir or (pt / "metrics" / "dependency-exposure")
