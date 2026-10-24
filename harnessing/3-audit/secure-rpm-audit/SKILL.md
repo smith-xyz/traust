@@ -467,12 +467,14 @@ For each RPM01–RPM10 finding, reference the specific RPM risk ID in the findin
 ### Crypto Provider Census & Governance (crypto-analysis)
 
 When the prepared source tree exists **and**
-python3 -m traust.cli adapters crypto-audit is available, run the crypto provider census
-over the tree the package will actually build from:
+python3 -m traust.cli adapters crypto-source is available, run the crypto provider census
+over the tree the package will actually build from (`--sbom` records the
+tree's SBOM from *SBOM & Dependency Scan* below on the dist-git commit first):
 
 ```bash
-python3 -m traust.cli adapters crypto-audit source <prepared-tree> \
-    --component <component> --output /tmp/<component>-crypto-audit.json
+python3 -m traust.cli adapters crypto-source <prepared-tree> \
+    --repo-url <dist-git url> --sha <dist-git commit> [--public] \
+    --sbom /tmp/<component>-sbom.cdx.json --out /tmp/<component>-crypto-audit.json
 ```
 
 Contract (identical in spirit to the other deterministic pre-scans —
