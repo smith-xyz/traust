@@ -46,7 +46,7 @@ def _row(ecosystem: str, name: str, version: str) -> SimpleNamespace:
 ROWS = [
     _row("rpm", "openssl-libs", "3.0.7-27.el9"),
     _row("rpm", "glibc", "2.34-100.el9"),
-    _row("golang", "golang.org/x/net", "v0.23.0"),
+    _row("go", "golang.org/x/net", "v0.23.0"),
 ]
 
 
@@ -151,7 +151,7 @@ def test_image_sbom_missing_file_is_exit_2(doors, home, tmp_path):
 def test_image_packages_counts_per_ecosystem(doors, home):
     rc, out = run(image.packages, home, DIGEST)
     assert rc == 0
-    assert out == {"digest": DIGEST, "total": 3, "by_ecosystem": {"rpm": 2, "golang": 1}}
+    assert out == {"digest": DIGEST, "total": 3, "by_ecosystem": {"rpm": 2, "go": 1}}
     assert doors.packages.calls == [(DIGEST,)]
 
 
