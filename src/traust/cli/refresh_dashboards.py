@@ -92,6 +92,7 @@ def build_stages(
                 *path_args,
             ],
         ),
+        # no door: an SLA view (profiles, clock ladder, digest); reads the retired findings.db
         ("sla", "consumer", [PYTHON, "-m", "traust.cli", "metrics", "sla", *cfg]),
         # no door: ComplianceDashboardView
         (
