@@ -12,6 +12,8 @@ refuted   a repository's false positives (the refuted register)
 surfaces  review-surface coverage (the audit, with later scans merged)
 sarif     a repository's findings as SARIF for code scanning
 tickets   the Jira tickets on a repository's findings
+summary   a repository's findings counted by state per group (severity, CWE, label, …)
+timeline  a repository's findings replayed by day, week or month (open, new, resolved, MTTR, risk)
 """
 
 from __future__ import annotations
@@ -26,8 +28,13 @@ from typing import Any
 from traust_core.v1.context import Context
 from traust_core.v1.errors import NotFoundError, ValidationError
 from traust_core.v1.models.attestation import AttestationDecision
-from traust_core.v1.models.common import PageRequest
-from traust_core.v1.models.findings import FindingFilter, RecordDecision, ReviewFilter
+from traust_core.v1.models.common import PageRequest, TimeBucket
+from traust_core.v1.models.findings import (
+    FindingDimension,
+    FindingFilter,
+    RecordDecision,
+    ReviewFilter,
+)
 from traust_core.v1.models.integrity import FingerprintInput
 from traust_core.v1.models.inventory import Repository
 from traust_core.v1.models.remediation import ExternalRef
@@ -369,5 +376,55 @@ def tickets(argv: list[str] | None = None) -> int:
         assert repo.id is not None
         found = (_BROWSE.search(t.ref) for t in core.services().attestation.tickets(repo.id))
         return sorted({m[1] for m in found if m})
+
+    return run(call)
+
+
+def _filter_args(ap: Any) -> None:
+    ap.add_argument("--repo-url", required=True)
+    ap.add_argument("--as-of", help="ISO time with a zone (default: now)")
+    ap.add_argument("--validity", choices=[v.value for v in Validity])
+    state = ap.add_mutually_exclusive_group()
+    state.add_argument("--open", dest="open", action="store_const", const=True)
+    state.add_argument("--closed", dest="open", action="store_const", const=False)
+
+
+def _filter(core: Context, args: Any) -> FindingFilter:
+    repo = _repository(core, args.repo_url)
+    assert repo.id is not None
+    return FindingFilter(
+        repository_id=repo.id,
+        validity=args.validity,
+        open=args.open,
+        as_of=_when(args.as_of) or datetime.now(UTC),
+    )
+
+
+def summary(argv: list[str] | None = None) -> int:
+    ap = parser("findings", "summary", "Count a repository's findings by state per group.")
+    _filter_args(ap)
+    ap.add_argument("--group-by", required=True, choices=[d.value for d in FindingDimension])
+    args = ap.parse_args(argv)
+
+    def call() -> list[Any]:
+        core = load_core(args.config_home)
+        group_by = FindingDimension(args.group_by)
+        return [_json(r) for r in core.services().findings.summary(_filter(core, args), group_by)]
+
+    return run(call)
+
+
+def timeline(argv: list[str] | None = None) -> int:
+    ap = parser("findings", "timeline", "Replay a repository's findings bucket by bucket.")
+    _filter_args(ap)
+    ap.add_argument(
+        "--bucket", default=TimeBucket.WEEK.value, choices=[b.value for b in TimeBucket]
+    )
+    args = ap.parse_args(argv)
+
+    def call() -> list[Any]:
+        core = load_core(args.config_home)
+        bucket = TimeBucket(args.bucket)
+        return [_json(p) for p in core.services().findings.timeline(_filter(core, args), bucket)]
 
     return run(call)

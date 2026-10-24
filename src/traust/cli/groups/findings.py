@@ -18,4 +18,6 @@ FINDINGS: dict[str, object] = {
     "surfaces": passthrough_op("findings", "Review-surface coverage.", "surfaces"),
     "sarif": passthrough_op("findings", "Export findings as SARIF.", "sarif"),
     "tickets": passthrough_op("findings", "Jira tickets on a repository's findings.", "tickets"),
+    "summary": passthrough_op("findings", "Findings counted by state per group.", "summary"),
+    "timeline": passthrough_op("findings", "Findings replayed by day, week or month.", "timeline"),
 }
