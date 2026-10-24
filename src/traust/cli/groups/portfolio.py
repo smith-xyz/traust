@@ -507,6 +507,9 @@ OWNER_HINTS = passthrough_op("portfolio_onboard", "Who may own a repository.", "
 IMPORT_OWNERS = passthrough_op(
     "portfolio_onboard", "Mirror the declared ownership source.", "import_owners"
 )
+IMPORT_RELEASE = passthrough_op(
+    "portfolio_onboard", "Record a product version and its commits.", "import_release"
+)
 POPULATION = passthrough_op(
     "portfolio_population", "What the registered repositories had assessed.", "main"
 )
