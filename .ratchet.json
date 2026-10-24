@@ -127,7 +127,6 @@
     "contracts": 1
   },
   "src/traust/cli/groups/metrics.py": {
-    "contracts": 1,
     "engine-internal": 2
   },
   "src/traust/cli/groups/portfolio.py": {

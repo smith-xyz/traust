@@ -189,3 +189,52 @@ def test_an_unknown_view_is_a_usage_error(publish: Door, home: Path, tmp_path: P
     with pytest.raises(SystemExit) as exit, contextlib.redirect_stderr(io.StringIO()):
         dashboard_view.main(["--config-home", str(home), "nope", "--out", str(tmp_path)])
     assert exit.value.code == 2 and publish.calls == []
+
+
+@pytest.fixture
+def policies(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
+    """The SLA policy each `services()` call saw registered on its Context."""
+    seen: list[Any] = []
+    services = SimpleNamespace(insight=SimpleNamespace(publish=Door(RENDERED)))
+
+    def build(self: Context) -> SimpleNamespace:
+        seen.append(self.sla_policy)
+        return services
+
+    monkeypatch.setattr(Context, "services", build)
+    return seen
+
+
+SLA_TEMPLATE = Path(__file__).resolve().parents[1] / "config" / "sla-policy.example.yaml"
+
+
+def test_the_config_homes_sla_policy_is_registered(
+    policies: list[Any], home: Path, tmp_path: Path
+) -> None:
+    (home / "sla-policy.yaml").write_text(SLA_TEMPLATE.read_text())
+    rc, _ = run(home, "sla", "--out", str(tmp_path / "sla"))
+    assert rc == 0
+    assert [p.policy_name for p in policies] == ["example-sla-policy"]
+
+
+def test_sla_policy_flag_wins_and_no_policy_registers_none(
+    policies: list[Any], home: Path, tmp_path: Path
+) -> None:
+    other = tmp_path / "other.yaml"
+    other.write_text(SLA_TEMPLATE.read_text().replace("example-sla-policy", "fedramp"))
+    assert run(home, "sla", "--sla-policy", str(other), "--out", str(tmp_path))[0] == 0
+    assert run(home, "findings-trend", "--out", str(tmp_path))[0] == 0
+    assert [p and p.policy_name for p in policies] == ["fedramp", None]
+
+
+@pytest.mark.parametrize("policy", ["missing.yaml", "invalid.yaml"])
+def test_an_unresolvable_sla_policy_is_exit_2_and_writes_nothing(
+    policies: list[Any], home: Path, tmp_path: Path, policy: str
+) -> None:
+    (tmp_path / "invalid.yaml").write_text("policy_name: x\n")
+    out = tmp_path / "out"
+    with pytest.raises(SystemExit) as exit, contextlib.redirect_stderr(io.StringIO()) as err:
+        argv = ["sla", "--sla-policy", str(tmp_path / policy), "--out", str(out)]
+        dashboard_view.main(["--config-home", str(home), *argv])
+    assert exit.value.code == 2 and "SLA policy not resolvable" in err.getvalue()
+    assert policies == [] and not out.exists()

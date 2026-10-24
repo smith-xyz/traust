@@ -1,4 +1,4 @@
-"""``traust metrics …`` — metrics journal, spend, SLA."""
+"""``traust metrics …`` — metrics journal, spend."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import json
 import sys
 from pathlib import Path
 
-from traust_contracts import DeploymentConfigMissing
 from traust_engine.metrics import collect_spend as css
 
 from traust.cli.groups._registry import OpSpec
@@ -226,74 +225,4 @@ ATTRIBUTE_SPEND = OpSpec(
     add_args=add_attribute_spend_args,
     call=call_attribute_spend,
     help="Attribute session spend to harness lanes from transcripts",
-)
-
-
-def add_sla_args(ap) -> None:
-    ap.add_argument("--db", type=Path, default=None)
-    ap.add_argument(
-        "--policy",
-        type=Path,
-        default=None,
-        help="SLA policy YAML (data, schema-validated). "
-        "Default: sla-policy.yaml in the config home.",
-    )
-    ap.add_argument(
-        "--profile", default=None, help="profile name (default: the policy's default profile)"
-    )
-    ap.add_argument("--as-of", default=None)
-    ap.add_argument(
-        "--out-dir",
-        type=Path,
-        default=None,
-        help="default: <metrics-root>/metrics/dashboards/sla",
-    )
-    ap.add_argument(
-        "--pd-cache-dir",
-        type=Path,
-        default=None,
-        help="product-definitions feed cache dir (optional source)",
-    )
-
-
-def call_sla(engine, args) -> int:
-    import datetime as dt
-
-    metrics = engine.metrics
-    db = args.db or metrics.findings_db()
-    if not db.is_file():
-        print(
-            f"ERROR: {db} not found — build it first: traust corpus findings-db",
-            file=sys.stderr,
-        )
-        return 1
-    as_of = dt.date.fromisoformat(args.as_of) if args.as_of else None
-    try:
-        view, out_dir = metrics.build_sla_view(
-            db_path=db,
-            policy_path=args.policy,
-            profile=args.profile,
-            as_of=as_of,
-            out_dir=args.out_dir,
-            pd_cache_dir=args.pd_cache_dir,
-        )
-    except DeploymentConfigMissing as e:
-        print(f"ERROR: {e} (or pass --policy)", file=sys.stderr)
-        return 1
-    s = view["summary"]
-    profile_name = view["metadata"]["profile"]
-    print(f"wrote {out_dir}/sla-view.{{json,md}} (profile {profile_name})")
-    print(
-        f"  open in-SLA {s['open_in_sla']:,} | overdue "
-        f"{s['open_overdue']:,} | no-SLA {s['open_no_sla']:,} | "
-        f"unclocked {s['unclocked']:,} | resolved compliance "
-        f"{s['resolved_sla_compliance_pct']}%"
-    )
-    return 0
-
-
-SLA = OpSpec(
-    add_args=add_sla_args,
-    call=call_sla,
-    help="Owner-response SLA views over the findings projection",
 )

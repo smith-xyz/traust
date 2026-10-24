@@ -23,6 +23,7 @@ from traust_engine.adapters.fleet_fix import register_fleet_fix
 from traust_engine.adapters.opengrep import load_supplemental_packs
 
 CORE_CONFIG = "core.yaml"
+SLA_POLICY = "sla-policy.yaml"
 
 # ---------------------------------------------------------------------------
 # Sanctioned environment overrides — read ONLY in this module, never in consumers.
@@ -90,6 +91,22 @@ def load_core(config_home: Path | None = None) -> Context:
     except ConfigError as e:
         print(f"core config not resolvable: {e}", file=sys.stderr)
         raise SystemExit(2) from e
+
+
+def load_insight_core(config_home: Path | None = None, sla_policy: Path | None = None) -> Context:
+    """``load_core`` with the SLA view built on ``sla_policy``, else on ``<config home>/
+    sla-policy.yaml`` when there is one (template: config/sla-policy.example.yaml); exit 2 when
+    the policy is unreadable or invalid."""
+    core = load_core(config_home)
+    home = config_home or deployment_config_dir()
+    path = sla_policy or (home / SLA_POLICY if home is not None else None)
+    if path is not None and (sla_policy is not None or path.is_file()):
+        try:
+            core.register_sla_policy(path)
+        except ConfigError as e:
+            print(f"SLA policy not resolvable: {e}", file=sys.stderr)
+            raise SystemExit(2) from e
+    return core
 
 
 def load_engine_core(config_home: Path | None = None, *, canaries: str = "canaries") -> Context:

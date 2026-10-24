@@ -534,7 +534,7 @@ Build or refresh the portfolio repository graph. Reads every segment of the inpu
 
 ## sla-view
 
-Use when the user asks about SLA compliance, overdue findings, response/remediation deadlines, breach counts, or escalation lists — e.g. "what's past SLA", "criticals overdue", "are we meeting the 30-day clock", "SLA view for FedRAMP", "who's most overdue". Replays disposition-ledger clocks against a schema-validated SLA policy (default: the deployment's sla-policy.yaml in the config home) and emits sla-view.{json,md} with per-team overdue tables and a human-gated escalation digest.
+Use when the user asks about SLA compliance, overdue findings, response/remediation deadlines, breach counts, or escalation lists — e.g. "what's past SLA", "criticals overdue", "are we meeting the 30-day clock", "SLA view for FedRAMP", "who's most overdue". Replays the clocks of the findings recorded in traust-core against a schema-validated SLA policy (default: the deployment's sla-policy.yaml in the config home) and emits sla-view-<policy>.{md,html,json} with per-team overdue tables and a human-gated escalation digest.
 
 - **Stage:** —
 - **Tier:** `secondary`

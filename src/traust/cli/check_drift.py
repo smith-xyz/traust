@@ -157,7 +157,6 @@ BUILDER_STALE_DAYS = 7
 # Stages absent here are reported as uncovered rather than skipped: a builder with no
 # freshness signal is exactly the case this check exists for.
 BUILDER_OUTPUT_DIRS = {
-    "sla": "sla",
     "compliance": "compliance",
     "attack-coverage": "attack-coverage",
 }

@@ -37,8 +37,8 @@ from traust_core.v1.models.operations import AssetRequest
 from traust.cli._doors import EXIT_CODES
 from traust.context import (
     add_config_home_arg,
-    load_core,
     load_engine,
+    load_insight_core,
     progress_tracker_dir,
     resolve_results_root,
     workspace_dir,
@@ -92,8 +92,6 @@ def build_stages(
                 *path_args,
             ],
         ),
-        # no door: an SLA view (profiles, clock ladder, digest); reads the retired findings.db
-        ("sla", "consumer", [PYTHON, "-m", "traust.cli", "metrics", "sla", *cfg]),
         # no door: ComplianceDashboardView
         (
             "compliance",
@@ -176,7 +174,7 @@ def build_stages(
 
 def run_views(args, out: Path) -> int:
     """The `dashboards` asset's materializer: one InsightService.refresh; prints its JobResult."""
-    materializer = DashboardsMaterializer(load_core(args.config_home).services(), out)
+    materializer = DashboardsMaterializer(load_insight_core(args.config_home).services(), out)
     result = materializer.materialize(
         AssetRequest(asset=materializer.asset, run_id=args.run_id, partition=args.view)
     )
