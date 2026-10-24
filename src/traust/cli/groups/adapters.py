@@ -868,3 +868,7 @@ CRYPTO_IMAGE = passthrough_op("crypto", "An image's crypto census, by digest.", 
 CRYPTO_CLUSTER = passthrough_op(
     "crypto", "A cluster's runtime crypto census, scope-gated.", "cluster"
 )
+
+# secure-container-audit's image doors on traust-core (traust.cli.image)
+IMAGE_SBOM = passthrough_op("image", "Record an image's SBOM, keyed by digest.", "sbom")
+IMAGE_PACKAGES = passthrough_op("image", "The packages an image's recorded SBOM holds.", "packages")
