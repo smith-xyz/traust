@@ -419,7 +419,7 @@ Use when the user asks whether derived artifacts or paired sources are stale or 
 
 ## executive-summary-findings
 
-Use when the user asks for an executive summary, leadership roll-up, or cross-portfolio dashboard of security-audit findings — e.g. "summarise all findings", "how many criticals do we have", "credential leaks across the campaign", "findings by language", or "rebuild the executive summary". Aggregates every *security-audit.{json,md} report under analysis-results/ into a one-page Markdown brief and a self-contained HTML dashboard.
+Use when the user asks for an executive summary, leadership roll-up, or cross-portfolio dashboard of security-audit findings — e.g. "summarise all findings", "how many criticals do we have", "credential leaks across the campaign", "findings by language", or "rebuild the executive summary". Aggregates every finding recorded in traust-core into a one-page Markdown brief and a self-contained HTML dashboard.
 
 - **Stage:** —
 - **Tier:** `secondary`

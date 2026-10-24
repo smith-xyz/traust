@@ -17,7 +17,16 @@ import yaml
 from traust_core.v1.context import Context
 from traust_core.v1.errors import ValidationError
 from traust_core.v1.models.common import TimeBucket, TimeWindow
-from traust_core.v1.models.insight import FindingsTrend, RenderedView, ViewFilter, ViewName
+from traust_core.v1.models.insight import (
+    ExecutiveSummary,
+    FindingsRollup,
+    FindingsTrend,
+    FindingTally,
+    LeastPrivilege,
+    RenderedView,
+    ViewFilter,
+    ViewName,
+)
 
 from traust.cli import dashboard_view
 
@@ -127,6 +136,37 @@ def test_until_closes_the_window(publish: Door, home: Path, tmp_path: Path) -> N
     assert rc == 0
     [(_, scope)] = publish.calls
     assert scope.window == TimeWindow(start=since, end=until) and scope.as_of is None
+
+
+def test_executive_summary_as_of_writes_its_files(
+    publish: Door, home: Path, tmp_path: Path
+) -> None:
+    publish.result = RenderedView(
+        view=ViewName.EXECUTIVE_SUMMARY,
+        stem="executive-summary-findings",
+        model=ExecutiveSummary(
+            rollup=FindingsRollup(as_of=AS_OF, total=FindingTally()),
+            privileges=LeastPrivilege(
+                profiles=0,
+                privileged=0,
+                scc_requesting=0,
+                wildcard_repositories=0,
+                wildcard_rules=0,
+            ),
+        ),
+        markdown="# Executive summary: findings\n",
+        html="<!doctype html><title>Executive summary: findings</title>",
+    )
+    out = tmp_path / "dashboards"
+    rc, answer = run(home, "executive-summary", "--as-of", AS_OF.isoformat(), "--out", str(out))
+    assert rc == 0
+    assert publish.calls == [(ViewName.EXECUTIVE_SUMMARY, ViewFilter(as_of=AS_OF))]
+    assert sorted(p.name for p in out.iterdir()) == [
+        "executive-summary-findings.html",
+        "executive-summary-findings.json",
+        "executive-summary-findings.md",
+    ]
+    assert answer["model"]["exposure"] is None
 
 
 @pytest.mark.parametrize(
