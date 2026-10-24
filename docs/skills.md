@@ -75,7 +75,6 @@ field on every skill.
 | [rbac-tenancy-rollup](#rbac-tenancy-rollup) | — | `secondary` | `/rbac-tenancy-rollup` |
 | [recall-benchmark](#recall-benchmark) | — | `secondary` | `/recall-benchmark` |
 | [refresh-dashboards](#refresh-dashboards) | — | `secondary` | `/refresh-dashboards` |
-| [repo-graph](#repo-graph) | — | `secondary` | `/repo-graph` |
 | [sla-view](#sla-view) | — | `secondary` | `/sla-view` |
 | [threat-register](#threat-register) | — | `secondary` | `/threat-register` |
 | [traust-metrics](#traust-metrics) | — | `secondary` | `/traust-metrics` |
@@ -521,16 +520,6 @@ Use when the user asks to refresh, rebuild, or update all the dashboards — "re
 - **Invoke:** `/refresh-dashboards` — arguments: `[--only <stage...>] [--skip <stage>] [--spend-actuals] [--view <name>] [--out <dir>]`
 - **Skill:** [harnessing/refresh-dashboards/SKILL.md](../harnessing/refresh-dashboards/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/refresh-dashboards/SKILL.md#integrations)
-
-## repo-graph
-
-Build or refresh the portfolio repository graph. Reads every segment of the inputs inventory (`locations.inputs`) by the kind declared in `<inputs>/inventory.yaml` (groups / release-payload / catalog / services; ansible/ excluded by default), cross-references every repo against analysis-results/findings/ coverage (audit/triage/threat-model + severity), and emits repo-graph.{json,dot,gexf,html} + repo-graph-stats.md into analysis-results/graph/. Use when asked to "build the repo graph", "update the portfolio graph", "map repos to findings", "which repos have no coverage", or "what ships kube-rbac-proxy".
-
-- **Stage:** —
-- **Tier:** `secondary`
-- **Invoke:** `/repo-graph` — arguments: `[--inputs DIR] [--findings DIR] [--out DIR] [--exclude SEGMENT]... [--date YYYY-MM-DD]`
-- **Skill:** [harnessing/repo-graph/SKILL.md](../harnessing/repo-graph/SKILL.md)
-- **Produces / consumes:** [Integrations](../harnessing/repo-graph/SKILL.md#integrations)
 
 ## sla-view
 
