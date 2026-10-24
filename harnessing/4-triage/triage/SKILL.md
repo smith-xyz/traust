@@ -6,7 +6,8 @@ description: Triage a batch of raw security findings. Verify each is real,
   + <repo>-triage.md sorted by what actually needs engineering attention. Use when
   asked to "triage findings", "validate scanner output", "prioritize vulns",
   or "review the backlog". Runs interactively by default; pass --auto to
-  skip the interview.
+  skip the interview. Scanner source attribution comes from the recorded Core
+  assessment, not a caller-supplied origin flag.
 argument-hint: "<findings-path> [--auto] [--votes N] [--repo PATH] [--fp-rules FILE] [--fresh]"
 user-invocable: true
 metadata:
@@ -268,11 +269,14 @@ source format.
 
   ```bash
   python3 -m traust.cli triage intake <file> --format sarif|dependabot|govulncheck \
-      --repo-url <https URL> --sha <scanned commit> --origin vuln-scan [--public]
+      --repo-url <https URL> --sha <scanned commit> [--public]
   ```
 
   Never hand-parse these formats. Suppressed SARIF results are skipped.
   A scanner that gives no severity reports `unrated`.
+  Core records source kind and the scanner name/version from the supplied output.
+  Do not supply an origin override; the first assessment's assessor owns origin
+  grouping after later scans too.
 - **(C) Anything else** (the formats below): triage it with the generic
   rules. There are no recorded findings to attach verdicts to, so 6e
   doesn't apply; say so in the terminal summary.
@@ -542,9 +546,9 @@ in the Phase 2 checkpoint delta.
 `*-discovery-candidates.json` files (from python3 -m traust.cli impact cluster-state-diff
 and future P5 sweeps) are ordinary generic-JSON inputs: machine-generated
 candidates with `origin: validation-discovery`, transcript-backed.
-Triage them like any scanner output; the origin field flows through so
-dashboards count the validation lane's detection contribution
-separately.
+Keep this raw origin tag as input evidence. For Core-stored findings, origin grouping
+comes from the first reporting assessment's assessor; never pass the tag as a
+candidate-field or `triage intake` override.
 
 ### Note — class-generalization sweep candidates
 
@@ -557,8 +561,8 @@ error-correction plan §6). Ingest the container's `candidates[]` array
 
 - Map `file` + `line` → location, `excerpt` → the claimed evidence,
   `rule_id` → `category` prefix (`sweep:<rule_id>`), `severity_hint` →
-  claimed severity (default `medium` when absent), and set
-  `origin: sweep` so dashboards count the sweep lane separately.
+  claimed severity (default `medium` when absent), and retain raw `origin: sweep`
+  as descriptive provenance, not a Core classifier override.
 - `source_finding_provenance` (the confirmed findings the rule was
   generalized from) rides into the verifier prompt as context — a
   provenance citation is WHY the class is worth checking, never

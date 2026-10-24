@@ -289,12 +289,18 @@ file-based state; the typed async workbench does not restore those paths.
 ## Scanner intake
 
 `traust triage intake <scan> --format sarif|dependabot|govulncheck --repo-url <url>
---sha <commit> --origin <skill> --config-home <private-config>` uses
+--sha <commit> --config-home <private-config>` uses
 `Context.services().assessment.record_scan`. Core parses the original scanner
 output and validates the complete finding batch, including nested locations,
 before committing the assessment and intake together. A malformed batch leaves
 no partial assessment, occurrence or finding rows. Scanner claims do not create
 disposition decisions.
+
+Source comes from the recorded assessment's kind and native scanner name/version;
+origin grouping uses the finding's first reporting assessor. There is no `--origin`
+override or `FindingCandidate.origin` field. A later scanner can add observations
+without replacing that first-source attribution. Raw report origin tags remain
+historical/provider evidence, not an alternative Core classifier input.
 
 Service callers replay using the original provenance timestamp; lookup uses the
 database's existing timestamp precision. The CLI records each actual invocation

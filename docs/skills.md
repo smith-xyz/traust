@@ -255,7 +255,7 @@ Use when the user wants to record human feedback against audit findings, review 
 
 ## triage
 
-Triage a batch of raw security findings. Verify each is real, collapse duplicates, re-rank by derived exploitability, and tag with an owner. Takes a directory or file of scanner output and writes <repo>-triage.json + <repo>-triage.md sorted by what actually needs engineering attention. Use when asked to "triage findings", "validate scanner output", "prioritize vulns", or "review the backlog". Runs interactively by default; pass --auto to skip the interview.
+Triage a batch of raw security findings. Verify each is real, collapse duplicates, re-rank by derived exploitability, and tag with an owner. Takes a directory or file of scanner output and writes <repo>-triage.json + <repo>-triage.md sorted by what actually needs engineering attention. Use when asked to "triage findings", "validate scanner output", "prioritize vulns", or "review the backlog". Runs interactively by default; pass --auto to skip the interview. Scanner source attribution comes from the recorded Core assessment, not a caller-supplied origin flag.
 
 - **Stage:** ④ Triage
 - **Tier:** `primary`

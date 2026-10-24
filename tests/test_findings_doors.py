@@ -53,7 +53,7 @@ def scanned(home: Path, tmp_path: Path) -> str:
     """One finding at entry.c, recorded through the triage skill's intake door."""
     scan = tmp_path / "scan.sarif"
     scan.write_text(json.dumps(SARIF))
-    argv = ("--format", "sarif", "--repo-url", REPO, "--sha", SHA, "--origin", "vuln-scan")
+    argv = ("--format", "sarif", "--repo-url", REPO, "--sha", SHA)
     rc, out = run(triage.intake, home, str(scan), *argv)
     assert rc == 0, out
     rc, listed = run(findings.baseline, home, "--repo-url", REPO)

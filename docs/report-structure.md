@@ -62,7 +62,7 @@ projections.
 | `disposition` | No | Present only on cumulative reports (`*-findings-current.json`): both disposition axes, conflict and awaiting-signoff flags, and event history, derived from the ledger. Never authored in a baseline. |
 | `effective_severity` | No | Present only on cumulative reports: equals a human severity override from the ledger when one exists, else the original severity. The original `severity` is never rewritten. |
 | `source_findings` | No | Source scanner finding IDs / provenance refs (for routed findings: the producer's own id — e.g. a `REG-*` regression id — plus the producing report's path). |
-| `origin` | No | Producer of a finding that entered the ledger as an event rather than from the baseline audit: `verify-remediation` \| `vuln-scan` \| `create-fuzzing` \| `validate-findings` \| `validation-discovery` \| `impact-analysis`. Absent on findings authored by the baseline audit itself. |
+| `origin` | No | Historical/provider report provenance tag: `verify-remediation` \| `vuln-scan` \| `create-fuzzing` \| `validate-findings` \| `validation-discovery` \| `impact-analysis`. It remains readable in raw artifacts; Core source attribution comes from the first reporting assessment, not a candidate-field or CLI override. |
 
 ## Optional top-level keys
 

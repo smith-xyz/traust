@@ -18,7 +18,7 @@ from traust_core.v1.models.assessment import AssessmentKind
 from traust_core.v1.models.common import CodeSpan, Provenance
 from traust_core.v1.models.findings import FindingCandidate
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
-from traust_core.v1.models.vocabulary import FindingOrigin, ScannerSeverity, SourceType
+from traust_core.v1.models.vocabulary import ScannerSeverity, SourceType
 from traust_core.v1.services.artifact_publishing import PublishSpec, PublishSpecs
 
 from tests.test_validate_report import _valid_report as security_audit
@@ -50,7 +50,6 @@ def record_source(core, repo, ref, source, checkout):
                 title=claim.title,
                 locations=(CodeSpan(path=claim.file, line=claim.line),),
                 reported_severity=ScannerSeverity.HIGH,
-                origin=FindingOrigin.VULN_SCAN,
             )
         ],
     )

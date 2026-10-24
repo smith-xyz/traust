@@ -86,8 +86,6 @@ def intake(home: Path, tmp_path: Path) -> str:
         "https://github.com/example/canary",
         "--sha",
         SHA,
-        "--origin",
-        "vuln-scan",
     )
     assert rc == 0, out
     got = json.loads(out)
