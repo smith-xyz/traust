@@ -119,7 +119,7 @@ Three shapes, three treatments:
 
 ```bash
 python3 -m traust.cli check fix-propagation \
-    --repo-url <original-repo-url> --sha <commit> \
+    --repo-url <original-repo-url> --sha <commit> [--branch <branch>] \
     --ecosystem <eco> --module <fixed module> --fixed-version <vX.Y.Z> \
     [--sbom <syft output for the commit's checkout>]
 ```
