@@ -27,7 +27,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `check` | Deterministic gates | `citations`, `content-licenses`, `docs-consistency`, `estate-data`, `drift`, `fix-propagation`, `location-paths`, `reference-integrity`, `skill-alignment`, `skill-security` |
 | `cloud-config` | The cloud-config-audit skill's doors on traust-core | `check`, `record`, `run` |
 | `compliance` | Compliance reporting; boundary doors on traust-core | `dashboard`, `declare`, `resolve`, `scopes` |
-| `dashboard` | Dashboard rebuilds and the team report | `refresh`, `team-report` |
+| `dashboard` | Dashboard rebuilds, the team report and one insight view | `refresh`, `team-report`, `view` |
 | `feeds` | Security feed snapshots (traust-core) and the product-definitions cache | `fetch`, `fetch-products` |
 | `findings` | track-findings' and findings-db's doors on traust-core | `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `refuted`, `reject`, `sarif`, `status`, `summary`, `surfaces`, `tickets`, `timeline` |
 | `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `find`, `sbom`, `sweep`, `symbols` |

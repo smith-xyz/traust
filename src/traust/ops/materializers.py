@@ -96,10 +96,13 @@ class LedgerAuditMaterializer:
         )
 
 
-def write_view(view: RenderedView, base: Path) -> tuple[Path, ...]:
-    """The rendered pair, `<base>.md` and `<base>.html`; core stores no view."""
+def write_view(view: RenderedView, base: Path, model: bool = False) -> tuple[Path, ...]:
+    """The rendered pair, `<base>.md` and `<base>.html` (and its model as `<base>.json`);
+    core stores no view."""
     base.parent.mkdir(parents=True, exist_ok=True)
     out = {base.with_suffix(".md"): view.markdown, base.with_suffix(".html"): view.html}
+    if model:
+        out[base.with_suffix(".json")] = view.model.model_dump_json(indent=2)
     for path, text in out.items():
         path.write_text(text, encoding="utf-8")
     return tuple(out)
@@ -123,10 +126,7 @@ class DashboardsMaterializer:
             return JobResult.failed(f"bad request: {e}")
         written: list[Path] = []
         for view in result.rendered.values():
-            base = self._out / view.view / view.stem
-            written += write_view(view, base)
-            written.append(base.with_suffix(".json"))
-            written[-1].write_text(view.model.model_dump_json(indent=2), encoding="utf-8")
+            written += write_view(view, self._out / view.view / view.stem, model=True)
         reason = "; ".join(f"{name}: {why}" for name, why in result.failed.items()) or None
         degraded = {name.value: 1 for name in result.failed}
         return JobResult.partly(degraded, tuple(map(str, written))).model_copy(

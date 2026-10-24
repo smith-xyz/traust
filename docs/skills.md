@@ -449,7 +449,7 @@ Use when the user asks an ad-hoc question over the findings corpus that reads li
 
 ## findings-trends
 
-Use when the user asks whether portfolio security findings are trending up or down, wants a burndown, remediation velocity, MTTR, risk-index, or accepted-risk trend, or asks to (re)build the findings-trends dashboard — e.g. "are we getting better", "findings over time", "how fast are we remediating", "what risk have we accepted". Replays every repo's track-findings disposition ledger against time buckets and emits findings-trends.{json,md,html} with direction arrows per metric.
+Use when the user asks whether portfolio security findings are trending up or down, wants a burndown, remediation velocity, MTTR, risk-index, or accepted-risk trend, or asks to (re)build the findings-trends dashboard — e.g. "are we getting better", "findings over time", "how fast are we remediating", "what risk have we accepted". Replays every repo's recorded findings and decisions against time buckets and emits the findings-trend view {json,md,html}.
 
 - **Stage:** —
 - **Tier:** `secondary`
