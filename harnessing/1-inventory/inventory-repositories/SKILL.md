@@ -21,6 +21,9 @@ allowed-tools:
   - Bash(podman create:*)
   - Bash(podman cp:*)
   - Bash(podman rm:*)
+  - Bash(traust portfolio owner-hints:*)
+  - Bash(traust portfolio import-owners:*)
+  # fetch_forge_owners.py stays for --file only (no forge file-read door yet)
   - Bash(python3 *traust/harnessing/1-inventory/inventory-repositories/scripts/fetch_forge_owners.py:*)
   - Bash(python3 -m traust.cli registry:*)
 ---
@@ -108,10 +111,10 @@ sources in order and record which one answered in `Ownership Source`:
    consult it first (it is the only source that knows teams and managers).
    The extension documents its own procedure; the harness ships none.
 2. **`OWNERS` / `approvers` / `CODEOWNERS` files in the repository** —
-   `python3 harnessing/1-inventory/inventory-repositories/scripts/fetch_forge_owners.py --repo-url <URL>` fetches them
+   `traust portfolio owner-hints --repo <URL>` fetches them
    through the forge CLI (`gh api` / `glab api`; the token never touches
-   argv) and prints `approvers` parsed from the file.
-3. **Forge top contributors** — the same script's `contributors` list
+   argv) and prints the approvers parsed from the file (`origin: owners-file`).
+3. **Forge top contributors** — the same command's `origin: contributor` hints
    (bots removed); take the top one or two as a fallback.
 4. **Organisation-level mapping** — `org_teams:` in the inventory descriptor
    maps a forge organisation to a team name for repos where nothing
@@ -120,6 +123,8 @@ sources in order and record which one answered in `Ownership Source`:
    org_teams:
      example-org: Platform Team
    ```
+   `traust portfolio import-owners --source <inputs>/inventory.yaml` records
+   it in traust-core for every registered repository.
 5. **Manager fallback** — if a team manager is known from source 1 but no
    individual owner was found, record the manager as the individual owner.
 6. **Unknown** — if nothing answers, set `Owner Team` = `Unknown`. Never
@@ -206,7 +211,8 @@ When the same repository appears across multiple versions:
 
 - **Consumes**: `<inputs>/inventory.yaml` (segment kinds, `payload_image`,
   `registries`, `org_teams`); registry data via `oc`/`skopeo`/`podman`; forge
-  data only via `harnessing/1-inventory/inventory-repositories/scripts/fetch_forge_owners.py`.
+  data only via `traust portfolio owner-hints` (and
+  `harnessing/1-inventory/inventory-repositories/scripts/fetch_forge_owners.py --file`).
 - **Emits**: `<segment>-<version>-payload-repos.csv`, `*-payload-analysis.md`
   and `owners.csv` under `locations.inputs`, read by `repo-graph` (graph
   nodes, release/product-version layers, owner edges),

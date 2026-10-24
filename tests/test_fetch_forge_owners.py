@@ -1,4 +1,4 @@
-"""inventory-repositories/scripts/fetch_forge_owners.py — URL gate + parsing.
+"""inventory-repositories/scripts/fetch_forge_owners.py — URL gate + file fetch.
 
 No network: the forge CLI is stubbed.
 """
@@ -50,55 +50,50 @@ def test_repo_url_gate_rejects_everything_else(url):
         _load().parse_repo_url(url)
 
 
-def test_approvers_from_owners_yaml_and_codeowners():
-    m = _load()
-    assert m.approvers_from_owners(
-        "reviewers:\n- r1\napprovers:\n  - alice\n  - bob\nlabels: [x]\n"
-    ) == ["alice", "bob"]
-    assert m.approvers_from_owners("approvers: [alice, 'bob']\n") == ["alice", "bob"]
-    assert m.approvers_from_owners("# comment\n*.go @carol @acme/team\ndocs/ @dave\n") == [
-        "carol",
-        "acme/team",
-        "dave",
-    ]
-    assert m.approvers_from_owners(None) == []
-
-
-def test_github_path_uses_gh_api_only_and_drops_bots(monkeypatch):
+def test_github_file_uses_gh_api_only(monkeypatch):
     m = _load()
     calls: list[list[str]] = []
 
     def fake_run(argv):
         calls.append(argv)
-        assert argv[0] == "gh" and argv[1] == "api"
-        if argv[2].endswith("/contents/OWNERS"):
-            return base64.b64encode(b"approvers:\n- alice\n").decode()
-        if "/contributors" in argv[2]:
-            return "alice\nweb-flow\ndependabot[bot]\nbob\n"
-        return None
+        assert argv[:3] == ["gh", "api", "repos/acme/api/contents/bundle/x.yaml"]
+        return base64.b64encode(b"kind: ClusterServiceVersion\n").decode()
 
     monkeypatch.setattr(m, "_run", fake_run)
     monkeypatch.setattr(m.shutil, "which", lambda _: "/usr/bin/gh")
-    res = m.github("acme/api", None)
-    assert res["owners_file_name"] == "OWNERS"
-    assert res["contributors"] == ["alice", "bob"]
-    assert m.approvers_from_owners(res["owners_file"]) == ["alice"]
-    assert all(c[0] == "gh" for c in calls)
-    assert not any("curl" in " ".join(c) for c in calls)
+    assert m.github("acme/api", "bundle/x.yaml") == "kind: ClusterServiceVersion\n"
+    assert len(calls) == 1
 
 
-def test_main_emits_json(monkeypatch, capsys):
+def test_gitlab_file_names_the_host_and_quotes_the_path(monkeypatch):
     m = _load()
-    monkeypatch.setattr(
-        m,
-        "github",
-        lambda path, file: {
-            "owners_file": "approvers:\n- alice\n",
-            "owners_file_name": "OWNERS",
-            "contributors": ["alice"],
-            "file": None,
-        },
-    )
-    assert m.main(["--repo-url", "https://github.com/acme/api"]) == 0
-    out = json.loads(capsys.readouterr().out)
-    assert out["repo"] == "acme/api" and out["approvers"] == ["alice"]
+    calls: list[list[str]] = []
+    monkeypatch.setattr(m, "_run", lambda argv: calls.append(argv) or "text")
+    monkeypatch.setattr(m.shutil, "which", lambda _: "/usr/bin/glab")
+    assert m.gitlab("gitlab.example.com", "grp/proj", "bundle/x.yaml") == "text"
+    assert calls == [
+        [
+            "glab",
+            "api",
+            "--hostname",
+            "gitlab.example.com",
+            "projects/grp%2Fproj/repository/files/bundle%2Fx.yaml/raw?ref=HEAD",
+        ]
+    ]
+
+
+def test_main_emits_the_file_as_json(monkeypatch, capsys):
+    m = _load()
+    monkeypatch.setattr(m, "github", lambda path, file: None)
+    argv = ["--repo-url", "https://github.com/acme/api", "--file", "missing.yaml"]
+    assert m.main(argv) == 0
+    assert json.loads(capsys.readouterr().out) == {
+        "repo": "acme/api",
+        "host": "github.com",
+        "file": None,
+    }
+
+
+def test_main_needs_a_file():
+    with pytest.raises(SystemExit):
+        _load().main(["--repo-url", "https://github.com/acme/api"])

@@ -1,4 +1,4 @@
-"""`traust inventory plan|onboard|owner-hints|import-owners` end to end on traust-core, in-process
+"""`traust portfolio plan|onboard|owner-hints|import-owners` end to end on traust-core, in-process
 on SQLite and Postgres; the forge CLI is replayed from recorded answers."""
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import yaml
 from traust_core.v1.providers.process import ProcessResult, ProcessRunner
 
 from tests.test_products_doors import _postgres
-from traust.cli import auth, inventory, products
+from traust.cli import auth, portfolio_onboard, products
 
 FIXTURES = Path(__file__).parent / "fixtures" / "inventory"
 ORG = "example-org"
@@ -95,25 +95,25 @@ REQUEST = ("--product", "example", "--org", ORG, "--repo", EXTRA)
 
 
 def test_plan_lists_what_onboard_would_add_and_writes_nothing(home: Path) -> None:
-    rc, plan = run(inventory.plan, home, *REQUEST)
+    rc, plan = run(portfolio_onboard.plan, home, *REQUEST)
     assert rc == 0, plan
     assert sorted(s["url"] for s in plan["new"]) == sorted([EXTRA, *LISTED])
     assert plan["existing_repository_ids"] == []
     assert [g["subject"] for g in plan["gaps"]] == ["example"]
-    rc, again = run(inventory.plan, home, *REQUEST)
+    rc, again = run(portfolio_onboard.plan, home, *REQUEST)
     assert again == plan
 
 
 def test_onboard_registers_once_and_reruns_are_no_ops(home: Path, forge: Forge) -> None:
     logged_in(home)
-    rc, first = run(inventory.onboard, home, *REQUEST, "--label", "Example")
+    rc, first = run(portfolio_onboard.onboard, home, *REQUEST, "--label", "Example")
     assert rc == 0, first
     assert len(first["repository_ids"]) == len(LISTED) + 1 == 12
     assert first["order_ids"] == []
 
-    rc, second = run(inventory.onboard, home, *REQUEST)
+    rc, second = run(portfolio_onboard.onboard, home, *REQUEST)
     assert (rc, second) == (0, first)
-    rc, plan = run(inventory.plan, home, *REQUEST)
+    rc, plan = run(portfolio_onboard.plan, home, *REQUEST)
     assert (plan["new"], plan["gaps"]) == ([], [])
     assert sorted(plan["existing_repository_ids"]) == sorted(first["repository_ids"])
 
@@ -126,16 +126,16 @@ def test_onboard_registers_once_and_reruns_are_no_ops(home: Path, forge: Forge) 
 
 def test_onboard_refuses_an_unregistered_product_without_a_label(home: Path) -> None:
     logged_in(home)
-    rc, err = run(inventory.onboard, home, *REQUEST)
+    rc, err = run(portfolio_onboard.onboard, home, *REQUEST)
     assert rc == 2 and "product is not registered" in err
-    rc, plan = run(inventory.plan, home, *REQUEST)
+    rc, plan = run(portfolio_onboard.plan, home, *REQUEST)
     assert len(plan["new"]) == 12
 
 
 def test_onboard_needs_a_login(home: Path) -> None:
-    rc, err = run(inventory.onboard, home, *REQUEST, "--label", "Example")
+    rc, err = run(portfolio_onboard.onboard, home, *REQUEST, "--label", "Example")
     assert rc == 2 and "traust auth" in err
-    rc, plan = run(inventory.plan, home, *REQUEST)
+    rc, plan = run(portfolio_onboard.plan, home, *REQUEST)
     assert len(plan["new"]) == 12
 
 
@@ -153,22 +153,22 @@ def test_bad_input_is_refused_before_any_write(
     home: Path, argv: tuple[str, ...], reason: str
 ) -> None:
     logged_in(home)
-    rc, err = run(inventory.onboard, home, *argv, "--label", "Example")
+    rc, err = run(portfolio_onboard.onboard, home, *argv, "--label", "Example")
     assert rc == 2 and reason in err, err
 
 
 def test_a_forge_refusal_surfaces_and_registers_nothing(home: Path, forge: Forge) -> None:
     logged_in(home)
     forge.fail = True
-    rc, err = run(inventory.onboard, home, *REQUEST, "--label", "Example")
+    rc, err = run(portfolio_onboard.onboard, home, *REQUEST, "--label", "Example")
     assert rc == 2 and "Bad credentials" in err
     forge.fail = False
-    rc, plan = run(inventory.plan, home, *REQUEST)
+    rc, plan = run(portfolio_onboard.plan, home, *REQUEST)
     assert len(plan["new"]) == 12
 
 
 def test_owner_hints_are_approvers_then_contributors_without_bots(home: Path) -> None:
-    rc, hints = run(inventory.owner_hints, home, "--repo", LISTED[0])
+    rc, hints = run(portfolio_onboard.owner_hints, home, "--repo", LISTED[0])
     assert rc == 0, hints
     assert [(h["handle"], h["origin"]) for h in hints] == [
         ("approver-a", "owners-file"),
@@ -185,7 +185,7 @@ def test_owner_hints_are_approvers_then_contributors_without_bots(home: Path) ->
 
 def test_owner_hints_surface_a_forge_refusal(home: Path, forge: Forge) -> None:
     forge.fail = True
-    rc, err = run(inventory.owner_hints, home, "--repo", LISTED[0])
+    rc, err = run(portfolio_onboard.owner_hints, home, "--repo", LISTED[0])
     assert rc == 2 and "Bad credentials" in err
 
 
@@ -197,7 +197,7 @@ def source(tmp_path: Path, doc: Any) -> str:
 
 def test_import_owners_mirrors_the_declared_source(home: Path, tmp_path: Path) -> None:
     logged_in(home)
-    run(inventory.onboard, home, *REQUEST, "--label", "Example")
+    run(portfolio_onboard.onboard, home, *REQUEST, "--label", "Example")
     descriptor = {
         "segments": {"services": {"kind": "services"}},
         "org_teams": {ORG: "Platform Team"},
@@ -206,15 +206,15 @@ def test_import_owners_mirrors_the_declared_source(home: Path, tmp_path: Path) -
             {"repo": "https://github.com/other-org/unknown", "teams": ["Nobody"]},
         ],
     }
-    rc, first = run(inventory.import_owners, home, "--source", source(tmp_path, descriptor))
+    rc, first = run(portfolio_onboard.import_owners, home, "--source", source(tmp_path, descriptor))
     assert rc == 0, first
     assert (len(first["added"]), first["removed"]) == (12, [])
     assert first["skipped"] == ["https://github.com/other-org/unknown"]
 
-    rc, again = run(inventory.import_owners, home, "--source", source(tmp_path, descriptor))
+    rc, again = run(portfolio_onboard.import_owners, home, "--source", source(tmp_path, descriptor))
     assert (len(again["added"]), sorted(again["unchanged"])) == (0, sorted(first["added"]))
 
-    rc, dropped = run(inventory.import_owners, home, "--source", source(tmp_path, {}))
+    rc, dropped = run(portfolio_onboard.import_owners, home, "--source", source(tmp_path, {}))
     assert (dropped["added"], sorted(dropped["removed"])) == ([], sorted(first["added"]))
 
 
@@ -229,10 +229,10 @@ def test_import_owners_mirrors_the_declared_source(home: Path, tmp_path: Path) -
 def test_import_owners_refuses_a_malformed_source(
     home: Path, tmp_path: Path, doc: Any, reason: str
 ) -> None:
-    rc, err = run(inventory.import_owners, home, "--source", source(tmp_path, doc))
+    rc, err = run(portfolio_onboard.import_owners, home, "--source", source(tmp_path, doc))
     assert rc == 2 and reason in err, err
 
 
 def test_import_owners_needs_the_source_file(home: Path, tmp_path: Path) -> None:
-    rc, err = run(inventory.import_owners, home, "--source", str(tmp_path / "missing.yaml"))
+    rc, err = run(portfolio_onboard.import_owners, home, "--source", str(tmp_path / "missing.yaml"))
     assert rc == 2 and "missing.yaml" in err

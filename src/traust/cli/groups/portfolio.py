@@ -500,3 +500,10 @@ PARSERS = OpSpec(
 OBSERVE = passthrough_op(
     "portfolio_observe", "Observe one repository at its forge; keep what it answered.", "main"
 )
+
+PLAN = passthrough_op("portfolio_onboard", "What onboard would register, writing nothing.", "plan")
+ONBOARD = passthrough_op("portfolio_onboard", "Register a product's repositories.", "onboard")
+OWNER_HINTS = passthrough_op("portfolio_onboard", "Who may own a repository.", "owner_hints")
+IMPORT_OWNERS = passthrough_op(
+    "portfolio_onboard", "Mirror the declared ownership source.", "import_owners"
+)

@@ -1,5 +1,5 @@
-"""``traust inventory plan|onboard|owner-hints|import-owners``: add-inputs' and
-inventory-repositories' doors on traust-core.
+"""``traust portfolio plan|onboard|owner-hints|import-owners``: add-inputs' and
+inventory-repositories' doors on traust-core (onboarding and portfolio sync).
 
 plan           what onboard would register and order, writing nothing (the dry run)
 onboard        register the product (when --label names a new one), the repositories and an
@@ -65,7 +65,7 @@ def _request(core: Context, args: argparse.Namespace) -> OnboardingRequest:
 
 
 def plan(argv: list[str] | None = None) -> int:
-    ap = parser("inventory", "plan", "What onboard would register, writing nothing.")
+    ap = parser("portfolio", "plan", "What onboard would register, writing nothing.")
     _request_args(ap)
     args = ap.parse_args(argv)
 
@@ -77,7 +77,7 @@ def plan(argv: list[str] | None = None) -> int:
 
 
 def onboard(argv: list[str] | None = None) -> int:
-    ap = parser("inventory", "onboard", "Register a product's repositories in the inventory.")
+    ap = parser("portfolio", "onboard", "Register a product's repositories in the inventory.")
     _request_args(ap)
     args = ap.parse_args(argv)
 
@@ -90,7 +90,7 @@ def onboard(argv: list[str] | None = None) -> int:
 
 
 def owner_hints(argv: list[str] | None = None) -> int:
-    ap = parser("inventory", "owner-hints", "Who may own a repository, from its forge.")
+    ap = parser("portfolio", "owner-hints", "Who may own a repository, from its forge.")
     ap.add_argument("--repo", required=True, help="an https repository URL")
     args = ap.parse_args(argv)
 
@@ -128,7 +128,7 @@ def _source(core: Context, path: Path) -> OwnershipSource:
 
 
 def import_owners(argv: list[str] | None = None) -> int:
-    ap = parser("inventory", "import-owners", "Mirror the declared ownership source.")
+    ap = parser("portfolio", "import-owners", "Mirror the declared ownership source.")
     ap.add_argument(
         "--source",
         type=Path,

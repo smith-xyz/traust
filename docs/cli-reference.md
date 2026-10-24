@@ -16,7 +16,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 
 ## Command groups
 
-21 groups (plus the deprecated `tools` group below).
+20 groups (plus the deprecated `tools` group below).
 
 | Group | Description | Operations |
 |---|---|---|
@@ -31,10 +31,9 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `feeds` | Security feed snapshots (traust-core) and the product-definitions cache | `fetch`, `fetch-products` |
 | `findings` | track-findings' doors on traust-core | `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `refuted`, `reject`, `sarif`, `status`, `surfaces`, `tickets` |
 | `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `find`, `sbom`, `sweep`, `symbols` |
-| `inventory` | add-inputs' and inventory-repositories' doors on traust-core: onboarding and ownership | `import-owners`, `onboard`, `owner-hints`, `plan` |
 | `ledger` | Ledger audit (traust-core) and the doc-variance register | `audit`, `doc-variance` |
 | `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `sla`, `spend` |
-| `portfolio` | Portfolio graph; `observe` is the `repo_state` materializer | `artifacts`, `build`, `deps-multi`, `freshness`, `interfaces`, `observe`, `parsers`, `query`, `stats`, `symbols` |
+| `portfolio` | Portfolio graph; `observe` is the `repo_state` materializer; `plan` / `onboard` / `owner-hints` / `import-owners` are add-inputs' doors on traust-core | `artifacts`, `build`, `deps-multi`, `freshness`, `import-owners`, `interfaces`, `observe`, `onboard`, `owner-hints`, `parsers`, `plan`, `query`, `stats`, `symbols` |
 | `products` | corpus-intake's doors on traust-core: products and their corpus ownership | `add`, `list`, `update` |
 | `registry` | Model/product registry | `models`, `products` |
 | `reporting` | Report validation & rendering | `lint`, `rate-threats`, `render`, `sarif`, `validate` |

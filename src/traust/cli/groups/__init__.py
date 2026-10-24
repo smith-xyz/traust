@@ -14,7 +14,6 @@ from traust.cli.groups import (
     feeds,
     findings,
     impact,
-    inventory,
     ledger,
     metrics,
     portfolio,
@@ -55,7 +54,6 @@ GROUPS: dict[str, dict[str, object]] = {
     "feeds": dict(feeds.FEEDS),
     "findings": dict(findings.FINDINGS),
     "impact": dict(impact.IMPACT),
-    "inventory": dict(inventory.INVENTORY),
     "ledger": dict(ledger.LEDGER),
     "metrics": {
         "history": metrics.HISTORY,
@@ -80,6 +78,10 @@ GROUPS: dict[str, dict[str, object]] = {
         "query": portfolio.QUERY,
         "parsers": portfolio.PARSERS,
         "observe": portfolio.OBSERVE,
+        "plan": portfolio.PLAN,
+        "onboard": portfolio.ONBOARD,
+        "owner-hints": portfolio.OWNER_HINTS,
+        "import-owners": portfolio.IMPORT_OWNERS,
     },
     "reporting": {
         "validate": reporting.VALIDATE,
