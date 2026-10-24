@@ -67,10 +67,6 @@
     "database": 1,
     "engine-internal": 7
   },
-  "harnessing/portfolio-graph/scripts/smoke_deps_multi.py": {
-    "database": 1,
-    "engine-internal": 2
-  },
   "harnessing/refresh-dashboards/scripts/build_dependency_exposure.py": {
     "database": 1,
     "engine-internal": 2,
