@@ -39,7 +39,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from traust.context import add_config_home_arg, load_engine, progress_tracker_dir
+from traust.context import add_config_home_arg, load_core, progress_tracker_dir
 from traust.paths import HARNESS_ROOT, skill_dir
 
 try:
@@ -209,8 +209,8 @@ def main(argv=None) -> int:
     if yaml is None:
         sys.exit("PyYAML required")
 
-    engine = load_engine(args.config_home)
-    tracker = progress_tracker_dir(engine)
+    core = load_core(args.config_home)
+    tracker = progress_tracker_dir(core)
     fixture = args.fixture or (
         HARNESS_ROOT / "tests" / "fixtures" / "compliance" / "efficacy" / "seeded-target"
     )

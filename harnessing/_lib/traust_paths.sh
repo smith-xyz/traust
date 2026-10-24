@@ -14,17 +14,17 @@ _traust_path() {
 from traust.context import (
     analysis_results_dir,
     findings_tree_dir,
-    load_engine,
+    load_core,
     workspace_dir,
 )
 import sys
-e = load_engine()
+core = load_core()
 m = {
     'workspace': workspace_dir,
     'analysis_results': analysis_results_dir,
     'findings': findings_tree_dir,
 }
-print(m[sys.argv[1]](e).resolve())
+print(m[sys.argv[1]](core).resolve())
 " "$1"
 }
 

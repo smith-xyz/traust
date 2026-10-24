@@ -43,7 +43,7 @@ from pathlib import Path
 from traust.context import (
     add_config_home_arg,
     analysis_results_dir,
-    load_engine,
+    load_core,
     workspace_dir,
 )
 from traust.paths import optional_config_path
@@ -150,8 +150,8 @@ def main(argv=None) -> int:
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args(argv)
 
-    engine = load_engine(args.config_home)
-    results_root = analysis_results_dir(engine)
+    core = load_core(args.config_home)
+    results_root = analysis_results_dir(core)
     manifest = results_root / "findings" / "_manifest"
     args.worklist = args.worklist or manifest / "rescan-worklist.json"
     args.out_dir = args.out_dir or manifest
@@ -227,7 +227,7 @@ def main(argv=None) -> int:
             ceiling, why = brw.read_policy_shadow_ceiling(
                 optional_config_path("budget-policy.yaml")
             )
-            ws = workspace_dir(engine)
+            ws = workspace_dir(core)
             backlog = [d for d in (doc.get("decisions") or []) if d.get("lane") in brw._FULL_LANES]
             shadow = budget_shadow.shadow_verdict(ws, rows, ceiling, why, backlog_rows=backlog)
             manifest["budget_shadow"] = shadow

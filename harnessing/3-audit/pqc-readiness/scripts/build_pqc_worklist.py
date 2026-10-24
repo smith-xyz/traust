@@ -26,7 +26,7 @@ from traust_engine.corpus.resolver import normalize_repo_url
 from traust.context import (
     add_config_home_arg,
     analysis_results_dir,
-    load_engine,
+    load_core,
 )
 
 CRYPTO_CWES = {
@@ -86,8 +86,8 @@ def main():
     ap.add_argument("--analysis-results", type=Path, default=None)
     args = ap.parse_args()
 
-    engine = load_engine(args.config_home)
-    ar = args.analysis_results.resolve() if args.analysis_results else analysis_results_dir(engine)
+    core = load_core(args.config_home)
+    ar = args.analysis_results.resolve() if args.analysis_results else analysis_results_dir(core)
     findings = ar / "findings"
     if not findings.is_dir():
         raise SystemExit(f"findings/ not found under {ar}")

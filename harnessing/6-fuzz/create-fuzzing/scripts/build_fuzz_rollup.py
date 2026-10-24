@@ -39,7 +39,7 @@ from pathlib import Path
 
 from traust.context import (
     add_config_home_arg,
-    load_engine,
+    load_core,
     progress_tracker_dir,
     resolve_results_root,
     workspace_dir,
@@ -623,12 +623,12 @@ def main(argv=None):
     ap.add_argument("--results-root", type=Path, default=None)
     args = ap.parse_args(argv)
 
-    engine = load_engine(args.config_home)
+    core = load_core(args.config_home)
     results_root = resolve_results_root(args)
     configure_corpus(
         results_root,
-        workspace_dir(engine),
-        progress_tracker_dir(engine) / "metrics" / "dashboards" / "fuzz",
+        workspace_dir(core),
+        progress_tracker_dir(core) / "metrics" / "dashboards" / "fuzz",
     )
     SUMMARY_OUT = _corpus_path("summary_out")
     ROLLUP_OUT = _corpus_path("rollup_out")

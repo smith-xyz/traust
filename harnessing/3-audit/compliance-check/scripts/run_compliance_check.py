@@ -54,7 +54,6 @@ from traust.context import (
     add_config_home_arg,
     findings_db,
     load_core,
-    load_engine,
 )
 from traust.paths import HARNESS_ROOT, config_path
 
@@ -459,12 +458,12 @@ def main(argv=None) -> int:
     ap.add_argument("--out-dir", type=Path, default=Path.cwd())
     ap.add_argument("--oscal", action="store_true")
     args = ap.parse_args(argv)
-    engine = load_engine(args.config_home)
+    core = load_core(args.config_home)
     # Scope and org parameters are deployment config (the config home); the
     # control-to-check mapping ships with traust-engine.
     args.registry = args.registry or (compliance_data_dir() / "compliance-mapping.yaml")
     args.org_parameters = args.org_parameters or config_path("org-parameters.yaml")
-    args.findings_db = args.findings_db or findings_db(engine)
+    args.findings_db = args.findings_db or findings_db(core)
     if yaml is None:
         sys.exit("PyYAML required")
 
