@@ -100,7 +100,7 @@ Use when the user wants to register, update, or review a corpus tree or scan eng
 
 ## inventory-repositories
 
-Use when the user asks to list, discover, inventory, or extract the source repositories that ship in a release payload image or an OLM operator bundle/catalog — e.g. "inventory release 4.21", "which repos ship in the foo operator 2.3", "refresh the payload inventory". Writes the per-segment CSV inventory that repo-graph and the dashboards read, and registers the repositories and their owner teams in traust-core.
+Use when the user asks to list, discover, inventory, or extract the source repositories that ship in a release payload image or an OLM operator bundle/catalog — e.g. "inventory release 4.21", "which repos ship in the foo operator 2.3", "refresh the payload inventory". Writes the per-segment CSV inventory that the dashboards read, and registers the repositories and their owner teams in traust-core.
 
 - **Stage:** ① Inventory
 - **Tier:** `secondary`
