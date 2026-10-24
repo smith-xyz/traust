@@ -12,4 +12,5 @@ PQC: dict[str, object] = {
     "blockers": passthrough_op(
         "pqc", "Remediations of each commit's latest readiness.", "blockers"
     ),
+    "dashboard": passthrough_op("pqc", "Write the PQC view as an md/html pair.", "dashboard"),
 }

@@ -1,4 +1,4 @@
-"""``traust pqc record|check|prepare|summary|blockers``: the pqc-readiness skill's doors
+"""``traust pqc record|check|prepare|summary|blockers|dashboard``: the pqc-readiness skill's doors
 on traust-core.
 
 record    a commit's Layer-1 facts (`pqc_facts.py`; `PqcService.prescan` waits on the engine's
@@ -7,6 +7,7 @@ check     a readiness report against its gate past the schema (`record` applies 
 prepare   what Layer 2 scores from: the commit's facts, its route (full/light/skip) and prior report
 summary   the latest readiness per commit in scope, rolled up by bucket or dominant provenance
 blockers  the remediations of each commit's latest readiness, in the vocabulary /patch reads
+dashboard the PQC view (per product, by bucket and provenance) written as an md/html pair
 """
 
 from __future__ import annotations
@@ -21,16 +22,19 @@ from traust_core.v1.context import Context
 from traust_core.v1.errors import NotFoundError
 from traust_core.v1.models.artifacts import PqcFactsArtifact, PqcReadinessArtifact
 from traust_core.v1.models.common import Provenance
+from traust_core.v1.models.insight import ViewFilter, ViewName
 from traust_core.v1.models.pqc import PqcDimension, PqcFilter
-from traust_core.v1.models.values import GitSha, HttpsRepoUrl, ProductSlug
+from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import (
     PqcReadinessBucket,
     PqcRemediationCategory,
     SourceType,
 )
 
+from traust.cli import _doors
 from traust.cli._doors import parser, run
 from traust.context import load_core
+from traust.ops.materializers import write_view
 
 
 def _parser(op: str, about: str, *, commit: bool = True) -> argparse.ArgumentParser:
@@ -129,12 +133,7 @@ def _filter_parser(op: str, about: str) -> argparse.ArgumentParser:
 
 
 def _filter(core: Context, args: argparse.Namespace, **more: object) -> PqcFilter:
-    product_id = None
-    if args.product:
-        product = core.services().portfolio.find_product(ProductSlug(args.product))
-        if product is None:
-            raise NotFoundError(f"product {args.product} is not registered")
-        product_id = product.id
+    product_id = _doors.products(core.services(), [args.product])[0].id if args.product else None
     refs = None if args.repo is None else tuple(_find(core, u, s) for u, s in args.repo)
     return PqcFilter(
         repository_ref_ids=refs,
@@ -188,5 +187,21 @@ def blockers(argv: list[str] | None = None) -> int:
             )
         )
         return [{**b.model_dump(mode="json"), "patchable": b.patchable} for b in found]
+
+    return run(call)
+
+
+def dashboard(argv: list[str] | None = None) -> int:
+    ap = _parser("dashboard", "Write the PQC view as pqc-dashboard.{md,html}.", commit=False)
+    ap.add_argument("--product", action="append", default=[], help="a product slug (repeatable)")
+    ap.add_argument("--out", type=Path, required=True, help="the folder the pair is written to")
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        services = load_core(args.config_home).services()
+        scope = ViewFilter(product_ids=tuple(p.id for p in _doors.products(services, args.product)))
+        rendered = services.insight.publish(ViewName.PQC, scope)
+        written = write_view(rendered, args.out / "pqc-dashboard", model=True)
+        return {"written": [str(p) for p in written]}
 
     return run(call)

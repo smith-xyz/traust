@@ -465,8 +465,9 @@ live campaign status after every batch from the recorded readiness: per
 bucket (or dominant provenance) the repositories, mean overall score,
 2030-clock and HNDL counts, blocked count and remediation mix;
 `traust pqc blockers --category deadline` lists the 2030/2035 clock items
-with their locations. (The rendered dashboard waits on traust-core's PQC
-view; the ranked lists stay in the roll-up below.)
+with their locations; `traust pqc dashboard [--product <slug>] --out <dir>`
+writes the rendered `pqc-dashboard.{md,html}`. (The ranked lists stay in
+the roll-up below.)
 
 `build_pqc_worklist.py --analysis-results <dir>` writes
 `findings/_manifest/pqc-worklist.{json,md}`: one entry per unique repository
