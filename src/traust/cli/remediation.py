@@ -1,7 +1,13 @@
 """``traust remediation …``: the remediation loop's doors on traust-core.
 
+open                 a work item for confirmed, open findings of a commit
+work-items           a repository's work items, oldest first
 next                 a repository's oldest work item still waiting for a patch
 prepare              what a patch of one work item fixes (findings, decisions, strategy, fork)
+fork                 the private fork a repository's fixes are pushed to
+progress             move a work item to a status (forward only)
+mutation-evidence    a mewt campaign's status JSON as one patch_evidence item
+record               a validated remediation report on its work item
 verify-sweep         which repositories are worth re-verifying, by tier, and why the rest are not
 verify-prepare       what a verification of one work item re-checks, as JSON
 verify-differential  the scanner that backed a work item's findings, compared on a patched commit
@@ -19,12 +25,16 @@ from pathlib import Path
 from typing import Any
 
 from traust_core.v1.errors import NotFoundError
-from traust_core.v1.models.artifacts import VerificationArtifact
+from traust_core.v1.models.artifacts import RemediationArtifact, VerificationArtifact
 from traust_core.v1.models.common import Provenance, every_item
 from traust_core.v1.models.inventory import Repository, RepositoryFilter
-from traust_core.v1.models.remediation import VerificationFilter, WorkItemFilter
+from traust_core.v1.models.remediation import (
+    VerificationFilter,
+    WorkItemFilter,
+    mutation_evidence,
+)
 from traust_core.v1.models.values import GitSha, ProductSlug
-from traust_core.v1.models.vocabulary import SourceType
+from traust_core.v1.models.vocabulary import RemediationStatus, SourceType
 
 from traust.cli._doors import parser, run
 from traust.cli.findings import _repository
@@ -40,6 +50,108 @@ def _emit(text: str, out: Path | None) -> str | None:
         return text
     out.write_text(text + "\n", encoding="utf-8")
     return None
+
+
+def open_(argv: list[str] | None = None) -> int:
+    ap = _parser("open", "Open a work item for confirmed, open findings of a commit.")
+    ap.add_argument("--repo-url", required=True)
+    ap.add_argument("--sha", required=True, help="the commit the findings were found on")
+    ap.add_argument("--finding", type=uuid.UUID, action="append", required=True, help="repeatable")
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        core = load_core(args.config_home)
+        services = core.services()
+        repo = _repository(core, args.repo_url)
+        ref = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None)  # type: ignore[arg-type]
+        return services.remediation.open(args.finding, ref.id).model_dump(mode="json")  # type: ignore[arg-type]
+
+    return run(call)
+
+
+def work_items(argv: list[str] | None = None) -> int:
+    ap = _parser("work-items", "List a repository's work items, oldest first.")
+    ap.add_argument("--repo-url", required=True)
+    ap.add_argument("--status", choices=[s.value for s in RemediationStatus])
+    args = ap.parse_args(argv)
+
+    def call() -> list:
+        core = load_core(args.config_home)
+        repo = _repository(core, args.repo_url)
+        wanted = WorkItemFilter(repository_id=repo.id, status=args.status)  # type: ignore[arg-type]
+        found = every_item(lambda p: core.services().remediation.list(wanted, p))
+        return [i.model_dump(mode="json") for i in found]
+
+    return run(call)
+
+
+def fork(argv: list[str] | None = None) -> int:
+    ap = _parser("fork", "Print the private fork a repository's fixes are pushed to.")
+    ap.add_argument("--repo-url", required=True)
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        core = load_core(args.config_home)
+        repo = _repository(core, args.repo_url)
+        found = core.services().remediation.resolve_fork(repo.id)  # type: ignore[arg-type]
+        return {**found.model_dump(mode="json"), "url": str(found.url)}
+
+    return run(call)
+
+
+def progress(argv: list[str] | None = None) -> int:
+    ap = _parser("progress", "Move a work item to a status (forward only).")
+    ap.add_argument("work_item_id", type=uuid.UUID)
+    ap.add_argument("status", choices=[s.value for s in RemediationStatus])
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        remediation = load_core(args.config_home).services().remediation
+        moved = remediation.record_progress(args.work_item_id, RemediationStatus(args.status))
+        return moved.model_dump(mode="json")
+
+    return run(call)
+
+
+def mutation_evidence_(argv: list[str] | None = None) -> int:
+    ap = _parser("mutation-evidence", "Turn a mewt campaign's result into one patch_evidence item.")
+    ap.add_argument("--target", required=True, help="the package the patch touched")
+    ap.add_argument("--rc", type=int, required=True, help="the campaign's exit code")
+    ap.add_argument("--tool-version", default="")
+    ap.add_argument("--log", required=True, help="the campaign log")
+    ap.add_argument("--status-json", type=Path, required=True, help="mewt status --format json")
+    ap.add_argument("--boundary", default="", help="how the campaign was contained")
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        status = args.status_json.read_bytes() if args.status_json.is_file() else None
+        found = mutation_evidence(
+            args.target, args.rc, args.tool_version, args.log, status, args.boundary
+        )
+        return found.model_dump(mode="json", exclude_none=True)
+
+    return run(call)
+
+
+def record(argv: list[str] | None = None) -> int:
+    ap = _parser("record", "Record a validated remediation report on its work item.")
+    ap.add_argument("report", type=Path, help="the remediation report JSON")
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        doc = RemediationArtifact.parse(args.report.read_bytes())
+        when = datetime.now(UTC)
+        made = (
+            load_core(args.config_home)
+            .services()
+            .remediation.record(
+                doc,
+                Provenance(run_id=uuid.uuid4(), source=SourceType.INTERACTIVE, occurred_at=when),
+            )
+        )
+        return made.model_dump(mode="json")
+
+    return run(call)
 
 
 def next_(argv: list[str] | None = None) -> int:

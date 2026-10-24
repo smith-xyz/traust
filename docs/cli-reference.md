@@ -39,7 +39,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `pqc` | The pqc-readiness skill's doors on traust-core | `blockers`, `check`, `dashboard`, `prepare`, `record`, `summary` |
 | `products` | corpus-intake's doors on traust-core: products and their corpus ownership | `add`, `list`, `update` |
 | `registry` | Model/product registry | `models`, `products` |
-| `remediation` | The remediation loop's doors on traust-core (patch, verify-remediation) | `next`, `prepare`, `verifications`, `verify-differential`, `verify-prepare`, `verify-record`, `verify-sweep` |
+| `remediation` | The remediation loop's doors on traust-core (remediate-finding, patch, verify-remediation) | `fork`, `mutation-evidence`, `next`, `open`, `prepare`, `progress`, `record`, `verifications`, `verify-differential`, `verify-prepare`, `verify-record`, `verify-sweep`, `work-items` |
 | `reporting` | Report validation, rendering & recording | `lint`, `rate-threats`, `record`, `render`, `sarif`, `validate` |
 | `triage` | The triage skill's doors on traust-core | `check`, `intake`, `prepare`, `record`, `render` |
 | `sweep` | Class-generalization sweep; recall-benchmark answer key | `benchmark`, `benchmark-targets`, `collect`, `draft`, `emit`, `mine`, `rule-lane`, `sweep` |
