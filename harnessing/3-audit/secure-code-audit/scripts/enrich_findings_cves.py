@@ -3,8 +3,8 @@
 
 Joins every CVE id found in the input artifacts against the EPSS and
 CISA KEV feeds (traust-core's latest `traust feeds fetch` snapshots) and, where
-the repository is known to repo-graph, adds deployment-reachability
-context (how many products ship the repo, owning team). Output is an
+the repository is registered in traust-core, adds deployment-reachability
+context (which products ship the repo, owning teams). Output is an
 ENRICHMENT TAGGER artifact: it routes prioritization and joins evidence —
 it never changes a severity, never concludes, and never emits findings
 (docs/deterministic-inferential-mix.md).
@@ -16,15 +16,14 @@ deterministically (regex over each item) so schema drift cannot silently
 drop coverage.
 
 Deployment reachability tiers (weakest→strongest):
-  product_shipped   repo appears in repo-graph `ships` edges
+  product_shipped   a product's imported release includes a commit of the repo
   deployed          only when --workloads names it (an `oc` inventory from
                     an authorized lab cluster, validate-core-ocp blast
                     radius); absent input ⇒ "unknown", never guessed
 
 Usage:
     python3 enrich_findings_cves.py --in <artifact.json> [--in ...]
-        [--refresh] [--repo-graph FILE]
-        [--workloads FILE] [--out FILE]
+        [--refresh] [--workloads FILE] [--out FILE]
 """
 
 from __future__ import annotations
@@ -37,14 +36,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from traust_core.v1.errors import NotFoundError
+from traust_core.v1.errors import NotFoundError, ValidationError
 from traust_core.v1.models.dependencies import AdvisoryIdentifier
+from traust_core.v1.models.values import HttpsRepoUrl
 
-from traust.context import (
-    add_config_home_arg,
-    analysis_results_dir,
-    load_core,
-)
+from traust.context import add_config_home_arg, load_core
 from traust.paths import HARNESS_ROOT
 from traust.registry.feeds_config import registry_path
 
@@ -70,26 +66,21 @@ def harness_version():
         return v
 
 
-def load_repo_graph(path: Path) -> dict[str, dict]:
-    """label 'org/name' -> {products: [...], owner: str|None}"""
-    g = json.loads(path.read_text(encoding="utf-8"))
-    by_id, by_label, labels = {}, {}, {}
-    for n in g.get("nodes") or []:
-        if n.get("type") == "repo":
-            entry = {"products": [], "owner": None}
-            by_id[n["id"]] = entry
-            by_label[n.get("label") or ""] = entry
-        labels[n["id"]] = n.get("label") or n["id"].split(":", 1)[-1]
-    for e in g.get("edges") or []:
-        rel = e.get("rel")
-        if rel == "ships" and e.get("to") in by_id:
-            by_id[e["to"]]["products"].append(labels.get(e.get("from"), e.get("from")))
-        elif rel == "owned-by":
-            if e.get("from") in by_id:
-                by_id[e["from"]]["owner"] = str(e.get("to", "")).split(":", 1)[-1]
-            elif e.get("to") in by_id:
-                by_id[e["to"]]["owner"] = str(e.get("from", "")).split(":", 1)[-1]
-    return by_label
+def repository_reach(portfolio, label: str | None, forge_hosts) -> dict:
+    """The products shipping the 'org/name' repository and its owning teams, from traust-core;
+    an unregistered repository has neither."""
+    try:
+        url = HttpsRepoUrl.parse(f"https://github.com/{label}", forge_hosts) if label else None
+    except ValidationError:
+        url = None
+    repo = url and portfolio.find_repository(url)
+    if not repo:
+        return {"registered": False, "products_shipping": [], "owner_teams": []}
+    return {
+        "registered": True,
+        "products_shipping": sorted(p.name for p in portfolio.list_products_of(repo.id)),
+        "owner_teams": sorted(t.name for t in portfolio.list_owners(repo.id)),
+    }
 
 
 def repo_label(doc: dict) -> str | None:
@@ -166,7 +157,6 @@ def main(argv=None) -> int:
         "--refresh", action="store_true", help="refresh the feeds cache first (network)"
     )
     ap.add_argument("--max-age-hours", type=float, default=24.0)
-    ap.add_argument("--repo-graph", type=Path, default=None)
     ap.add_argument(
         "--workloads",
         type=Path,
@@ -179,12 +169,9 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     core = load_core(args.config_home)
-    results_root = analysis_results_dir(core)
-    if args.repo_graph is None:
-        args.repo_graph = results_root / "graph" / "repo-graph.json"
-    core = load_core(args.config_home)
     core.register_feeds(registry_path())
-    exposure = core.services().exposure
+    services = core.services()
+    exposure = services.exposure
     if args.refresh:
         for feed in exposure.refresh_feeds():
             print(f"  {feed.name}: {feed.last_error or 'refreshed'}")
@@ -224,12 +211,6 @@ def main(argv=None) -> int:
         for f in exposure.feed_statuses()
     }
 
-    graph = {}
-    if args.repo_graph.is_file():
-        try:
-            graph = load_repo_graph(args.repo_graph)
-        except (OSError, json.JSONDecodeError) as e:
-            print(f"[!] repo-graph unavailable ({e}); no reachability context", file=sys.stderr)
     workloads = None
     if args.workloads:
         workloads = set(json.loads(args.workloads.read_text(encoding="utf-8")))
@@ -239,12 +220,9 @@ def main(argv=None) -> int:
         kind, items = items_of(doc)
         enriched = enrich_items(items, epss, kev)
         label = repo_label(doc)
-        g = graph.get(label) if label else None
         reach = {
             "repo": label,
-            "in_repo_graph": g is not None,
-            "products_shipping": sorted((g or {}).get("products") or []),
-            "owner_team": (g or {}).get("owner"),
+            **repository_reach(services.portfolio, label, core.config.forge_hosts),
             "deployed": ((label in workloads) if (workloads is not None and label) else "unknown"),
         }
         sources.append(

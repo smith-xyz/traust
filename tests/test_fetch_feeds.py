@@ -1,16 +1,21 @@
 """Tests for traust.cli.fetch_feeds (product-definitions) + enrich_findings_cves.py (C8)."""
 
+import dataclasses
 import gzip
 import json
 import os
 import shutil
 import sys
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
 from traust_contracts import Locations
+from traust_core.v1.context import Context
+from traust_core.v1.models.inventory import Product, Repository, Team
 from traust_core.v1.providers.base import Acquisition, Readiness, Result
 from traust_engine.registry import feeds as pd_feeds
 
@@ -211,32 +216,28 @@ def test_repo_label():
     assert en.repo_label({"metadata": {"repository": "/tmp/x"}}) is None
 
 
-def test_main_end_to_end(tmp_path, monkeypatch, core_feeds):
+@pytest.fixture
+def registered(monkeypatch):
+    """org/app registered in traust-core, shipped by ACM and owned by example-team."""
+    app = Repository(id=uuid.uuid4(), url="https://github.com/org/app", public=True)
+    portfolio = SimpleNamespace(
+        find_repository=lambda url: app if str(url) == app.url else None,
+        list_products_of=lambda repository_id: [Product(id=uuid.uuid4(), slug="acm", name="ACM")],
+        list_owners=lambda repository_id: [Team(id=uuid.uuid4(), name="example-team")],
+    )
+    services = Context.services
+    monkeypatch.setattr(
+        Context, "services", lambda self: dataclasses.replace(services(self), portfolio=portfolio)
+    )
+
+
+def test_main_end_to_end(tmp_path, monkeypatch, core_feeds, registered):
     artifact = tmp_path / "x-osv-scanner.json"
     artifact.write_text(
         json.dumps(
             {
                 "metadata": {"repository": "https://github.com/org/app"},
                 "candidates": [{"osv_id": "GHSA-x", "aliases": ["CVE-2026-3333"]}],
-            }
-        )
-    )
-    graph = tmp_path / "repo-graph.json"
-    graph.write_text(
-        json.dumps(
-            {
-                "nodes": [
-                    {"id": "repo:github.com/org/app", "type": "repo", "label": "org/app"},
-                    {"id": "product:acm", "type": "product", "label": "ACM"},
-                ],
-                "edges": [
-                    {"rel": "ships", "from": "product:acm", "to": "repo:github.com/org/app"},
-                    {
-                        "rel": "owned-by",
-                        "from": "repo:github.com/org/app",
-                        "to": "team:example-team",
-                    },
-                ],
             }
         )
     )
@@ -247,8 +248,6 @@ def test_main_end_to_end(tmp_path, monkeypatch, core_feeds):
         [
             "--in",
             str(artifact),
-            "--repo-graph",
-            str(graph),
             "--workloads",
             str(workloads),
             "--out",
@@ -261,7 +260,8 @@ def test_main_end_to_end(tmp_path, monkeypatch, core_feeds):
     assert src["items"][0]["kev_any"] is True
     reach = src["repository_reach"]
     assert reach["products_shipping"] == ["ACM"]
-    assert reach["owner_team"] == "example-team"
+    assert reach["registered"] is True
+    assert reach["owner_teams"] == ["example-team"]
     assert reach["deployed"] is True
     assert doc["summary"] == {"items_with_cves": 1, "kev_hits": 1}
 
@@ -281,15 +281,15 @@ def test_main_without_workloads_is_unknown(tmp_path, core_feeds):
         [
             "--in",
             str(artifact),
-            "--repo-graph",
-            str(tmp_path / "absent.json"),
             "--out",
             str(out),
         ]
     )
     assert rc == 0
     doc = json.loads(out.read_text())
-    assert doc["sources"][0]["repository_reach"]["deployed"] == "unknown"
+    reach = doc["sources"][0]["repository_reach"]
+    assert reach["deployed"] == "unknown"
+    assert reach["registered"] is False and reach["owner_teams"] == []
 
 
 # ---------------- product-definitions loader shape guard ----------------
