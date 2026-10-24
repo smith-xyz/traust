@@ -167,7 +167,7 @@ Use when determining which portfolio repositories are affected by an advisory (C
 
 ## isolation-review
 
-Use when the user asks to review, assess, or score the tenant isolation of a multi-tenant service — resolving the service's repo set via the portfolio graph, building a customer-facing interface inventory from graph data and existing audit/threat-model findings, rating per-interface complexity, scoring five isolation-hardening dimensions (privilege, encryption, authentication, connectivity, operational hygiene) with cited evidence, and emitting a schema-validated isolation report under analysis-results/isolation/<service-slug>/.
+Use when the user asks to review, assess, or score the tenant isolation of a multi-tenant service — resolving the service's repo set via the portfolio graph, building a customer-facing interface inventory from graph data and existing audit/threat-model findings, rating per-interface complexity, scoring five isolation-hardening dimensions (privilege, encryption, authentication, connectivity, operational hygiene) with cited evidence, emitting a schema-validated isolation report under analysis-results/isolation/<service-slug>/, and recording canonical isolation_review assessments on every covered commit through traust-core.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -177,7 +177,7 @@ Use when the user asks to review, assess, or score the tenant isolation of a mul
 
 ## operator-priv-profile
 
-Use when the user asks whether an operator runs with least privilege, what SCCs/securityContext/namespaces/roles an operator uses or requires, or for a fleet least-privilege inventory of OpenShift core and optional operators. Builds a deterministic per-operator privilege profile from manifests/CSVs (tier 1 — SCC requests, per-container securityContext, namespaces/install modes, complete RBAC enumeration), diffs shipped RBAC against the code's +kubebuilder:rbac markers (tier 2 — surplus grants = least-priv gap), and ships a gated runtime capture for the actually-assigned SCC and effective SA permissions (tier 3, executed only with explicit cluster authorization).
+Use when the user asks whether an operator runs with least privilege, what SCCs/securityContext/namespaces/roles an operator uses or requires, or for a fleet least-privilege inventory of OpenShift core and optional operators. Builds a deterministic per-operator privilege profile from manifests/CSVs (tier 1 — SCC requests, per-container securityContext, namespaces/install modes, complete RBAC enumeration), diffs shipped RBAC against the code's +kubebuilder:rbac markers (tier 2 — surplus grants = least-priv gap), and ships a gated runtime capture for the actually-assigned SCC and effective SA permissions (tier 3, executed only with explicit cluster authorization). Records canonical priv_profile assessments for each profiled commit through traust-core.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`

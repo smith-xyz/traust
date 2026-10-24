@@ -1,6 +1,6 @@
 ---
 name: isolation-review
-description: Use when the user asks to review, assess, or score the tenant isolation of a multi-tenant service — resolving the service's repo set via the portfolio graph, building a customer-facing interface inventory from graph data and existing audit/threat-model findings, rating per-interface complexity, scoring five isolation-hardening dimensions (privilege, encryption, authentication, connectivity, operational hygiene) with cited evidence, and emitting a schema-validated isolation report under analysis-results/isolation/<service-slug>/.
+description: Use when the user asks to review, assess, or score the tenant isolation of a multi-tenant service — resolving the service's repo set via the portfolio graph, building a customer-facing interface inventory from graph data and existing audit/threat-model findings, rating per-interface complexity, scoring five isolation-hardening dimensions (privilege, encryption, authentication, connectivity, operational hygiene) with cited evidence, emitting a schema-validated isolation report under analysis-results/isolation/<service-slug>/, and recording canonical isolation_review assessments on every covered commit through traust-core.
 user-invocable: true
 metadata:
   harness.tier: "primary"
@@ -175,7 +175,7 @@ if nothing supports a score, the score is wrong or the review is incomplete.
    ```bash
    python3 -m traust.cli reporting record \
      analysis-results/isolation/<service-slug>/<service-slug>-isolation-review.json \
-     --kind isolation-review --repo-url <repo url> --sha <commit>   # once per repo
+     --kind isolation_review --repo-url <repo url> --sha <commit>   # once per repo
    ```
 
    The JSON shape is `isolation-review.schema.json` in traust-contracts.

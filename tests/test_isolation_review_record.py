@@ -23,7 +23,7 @@ def test_one_review_is_an_assessment_of_each_commit_it_covers(core_home: Path, t
 
     def record(url: str, sha: str) -> str:
         rc, out = run(
-            core_home, str(review), "--kind", "isolation-review", "--repo-url", url, "--sha", sha
+            core_home, str(review), "--kind", "isolation_review", "--repo-url", url, "--sha", sha
         )
         assert rc == 0, out
         return out["id"]
@@ -43,7 +43,7 @@ def test_a_review_failing_its_schema_records_nothing(core_home: Path, tmp_path: 
     url, sha = REPOS[0]
 
     rc, err = run(
-        core_home, str(review), "--kind", "isolation-review", "--repo-url", url, "--sha", sha
+        core_home, str(review), "--kind", "isolation_review", "--repo-url", url, "--sha", sha
     )
 
     assert rc == 2

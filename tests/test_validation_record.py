@@ -9,16 +9,73 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
-from traust_core.v1.models.artifacts import TriageArtifact, ValidationArtifact
+from traust_core.v1.models.artifacts import (
+    SecurityAuditArtifact,
+    TriageArtifact,
+    ValidationArtifact,
+)
 from traust_core.v1.models.assessment import AssessmentKind
-from traust_core.v1.models.common import ArtifactRef, CodeSpan, Provenance
+from traust_core.v1.models.common import CodeSpan, Provenance
 from traust_core.v1.models.findings import FindingCandidate
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import FindingOrigin, ScannerSeverity, SourceType
 from traust_core.v1.services.artifact_publishing import PublishSpec, PublishSpecs
 
+from tests.test_validate_report import _valid_report as security_audit
 from traust.cli.__main__ import main
 from traust.context import load_core, load_services
+
+
+def record_source(core, repo, ref, source, checkout):
+    services = core.services()
+    raw_scan = security_audit()
+    raw_scan["metadata"]["repository"] = str(repo.url)
+    observed = services.assessment.record(
+        SecurityAuditArtifact.from_document(raw_scan),
+        ref.id,
+        AssessmentKind.SECURE_CODE_CANONICAL,
+        "fixture",
+        "1",
+        Provenance(
+            run_id=uuid4(), source=SourceType.VULN_SCAN_REPORT, occurred_at=datetime.now(UTC)
+        ),
+    )
+    claim = source.findings[0]
+    taken = services.findings.intake.accept(
+        observed.id,
+        [
+            FindingCandidate(
+                label=claim.id,
+                repository_id=repo.id,
+                title=claim.title,
+                locations=(CodeSpan(path=claim.file, line=claim.line),),
+                reported_severity=ScannerSeverity.HIGH,
+                origin=FindingOrigin.VULN_SCAN,
+            )
+        ],
+    )
+    finding_id = taken.findings[claim.id]
+    finding = services.findings.get(finding_id).finding
+    raw_source = json.loads(source.payload)
+    raw_source["findings"][0].update(
+        fingerprint_algo=finding.fingerprint_algo,
+        fingerprint=finding.fingerprint,
+        verify_verdict="needs_manual_test",
+    )
+    source = TriageArtifact.from_document(raw_source)
+    checkout.mkdir(parents=True)
+    (checkout / claim.file).write_text("\n" * claim.line)
+    services.findings.decisions.record(
+        observed.id,
+        source,
+        Provenance(run_id=uuid4(), source=SourceType.TRIAGE_REPORT, occurred_at=datetime.now(UTC)),
+        checkout,
+    )
+    assessment = services.assessment.latest(ref.id, AssessmentKind.TRIAGE)
+    assert assessment is not None
+    publisher = core.artifact_publisher(PublishSpecs(PublishSpec(TriageArtifact)))
+    (artifact,) = publisher.list_for_assessment(assessment.id)
+    return source, assessment, artifact, finding_id
 
 
 @pytest.fixture
@@ -69,36 +126,9 @@ def recording(tmp_path):
             ],
         }
     )
-    publisher = core.artifact_publisher(PublishSpecs(PublishSpec(TriageArtifact)))
-    published = publisher.publish_artifact(source)
-    origin = Provenance(
-        run_id=uuid4(),
-        source=SourceType.TRIAGE_REPORT,
-        occurred_at=datetime.now(UTC),
-        artifact=ArtifactRef(
-            id=published.artifact_id,
-            name="triage",
-            digest=hashlib.sha256(source.payload).hexdigest(),
-        ),
+    source, assessment, artifact, finding_id = record_source(
+        core, repo, ref, source, tmp_path / "source-checkout"
     )
-    assessment = services.assessment.record(
-        source, ref.id, AssessmentKind.TRIAGE, "fixture", "1", origin
-    )
-    taken = services.findings.intake.accept(
-        assessment.id,
-        [
-            FindingCandidate(
-                label="f001",
-                repository_id=repo.id,
-                title="Bound original claim",
-                locations=(CodeSpan(path="entry.c", line=25),),
-                reported_severity=ScannerSeverity.HIGH,
-                origin=FindingOrigin.VULN_SCAN,
-            )
-        ],
-    )
-    (artifact,) = publisher.list_for_assessment(assessment.id)
-    finding_id = taken.findings["f001"]
     report = {
         "title": "Live Validation Report — isolated recording fixture",
         "metadata": {
@@ -278,7 +308,8 @@ def test_voided_validation_full_review_card_retains_report_and_recording_compani
         == 0
     )
     page = json.loads(capsys.readouterr().out)
-    [card] = page["items"]
+    review_ids = receipt["findings"][0]["review_item_ids"]
+    [card] = [card for card in page["items"] if card["review_item"]["id"] in review_ids]
     assert card["history"] == []
     evidence = {entry["artifact_id"]: entry["document"] for entry in card["evidence"]}
     assert evidence[receipt["artifact_ids"][0]] == report
@@ -499,33 +530,9 @@ def test_multisource_original_labels_are_bound_without_path_aliases(
     doc = TriageArtifact.from_document(source)
     repo = services.portfolio.register_repository(HttpsRepoUrl.parse(url, ("github.com",)), False)
     ref = services.portfolio.register_ref(repo.id, GitSha.parse("b" * 40), None, None)
-    published = publisher.publish_artifact(doc)
-    provenance = Provenance(
-        run_id=uuid4(),
-        source=SourceType.TRIAGE_REPORT,
-        occurred_at=datetime.now(UTC),
-        artifact=ArtifactRef(
-            id=published.artifact_id, name="triage", digest=hashlib.sha256(doc.payload).hexdigest()
-        ),
+    doc, assessment, artifact, second_finding = record_source(
+        core, repo, ref, doc, recording["root"] / "second-source-checkout"
     )
-    assessment = services.assessment.record(
-        doc, ref.id, AssessmentKind.TRIAGE, "fixture", "1", provenance
-    )
-    taken = services.findings.intake.accept(
-        assessment.id,
-        [
-            FindingCandidate(
-                label="f001",
-                repository_id=repo.id,
-                title="Bound original claim",
-                locations=(CodeSpan(path="second.c", line=25),),
-                reported_severity=ScannerSeverity.HIGH,
-                origin=FindingOrigin.VULN_SCAN,
-            )
-        ],
-    )
-    (artifact,) = publisher.list_for_assessment(assessment.id)
-    second_finding = taken.findings["f001"]
     report = copy.deepcopy(recording["report"])
     source_ref = "different://opaque/report-not-a-local-path"
     report["source_reports"].append(

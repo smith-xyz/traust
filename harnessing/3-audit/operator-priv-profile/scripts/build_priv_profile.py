@@ -18,7 +18,7 @@ Usage:
   build_priv_profile.py --repo-url <url> [--ref <ref>] --name <n> --out-dir <dir>
   build_priv_profile.py --rollup <profiles-glob> --rollup-out <dir>
 
-Record each profile with `traust reporting record --kind priv-profile` (AssessmentService.record).
+Record each profile with `traust reporting record --kind priv_profile` (AssessmentService.record).
 Legacy kept: --rollup reads the profile files until AssessmentService.privileges carries the
 rollup's columns (container posture, namespaces/install modes, tier-2 surplus and markers).
 """

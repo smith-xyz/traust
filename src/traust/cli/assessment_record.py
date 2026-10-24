@@ -29,16 +29,18 @@ from traust.context import load_core
 RECORDS: dict[AssessmentKind, tuple[str, type[ArtifactDocument]]] = {
     AssessmentKind.CONTAINER: ("secure-container-audit", SecurityAuditArtifact),
     AssessmentKind.RPM: ("secure-rpm-audit", SecurityAuditArtifact),
-    AssessmentKind.ISOLATION_REVIEW: ("isolation-review", IsolationReviewArtifact),
-    AssessmentKind.PRIV_PROFILE: ("operator-priv-profile", PrivProfileArtifact),
+    AssessmentKind.ISOLATION_REVIEW_CANONICAL: ("isolation-review", IsolationReviewArtifact),
+    AssessmentKind.PRIV_PROFILE_CANONICAL: ("operator-priv-profile", PrivProfileArtifact),
 }
 
 
 def ran_at(kind: AssessmentKind, doc: ArtifactDocument) -> datetime:
     """When the audit ran, so re-recording a document is the same run."""
-    if kind is AssessmentKind.PRIV_PROFILE:
+    if kind is AssessmentKind.PRIV_PROFILE_CANONICAL:
         return datetime.now(UTC)  # a profile states no run time: each record is a new run
-    if kind is AssessmentKind.ISOLATION_REVIEW and (reviewed := when(doc.metadata.reviewed_at)):
+    if kind is AssessmentKind.ISOLATION_REVIEW_CANONICAL and (
+        reviewed := when(doc.metadata.reviewed_at)
+    ):
         return reviewed
     return datetime.combine(date.fromisoformat(doc.metadata.date), time(), UTC)  # schema: a date
 

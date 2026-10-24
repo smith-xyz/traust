@@ -98,8 +98,8 @@ def run(home: Path, *argv: str) -> tuple[int, Any]:
     [
         ("container", security_audit(), SecurityAuditArtifact, "secure-container-audit"),
         ("rpm", security_audit(), SecurityAuditArtifact, "secure-rpm-audit"),
-        ("isolation-review", isolation_review(), IsolationReviewArtifact, "isolation-review"),
-        ("priv-profile", PRIV_PROFILE, PrivProfileArtifact, "operator-priv-profile"),
+        ("isolation_review", isolation_review(), IsolationReviewArtifact, "isolation-review"),
+        ("priv_profile", PRIV_PROFILE, PrivProfileArtifact, "operator-priv-profile"),
     ],
 )
 def test_record_files_the_document_on_the_commit(
@@ -124,7 +124,7 @@ def test_record_files_the_document_on_the_commit(
     ("kind", "body", "ran"),
     [
         ("container", security_audit(), datetime(2026, 5, 21, tzinfo=UTC)),
-        ("isolation-review", isolation_review(), datetime(2026, 7, 20, tzinfo=UTC)),
+        ("isolation_review", isolation_review(), datetime(2026, 7, 20, tzinfo=UTC)),
     ],
 )
 def test_record_stamps_when_the_audit_ran(doors, home, tmp_path, kind, body, ran):
@@ -137,7 +137,7 @@ def test_record_stamps_when_the_audit_ran(doors, home, tmp_path, kind, body, ran
 def test_record_stamps_a_profile_when_recorded(doors, home, tmp_path):
     before = datetime.now(UTC)
     path = document(tmp_path, PRIV_PROFILE)
-    assert run(home, str(path), "--kind", "priv-profile", "--repo-url", URL, "--sha", SHA)[0] == 0
+    assert run(home, str(path), "--kind", "priv_profile", "--repo-url", URL, "--sha", SHA)[0] == 0
     assert doors.record.calls[0][-1].occurred_at >= before
 
 
@@ -150,7 +150,7 @@ def test_record_stamps_a_profile_when_recorded(doors, home, tmp_path):
             "metadata/date",
         ),
         (
-            "isolation-review",
+            "isolation_review",
             {
                 **isolation_review(),
                 "metadata": {
@@ -173,7 +173,7 @@ def test_record_refuses_a_run_time_off_its_schema(doors, home, tmp_path, kind, b
 def test_record_marks_a_public_repository(doors, home, tmp_path):
     path = document(tmp_path, PRIV_PROFILE)
     rc, _ = run(
-        home, str(path), "--kind", "priv-profile", "--repo-url", URL, "--sha", SHA, "--public"
+        home, str(path), "--kind", "priv_profile", "--repo-url", URL, "--sha", SHA, "--public"
     )
     assert rc == 0
     assert doors.register_repository.calls[0][1] is True
@@ -197,7 +197,7 @@ def test_record_refuses_a_kind_it_does_not_record(doors, home, tmp_path):
 
 def test_record_refuses_a_short_sha(doors, home, tmp_path):
     path = document(tmp_path, PRIV_PROFILE)
-    rc, _ = run(home, str(path), "--kind", "priv-profile", "--repo-url", URL, "--sha", "abc")
+    rc, _ = run(home, str(path), "--kind", "priv_profile", "--repo-url", URL, "--sha", "abc")
     assert rc == 2
     assert doors.record.calls == []
 
@@ -213,14 +213,14 @@ def test_record_missing_document_is_exit_2(doors, home, tmp_path):
 def test_record_refusal_from_core_is_exit_2(doors, home, tmp_path):
     doors.record.result = NotFoundError(f"repository ref {REF} not found")
     path = document(tmp_path, PRIV_PROFILE)
-    rc, err = run(home, str(path), "--kind", "priv-profile", "--repo-url", URL, "--sha", SHA)
+    rc, err = run(home, str(path), "--kind", "priv_profile", "--repo-url", URL, "--sha", SHA)
     assert rc == 2
     assert "not found" in err
 
 
 def test_reporting_group_routes_record(doors, home, tmp_path, capsys):
     path = document(tmp_path, PRIV_PROFILE)
-    argv = ["reporting", "record", "--config-home", str(home), str(path), "--kind", "priv-profile"]
+    argv = ["reporting", "record", "--config-home", str(home), str(path), "--kind", "priv_profile"]
     rc = cli([*argv, "--repo-url", URL, "--sha", SHA])
     assert rc == 0
     assert json.loads(capsys.readouterr().out)["id"] == "a-1"
@@ -242,7 +242,7 @@ def core_home(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Path]:
 def test_record_on_core_files_one_assessment_on_the_bare_commit(core_home, tmp_path):
     home = core_home
     path = document(tmp_path, PRIV_PROFILE)
-    rc, out = run(home, str(path), "--kind", "priv-profile", "--repo-url", URL, "--sha", SHA)
+    rc, out = run(home, str(path), "--kind", "priv_profile", "--repo-url", URL, "--sha", SHA)
     assert rc == 0, out
     core = Context.from_file(home / "core.yaml")
     services = core.services()

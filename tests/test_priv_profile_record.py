@@ -1,5 +1,5 @@
 """operator-priv-profile: the profile build_priv_profile.py writes is the contract's
-operator-priv-profile document, so `traust reporting record --kind priv-profile` files it."""
+operator-priv-profile document, so `traust reporting record --kind priv_profile` files it."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def test_a_built_profile_records_as_a_priv_profile(tmp_path: Path) -> None:
     home.mkdir()
     (home / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
 
-    rc, out = run(home, str(profile), "--kind", "priv-profile", "--repo-url", URL, "--sha", SHA)
+    rc, out = run(home, str(profile), "--kind", "priv_profile", "--repo-url", URL, "--sha", SHA)
 
     assert rc == 0, out
     core = Context.from_file(home / "core.yaml")
