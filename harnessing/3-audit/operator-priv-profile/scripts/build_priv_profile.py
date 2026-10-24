@@ -17,6 +17,9 @@ Usage:
   build_priv_profile.py --repo <checkout> --name <repo-name> --out-dir <dir>
   build_priv_profile.py --repo-url <url> [--ref <ref>] --name <n> --out-dir <dir>
   build_priv_profile.py --rollup <profiles-glob> --rollup-out <dir>
+
+Legacy kept: traust-core has no door that publishes and records a priv-profile from traust yet;
+once it does, --rollup becomes AssessmentService.privileges over the recorded profiles.
 """
 
 from __future__ import annotations
