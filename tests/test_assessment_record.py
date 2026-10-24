@@ -306,3 +306,13 @@ def test_record_refuses_a_vuln_scan_time_without_a_zone(doors, home, tmp_path):
     assert rc == 2
     assert "time zone" in err
     assert doors.record.calls == []
+
+
+def test_record_files_a_secure_code_audit_at_its_report_date(doors, home, tmp_path):
+    path = document(tmp_path, security_audit())
+    rc, _ = run(home, str(path), "--kind", "secure-code", "--repo-url", URL, "--sha", SHA)
+    assert rc == 0
+    [(doc, ref, kind, assessor, _, provenance)] = doors.record.calls
+    assert isinstance(doc, SecurityAuditArtifact)
+    assert (ref, kind, assessor) == (REF, AssessmentKind.SECURE_CODE, "skill:secure-code-audit")
+    assert provenance.occurred_at == datetime(2026, 5, 21, tzinfo=UTC)
