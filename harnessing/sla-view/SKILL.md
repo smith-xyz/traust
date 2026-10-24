@@ -36,11 +36,12 @@ harness enum are different languages and the join must stay auditable.
 ## Procedure
 
 1. **Freshness first** — the view reads the C9 findings DB; rebuild it
-   if the ledgers moved since its `built_at`:
-
-   ```bash
-   python3 -m traust.cli corpus findings-db
-   ```
+   if the ledgers moved since its `built_at`.
+   (No door yet: traust-core has no SLA view, and the hub retired the
+   findings DB builder (`corpus findings-db`), so step 2 runs only where a
+   findings DB is still on disk. Each finding's deadline is recorded state
+   now: `traust findings baseline --repo-url <url> [--as-of <ISO>]` gives its
+   `sla_due` — core's `rating.sla`, one profile, clock from the first report.)
 
 2. **Build the view** (repeat per profile when asked for a compliance
    cut):
