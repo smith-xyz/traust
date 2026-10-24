@@ -101,6 +101,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "sweep": sweep.SWEEP,
         "emit": sweep.EMIT,
         "benchmark": sweep.BENCHMARK,
+        "benchmark-targets": sweep.BENCHMARK_TARGETS,
         "rule-lane": sweep.RULE_LANE,
         "mine": sweep.MINE,
     },
