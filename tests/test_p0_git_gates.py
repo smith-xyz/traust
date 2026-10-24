@@ -25,10 +25,6 @@ def _load(name, rel):
 
 
 aff = _load("apply_fleet_fix_p0", "harnessing/7-remediate/fleet-fix/scripts/apply_fleet_fix.py")
-brm = _load(
-    "build_remediation_manifest_p0",
-    "harnessing/7-remediate/remediate-finding/scripts/build_remediation_manifest.py",
-)
 
 
 class _Boom:
@@ -77,31 +73,6 @@ def test_fleet_fix_ls_remote_env_caps_protocol(monkeypatch):
     assert aff.ls_remote_sha("https://github.com/o/r", "main") == "a" * 40
     assert seen["env"].get("GIT_ALLOW_PROTOCOL") == "https"
     assert "--" in seen["argv"]
-
-
-def test_manifest_fid_gate():
-    assert brm.FID_RE.fullmatch("svc-a1b2c3d-001")
-    assert brm.FID_RE.fullmatch("f003")
-    for bad in ("../../../etc/passwd", "a/b", "-evil", "", ".hidden", "a b"):
-        assert not brm.FID_RE.fullmatch(bad), bad
-
-
-def test_emit_report_path_containment(tmp_path, monkeypatch):
-    err = _load(
-        "emit_remediation_report_p0",
-        "harnessing/7-remediate/remediate-finding/scripts/emit_remediation_report.py",
-    )
-    ws = tmp_path / "ws"
-    ar = ws / "analysis-results"
-    (ar / "remediations" / "_manifest").mkdir(parents=True)
-    monkeypatch.setattr(err, "load_engine", lambda config_home=None: object())
-    monkeypatch.setattr(err, "workspace_dir", lambda engine: ws)
-    monkeypatch.setattr(err, "resolve_results_root", lambda args: ar)
-    monkeypatch.setattr(
-        err, "load_row", lambda rid, manifest: {"report_path": "../../.zshenv", "rem_id": rid}
-    )
-    with pytest.raises(SystemExit, match="refusing to write"):
-        err.main(["--rem-id", "x.f001", "--worktree", str(tmp_path), "--rationale", "t"])
 
 
 def test_credential_liveness_commit_hex_gate():

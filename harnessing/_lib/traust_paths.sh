@@ -28,13 +28,6 @@ print(m[sys.argv[1]](core).resolve())
 " "$1"
 }
 
-# Remediation flow settings (remediation.yaml in the config home; env overrides).
-# Exports FORK_ORG (fails loud when unset) and REMEDIATION_PREFIX.
-traust_load_remediation() {
-  FORK_ORG="$("$(_traust_py)" -c 'from traust.context import require_fork_org; print(require_fork_org())')" || exit 1
-  REMEDIATION_PREFIX="$("$(_traust_py)" -c 'from traust.context import remediation_settings; print(remediation_settings()["naming_prefix"])')"
-  export FORK_ORG REMEDIATION_PREFIX HARNESS_FORK_ORG="$FORK_ORG"
-}
 traust_load_paths() {
   WS="$(_traust_path workspace)"
   AR="$(_traust_path analysis_results)"

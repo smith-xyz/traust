@@ -64,10 +64,7 @@ def _src(rel):
 
 
 def test_e2_no_authorization_header_in_curl_argv():
-    for rel in (
-        "harnessing/7-remediate/remediate-finding/ensure_fork.sh",
-        "harnessing/7-remediate/remediate-finding/finish_batch.sh",
-    ):
+    for rel in ("harnessing/7-remediate/remediate-finding/ensure_fork.sh",):
         s = _src(rel)
         assert '-H "Authorization' not in s, rel
         assert "--config -" in s, rel
