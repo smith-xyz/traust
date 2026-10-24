@@ -8,6 +8,7 @@ import io
 import json
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -119,6 +120,56 @@ def test_record_files_the_document_on_the_commit(
     assert str(doors.register_ref.calls[0][1]) == SHA
 
 
+@pytest.mark.parametrize(
+    ("kind", "body", "ran"),
+    [
+        ("container", security_audit(), datetime(2026, 5, 21, tzinfo=UTC)),
+        ("isolation-review", isolation_review(), datetime(2026, 7, 20, tzinfo=UTC)),
+    ],
+)
+def test_record_stamps_when_the_audit_ran(doors, home, tmp_path, kind, body, ran):
+    path = document(tmp_path, body)
+    for _ in range(2):
+        assert run(home, str(path), "--kind", kind, "--repo-url", URL, "--sha", SHA)[0] == 0
+    assert [call[-1].occurred_at for call in doors.record.calls] == [ran, ran]
+
+
+def test_record_stamps_a_profile_when_recorded(doors, home, tmp_path):
+    before = datetime.now(UTC)
+    path = document(tmp_path, PRIV_PROFILE)
+    assert run(home, str(path), "--kind", "priv-profile", "--repo-url", URL, "--sha", SHA)[0] == 0
+    assert doors.record.calls[0][-1].occurred_at >= before
+
+
+@pytest.mark.parametrize(
+    ("kind", "body", "message"),
+    [
+        (
+            "rpm",
+            {**security_audit(), "metadata": {"date": "21 May", "scope": "x"}},
+            "metadata/date",
+        ),
+        (
+            "isolation-review",
+            {
+                **isolation_review(),
+                "metadata": {
+                    **isolation_review()["metadata"],
+                    "reviewed_at": "2026-07-20T00:00:00",
+                },
+            },
+            "time zone",
+        ),
+    ],
+)
+def test_record_refuses_a_run_time_off_its_schema(doors, home, tmp_path, kind, body, message):
+    path = document(tmp_path, body)
+    rc, err = run(home, str(path), "--kind", kind, "--repo-url", URL, "--sha", SHA)
+    assert rc == 2
+    assert message in err
+    assert doors.record.calls == []
+
+
 def test_record_marks_a_public_repository(doors, home, tmp_path):
     path = document(tmp_path, PRIV_PROFILE)
     rc, _ = run(
@@ -202,3 +253,13 @@ def test_record_on_core_files_one_assessment_on_the_bare_commit(core_home, tmp_p
     assert (str(latest.id), latest.assessor) == (out["id"], "skill:operator-priv-profile")
     # privileges reads the default line only; a bare commit recorded from traust isn't on it.
     assert services.assessment.privileges(AssessmentFilter(), [repo.id]) == []
+
+
+def test_record_on_core_rerecording_a_report_is_the_same_run(core_home, tmp_path):
+    path = document(tmp_path, security_audit())
+    ids = set()
+    for _ in range(2):
+        rc, out = run(core_home, str(path), "--kind", "rpm", "--repo-url", URL, "--sha", SHA)
+        assert rc == 0, out
+        ids.add(out["id"])
+    assert len(ids) == 1

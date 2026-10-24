@@ -7,7 +7,7 @@ assessment; the same document of the same kind on the same commit at the same ti
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 from importlib.metadata import version
 from pathlib import Path
 
@@ -22,7 +22,7 @@ from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import SourceType
 
-from traust.cli._doors import parser, run
+from traust.cli._doors import parser, run, when
 from traust.context import load_core
 
 # The kind of assessment each audit skill records, and its document's contract type.
@@ -32,6 +32,15 @@ RECORDS: dict[AssessmentKind, tuple[str, type[ArtifactDocument]]] = {
     AssessmentKind.ISOLATION_REVIEW: ("isolation-review", IsolationReviewArtifact),
     AssessmentKind.PRIV_PROFILE: ("operator-priv-profile", PrivProfileArtifact),
 }
+
+
+def ran_at(kind: AssessmentKind, doc: ArtifactDocument) -> datetime:
+    """When the audit ran, so re-recording a document is the same run."""
+    if kind is AssessmentKind.PRIV_PROFILE:
+        return datetime.now(UTC)  # a profile states no run time: each record is a new run
+    if kind is AssessmentKind.ISOLATION_REVIEW and (reviewed := when(doc.metadata.reviewed_at)):
+        return reviewed
+    return datetime.combine(date.fromisoformat(doc.metadata.date), time(), UTC)  # schema: a date
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -61,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
             Provenance(
                 run_id=uuid.uuid4(),
                 source=SourceType.VULN_SCAN_REPORT,
-                occurred_at=datetime.now(UTC),
+                occurred_at=ran_at(kind, doc),
             ),
         )
         return assessment.model_dump(mode="json", exclude_none=True)
