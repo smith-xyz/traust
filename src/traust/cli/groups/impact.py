@@ -6,6 +6,9 @@ from traust.cli.groups._registry import passthrough_op
 
 IMPACT: dict[str, object] = {
     "find": passthrough_op("impact", "Print an advisory as its source states it now.", "find"),
+    "package": passthrough_op(
+        "impact", "Print the advisories affecting one package version.", "package"
+    ),
     "sbom": passthrough_op("impact", "Record a commit's manifest SBOM.", "sbom"),
     "symbols": passthrough_op(
         "impact", "Print the functions an advisory's fix touched.", "symbols"
