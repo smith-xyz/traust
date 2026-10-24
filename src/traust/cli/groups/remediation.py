@@ -20,6 +20,11 @@ REMEDIATION: dict[str, object] = {
     "candidates": passthrough_op(
         "remediation", "A product's findings no work item covers yet.", "candidates"
     ),
+    "property-evidence": passthrough_op(
+        "remediation",
+        "A property test's two runs as one patch_evidence item.",
+        "property_evidence_",
+    ),
     "record": passthrough_op("remediation", "Record a validated remediation report.", "record"),
     "verify-sweep": passthrough_op(
         "remediation", "Which repositories are worth re-verifying.", "verify_sweep"
