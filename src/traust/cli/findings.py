@@ -49,7 +49,7 @@ from traust_core.v1.models.vocabulary import (
 from traust_core.v1.providers.comments import FORGE, JIRA
 from traust_core.v1.services.insight import SarifExport
 
-from traust.cli._doors import parser, run
+from traust.cli._doors import parser, run, when
 from traust.context import load_caller, load_core
 
 _JIRA_KEY = re.compile(r"^[A-Z][A-Z0-9]+-\d+$")
@@ -71,15 +71,6 @@ def _repository(core: Context, url: str) -> Repository:
     if found is None:
         raise NotFoundError(f"repository {url} is not registered")
     return found
-
-
-def _when(raw: str | None) -> datetime | None:
-    if raw is None:
-        return None
-    when = datetime.fromisoformat(raw)
-    if when.tzinfo is None:
-        raise ValidationError(f"{raw}: give a time zone (e.g. 2026-10-23T09:00:00Z)")
-    return when
 
 
 def _json(model: Any) -> Any:
@@ -139,7 +130,7 @@ def baseline(argv: list[str] | None = None) -> int:
         core = load_core(args.config_home)
         repo = _repository(core, args.repo_url)
         assert repo.id is not None
-        as_of = _when(args.as_of) or datetime.now(UTC)
+        as_of = when(args.as_of) or datetime.now(UTC)
         return [_json(v) for v in core.services().findings.baseline(repo.id, as_of)]
 
     return run(call)
@@ -173,7 +164,7 @@ def _statement(args: Any, finding_id: uuid.UUID) -> RecordDecision:
         evidence_grade=args.evidence_grade,
         reason=args.reason,
         source_channel=SourceType(args.source),
-        occurred_at=_when(args.occurred_at),
+        occurred_at=when(args.occurred_at),
     )
 
 
@@ -338,7 +329,7 @@ def surfaces(argv: list[str] | None = None) -> int:
         core = load_core(args.config_home)
         repo = _repository(core, args.repo_url)
         assert repo.id is not None
-        merged = core.services().findings.review_surfaces(repo.id, _when(args.as_of))
+        merged = core.services().findings.review_surfaces(repo.id, when(args.as_of))
         return {surface: _json(c) for surface, c in merged.items()}
 
     return run(call)
@@ -355,7 +346,7 @@ def sarif(argv: list[str] | None = None) -> int:
         core = load_core(args.config_home)
         repo = _repository(core, args.repo_url)
         assert repo.id is not None
-        views = core.services().findings.baseline(repo.id, _when(args.as_of) or datetime.now(UTC))
+        views = core.services().findings.baseline(repo.id, when(args.as_of) or datetime.now(UTC))
         doc = SarifExport().document(views, repo.url)
         if args.out is None:
             return doc
@@ -396,7 +387,7 @@ def _filter(core: Context, args: Any) -> FindingFilter:
         repository_id=repo.id,
         validity=args.validity,
         open=args.open,
-        as_of=_when(args.as_of) or datetime.now(UTC),
+        as_of=when(args.as_of) or datetime.now(UTC),
     )
 
 
