@@ -168,9 +168,6 @@
   "src/traust/ops/calibrate_compliance.py": {
     "engine-internal": 1
   },
-  "src/traust/ops/doctor.py": {
-    "contracts": 1
-  },
   "src/traust/ops/score_compliance_efficacy.py": {
     "database": 1,
     "state-file": 1
