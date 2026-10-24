@@ -30,7 +30,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `dashboard` | Dashboard rebuilds, the team report and one insight view | `refresh`, `team-report`, `view` |
 | `feeds` | Security feed snapshots (traust-core) and the product-definitions cache | `fetch`, `fetch-products` |
 | `findings` | track-findings' and findings-db's doors on traust-core | `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `refuted`, `reject`, `sarif`, `status`, `summary`, `surfaces`, `tickets`, `timeline` |
-| `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `find`, `sbom`, `sweep`, `symbols` |
+| `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `find`, `package`, `sbom`, `sweep`, `symbols` |
 | `ledger` | Ledger audit (traust-core) and the doc-variance register | `audit`, `doc-variance` |
 | `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `sla`, `spend` |
 | `portfolio` | Portfolio graph; `observe` is the `repo_state` materializer; `plan` / `onboard` / `owner-hints` / `import-owners` are add-inputs' doors on traust-core | `artifacts`, `build`, `deps-multi`, `freshness`, `import-owners`, `interfaces`, `observe`, `onboard`, `owner-hints`, `parsers`, `plan`, `population`, `query`, `stats`, `symbols` |
