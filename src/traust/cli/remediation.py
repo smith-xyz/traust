@@ -9,6 +9,7 @@ progress             move a work item to a status (forward only)
 mutation-evidence    a mewt campaign's status JSON as one patch_evidence item
 property-evidence    a property test's base-versus-patched exit codes as one evidence item
 record               a validated remediation report on its work item
+fleet-apply          a recorded fleet-fix spec on one repository under its leased run order (diff)
 fleet-record         a fleet-fix transform spec, once its golden tests pass
 fleet-targets        the repositories a fleet fix targets, widest product reach first
 verify-sweep         which repositories are worth re-verifying, by tier, and why the rest are not
@@ -49,7 +50,7 @@ from traust_core.v1.models.vocabulary import RemediationStatus, SourceType
 
 from traust.cli._doors import parser, run
 from traust.cli.findings import _repository
-from traust.context import load_core
+from traust.context import load_core, load_engine_core
 
 
 def _parser(op: str, about: str) -> argparse.ArgumentParser:
@@ -222,6 +223,23 @@ def fleet_record(argv: list[str] | None = None) -> int:
             )
         )
         return made.model_dump(mode="json")
+
+    return run(call)
+
+
+def fleet_apply(argv: list[str] | None = None) -> int:
+    ap = _parser("fleet-apply", "Apply a recorded fleet-fix spec to one repository (diff only).")
+    ap.add_argument("fleet_fix_id", type=uuid.UUID, help="the id fleet-record printed")
+    ap.add_argument("--repo-url", required=True, help="the target repository")
+    ap.add_argument("--order", type=uuid.UUID, required=True, help="its leased run order")
+    ap.add_argument("-o", "--out", type=Path, help="write the JSON here instead of stdout")
+    args = ap.parse_args(argv)
+
+    def call() -> str | None:
+        core = load_engine_core(args.config_home)
+        repo = _repository(core, args.repo_url)
+        found = core.services().remediation.apply_fleet_fix(args.fleet_fix_id, repo.id, args.order)  # type: ignore[arg-type]
+        return _emit(found.model_dump_json(indent=2), args.out)
 
     return run(call)
 

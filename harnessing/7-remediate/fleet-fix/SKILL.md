@@ -10,6 +10,7 @@ allowed-tools:
   # code execution (audit D5, plan P2.11; A11 un-grandfathered)
   - Bash(python3 *harnessing/7-remediate/fleet-fix/scripts/apply_fleet_fix.py:*)
   - Bash(python3 -m traust.cli remediation fleet-targets:*)
+  - Bash(python3 -m traust.cli remediation fleet-apply:*)
   - Bash(python3 -m traust.cli remediation fleet-record:*)
   - Bash(bash *run_checks.sh:*)
   - Bash(git clone:*)
@@ -116,8 +117,11 @@ python3 harnessing/7-remediate/fleet-fix/scripts/apply_fleet_fix.py \
     --out-dir /tmp/fleet-fix/<id>/out
 ```
 
-(`apply_fleet_fix.py` stays until traust-engine registers the applier
-traust-core's `apply_fleet_fix` door runs through.)
+Interactive apply stays here until traust has an ops CLI to
+submit/approve/claim a fleet-fix run order — NEED(ops CLI). Under a
+leased fleet-fix run order, apply the recorded spec through the door
+instead (a fresh clone of the repo's default-branch head, diff only):
+`python3 -m traust.cli remediation fleet-apply <fleet-fix-id> --repo-url <repo> --order <order-id> -o /tmp/fleet-fix/<id>/out/<repo>.json`.
 Collect the per-repo results: applied / no-match / unresolved / guard
 refusals. Where the target repo has usable checks, run
 `harnessing/7-remediate/remediate-finding/run_checks.sh` against the modified clone

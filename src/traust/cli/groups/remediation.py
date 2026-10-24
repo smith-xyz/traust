@@ -20,6 +20,9 @@ REMEDIATION: dict[str, object] = {
         "property_evidence_",
     ),
     "record": passthrough_op("remediation", "Record a validated remediation report.", "record"),
+    "fleet-apply": passthrough_op(
+        "remediation", "Apply a recorded fleet-fix spec to one repository.", "fleet_apply"
+    ),
     "fleet-record": passthrough_op(
         "remediation", "Record a fleet-fix spec once its goldens pass.", "fleet_record"
     ),
