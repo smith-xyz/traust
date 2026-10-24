@@ -96,23 +96,18 @@ class LedgerAuditMaterializer:
         )
 
 
-def write_view(view: RenderedView, directory: Path, stem: str | None = None) -> tuple[Path, ...]:
-    """`<stem>.md`, `.html` and `.json` (the model) under `directory`; core stores no view."""
-    directory.mkdir(parents=True, exist_ok=True)
-    base = directory / (stem or view.stem)
-    out = {
-        base.with_suffix(".md"): view.markdown,
-        base.with_suffix(".html"): view.html,
-        base.with_suffix(".json"): view.model.model_dump_json(indent=2),
-    }
+def write_view(view: RenderedView, base: Path) -> tuple[Path, ...]:
+    """The rendered pair, `<base>.md` and `<base>.html`; core stores no view."""
+    base.parent.mkdir(parents=True, exist_ok=True)
+    out = {base.with_suffix(".md"): view.markdown, base.with_suffix(".html"): view.html}
     for path, text in out.items():
         path.write_text(text, encoding="utf-8")
     return tuple(out)
 
 
 class DashboardsMaterializer:
-    """`dashboards`: render every built insight view (or the one in ``partition``) under
-    ``<out>/<view>/``. A view that fails is degraded; the rest are still written."""
+    """`dashboards`: render every built insight view (or the one in ``partition``) to
+    ``<out>/<view>/<stem>.{md,html,json}``. A view that fails is degraded; the rest are written."""
 
     asset = "dashboards"
 
@@ -126,11 +121,14 @@ class DashboardsMaterializer:
             result = self._insight.refresh(views, ViewFilter())
         except (ValueError, ConfigError) as e:
             return JobResult.failed(f"bad request: {e}")
-        written = tuple(
-            str(path)
-            for view in result.rendered.values()
-            for path in write_view(view, self._out / view.view)
-        )
+        written: list[Path] = []
+        for view in result.rendered.values():
+            base = self._out / view.view / view.stem
+            written += write_view(view, base)
+            written.append(base.with_suffix(".json"))
+            written[-1].write_text(view.model.model_dump_json(indent=2), encoding="utf-8")
         reason = "; ".join(f"{name}: {why}" for name, why in result.failed.items()) or None
         degraded = {name.value: 1 for name in result.failed}
-        return JobResult.partly(degraded, written).model_copy(update={"reason": reason})
+        return JobResult.partly(degraded, tuple(map(str, written))).model_copy(
+            update={"reason": reason}
+        )

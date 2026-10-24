@@ -100,13 +100,13 @@ def test_a_bad_request_fails_and_writes_nothing(
     assert not any(tmp_path.iterdir())
 
 
-def test_write_view_takes_another_stem(tmp_path: Path) -> None:
-    written = write_view(ROLLUP, tmp_path / "x", "Executive-Summary-Alpha")
+def test_write_view_writes_the_rendered_pair(tmp_path: Path) -> None:
+    written = write_view(ROLLUP, tmp_path / "x" / "Executive-Summary-Alpha")
     assert [p.name for p in written] == [
         "Executive-Summary-Alpha.md",
         "Executive-Summary-Alpha.html",
-        "Executive-Summary-Alpha.json",
     ]
+    assert written[1].read_text() == ROLLUP.html
 
 
 @pytest.fixture
