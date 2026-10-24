@@ -33,7 +33,7 @@ census is the denominator authority
 *Retired*: the `/repo-graph` skill is gone. traust-core holds the same facts as
 tables (products, releases, components, repositories, owner teams) and reads
 them through `PortfolioService` (`list_products_shipping`,
-`list_owned_repositories`) and `AssessmentService.coverage` (a stub today). The readers below
+`list_owned_repositories`) and `AssessmentService.coverage` (traust-core#123). The readers below
 still name `repo-graph.json` until their own ports.
 
 It was built from the inputs inventory (segment CSVs + `owners.csv`) cross-referenced
