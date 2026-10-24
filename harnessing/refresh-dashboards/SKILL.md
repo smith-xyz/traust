@@ -1,8 +1,8 @@
 ---
 name: refresh-dashboards
 description: >-
-  Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: projections first (findings.db, census), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, dependency-exposure, spend), then the leadership scoreboard last because it harvests the others. Deterministic, ~$0, no agents.
-argument-hint: "[--only <stage...>] [--skip <stage>] [--spend-actuals] [--note <text>]"
+  Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, dependency-exposure, spend), then the leadership scoreboard last because it harvests the others. Deterministic, ~$0, no agents.
+argument-hint: "[--only <stage...>] [--skip <stage>] [--spend-actuals] [--view <name>] [--out <dir>]"
 metadata:
   harness.tier: "secondary"
 allowed-tools:
@@ -18,8 +18,8 @@ allowed-tools:
 > configured roots.
 
 
-Every dashboard is a rebuildable projection of the disposition ledger and
-the findings corpus. This skill rebuilds all of them in dependency order
+Every dashboard is a rebuildable view of traust-core's recorded findings
+and decisions. This skill rebuilds all of them in dependency order
 as **one sequential deterministic job** — the same chain
 `docs/continuous-operations.md` schedules weekly ("Dashboards rebuild"),
 packaged so an operator, cron leg, or orchestrator fragment can fire it
@@ -27,10 +27,11 @@ as a single command.
 
 Ordering is the whole point:
 
-1. **Projections** — python3 -m traust.cli corpus findings-db, then
-   `RETIRED:build_census.py`. Everything downstream reads
-   these; a failure here **aborts the run** (consumers would silently
-   read stale data).
+1. **Core views** — `DashboardsMaterializer`: one `InsightService.refresh`
+   renders every view traust-core has built (today `findings-rollup`)
+   to `<out>/<view>/<stem>.{md,html,json}`. Reads are live, so there is
+   no projection to go stale; a view that fails is reported degraded and
+   the others still render.
 2. **Consumers** — executive summary, findings-trends,
    insecure-patterns, validation-fuzz dashboard, RBAC/tenancy rollup,
    SLA view, compliance dashboard, ATT&CK coverage rollup,
@@ -38,7 +39,7 @@ Ordering is the whole point:
    Each continues on error; failures are collected.
 3. **Scoreboard last** — `collect_harness_metrics.py` harvests headline
    numbers *from* the dashboards above, so it runs after all of them
-   and appends its usual immutable row to `metrics-history.jsonl`.
+   (`--no-history`: a trend is the view built at an earlier `as_of`).
 
 ## Procedure
 
@@ -48,25 +49,25 @@ Ordering is the whole point:
    python3 -m traust.cli dashboard refresh \
        [--workspace-root <path>] [--results-root <path>] \
        [--only <stage...>] [--skip <stage>] \
-       [--spend-actuals] [--note "<snapshot note>"] \
+       [--spend-actuals] [--view <name>] [--out <dir>] [--run-id <id>] \
        [--list] [--dry-run]
    ```
 
    `--list` prints the stage names; `--only`/`--skip` select stages
-   (canonical order is always preserved); `--note` is forwarded to the
-   scoreboard's metrics-history snapshot row.
+   (canonical order is always preserved); `--view` renders one core view
+   in the `views` stage, `--out` is where views are written (default
+   `progress-tracker/metrics/dashboards/`).
 
 2. **Read the summary table back.** Report which stages ran, which
-   failed, and the elapsed time. A projection failure means the run
-   aborted — say what did not run and fix the projection before
-   retrying. Consumer failures don't block the others; report each
+   failed, and the elapsed time. The `views` stage prints its JobResult:
+   each degraded view is named with its reason. Consumer failures don't block the others; report each
    failed stage with its builder so the user can rerun it alone
    (`--only <stage>`).
 
 3. **Commit the rebuilt artifacts** in `analysis-results/` and
    `progress-tracker/` per the workspace convention (dashboards are
-   projections — regenerating them is always safe; history lives in
-   `metrics-history.jsonl`, which only appends).
+   derived views — regenerating them is always safe; history is the
+   view built at an earlier `as_of`).
 
 ## What it does NOT cover
 
@@ -96,8 +97,7 @@ Ordering is the whole point:
 
 | Stage | Tier | Builder |
 |---|---|---|
-| `findings-db` | projection | python3 -m traust.cli corpus findings-db |
-| `census` | projection | `RETIRED:build_census.py` |
+| `views` | core | `InsightService.refresh` via `DashboardsMaterializer` (every built view: `findings-rollup`) |
 | `exec-summary` | consumer | `RETIRED:build_executive_summary.py` |
 | `trends` | consumer | `RETIRED:build_trends.py` |
 | `insecure-patterns` | consumer | `RETIRED:build_insecure_patterns.py` |
@@ -115,12 +115,13 @@ Ordering is the whole point:
 ## Integrations
 
 - **Emits no artifact of its own** — every output is owned by the
-  builder that writes it (census.{json,md,html}, the dashboard files
-  under `progress-tracker/metrics/dashboards/`, findings.db, the
-  scoreboard + metrics-history). Consumers are documented in each
+  builder that writes it (the core views and the dashboard files
+  under `progress-tracker/metrics/dashboards/`, the
+  scoreboard). Consumers are documented in each
   owning skill.
 - **docs/continuous-operations.md** names this script as the "Dashboards
-  rebuild" scheduled job (orchestrator target: weekly; spend ≤4d).
+  rebuild" scheduled job (orchestrator target: weekly; spend ≤4d); the
+  security pack's `dashboards` asset runs it.
 - **/drift-watch** routes attention here: when `dashboards:*` rows go
   stale, the refresh command is this script.
 - **/traust-metrics `--refresh-sources`** remains the

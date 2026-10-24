@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from pathlib import Path
 from uuid import UUID
 
 from traust_core.v1.context import Services
 from traust_core.v1.errors import ConfigError, NotFoundError, ValidationError
 from traust_core.v1.models.dependencies import FeedName
+from traust_core.v1.models.insight import RenderedView, ViewFilter, ViewName
 from traust_core.v1.models.observation import ComparisonStatus
 from traust_core.v1.models.operations import AssetRequest, JobResult
 from traust_core.v1.models.values import HttpsRepoUrl
@@ -91,4 +93,42 @@ class LedgerAuditMaterializer:
         unverified = sum(1 for r in results if r.warnings and not r.errors)
         return JobResult.partly(
             {k: n for k, n in (("failed", failed), ("unverified", unverified)) if n}
+        )
+
+
+def write_view(view: RenderedView, base: Path) -> tuple[Path, ...]:
+    """The rendered pair, `<base>.md` and `<base>.html`; core stores no view."""
+    base.parent.mkdir(parents=True, exist_ok=True)
+    out = {base.with_suffix(".md"): view.markdown, base.with_suffix(".html"): view.html}
+    for path, text in out.items():
+        path.write_text(text, encoding="utf-8")
+    return tuple(out)
+
+
+class DashboardsMaterializer:
+    """`dashboards`: render every built insight view (or the one in ``partition``) to
+    ``<out>/<view>/<stem>.{md,html,json}``. A view that fails is degraded; the rest are written."""
+
+    asset = "dashboards"
+
+    def __init__(self, services: Services, out: Path) -> None:
+        self._insight = services.insight
+        self._out = out
+
+    def materialize(self, request: AssetRequest) -> JobResult:
+        try:
+            views = None if request.partition is None else [ViewName(request.partition)]
+            result = self._insight.refresh(views, ViewFilter())
+        except (ValueError, ConfigError) as e:
+            return JobResult.failed(f"bad request: {e}")
+        written: list[Path] = []
+        for view in result.rendered.values():
+            base = self._out / view.view / view.stem
+            written += write_view(view, base)
+            written.append(base.with_suffix(".json"))
+            written[-1].write_text(view.model.model_dump_json(indent=2), encoding="utf-8")
+        reason = "; ".join(f"{name}: {why}" for name, why in result.failed.items()) or None
+        degraded = {name.value: 1 for name in result.failed}
+        return JobResult.partly(degraded, tuple(map(str, written))).model_copy(
+            update={"reason": reason}
         )

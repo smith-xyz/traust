@@ -66,7 +66,8 @@ assets:
     freshness: {fail: 8d}
     runner: {labels: [deterministic]}
 
-  dashboards:  # spend dashboards go stale after 4d, the scoreboard after 7d
+  dashboards:  # InsightService.refresh through traust.ops.materializers, then the builders of
+    # views core lacks; spend dashboards go stale after 4d, the scoreboard after 7d
     run: [python3, -m, traust.cli, dashboard, refresh]
     trigger: {every: 3d}
     priority: 60

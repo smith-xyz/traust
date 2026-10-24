@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""Rebuild every deterministic dashboard in dependency order.
+"""Rebuild every deterministic dashboard: the `dashboards` asset, by hand or from a runner.
 
 Packages the "Dashboards rebuild" job from docs/continuous-operations.md
-as one command: projections first (findings.db, census), then the
-per-dashboard builders, then the leadership scoreboard last because it
+as one command: first traust-core's insight views (`DashboardsMaterializer`,
+one `InsightService.refresh`), then the builders of the dashboards core has
+no view for yet, then the leadership scoreboard last because it
 harvests from the other dashboards' output.
 
-All stages are deterministic scripts (~$0, no agent). A projection
-failure aborts the run — every consumer downstream would read stale
-data. A consumer failure is recorded and the remaining consumers still
-run; the exit code is non-zero if anything failed.
+All stages are deterministic (~$0, no agent). A failure is recorded and
+the remaining stages still run; the exit code is non-zero if anything failed.
 
 The spend-actuals leg (collect_session_spend.py --append) reads Claude
 Code session transcripts on the operator's workstation, so it is NOT
@@ -19,10 +18,11 @@ with --spend-actuals when running on a workstation that has transcripts.
 Usage:
   python3 -m traust.cli.refresh_dashboards               # full chain
   python3 -m traust.cli.refresh_dashboards --list        # show stages
-  python3 -m traust.cli.refresh_dashboards --only trends spend
+  python3 -m traust.cli.refresh_dashboards --only views spend
+  python3 -m traust.cli.refresh_dashboards --view findings-rollup --out /tmp/dashboards
   python3 -m traust.cli.refresh_dashboards --skip scoreboard
   python3 -m traust.cli.refresh_dashboards --dry-run
-  python3 -m traust.cli.refresh_dashboards --spend-actuals --note "weekly"
+  python3 -m traust.cli.refresh_dashboards --spend-actuals
 """
 
 import argparse
@@ -31,13 +31,22 @@ import sys
 import time
 from pathlib import Path
 
+from traust_core.v1.models.insight import ViewName
+from traust_core.v1.models.operations import AssetRequest
+
+from traust.cli._doors import EXIT_CODES
 from traust.context import (
     add_config_home_arg,
+    load_core,
     load_engine,
+    progress_tracker_dir,
     resolve_results_root,
     workspace_dir,
 )
+from traust.ops.materializers import MANUAL, DashboardsMaterializer
 from traust.paths import HARNESS_ROOT
+
+VIEWS = "views"
 
 PYTHON = sys.executable or "python3"
 
@@ -59,17 +68,18 @@ def _engine_path_args(config_home: Path | None, results_root: Path) -> list[str]
 def build_stages(
     workspace: Path,
     results_root: Path,
-    note: str,
     spend_actuals: bool,
     *,
     config_home: Path | None = None,
 ):
-    """Ordered (name, tier, argv) stage list. tier: projection stages
-    abort the run on failure; consumer stages continue-on-error."""
+    """Ordered (name, tier, argv) stage list, each continue-on-error. Each builder below waits
+    on its traust-core view (a stub today) and goes when that view lands."""
     h = HARNESS_ROOT
     path_args = _engine_path_args(config_home, results_root)
     cfg = _config_home_arg(config_home)
     stages = [
+        (VIEWS, "core", []),  # InsightService.refresh, in-process (run_views)
+        # no door: ValidationFuzzView (ValidationService.summary)
         (
             "validation-fuzz",
             "consumer",
@@ -83,11 +93,13 @@ def build_stages(
             ],
         ),
         ("sla", "consumer", [PYTHON, "-m", "traust.cli", "metrics", "sla", *cfg]),
+        # no door: ComplianceDashboardView
         (
             "compliance",
             "consumer",
             [PYTHON, "-m", "traust.cli", "compliance", "dashboard", *path_args],
         ),
+        # no door: AttackCoverageView (AssessmentService.threats)
         (
             "attack-coverage",
             "consumer",
@@ -97,7 +109,7 @@ def build_stages(
                 *path_args,
             ],
         ),
-        # --no-fetch: rebuild from the committed gh-languages cache only;
+        # no door: LocView. --no-fetch: rebuild from the committed gh-languages cache only;
         # refreshing the cache hits the GitHub API and stays with the
         # owning skill (see gh-api fleet-sweep constraints).
         (
@@ -110,9 +122,8 @@ def build_stages(
                 "--no-fetch",
             ],
         ),
-        # Dependency exposure reads the portfolio graph's dependency layer
-        # + impact/fleet-OSV artifacts (consumer-side; degrades gracefully
-        # when the graph or impact dir is absent).
+        # no door: ExposureView (ExposureService.summary). Reads the portfolio graph's
+        # dependency layer + impact/fleet-OSV artifacts; degrades when they are absent.
         (
             "dependency-exposure",
             "consumer",
@@ -148,24 +159,34 @@ def build_stages(
             [PYTHON, "-m", "traust.cli", "metrics", "spend", *cfg, "--workspace", str(workspace)],
         )
     )
-    # Last on purpose: the scoreboard harvests from the dashboards above.
+    # Last on purpose: the scoreboard harvests from the dashboards above. no door: ProgramView
+    # (OpsService.timeline). No history row: a trend is the view built at an earlier as_of.
     scoreboard = [
         PYTHON,
         str(h / "harnessing/traust-metrics/scripts/collect_harness_metrics.py"),
         *path_args,
         "--workspace-root",
         str(workspace),
+        "--no-history",
     ]
-    if note:
-        scoreboard += ["--note", note]
     stages.append(("scoreboard", "consumer", scoreboard))
     return stages
 
 
+def run_views(args, out: Path) -> int:
+    """The `dashboards` asset's materializer: one InsightService.refresh; prints its JobResult."""
+    materializer = DashboardsMaterializer(load_core(args.config_home).services(), out)
+    result = materializer.materialize(
+        AssetRequest(asset=materializer.asset, run_id=args.run_id, partition=args.view)
+    )
+    print(result.model_dump_json(), flush=True)
+    return EXIT_CODES[result.outcome]
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(
-        description="Rebuild all deterministic dashboards in "
-        "dependency order (projections before consumers)."
+        description="Rebuild all deterministic dashboards: traust-core's views, "
+        "then the remaining builders, the scoreboard last."
     )
     add_config_home_arg(ap)
     ap.add_argument(
@@ -197,8 +218,18 @@ def main(argv=None):
         "transcripts (operator workstations only)",
     )
     ap.add_argument(
-        "--note", default="", help="Forwarded to the scoreboard's metrics-history snapshot row"
+        "--view",
+        choices=[v.value for v in ViewName],
+        help="the views stage renders only this insight view (default: every built view)",
     )
+    ap.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="where the views stage writes <view>/<stem>.{md,html,json} "
+        "(default: <progress-tracker>/metrics/dashboards)",
+    )
+    ap.add_argument("--run-id", default=MANUAL, help="the run order this refresh is for")
     ap.add_argument("--list", action="store_true", help="List stages and exit")
     ap.add_argument(
         "--dry-run", action="store_true", help="Print the commands without running them"
@@ -209,13 +240,7 @@ def main(argv=None):
     workspace = (args.workspace_root or workspace_dir(engine)).resolve()
     results_root = resolve_results_root(args)
     spend_actuals = args.spend_actuals or args.list or "spend-actuals" in (args.only or [])
-    stages = build_stages(
-        workspace,
-        results_root,
-        args.note,
-        spend_actuals,
-        config_home=args.config_home,
-    )
+    stages = build_stages(workspace, results_root, spend_actuals, config_home=args.config_home)
 
     if args.list:
         for name, tier, _ in stages:
@@ -236,25 +261,21 @@ def main(argv=None):
         if (args.only is None or n in args.only) and n not in args.skip
     ]
 
+    out = args.out or progress_tracker_dir(engine) / "metrics" / "dashboards"
     results = []
+    views_rc = 0
     for name, tier, cmd in selected:
         if args.dry_run:
-            print(f"[dry-run] {name}: {' '.join(cmd)}")
+            print(f"[dry-run] {name}: {' '.join(cmd) or f'InsightService.refresh -> {out}'}")
             continue
         print(f"==> {name} ({tier})", flush=True)
         start = time.monotonic()
-        proc = subprocess.run(cmd, cwd=HARNESS_ROOT)
-        elapsed = time.monotonic() - start
-        ok = proc.returncode == 0
-        results.append((name, tier, ok, elapsed))
-        if not ok and tier == "projection":
-            print(
-                f"ABORT: projection stage '{name}' failed "
-                f"(rc={proc.returncode}); consumers would read stale "
-                f"data. Nothing after it was run.",
-                file=sys.stderr,
-            )
-            break
+        if name == VIEWS:
+            views_rc = run_views(args, out)
+            rc = views_rc
+        else:
+            rc = subprocess.run(cmd, cwd=HARNESS_ROOT).returncode
+        results.append((name, tier, rc == 0, time.monotonic() - start))
 
     if args.dry_run:
         return 0
@@ -276,7 +297,7 @@ def main(argv=None):
             "rerun with --spend-actuals on a workstation with "
             "session transcripts)"
         )
-    return 1 if failed else 0
+    return views_rc or (1 if failed else 0)
 
 
 if __name__ == "__main__":
