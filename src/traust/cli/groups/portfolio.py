@@ -389,6 +389,7 @@ OBSERVE = passthrough_op(
 PLAN = passthrough_op("portfolio_onboard", "What onboard would register, writing nothing.", "plan")
 ONBOARD = passthrough_op("portfolio_onboard", "Register a product's repositories.", "onboard")
 OWNER_HINTS = passthrough_op("portfolio_onboard", "Who may own a repository.", "owner_hints")
+FILE = passthrough_op("portfolio_onboard", "One file's text at a pinned commit.", "file")
 IMPORT_OWNERS = passthrough_op(
     "portfolio_onboard", "Mirror the declared ownership source.", "import_owners"
 )
