@@ -554,7 +554,7 @@ def check_repo_liveness(ws: Path) -> list[dict]:
                 "repo-liveness",
                 "pending",
                 "artifact absent",
-                "python3 -m traust.cli.check_repo_liveness (census Step 2b)",
+                "python3 -m traust.cli portfolio liveness (census Step 2b)",
             )
         ]
     days = _age_days(mt)

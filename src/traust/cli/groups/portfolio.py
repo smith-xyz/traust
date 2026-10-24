@@ -404,3 +404,6 @@ DEPENDENCIES = passthrough_op(
 DEPENDENTS = passthrough_op(
     "portfolio_dependencies", "The commits a package reaches.", "dependents"
 )
+LIVENESS = passthrough_op(
+    "portfolio_liveness", "Each registered repository's archived flag and push.", "main"
+)
