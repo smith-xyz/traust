@@ -17,6 +17,7 @@ from traust.cli.groups import (
     ledger,
     metrics,
     portfolio,
+    pqc,
     products,
     registry,
     remediation,
@@ -66,6 +67,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "collect-spend": metrics.COLLECT_SPEND,
         "attribute-spend": metrics.ATTRIBUTE_SPEND,
     },
+    "pqc": dict(pqc.PQC),
     "products": dict(products.PRODUCTS),
     "registry": {
         "models": registry.MODELS,
