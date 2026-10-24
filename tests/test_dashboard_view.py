@@ -18,13 +18,7 @@ from traust_core.v1.context import Context
 from traust_core.v1.errors import ValidationError
 from traust_core.v1.models import insight
 from traust_core.v1.models.common import TimeBucket, TimeWindow
-from traust_core.v1.models.insight import (
-    FindingsTrend,
-    LocDashboard,
-    RenderedView,
-    ViewFilter,
-    ViewName,
-)
+from traust_core.v1.models.insight import FindingsTrend, RenderedView, ViewFilter, ViewName
 
 from traust.cli import dashboard_view
 
@@ -98,7 +92,7 @@ def test_loc_writes_the_lines_of_code_view(publish: Door, home: Path, tmp_path: 
     publish.result = RenderedView(
         view=ViewName.LOC,
         stem="lines-of-code",
-        model=LocDashboard(code=120, total=150),
+        model=insight.LocDashboard(code=120, total=150),
         markdown="# Lines of code\n",
         html="<!doctype html><title>Lines of code</title>",
     )
