@@ -10,10 +10,10 @@ import sys
 from pathlib import Path
 
 from traust_engine._util import elf as elf_util
-from traust_engine._util import redact as redact_util
 from traust_engine._util import safe_exec
 
 from traust.cli.groups._registry import OpSpec
+from traust.context import load_services
 
 
 def add_redact_args(ap) -> None:
@@ -30,13 +30,17 @@ def add_redact_args(ap) -> None:
 
 
 def call_redact(_engine, args) -> int:
+    policy = load_services(args.config_home).redaction
+
+    def redact(text: str) -> tuple[str, list[dict]]:
+        done = policy.redact(text.encode("utf-8"))
+        return done.payload.decode("utf-8"), [h.model_dump() for h in done.hits]
+
     if not args.paths:
-        text = sys.stdin.read()
+        cleaned, hits = redact(sys.stdin.read())
         if args.scan_only:
-            hits = redact_util.scan_text(text)
             print(json.dumps(hits, indent=2))
             return 1 if hits else 0
-        cleaned, hits = redact_util.redact_text(text)
         sys.stdout.write(cleaned)
         if hits:
             print(f"redact: {len(hits)} hit(s) on stdin", file=sys.stderr)
@@ -55,12 +59,9 @@ def call_redact(_engine, args) -> int:
             except (OSError, UnicodeDecodeError) as e:
                 print(f"skip {f}: {e}", file=sys.stderr)
                 continue
-            if args.scan_only:
-                hits = redact_util.scan_text(text)
-            else:
-                text, hits = redact_util.redact_text(text)
-                if hits:
-                    f.write_text(text, encoding="utf-8")
+            cleaned, hits = redact(text)
+            if hits and not args.scan_only:
+                f.write_text(cleaned, encoding="utf-8")
             total_hits += len(hits)
             for h in hits:
                 print(f"{f}: {h['category']} ({h['match_prefix']}…)")
