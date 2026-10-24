@@ -23,6 +23,7 @@ from traust_core.v1.models.dependencies import (
     RefDependency,
 )
 from traust_core.v1.models.inventory import Repository, RepositoryRef
+from traust_core.v1.models.vocabulary import Ecosystem
 
 from traust.cli import portfolio_dependencies
 
@@ -183,3 +184,55 @@ def test_dependents_needs_a_package_uuid(doors, home):
 
     assert exc.value.code == 2
     assert doors.dependents.calls == []
+
+
+@pytest.fixture
+def find_package(doors: SimpleNamespace) -> Door:
+    door = Door(PACKAGE)
+    Context.services(None).exposure.find_package = door  # type: ignore[arg-type]
+    return door
+
+
+def test_dependents_by_name_finds_the_package_then_walks_from_it(doors, home, find_package):
+    doors.dependents.result = [REF.id]
+
+    rc, out = dependents(home, "--name", "golang.org/x/net")
+
+    assert rc == 0
+    assert out == [{"repository_ref_id": str(REF.id), "repository": REPO_URL, "sha": SHA}]
+    assert find_package.calls == [(Ecosystem.GO, "golang.org/x/net")]
+    assert doors.dependents.calls == [(PACKAGE.id,)]
+
+
+def test_dependents_ecosystem_and_version_go_to_the_doors(doors, home, find_package):
+    argv = ("--name", "Left-Pad", "--ecosystem", "npm", "--version", "1.3.0")
+
+    assert dependents(home, *argv) == (0, [])
+    assert find_package.calls == [(Ecosystem.NPM, "Left-Pad")]
+    assert doors.dependents.calls == [(PACKAGE.id, "1.3.0")]
+
+
+def test_dependents_of_an_unknown_name_exits_2_and_walks_nothing(doors, home, find_package):
+    find_package.result = None
+
+    rc, err = dependents(home, "--name", "left-pad", "--ecosystem", "npm")
+
+    assert rc == 2
+    assert "no npm package named left-pad" in err
+    assert doors.dependents.calls == []
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        (),
+        ("--name", "x", "--package-id", str(PACKAGE.id)),
+        ("--name", "x", "--ecosystem", "golang"),
+    ],
+)
+def test_dependents_needs_one_package_and_a_known_ecosystem(doors, home, find_package, argv):
+    with pytest.raises(SystemExit) as exc, contextlib.redirect_stderr(io.StringIO()):
+        dependents(home, *argv)
+
+    assert exc.value.code == 2
+    assert find_package.calls == doors.dependents.calls == []

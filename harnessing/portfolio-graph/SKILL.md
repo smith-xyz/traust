@@ -50,8 +50,8 @@ Design, layer roadmap, and per-layer dependencies are recorded in
 RubyGems, and NuGet manifests, language-gated
 per repo against a `gh-languages` cache. Non-Go package nodes are namespaced
 `pkg:<eco>/<name>` (a distinct id space from Go's `module:<path>`) and their
-`depends_on` edges carry an `ecosystem` attr — `blast-radius` and the other
-canned queries take an explicit ecosystem so a same-named package in two
+`depends_on` edges carry an `ecosystem` attr — the blast radius
+(`portfolio dependents`) takes an explicit ecosystem so a same-named package in two
 ecosystems never cross-contaminates a result. Manifest discovery walks the
 git tree recursively (a repo's manifests can live in any subdirectory —
 nested `.csproj`, submodule `pom.xml`, monorepo layouts — not just root).
@@ -182,13 +182,13 @@ absence of dependencies.
 Canned queries (JSON to stdout):
 
 ```bash
-# CVE lands in a module — who requires it, at what version, in which products?
-python3 -m traust.cli portfolio query --db <db> blast-radius golang.org/x/net
+# CVE lands in a module — which commits hold it (traust-core; --version
+# starts only from SBOMs holding that version)?
+python3 -m traust.cli portfolio dependents --name golang.org/x/net [--version <v>]
 
-# Same query on a non-Go package: --ecosystem resolves the positional arg
-# to the right node id (default 'go' -> module:<path>; e.g. 'npm' ->
-# pkg:npm/<name>).
-python3 -m traust.cli portfolio query --db <db> blast-radius left-pad --ecosystem npm
+# Same query on a non-Go package: --ecosystem (default 'go'), the name as
+# that ecosystem normalises it.
+python3 -m traust.cli portfolio dependents --name left-pad --ecosystem npm
 
 # Highest-fan-in libraries across the portfolio
 python3 -m traust.cli portfolio query --db <db> top-shared --limit 20
@@ -203,7 +203,7 @@ python3 -m traust.cli portfolio query --db <db> crd-consumers route.openshift.io
 # traust-core: one commit's packages, then the commits a package reaches
 # (directly, through a base image or an internal library)
 python3 -m traust.cli portfolio dependencies --repo-url <url> --sha <commit>
-python3 -m traust.cli portfolio dependents --package-id <package_id>
+python3 -m traust.cli portfolio dependents --package-id <package_id>  # or --ecosystem + --name
 ```
 
 Anything beyond the canned set: query the SQLite schema directly —
