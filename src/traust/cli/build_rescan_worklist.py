@@ -155,7 +155,6 @@ from traust_core.v1.models.observation import (
     is_deps_manifest,
     is_first_party,
 )
-from traust_core.v1.services.assessment import MAX_CHANGED_FILE_RATIO
 from traust_engine.corpus.resolver import normalize_repo_url
 
 from traust.context import add_config_home_arg, analysis_results_dir, load_engine
@@ -199,8 +198,8 @@ def _git_hosts() -> dict[str, str]:
 
 GIT_HOSTS = _git_hosts()
 
-# The first-party filter, NARROW sensitive matcher (rescan-cadence plan §2.2), deps manifests
-# and diff-refusal file ratio are traust-core's, shared with /vuln-scan --diff's scoping.
+# The first-party filter, NARROW sensitive matcher (rescan-cadence plan §2.2) and deps
+# manifests are traust-core's, shared with /vuln-scan --diff's scoping.
 
 GH_COMPARE_FILE_CAP = 300  # GitHub compare API hard cap on files[]
 GITLAB_DIFF_CAP = 1000  # GitLab compare caps diffs[] server-side
@@ -208,6 +207,8 @@ GITLAB_DIFF_CAP = 1000  # GitLab compare caps diffs[] server-side
 CHURN_FULL_LINES = 8000  # rule-2 C threshold (plan §2.3)
 CHURN_FULL_RATIO = 0.10  # rule-2 R threshold
 SENSITIVE_MIN_LINES = 200  # rule-3
+# Diff-refusal file ratio: the same threshold traust-core's diff scoping refuses at.
+MAX_CHANGED_FILE_RATIO = 0.30
 PREROUTE_MIN_FILES = 3  # ratio pre-check only when >= this many
 # first-party files changed (tranche-1
 # observed a 5/10-file refusal, so the
