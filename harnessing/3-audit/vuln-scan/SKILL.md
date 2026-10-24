@@ -56,6 +56,8 @@ allowed-tools:
   # network) and traust's store; writes only its -o. Never authors a
   # finding. Do not widen to other interpreters/scripts.
   - Bash(python3 *-m traust.cli assessments prepare:*)
+  # Records the validated report in traust-core (Step 5); reads only the report file.
+  - Bash(python3 *-m traust.cli reporting record:*)
   # Precision Gate FP-precedent check (Step 3c): `match` mode only —
   # reads the prebuilt cache JSON + a candidates file, no network, no
   # cache writes. Never run `build` from this skill.
@@ -900,30 +902,22 @@ Tell the user:
      state) and bypasses the rescan router's authority over when a new
      baseline is cut.
 
-     The scan's verified new findings (they passed the per-finding
-     confidence pass and the Precision Gate) each become **one event on
-     the repo's `<repo>-findings-layer.json`, carrying the finding's claim
-     in the event's `finding` block** (contracts `$defs/event_finding`).
-     `build_cumulative` unions event-carried findings with the baseline's
-     at replay, so the finding is exactly as visible in
-     `*-findings-current.*` and every dashboard.
+     Record the scan in traust-core once the validator passes:
 
-     Event shape: `source.type: vuln_scan_report`, machine actor
-     `vuln-scan`, `disposition: {resolution: "open"}` (an arrival is not a
-     determination — validity stays unstated; nothing at scan time sets
-     `confirmed`, that takes execution evidence or a human reviewer).
-     The carried `finding` uses the
-     `contracts/schemas/report.schema.json` finding shape — keep this
-     scan's campaign `id`; `cwe` → `cwes[]` (`CWE-\d{1,5}`, at least one
-     entry); `file`/`line` → `locations: [{path, lines}]`;
-     `recommendation` → `remediation`;
-     `validation_status: not_verified`; `origin: "vuln-scan"`; set
-     `source_findings` to the scan report path. Pin its claim hash into
-     `metadata.claim_hashes` (add-only), then stamp and sign the layer.
+     ```bash
+     python3 -m traust.cli reporting record <target-dir>/<repo>-vuln-findings.json \
+         --kind vuln-scan --repo-url <https URL of the origin remote> \
+         --sha <the scanned commit>
+     ```
 
-     Mechanics and worked examples: [docs/findings-routing.md](../../../docs/findings-routing.md).
-     (Legacy path: traust-core has no door yet that records a
-     vuln-findings report as an assessment with its findings.)
+     It records a vuln-scan assessment of that commit with the report as
+     its artifact (schema-checked; a retried run adds nothing), and
+     `traust findings surfaces` merges its `review_surface_coverage`
+     into the repository's record; re-recording the same report is the
+     same run (`scanned_at`).
+     (Legacy gap: traust-core doesn't yet enter the report's findings as
+     findings; the per-finding events this step wrote went with the
+     retired findings layer.)
 
      `/triage` remains the **downstream adjudicator**: its verdicts, and
      any refutations, flow through the disposition ledger
