@@ -344,7 +344,7 @@ Use when the user provides a previous secure-code-audit report and a patched ver
 
 ## generate-team-report
 
-Use when the user asks to generate a shareable findings folder, executive summary, or team-specific security audit report for one or more products from the findings directory.
+Use when the user asks to generate a shareable findings folder, executive summary, or team-specific security audit report for one or more products from traust-core's recorded findings.
 
 - **Stage:** ⑨ Delivery
 - **Tier:** `secondary`

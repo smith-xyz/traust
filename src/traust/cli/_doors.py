@@ -6,8 +6,9 @@ import argparse
 import json
 import sys
 from collections.abc import Callable
+from datetime import datetime
 
-from traust_core.v1.errors import TraustError
+from traust_core.v1.errors import TraustError, ValidationError
 from traust_core.v1.models.operations import JobResult, Outcome
 
 from traust.context import add_config_home_arg
@@ -17,6 +18,16 @@ def parser(group: str, op: str, about: str) -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog=f"traust {group} {op}", description=about)
     add_config_home_arg(ap)
     return ap
+
+
+def when(raw: str | None) -> datetime | None:
+    """An ``--as-of`` style time; it must carry a zone."""
+    if raw is None:
+        return None
+    at = datetime.fromisoformat(raw)
+    if at.tzinfo is None:
+        raise ValidationError(f"{raw}: give a time zone (e.g. 2026-10-23T09:00:00Z)")
+    return at
 
 
 def run(call: Callable[[], object]) -> int:

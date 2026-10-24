@@ -1,4 +1,4 @@
-"""``traust dashboard …`` — deterministic dashboard rebuild."""
+"""``traust dashboard …`` — deterministic dashboard rebuild and the team report."""
 
 from __future__ import annotations
 
@@ -9,4 +9,8 @@ REFRESH = passthrough_op(
     "Rebuild every deterministic dashboard in dependency order.",
 )
 
-DASHBOARD: dict[str, object] = {"refresh": REFRESH}
+TEAM_REPORT = passthrough_op(
+    "team_report", "Write a product or team's executive-summary pair.", "main"
+)
+
+DASHBOARD: dict[str, object] = {"refresh": REFRESH, "team-report": TEAM_REPORT}
