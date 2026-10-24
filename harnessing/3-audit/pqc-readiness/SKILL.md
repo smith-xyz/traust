@@ -284,9 +284,9 @@ arrays are owner-facing. Fact ids (`F0008`) stay only on
 `scores.*.checks[]` / `clock_items[]` (and the sibling facts file) as
 machine citations; owners navigate via `locations`.
 `waiting-on-upstream` entries must name `blocked_on`. The validator
-checks the section whenever present. Reports written before 0.153.0 are
-re-scored (*the backfill script is retired*: it migrated Markdown-era files
-that traust-core never recorded).
+checks the section whenever present. Reports written before 0.153.0 were
+backfilled by a script, now *retired*: it migrated Markdown-era files
+that traust-core never recorded.
 
 **Markdown companion format (`<slug>-pqc-readiness.md`)** — this file is
 read by developers and engineering leads who are NOT PQC experts. Write it
