@@ -245,7 +245,7 @@ Static source-code vulnerability scan. Reads a target directory (and its threat 
 
 ## track-findings
 
-Use when the user wants to record human feedback against audit findings, review core decision cards, countersign machine verdicts, or inspect current finding state. Imports forge/Jira statements and supports private asynchronous countersign-queue.md review, typed single/bulk answers and direct verified-human judgements through shared traust auth or explicit stdin tokens. Requires genuine judged fields and the reviewer's own rationale; core owns evidence admission. Reports validity, resolution, assurance, severity, SLA and review surfaces, and exports SARIF. Machine reports record through their own skills.
+Use when the user wants to record human feedback against audit findings, review core decision cards, countersign machine verdicts, or inspect current finding state. Imports forge/Jira statements and supports private asynchronous countersign-queue.md review, typed single/bulk answers and direct verified-human judgements through shared traust auth or explicit stdin tokens. Requires genuine judged fields and the reviewer's own rationale; core owns evidence admission. Reports validity, resolution, assurance, severity, SLA and review surfaces, and exports SARIF. Machine reports record through their own skills. Untrusted review blocks use the workbench's lossless JSON quotation.
 
 - **Stage:** ④ Triage
 - **Tier:** `primary`

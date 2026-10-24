@@ -69,7 +69,6 @@ from traust_core.v1.models.vocabulary import (
 )
 from traust_core.v1.providers.comments import FORGE, JIRA
 from traust_core.v1.services.insight import SarifExport
-from traust_engine.escaping import fence_untrusted
 
 from traust.cli._doors import parser, run, when
 from traust.context import load_caller, load_core
@@ -147,7 +146,9 @@ def _quoted_json(value: object) -> str:
     text = json.dumps(value, indent=2, ensure_ascii=True)
     for character, escaped in (("<", "\\u003c"), (">", "\\u003e"), ("&", "\\u0026")):
         text = text.replace(character, escaped)
-    return fence_untrusted(text, "json")
+    longest = max((len(m.group(0)) for m in re.finditer(r"`+", text)), default=0)
+    fence = "`" * max(3, longest + 1)
+    return f"{fence}json\n{text}\n{fence}"
 
 
 def _markdown(cards: list[dict], next_cursor: str | None, filters: dict) -> str:

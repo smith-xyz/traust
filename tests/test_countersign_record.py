@@ -980,3 +980,13 @@ def test_markdown_bulk_reports_success_and_failure_without_changing_deferred_ite
     assert run_operation(writer, monkeypatch, "review-cases") == 0
     pending = json.loads(capsys.readouterr().out)["items"]
     assert {card["review_item"]["id"] for card in pending} == {second["id"], str(deferred.id)}
+
+
+def test_quoted_evidence_outlengthens_backticks_without_losing_payload():
+    hostile = "data\n````\ninjected heading\n````"
+    header, rest = findings._quoted_json(hostile).split("\n", 1)
+    quoted, closing = rest.rsplit("\n", 1)
+    fence = header.removesuffix("json")
+    assert set(fence) == {"`"} and len(fence) >= 5
+    assert closing == fence
+    assert json.loads(quoted) == hostile
