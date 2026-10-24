@@ -40,11 +40,11 @@ dev = ["ruff>=0.6", "pytest-xdist>=3", "psycopg[binary]>=3.1"]
 # traust's traust-core pin wins over the engine's, so a core bump needs no engine PR.
 [tool.uv]
 override-dependencies = [
-  "traust-core @ git+https://github.com/traust-security/traust-core.git@84bcc6cfa033370d53ee9eb51de0e944795de507",
+  "traust-core @ git+https://github.com/traust-security/traust-core.git@ca8c68650822f72da799efba24ef96227d08f4ab",
 ]
 
 [tool.uv.sources]
-traust-core = { git = "https://github.com/traust-security/traust-core.git", rev = "84bcc6cfa033370d53ee9eb51de0e944795de507" }
+traust-core = { git = "https://github.com/traust-security/traust-core.git", rev = "ca8c68650822f72da799efba24ef96227d08f4ab" }
 traust-engine = { git = "https://github.com/traust-security/traust-engine.git", rev = "b53df232875b4cb1f184083d9ec7f8e743d7864b" }
 
 # Multi-skill CLIs live under src/traust/; harnessing/<skill>/ for single-skill

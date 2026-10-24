@@ -61,8 +61,9 @@ two sides. The full sequence — both registrations, census confirmation,
 repo-graph rebuild — is a deployment procedure; each step is its own skill
 (`/add-inputs`, `/corpus-intake`, `/census`, `/repo-graph`).
 
-**Output:** CSV inventories, Markdown analysis reports, and `owners.csv`
-files pushed to the **inventory repository** (see Repository Map).
+**Output:** CSV inventories and Markdown analysis reports pushed to the
+**inventory repository** (see Repository Map); repositories and owner teams
+registered in traust-core.
 
 ---
 
