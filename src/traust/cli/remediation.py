@@ -11,6 +11,8 @@ assemble             a work item's remediation report from its worktree (not rec
 property-evidence    a property test's base-versus-patched exit codes as one evidence item
 record               a validated remediation report on its work item
 candidates           a product's confirmed, open findings no work item covers, by repository
+fleet-record         a fleet-fix transform spec, once its golden tests pass
+fleet-targets        the repositories a fleet fix targets, widest product reach first
 verify-sweep         which repositories are worth re-verifying, by tier, and why the rest are not
 verify-prepare       what a verification of one work item re-checks, as JSON
 verify-differential  the scanner that backed a work item's findings, compared on a patched commit
@@ -22,19 +24,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pydantic
+import yaml
 from traust_core.v1.errors import NotFoundError, ValidationError
-from traust_core.v1.models.artifacts import RemediationArtifact, VerificationArtifact
+from traust_core.v1.models.artifacts import (
+    FleetFixArtifact,
+    RemediationArtifact,
+    VerificationArtifact,
+)
 from traust_core.v1.models.common import Provenance, every_item
 from traust_core.v1.models.inventory import Repository, RepositoryFilter
 from traust_core.v1.models.remediation import (
     Check,
     EvidenceItem,
+    FleetScope,
     PatchNarrative,
     VerificationFilter,
     WorkItemFilter,
@@ -255,6 +264,56 @@ def record(argv: list[str] | None = None) -> int:
             )
         )
         return made.model_dump(mode="json")
+
+    return run(call)
+
+
+def _cwe(raw: str) -> str:
+    if not re.fullmatch(r"CWE-\d{1,5}", raw):
+        raise argparse.ArgumentTypeError(f"{raw}: give a CWE id like CWE-1104")
+    return raw
+
+
+def fleet_record(argv: list[str] | None = None) -> int:
+    ap = _parser("fleet-record", "Record a fleet-fix transform spec once its golden tests pass.")
+    ap.add_argument("spec", type=Path, help="the spec (YAML or JSON)")
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        try:
+            raw = yaml.safe_load(args.spec.read_text(encoding="utf-8"))
+        except yaml.YAMLError as e:
+            raise ValidationError(f"{args.spec}: not YAML or JSON: {e}") from e
+        doc = FleetFixArtifact.parse(json.dumps(raw, default=str).encode())
+        when = datetime.now(UTC)
+        made = (
+            load_core(args.config_home)
+            .services()
+            .remediation.record(
+                doc,
+                Provenance(run_id=uuid.uuid4(), source=SourceType.INTERACTIVE, occurred_at=when),
+            )
+        )
+        return made.model_dump(mode="json")
+
+    return run(call)
+
+
+def fleet_targets(argv: list[str] | None = None) -> int:
+    ap = _parser("fleet-targets", "The repositories a fleet fix targets, widest reach first.")
+    scope = ap.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--cwe", type=_cwe, help="repositories with an open finding of this CWE")
+    scope.add_argument("--package-id", type=uuid.UUID, help="repositories depending on it")
+    scope.add_argument("--repo-url", action="append", help="named repositories, repeatable")
+    ap.add_argument("-o", "--out", type=Path, help="write the JSON here instead of stdout")
+    args = ap.parse_args(argv)
+
+    def call() -> str | None:
+        core = load_core(args.config_home)
+        named = tuple(_repository(core, u).id for u in args.repo_url or ())
+        wanted = FleetScope(cwe=args.cwe, package_id=args.package_id, repository_ids=named)  # type: ignore[arg-type]
+        found = core.services().remediation.fleet_targets(wanted)
+        return _emit(json.dumps([t.model_dump(mode="json") for t in found], indent=2), args.out)
 
     return run(call)
 
