@@ -9,10 +9,10 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from traust_core.v1.errors import NotFoundError, ValidationError
+from traust_core.v1.errors import ValidationError
 from traust_core.v1.models.insight import ViewFilter, ViewName
-from traust_core.v1.models.values import ProductSlug
 
+from traust.cli import _doors
 from traust.cli._doors import parser, run, when
 from traust.context import load_core
 from traust.ops.materializers import write_view
@@ -32,12 +32,7 @@ def main(argv: list[str] | None = None) -> int:
         if not (args.product or args.team_id):
             raise ValidationError("name a --product or a --team-id")
         services = load_core(args.config_home).services()
-        products = []
-        for slug in dict.fromkeys(args.product):
-            found = services.portfolio.find_product(ProductSlug(slug))
-            if found is None:
-                raise NotFoundError(f"product {slug} is not registered (`traust products list`)")
-            products.append(found)
+        products = _doors.products(services, args.product)
         scope = ViewFilter(
             product_ids=tuple(p.id for p in products),
             team_ids=tuple(args.team_id),
