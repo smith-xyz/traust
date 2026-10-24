@@ -50,7 +50,9 @@ GROUPS: dict[str, dict[str, object]] = {
     "cloud-config": dict(cloud_config.CLOUD_CONFIG),
     "compliance": {
         "dashboard": compliance.DASHBOARD,
-        "scope": compliance.SCOPE,
+        "declare": compliance.DECLARE,
+        "scopes": compliance.SCOPES,
+        "resolve": compliance.RESOLVE,
     },
     "dashboard": dict(dashboard.DASHBOARD),
     "feeds": dict(feeds.FEEDS),

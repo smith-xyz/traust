@@ -124,8 +124,7 @@
     "engine-internal": 3
   },
   "src/traust/cli/groups/compliance.py": {
-    "contracts": 1,
-    "engine-internal": 1
+    "contracts": 1
   },
   "src/traust/cli/groups/metrics.py": {
     "contracts": 1,

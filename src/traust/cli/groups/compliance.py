@@ -1,4 +1,4 @@
-"""``traust compliance …`` — posture dashboard and boundary scope."""
+"""``traust compliance …`` — posture dashboard; boundary doors on traust-core."""
 
 from __future__ import annotations
 
@@ -7,9 +7,8 @@ import sys
 from pathlib import Path
 
 from traust_contracts import DeploymentConfigMissing
-from traust_engine.compliance.scope import ScopeError
 
-from traust.cli.groups._registry import OpSpec
+from traust.cli.groups._registry import OpSpec, passthrough_op
 
 
 def add_dashboard_args(ap) -> None:
@@ -75,51 +74,6 @@ DASHBOARD = OpSpec(
 )
 
 
-def add_scope_args(ap) -> None:
-    ap.add_argument("--boundary", help="boundary id to resolve")
-    ap.add_argument("--scope", type=Path, default=None)
-    ap.add_argument("--graph", type=Path, default=None)
-    ap.add_argument("--list", action="store_true", help="list declared boundaries and exit")
-    ap.add_argument("--json", action="store_true", dest="as_json")
-
-
-def call_scope(engine, args) -> int:
-    compliance = engine.compliance
-    try:
-        doc = compliance.load_scope(args.scope)
-        if args.list:
-            for bid, b in sorted((doc.get("boundaries") or {}).items()):
-                draft = " [DRAFT]" if str(b.get("declared_by", "")).startswith("draft:") else ""
-                print(
-                    f"{bid}{draft}: {', '.join(b['frameworks'])} "
-                    f"(via {b['resolves_via']}"
-                    f"{', ' + b['product'] if b.get('product') else ''})"
-                )
-            return 0
-        if not args.boundary:
-            print("--boundary required (or --list)", file=sys.stderr)
-            return 2
-        res = compliance.resolve(doc, args.boundary, args.graph)
-    except ScopeError as e:
-        print(f"scope resolution FAILED: {e}", file=sys.stderr)
-        return 1
-
-    if args.as_json:
-        print(json.dumps(res, indent=2))
-    else:
-        draft = " [DRAFT — unsigned declaration]" if res["draft"] else ""
-        print(
-            f"{res['boundary']}{draft}: {len(res['repos'])} repos, "
-            f"frameworks {', '.join(res['frameworks'])}, "
-            f"{len(res['excluded'])} excluded"
-        )
-        for r in res["repos"]:
-            print(f"  {r}")
-    return 0
-
-
-SCOPE = OpSpec(
-    add_args=add_scope_args,
-    call=call_scope,
-    help="Resolve a compliance boundary to concrete repos",
-)
+DECLARE = passthrough_op("compliance", "Record one compliance boundary declaration.", "declare")
+SCOPES = passthrough_op("compliance", "The current declaration of each boundary.", "scopes")
+RESOLVE = passthrough_op("compliance", "A boundary's repositories now.", "resolve")
