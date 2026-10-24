@@ -97,8 +97,8 @@ Ordering is the whole point:
 
 | Stage | Tier | Builder |
 |---|---|---|
-| `views` | core | `InsightService.refresh` via `DashboardsMaterializer` (every built view: `findings-rollup`, `findings-trend`) |
-| `exec-summary` | consumer | `RETIRED:build_executive_summary.py` |
+| `views` | core | `InsightService.refresh` via `DashboardsMaterializer` (every view traust-core has built) |
+| `exec-summary` | — | *retired:* rendered by the `views` stage (`ExecutiveSummaryView`) |
 | `insecure-patterns` | consumer | `RETIRED:build_insecure_patterns.py` |
 | `validation-fuzz` | consumer | `harnessing/validation-fuzz-dashboard/scripts/build_validation_fuzz_dashboard.py` |
 | `rbac-tenancy` | consumer | `RETIRED:build_rbac_tenancy_rollup.py` |
