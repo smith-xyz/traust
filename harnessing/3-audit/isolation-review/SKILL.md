@@ -169,6 +169,15 @@ if nothing supports a score, the score is wrong or the review is incomplete.
    # must print: isolation review valid: 0 errors
    ```
 
+   Then record it as an isolation-review assessment of each commit in the
+   repo set (one document, filed on every commit it covers):
+
+   ```bash
+   python3 -m traust.cli reporting record \
+     analysis-results/isolation/<service-slug>/<service-slug>-isolation-review.json \
+     --kind isolation-review --repo-url <repo url> --sha <commit>   # once per repo
+   ```
+
    The JSON shape is `isolation-review.schema.json` in traust-contracts.
 
 ## Hard rules
