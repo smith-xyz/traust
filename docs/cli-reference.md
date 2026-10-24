@@ -36,6 +36,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `portfolio` | Portfolio graph; `observe` is the `repo_state` materializer; `plan` / `onboard` / `owner-hints` / `import-owners` / `import-release` are add-inputs' and inventory-repositories' doors on traust-core; `dependencies` / `dependents` read traust-core's SBOMs | `artifacts`, `build`, `dependencies`, `dependents`, `freshness`, `import-owners`, `import-release`, `interfaces`, `observe`, `onboard`, `owner-hints`, `plan`, `population`, `query`, `stats`, `symbols` |
 | `products` | corpus-intake's doors on traust-core: products and their corpus ownership | `add`, `list`, `update` |
 | `registry` | Model/product registry | `models`, `products` |
+| `remediation` | The remediation loop's doors on traust-core (verify-remediation) | `verifications`, `verify-differential`, `verify-prepare`, `verify-record`, `verify-sweep` |
 | `reporting` | Report validation, rendering & recording | `lint`, `rate-threats`, `record`, `render`, `sarif`, `validate` |
 | `triage` | The triage skill's doors on traust-core | `check`, `intake`, `prepare`, `record`, `render` |
 | `sweep` | Class-generalization sweep; recall-benchmark answer key | `benchmark`, `benchmark-targets`, `collect`, `draft`, `emit`, `mine`, `rule-lane`, `sweep` |
