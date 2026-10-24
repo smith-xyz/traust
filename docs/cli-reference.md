@@ -20,7 +20,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 
 | Group | Description | Operations |
 |---|---|---|
-| `adapters` | Scanner adapters (deterministic pre-scans) | `checkov`, `crypto-audit`, `crypto-cluster`, `crypto-image`, `crypto-probe`, `crypto-source`, `gitleaks`, `govulncheck`, `joern`, `opengrep`, `osv`, `yara` |
+| `adapters` | Scanner adapters (deterministic pre-scans) | `checkov`, `crypto-audit`, `crypto-cluster`, `crypto-image`, `crypto-probe`, `crypto-source`, `gitleaks`, `govulncheck`, `image-packages`, `image-sbom`, `joern`, `opengrep`, `osv`, `yara` |
 | `admin` | Operator tooling | `attest-target`, `checkpoint`, `query-index`, `scan-internal-refs`, `toolchain` |
 | `auth` | Who you act as, over traust-core's identity provider | `local`, `login`, `logout`, `refresh`, `service-account`, `status`, `token` |
 | `build` | Deterministic builders | `rescan-worklist`, `skills-reference`, `symbol-index` |

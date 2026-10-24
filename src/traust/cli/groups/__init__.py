@@ -40,6 +40,8 @@ GROUPS: dict[str, dict[str, object]] = {
         "crypto-source": adapters.CRYPTO_SOURCE,
         "crypto-image": adapters.CRYPTO_IMAGE,
         "crypto-cluster": adapters.CRYPTO_CLUSTER,
+        "image-sbom": adapters.IMAGE_SBOM,
+        "image-packages": adapters.IMAGE_PACKAGES,
     },
     "admin": dict(admin.ADMIN),
     "auth": dict(auth.AUTH),
