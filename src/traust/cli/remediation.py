@@ -13,7 +13,7 @@ record               a validated remediation report on its work item
 candidates           a product's confirmed, open findings no work item covers, by repository
 fleet-apply          a recorded fleet-fix spec on one repository under its leased run order (diff)
 fleet-record         a fleet-fix transform spec, once its golden tests pass
-fleet-targets        the repositories a fleet fix targets, widest product reach first
+fleet-targets        the repositories a fleet fix targets, widest product reach first, with owners
 verify-sweep         which repositories are worth re-verifying, by tier, and why the rest are not
 verify-prepare       what a verification of one work item re-checks, as JSON
 verify-differential  the scanner that backed a work item's findings, compared on a patched commit
@@ -330,8 +330,14 @@ def fleet_targets(argv: list[str] | None = None) -> int:
         core = load_core(args.config_home)
         named = tuple(_repository(core, u).id for u in args.repo_url or ())
         wanted = FleetScope(cwe=args.cwe, package_id=args.package_id, repository_ids=named)  # type: ignore[arg-type]
-        found = core.services().remediation.fleet_targets(wanted)
-        return _emit(json.dumps([t.model_dump(mode="json") for t in found], indent=2), args.out)
+        services = core.services()
+        owners = services.portfolio.list_owners
+        found = [
+            t.model_dump(mode="json")
+            | {"owner_teams": sorted(o.name for o in owners(t.repository_id))}
+            for t in services.remediation.fleet_targets(wanted)
+        ]
+        return _emit(json.dumps(found, indent=2), args.out)
 
     return run(call)
 
