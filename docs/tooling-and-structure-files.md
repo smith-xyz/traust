@@ -65,7 +65,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | python3 -m traust.cli route regressions | Direct-ledger routing for follow-up-scan findings — transcribes verify-remediation regressions into the ledger as event-carried findings with campaign IDs (never the baseline — gate A15) (no triage precondition); idempotent |
 | python3 -m traust.cli corpus precedent | Tiered FP-precedent index (human-countersigned > machine-refuted-sound) keyed by finding fingerprint — kills shared-component re-refutation; consumed by /triage and the Precision Gate |
 | python3 -m traust.cli sweep | Class-generalization sweep loop: confirmed finding → candidate rule → corpus-wide sweep → triage-ready candidates |
-| python3 -m traust.cli sweep mine | The /mine-ledger miner — confirmed-TP corpus, cluster coverage vs the opengrep pack, per-rule campaign precision |
+| python3 -m traust.cli sweep mine | The /mine-ledger miner on traust-core (`DetectionQualityService.mine_rules`) — confirmed-TP corpus, cluster coverage vs the opengrep pack, per-rule campaign precision |
 | harnessing/mine-ledger/scripts/emit_rule_drafts.py | Regression-rule draft staging from resolved-at-fix-commit findings (pre/post calibration pairs) |
 | python3 -m traust.cli sweep rule-lane | The weekly rule-mining lane runner — miner → sweep collect/draft → bounded draft staging → `lane-delta.{json,md}` vs the previous mine; exit 1 when the delta needs authoring attention |
 | harnessing/census/scripts/check_repo_liveness.py | Census-owned repo-liveness sweep (active/archived/moved/missing, status_since ratcheting) |

@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
 from traust_contracts import DeploymentConfigMissing
+from traust_core.v1.errors import ValidationError
+from traust_core.v1.models.detection_quality import RulePack, RuleRef
 from traust_engine.locations import SWEEPS_REL
 from traust_engine.sweep.engine import DEFAULT_SWEEP_LIMIT
 
+from traust.cli._doors import run
 from traust.cli.groups._registry import OpSpec
-from traust.context import rule_drafts_dir
+from traust.context import load_services, rule_drafts_dir
 
 
 def _add_common_sweep_args(ap) -> None:
@@ -320,80 +322,41 @@ RULE_LANE = OpSpec(
 
 def add_mine_args(ap) -> None:
     ap.add_argument(
-        "--root",
-        required=True,
-        type=Path,
-        help="Findings tree to mine (e.g. analysis-results/findings)",
-    )
-    ap.add_argument(
         "--pack",
         type=Path,
         default=None,
         help="Rule pack for coverage matching (default: context opengrep rules)",
     )
-    ap.add_argument(
-        "--out",
-        type=Path,
-        default=Path("rule-mining"),
-        help="Output directory (default ./rule-mining)",
-    )
+    ap.add_argument("--out", type=Path, default=None, help="also write the result here (JSON)")
 
 
 def call_mine(engine, args) -> int:
+    """The confirmed TPs in traust-core against the pack; the pack is read from its directory
+    until traust-engine registers core's RulePackSource (NEED(engine: rule-pack source))."""
     from traust_engine.sweep import mining as m
 
-    try:
-        pack = args.pack if args.pack is not None else engine.adapters.rule_pack_dir()
-    except ValueError as e:
-        print(str(e), file=sys.stderr)
-        return 2
+    def call() -> dict:
+        try:
+            directory = args.pack if args.pack is not None else engine.adapters.rule_pack_dir()
+        except ValueError as e:
+            raise ValidationError(str(e)) from e
+        if not directory.is_dir():
+            raise ValidationError(f"rule pack {directory} is not a directory")
+        rules = tuple(RuleRef.model_validate(r) for r in m.load_pack_rules(directory))
+        pack = RulePack(name=directory.name, version="", rules=rules)
+        mining = load_services(args.config_home).detection_quality.mine_rules(pack)
+        if args.out is not None:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(mining.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        return {
+            "pack": str(directory),
+            "pack_rules": len(rules),
+            "confirmed_tps": len(mining.corpus),
+            "ruleable_tps": mining.ruleable,
+            **mining.model_dump(mode="json", exclude={"pack", "corpus"}),
+        }
 
-    root = args.root.resolve()
-    if not root.is_dir():
-        print(f"not a directory: {root}", file=sys.stderr)
-        return 2
-    out = args.out
-    out.mkdir(parents=True, exist_ok=True)
-
-    corpus = m.mine_corpus(root)
-    rules = m.load_pack_rules(pack)
-    covered, uncovered = m.cluster_and_cover(corpus, rules)
-    precision = m.mine_precision(root)
-    worklist = m.build_worklist(corpus, covered)
-    languages = m.language_coverage(corpus, covered, uncovered, pack)
-
-    result = {
-        "tool": "mine_ledger_truepositives",
-        "root": str(root),
-        "pack": str(pack),
-        "pack_rules": len(rules),
-        "stats": {
-            "cumulative_reports": len({t["report"] for t in corpus})
-            if corpus
-            else sum(1 for _ in root.rglob("*-findings-current.json")),
-            "confirmed_tps": len(corpus),
-            "ruleable_tps": sum(1 for t in corpus if t["language"] in m.RULEABLE_LANGS),
-        },
-        "covered_clusters": covered,
-        "uncovered_clusters": uncovered,
-        "language_coverage": languages,
-        "rule_precision": precision,
-        "calibration_worklist": worklist,
-    }
-
-    (out / "tp-corpus.jsonl").write_text(
-        "\n".join(json.dumps(t, ensure_ascii=False) for t in corpus) + "\n" if corpus else ""
-    )
-    (out / "rule-mining.json").write_text(json.dumps(result, indent=2) + "\n")
-    (out / "rule-mining.md").write_text(m.render_md(result))
-
-    print(
-        f"mine: {result['stats']['confirmed_tps']} confirmed TP(s); "
-        f"{len(uncovered)} uncovered cluster(s), {len(covered)} covered; "
-        f"precision data for {len(precision)} rule(s); worklist {len(worklist)} repo(s)"
-    )
-    print(f"  outputs: {out}/tp-corpus.jsonl, rule-mining.json, rule-mining.md")
-    return 0
+    return run(call)
 
 
 MINE = OpSpec(
