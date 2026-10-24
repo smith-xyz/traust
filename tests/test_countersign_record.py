@@ -281,11 +281,31 @@ def test_bad_values_and_retired_flags_are_parser_errors(monkeypatch, capsys, cha
 
 
 @pytest.mark.parametrize("operation", ["reopen", "override_false_positive", "confirm_mapping"])
-def test_retired_operations_are_strict_errors(operation, capsys):
-    with pytest.raises(SystemExit) as error:
-        main(["findings", operation])
-    assert error.value.code == 2
-    assert "invalid choice" in capsys.readouterr().err
+def test_retired_operations_are_strict_errors(operation, tmp_path):
+    config_home = tmp_path / "config"
+    config_home.mkdir()
+    store_home = tmp_path / "store"
+    (config_home / "core.yaml").write_text(f"home: {store_home}\n", encoding="utf-8")
+    home = tmp_path / "home"
+    home.mkdir()
+    before = {
+        path.relative_to(tmp_path): path.read_bytes() if path.is_file() else None
+        for path in tmp_path.rglob("*")
+    }
+    result = subprocess.run(
+        [sys.executable, "-m", "traust.cli", "findings", operation],
+        env={**os.environ, "TRAUST_CONFIG_HOME": str(config_home), "HOME": str(home)},
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 2, result.stderr
+    assert not store_home.exists()
+    after = {
+        path.relative_to(tmp_path): path.read_bytes() if path.is_file() else None
+        for path in tmp_path.rglob("*")
+    }
+    assert after == before
 
 
 @pytest.mark.parametrize("missing", ["--rationale", "--decision", "--finding", "--severity"])

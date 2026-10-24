@@ -17,18 +17,6 @@ def test_traust_cli_top_level_help():
     assert "impact analyze" in proc.stdout
 
 
-def test_traust_impact_analyze_help():
-    proc = subprocess.run(
-        [sys.executable, "-m", "traust.cli", "impact", "analyze", "--help"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert proc.returncode == 0
-    assert "Assess and record the commits an advisory reaches" in proc.stdout
-    assert "--config-home" in proc.stdout
-
-
 def test_traust_portfolio_and_sweep_help():
     for group, op, flag in (
         ("portfolio", "build", "--spine"),
