@@ -435,7 +435,7 @@ through `/track-findings`. The report carries two independent proof channels:
 
 | Channel | Written by | Kinds / values |
 |---|---|---|
-| `evidence[]` (`patch_evidence`) | Phase 4b `run_mutation.sh` → `traust remediation mutation-evidence`; Phase 4c `harnessing/7-remediate/property-test/run_property.sh` → `harnessing/7-remediate/property-test/scripts/property_evidence.py` | `mutation` (Go only), `property` (Python only) |
+| `evidence[]` (`patch_evidence`) | Phase 4b `run_mutation.sh` → `traust remediation mutation-evidence`; Phase 4c `harnessing/7-remediate/property-test/run_property.sh` → `traust remediation property-evidence` | `mutation` (Go only), `property` (Python only) |
 | `revalidation` | Phase 7 | live-validation before/after verdicts |
 
 `/verify-remediation` adds a third kind, `scanner_differential`, to the

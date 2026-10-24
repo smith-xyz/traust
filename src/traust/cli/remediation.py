@@ -7,6 +7,7 @@ prepare              what a patch of one work item fixes (findings, decisions, s
 fork                 the private fork a repository's fixes are pushed to
 progress             move a work item to a status (forward only)
 mutation-evidence    a mewt campaign's status JSON as one patch_evidence item
+property-evidence    a property test's base-versus-patched exit codes as one evidence item
 record               a validated remediation report on its work item
 verify-sweep         which repositories are worth re-verifying, by tier, and why the rest are not
 verify-prepare       what a verification of one work item re-checks, as JSON
@@ -32,6 +33,7 @@ from traust_core.v1.models.remediation import (
     VerificationFilter,
     WorkItemFilter,
     mutation_evidence,
+    property_evidence,
 )
 from traust_core.v1.models.values import GitSha, ProductSlug
 from traust_core.v1.models.vocabulary import RemediationStatus, SourceType
@@ -127,6 +129,36 @@ def mutation_evidence_(argv: list[str] | None = None) -> int:
         status = args.status_json.read_bytes() if args.status_json.is_file() else None
         found = mutation_evidence(
             args.target, args.rc, args.tool_version, args.log, status, args.boundary
+        )
+        return found.model_dump(mode="json", exclude_none=True)
+
+    return run(call)
+
+
+def property_evidence_(argv: list[str] | None = None) -> int:
+    ap = _parser(
+        "property-evidence", "Turn a property test's two runs into one patch_evidence item."
+    )
+    ap.add_argument("--test-path", required=True)
+    ap.add_argument("--base-ref", required=True, help="the unpatched revision")
+    ap.add_argument("--base-rc", type=int, required=True)
+    ap.add_argument("--patched-rc", type=int, required=True)
+    ap.add_argument("--tool-version", default="")
+    ap.add_argument("--base-log", default="")
+    ap.add_argument("--patched-log", default="")
+    ap.add_argument("--boundary", default="", help="how the runs were contained")
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        found = property_evidence(
+            args.test_path,
+            args.base_ref,
+            args.base_rc,
+            args.patched_rc,
+            args.tool_version,
+            args.base_log,
+            args.patched_log,
+            args.boundary,
         )
         return found.model_dump(mode="json", exclude_none=True)
 
