@@ -363,7 +363,7 @@ Use when the user asks for MITRE ATT&CK coverage of the portfolio — "which ATT
 
 ## census
 
-Use when the user asks for the corpus census, the report population, "how many repos/reports do we actually have", how much duplication is in the numbers, the distinct-vulnerability count, ownership cuts (owned vs upstream vs external-BU), or asks to (re)build the census or corpus manifest. Deterministically resolves the report population via python3 -m traust.cli corpus + $TRAUST_CONFIG_HOME/corpus-config.yaml, quantifies the five duplication vectors, computes distinct vulnerabilities (fingerprint-deduped at HEAD, disposition-adjusted, FP-excluded, hardening separate) per ownership cut, and writes census.{json,md,html} — the denominator authority every other dashboard cites.
+Use when the user asks for the corpus census, the report population, "how many repos/reports do we actually have", how much duplication is in the numbers, the distinct-vulnerability count, ownership cuts (owned vs upstream vs external-BU), or asks to (re)build the census or corpus manifest. Deterministically resolves the report population via traust-core (`traust portfolio population`), quantifies the five duplication vectors, computes distinct vulnerabilities (fingerprint-deduped at HEAD, disposition-adjusted, FP-excluded, hardening separate) per ownership cut, and writes census.{json,md,html} — the denominator authority every other dashboard cites.
 
 - **Stage:** —
 - **Tier:** `secondary`

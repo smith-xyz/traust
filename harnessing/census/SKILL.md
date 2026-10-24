@@ -1,11 +1,11 @@
 ---
 name: census
-description: Use when the user asks for the corpus census, the report population, "how many repos/reports do we actually have", how much duplication is in the numbers, the distinct-vulnerability count, ownership cuts (owned vs upstream vs external-BU), or asks to (re)build the census or corpus manifest. Deterministically resolves the report population via python3 -m traust.cli corpus + $TRAUST_CONFIG_HOME/corpus-config.yaml, quantifies the five duplication vectors, computes distinct vulnerabilities (fingerprint-deduped at HEAD, disposition-adjusted, FP-excluded, hardening separate) per ownership cut, and writes census.{json,md,html} — the denominator authority every other dashboard cites.
+description: Use when the user asks for the corpus census, the report population, "how many repos/reports do we actually have", how much duplication is in the numbers, the distinct-vulnerability count, ownership cuts (owned vs upstream vs external-BU), or asks to (re)build the census or corpus manifest. Deterministically resolves the report population via traust-core (`traust portfolio population`), quantifies the five duplication vectors, computes distinct vulnerabilities (fingerprint-deduped at HEAD, disposition-adjusted, FP-excluded, hardening separate) per ownership cut, and writes census.{json,md,html} — the denominator authority every other dashboard cites.
 argument-hint: "[summary] [open] [<workspace-root-path>]"
 metadata:
   harness.tier: "secondary"
 allowed-tools:
-  - Bash(python3 *traust* -m traust.cli corpus findings-db:*)
+  - Bash(python3 *traust* -m traust.cli portfolio population:*)
   - Bash(python3 *traust/harnessing/census/scripts/check_repo_liveness.py:*)
   - Bash(ls:*)
   - Bash(open *.html:*)
@@ -16,7 +16,7 @@ allowed-tools:
 
 # Corpus Census — population, duplication, distinct vulnerabilities
 
-> **Being ported to traust-core** (progress-tracker skill port 09, census): build_census.py retired with the traust-core hub (it ran on the old ledger / corpus code). The steps marked RETIRED don't run until the port lands.
+> **Ported to traust-core in part** (progress-tracker skill port 09, census): the population is `traust portfolio population`. Distinct vulnerabilities, ownership cuts and the census files have no traust-core door yet (portfolio-wide findings summary, `NEED(product-portfolio-extension)`, the coverage view); those steps are marked.
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in
@@ -58,39 +58,37 @@ If neither contains `analysis-results/`, ask the user for the path.
 ### Step 2 — Run the harness script
 
 ```bash
-python3 RETIRED:build_census.py \
-    [--workspace-root <resolved-root>] \
-    [--summary]
+python3 -m traust.cli portfolio population \
+    [--kind secure-code] [--as-of <ISO time>]
 ```
 
 What the script does:
 
-1. Resolves the population via `python3 -m traust.cli corpus resolve` against
-   `$TRAUST_CONFIG_HOME/corpus-config.yaml`: depth-tolerant walk of every registered
-   tree, symlink aliases mapped to canonical reports (never counted),
-   branch-ref identity (declared `metadata.ref` preferred, legacy
-   `__release-X.Y` slug fallback → base slug + ref; a compact per-ref
-   breakdown table lands under "Population by tree"), ownership
-   tags (owned / upstream / external-bu). Registered engagement trees
-   (any registered `<engagement>-findings/`) activate automatically
-   when they appear on disk; unregistered trees holding audit reports
-   raise drift warnings.
-2. Loads every report's preferred layer — `*-findings-current.json`
+1. Resolves the population (now done by `traust portfolio population`): every
+   registered repository, per assessment kind the newest default-line
+   assessment, the default-line count and the branch re-audit count, and the
+   repositories never assessed. Symlink aliases and unregistered trees are
+   *retired* (one assessment row per run, no tree walk); ownership tags have
+   no storage yet (`NEED(product-portfolio-extension)`).
+2. *No traust-core door yet* (portfolio-wide findings summary; per repository:
+   `traust findings summary`). Loads every report's preferred layer — `*-findings-current.json`
    (disposition-aware) when present, else the audit JSON — and classifies
    each finding: false positives dropped, hardening bucketed separately,
    everything else a vulnerability keyed by its `fingerprint` (computed
    via python3 -m traust.cli corpus finding-identity when absent).
-3. Computes **distinct vulnerabilities** per ownership cut: unique
+3. *No traust-core door yet* (as 2). Computes **distinct vulnerabilities** per ownership cut: unique
    fingerprints at HEAD (branch re-audits excluded from the headline),
    severity = max across occurrences, open = any occurrence not
    resolved/risk-accepted.
-4. Quantifies the five duplication vectors: symlink aliases (incl.
+4. Branch re-audits are `population`'s `branches` count; the other vectors
+   are *retired* (one assessment row per run, no files to alias, restate or
+   duplicate). Quantifies the five duplication vectors: symlink aliases (incl.
    ledgers attached to aliased reports), branch re-audits (findings that
    fingerprint-match a HEAD finding count as confirmations, not new
    exposure — strict tier-1 matching, so branch-only counts are an upper
    bound), layered-artifact restatement, cross-tree slug overlap, and
    duplicate basenames.
-5. Writes the four outputs and appends a snapshot row to the central
+5. *No traust-core door yet* (the coverage view is a stub). Writes the four outputs and appends a snapshot row to the central
    metrics ledger (python3 -m traust.cli metrics history, source `census`;
    `--skip-ledger` to suppress), injecting a trend-vs-previous line into
    the Markdown.
@@ -106,6 +104,8 @@ python3 harnessing/census/scripts/check_repo_liveness.py \
     --out <workspace-root>/progress-tracker/metrics/repo-liveness.json
 ```
 
+(Stays: traust-core records `archived` only for audited repositories, through
+`traust portfolio observe`; there is no liveness door for the whole population.)
 One GitHub API call per repo (`gh` must be authenticated; ~10 minutes on
 a full sweep) emitting a status per repo — `active | archived | moved |
 missing | unknown` — with `status_since` ratcheted from the previous
@@ -123,17 +123,10 @@ The census refresh is what keeps the queryable findings DB current
 projection can never lag the denominator authority by more than one
 census run:
 
-```bash
-python3 -m traust.cli corpus findings-db \
-    --results-root <workspace-root>/analysis-results
-```
-
-Full deterministic rebuild (< 1 min), output
-`analysis-results/graph/findings.db` (gitignored, rebuildable). The DB is
-a **projection of this census** — its `meta` table records the build time
-and the authority rule; when DB and census numbers disagree, rebuild the
-DB and trust the census. Skip (and say so) only if the script or the
-corpus config is unavailable.
+*Retired with `findings.db`*: every `traust findings` read is derived
+from the recorded decisions when it runs, so there is no projection to
+rebuild. When a findings number and a census number disagree, trust the
+census.
 
 ### Step 2d — Compliance-assessed coverage line
 
@@ -165,12 +158,15 @@ If `open` was requested:
 
 ## Outputs
 
+*No traust-core door yet* for the three census files (the coverage view is a
+stub); `traust portfolio population` prints the population as JSON.
+
 | File | Purpose |
 |---|---|
 | `census/census.md` | Executive view, population-by-tree table, duplication vectors, parse gaps/drift, standard population block. |
 | `census/census.html` | Self-contained dashboard: stat cards, ownership severity chips, tree + duplication tables, drift warnings. |
 | `census/census.json` | Machine-readable census: population, ownership cuts, duplication vectors, warnings, timings. |
-| `findings.db` `repos` | Full resolved record list — the denominator source other dashboards cite. Written by `traust_engine.corpus.findings_db`, not here; `corpus-manifest.json` was retired 2026-08-20 as a write-only artifact nothing read. |
+| `findings.db` `repos` | *Retired with `findings.db`*: the resolved record list is `traust portfolio population`. |
 
 ---
 
