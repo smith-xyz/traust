@@ -54,8 +54,7 @@ in the Hybrid Platforms portfolio: OpenShift release payloads, OLM
 operator bundles, and managed services.
 
 For repos or whole orgs outside those discovery paths, `add-inputs`
-appends them (plus `owners.csv` rows) to a segment CSV directly —
-default segment `adhoc/`. When the addition is a new scan engagement,
+registers them in traust-core under a product (`traust portfolio onboard`). When the addition is a new scan engagement,
 `corpus-intake` registers the matching *output* tree in
 traust-core's corpus registry, linking the
 two sides. The full sequence — both registrations, census confirmation,

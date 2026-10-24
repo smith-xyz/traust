@@ -78,6 +78,10 @@ GROUPS: dict[str, dict[str, object]] = {
         "query": portfolio.QUERY,
         "parsers": portfolio.PARSERS,
         "observe": portfolio.OBSERVE,
+        "plan": portfolio.PLAN,
+        "onboard": portfolio.ONBOARD,
+        "owner-hints": portfolio.OWNER_HINTS,
+        "import-owners": portfolio.IMPORT_OWNERS,
     },
     "reporting": {
         "validate": reporting.VALIDATE,

@@ -330,10 +330,10 @@ operator catalog to inventory (`/inventory-repositories` writes those).
 
 Three ways to populate it:
 
-- **`/add-inputs`** appends a repository or a whole GitHub/GitLab org to a
-  segment and derives `owners.csv` rows from `OWNERS` / `approvers` files in
-  the repos. Point it at your inventory with `--inventory` or let it use
-  `locations.inputs`.
+- **`/add-inputs`** registers a repository or a whole GitHub/GitLab org in
+  traust-core under a product (`traust portfolio onboard`) and imports owning
+  teams from `org_teams:` (`traust portfolio import-owners`). It no longer
+  writes this CSV tree; readers of the tree move to traust-core with their ports.
 - **Export from your own source of truth** into the CSV shape above; a
   spreadsheet export is enough.
 - **Keep the inventory in its own repository**, as this project does, so that

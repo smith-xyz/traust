@@ -83,11 +83,11 @@ field on every skill.
 
 ## add-inputs
 
-Use when the user asks to add one or more GitHub/GitLab repositories or an entire GitHub organization to the repository inventory (`locations.inputs`). Adds entries to the appropriate segment CSV files and generates matching owners.csv rows.
+Use when the user asks to add one or more GitHub/GitLab repositories or an entire GitHub organization to the repository inventory (traust-core). Registers them under a product with `traust portfolio onboard` and imports their owners.
 
 - **Stage:** ① Inventory
 - **Tier:** `secondary`
-- **Invoke:** `/add-inputs` — arguments: `<repo-or-org-url> [--segment <segment>] [--inventory <path-or-url>]`
+- **Invoke:** `/add-inputs` — arguments: `<repo-or-org-url> --product <slug> [--label <name>] [--dry-run]`
 - **Skill:** [harnessing/1-inventory/add-inputs/SKILL.md](../harnessing/1-inventory/add-inputs/SKILL.md)
 
 ## corpus-intake
