@@ -12,7 +12,7 @@ from traust_engine.locations import SWEEPS_REL
 from traust_engine.sweep.engine import DEFAULT_SWEEP_LIMIT
 
 from traust.cli._doors import run
-from traust.cli.groups._registry import OpSpec
+from traust.cli.groups._registry import OpSpec, passthrough_op
 from traust.context import load_services, rule_drafts_dir
 
 
@@ -363,4 +363,8 @@ MINE = OpSpec(
     add_args=add_mine_args,
     call=call_mine,
     help="Mine ledger-confirmed TPs for opengrep rule authoring",
+)
+
+BENCHMARK_TARGETS = passthrough_op(
+    "recall", "Record the recall benchmark's answer key (benchmark-targets).", "targets"
 )
