@@ -13,6 +13,7 @@ import stat
 import sys
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ from traust_core.v1.repositories.sql import Dialect
 
 from traust.cli import cloud_config
 from traust.cli.__main__ import main
+from traust.context import load_core
 
 FIXTURES = Path(__file__).parent / "fixtures" / "cloud_config"
 REPORT = json.loads((FIXTURES / "myrepo-cloud-config-audit.json").read_text())
@@ -282,6 +284,47 @@ def test_record_is_a_degraded_assessment_with_a_decision_per_finding(
     rc, again, err = run(cloud_config.record, home, str(report), "--repo-url", REPO, "--sha", SHA)
     assert rc == 0, err
     assert json.loads(again)["assessment_id"] == got["assessment_id"]
+
+
+def test_record_stamps_the_audit_run_time(home: Path, tmp_path: Path) -> None:
+    rc, out, err = run(
+        cloud_config.record, home, str(a_report(tmp_path)), "--repo-url", REPO, "--sha", SHA
+    )
+
+    assert rc == 0, err
+    got = load_core(home).services().assessment.get(uuid.UUID(json.loads(out)["assessment_id"]))
+    assert got.occurred_at == datetime(2026, 10, 20, 9, tzinfo=UTC)
+
+
+def test_record_without_a_run_time_is_a_new_run_each_time(home: Path, tmp_path: Path) -> None:
+    doc = copy.deepcopy(REPORT)
+    del doc["metadata"]["generated_at"]
+    report = a_report(tmp_path, doc)
+
+    ids = []
+    for _ in range(2):
+        rc, out, err = run(cloud_config.record, home, str(report), "--repo-url", REPO, "--sha", SHA)
+        assert rc == 0, err
+        ids.append(json.loads(out)["assessment_id"])
+
+    assert ids[0] != ids[1]
+
+
+def test_record_refuses_a_run_time_without_a_zone(sqlite_home: Path, tmp_path: Path) -> None:
+    doc = copy.deepcopy(REPORT)
+    doc["metadata"]["generated_at"] = "2026-10-20T09:00:00"
+
+    rc, _, err = run(
+        cloud_config.record,
+        sqlite_home,
+        str(a_report(tmp_path, doc)),
+        "--repo-url",
+        REPO,
+        "--sha",
+        SHA,
+    )
+
+    assert rc == 2 and "time zone" in err
 
 
 def test_record_refuses_a_report_that_fails_its_gate(home: Path, tmp_path: Path) -> None:

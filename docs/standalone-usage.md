@@ -36,7 +36,7 @@ Skills with no infrastructure requirement need only the workflow engine and a ta
 | `patch` | ⑦ | Inert candidate-fix diffs per confirmed triage finding (patch subagent + independent reviewer); never applies, never writes outside `./PATCHES/` | A `TRIAGE.json`, audit report, or `*-vuln-findings.json` | — | mythos-class |
 | `remediate-finding` | ⑦ | Generate remediation patches on private forks (user supplies their own fork) | Any audit report + a fork with push access | — | mythos-class |
 | `verify-remediation` | ⑦ | Verifies a patched repo actually resolves prior audit findings | A previous audit report + patched checkout | — | mythos-class |
-| `generate-team-report` | ⑧ | Packages component reports into team-deliverable folders with HTML dashboards | Any findings directory | — | opus-class |
+| `generate-team-report` | ⑧ | Packages component reports into team-deliverable folders with HTML dashboards | Products registered in traust-core | — | opus-class |
 | `track-findings` | ④ | Core-backed finding state, source statement import, verified-human review cards and direct/selected-review judgements; private async Markdown or typed JSON batch answers | Existing core finding/review UUIDs, optional audit labels and forge/Jira source references | Core identity policy and shared `traust auth` login | opus-class |
 | `check-harness-docs` | — | Doc-drift guard: checks the harness's own docs (skill/command/script/stage counts + dead links) against the tree | The harness repo itself | — | sonnet-class |
 | `check-licensing` | — | Licensing gate: blocks re-imported restrictively-licensed framework text (PEACH/CIS guard, run by the pre-push hook) + license-intake checklist for new external dependencies | The harness repo itself | — | sonnet-class |

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from traust_engine.reporting import validate
 
-from traust.cli.groups._registry import OpSpec
+from traust.cli.groups._registry import OpSpec, passthrough_op
 
 
 def add_validate_args(ap) -> None:
@@ -350,4 +350,8 @@ SARIF = OpSpec(
     add_args=add_sarif_args,
     call=call_sarif,
     help="Export harness reports to SARIF 2.1.0",
+)
+
+RECORD = passthrough_op(
+    "assessment_record", "Record an audit document as an assessment of a commit."
 )

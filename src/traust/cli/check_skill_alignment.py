@@ -424,11 +424,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
     ): "human companion of the isolation-review JSON",
     (
         "A9",
-        "mine-ledger:tp-corpus.jsonl",
-    ): "rule-authoring specification corpus consumed by the opengrep-pack "
-    "test-and-calibrate workflow (human loop, by design)",
-    (
-        "A9",
         "validate-findings:attack-plan.yaml",
     ): "execution plan produced AND consumed inside the same validation "
     "run (plan → execute); the slug-prefixed portfolio copy "

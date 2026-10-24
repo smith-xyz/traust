@@ -28,11 +28,11 @@ as a single command.
 Ordering is the whole point:
 
 1. **Core views** — `DashboardsMaterializer`: one `InsightService.refresh`
-   renders every view traust-core has built (today `findings-rollup`)
+   renders every view traust-core has built (today `findings-rollup`, `findings-trend`)
    to `<out>/<view>/<stem>.{md,html,json}`. Reads are live, so there is
    no projection to go stale; a view that fails is reported degraded and
    the others still render.
-2. **Consumers** — executive summary, findings-trends,
+2. **Consumers** — executive summary,
    insecure-patterns, validation-fuzz dashboard, RBAC/tenancy rollup,
    SLA view, compliance dashboard, ATT&CK coverage rollup,
    LoC dashboard (cache-only), dependency-exposure, spend dashboard.
@@ -97,9 +97,8 @@ Ordering is the whole point:
 
 | Stage | Tier | Builder |
 |---|---|---|
-| `views` | core | `InsightService.refresh` via `DashboardsMaterializer` (every built view: `findings-rollup`) |
-| `exec-summary` | consumer | `RETIRED:build_executive_summary.py` |
-| `trends` | consumer | `RETIRED:build_trends.py` |
+| `views` | core | `InsightService.refresh` via `DashboardsMaterializer` (every view traust-core has built) |
+| `exec-summary` | — | *retired:* rendered by the `views` stage (`ExecutiveSummaryView`) |
 | `insecure-patterns` | consumer | `RETIRED:build_insecure_patterns.py` |
 | `validation-fuzz` | consumer | `harnessing/validation-fuzz-dashboard/scripts/build_validation_fuzz_dashboard.py` |
 | `rbac-tenancy` | consumer | `RETIRED:build_rbac_tenancy_rollup.py` |

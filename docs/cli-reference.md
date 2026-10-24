@@ -20,24 +20,24 @@ python3 -m traust.cli check skill-alignment      # equivalent
 
 | Group | Description | Operations |
 |---|---|---|
-| `adapters` | Scanner adapters (deterministic pre-scans) | `checkov`, `crypto-audit`, `crypto-cluster`, `crypto-image`, `crypto-probe`, `crypto-source`, `gitleaks`, `govulncheck`, `joern`, `opengrep`, `osv`, `yara` |
+| `adapters` | Scanner adapters (deterministic pre-scans) | `checkov`, `crypto-audit`, `crypto-cluster`, `crypto-image`, `crypto-probe`, `crypto-source`, `gitleaks`, `govulncheck`, `image-packages`, `image-sbom`, `joern`, `opengrep`, `osv`, `yara` |
 | `admin` | Operator tooling | `attest-target`, `checkpoint`, `query-index`, `scan-internal-refs`, `toolchain` |
 | `auth` | Who you act as, over traust-core's identity provider | `local`, `login`, `logout`, `refresh`, `service-account`, `status`, `token` |
 | `build` | Deterministic builders | `rescan-worklist`, `skills-reference`, `symbol-index` |
 | `check` | Deterministic gates | `citations`, `content-licenses`, `docs-consistency`, `estate-data`, `drift`, `fix-propagation`, `location-paths`, `reference-integrity`, `skill-alignment`, `skill-security` |
 | `cloud-config` | The cloud-config-audit skill's doors on traust-core | `check`, `record`, `run` |
-| `compliance` | Compliance reporting | `dashboard`, `scope` |
-| `dashboard` | Dashboard rebuilds | `refresh` |
+| `compliance` | Compliance reporting; boundary doors on traust-core | `dashboard`, `declare`, `resolve`, `scopes` |
+| `dashboard` | Dashboard rebuilds, the team report and one insight view | `refresh`, `team-report`, `view` |
 | `feeds` | Security feed snapshots (traust-core) and the product-definitions cache | `fetch`, `fetch-products` |
 | `findings` | track-findings' and findings-db's doors on traust-core | `apply`, `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `record`, `refuted`, `reject`, `request`, `review-cases`, `sarif`, `status`, `summary`, `surfaces`, `tickets`, `timeline` |
-| `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `find`, `sbom`, `sweep`, `symbols` |
+| `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `find`, `package`, `sbom`, `sweep`, `symbols` |
 | `ledger` | Ledger audit (traust-core) and the doc-variance register | `audit`, `doc-variance` |
 | `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `sla`, `spend` |
-| `portfolio` | Portfolio graph; `observe` is the `repo_state` materializer; `plan` / `onboard` / `owner-hints` / `import-owners` are add-inputs' doors on traust-core | `artifacts`, `build`, `deps-multi`, `freshness`, `import-owners`, `interfaces`, `observe`, `onboard`, `owner-hints`, `parsers`, `plan`, `query`, `stats`, `symbols` |
+| `portfolio` | Portfolio graph; `observe` is the `repo_state` materializer; `plan` / `onboard` / `owner-hints` / `import-owners` are add-inputs' doors on traust-core | `artifacts`, `build`, `deps-multi`, `freshness`, `import-owners`, `interfaces`, `observe`, `onboard`, `owner-hints`, `parsers`, `plan`, `population`, `query`, `stats`, `symbols` |
 | `products` | corpus-intake's doors on traust-core: products and their corpus ownership | `add`, `list`, `update` |
 | `registry` | Model/product registry | `models`, `products` |
-| `reporting` | Report validation & rendering | `lint`, `rate-threats`, `render`, `sarif`, `validate` |
-| `sweep` | Class-generalization sweep | `benchmark`, `collect`, `draft`, `emit`, `mine`, `rule-lane`, `sweep` |
+| `reporting` | Report validation, rendering & recording | `lint`, `rate-threats`, `record`, `render`, `sarif`, `validate` |
+| `sweep` | Class-generalization sweep; recall-benchmark answer key | `benchmark`, `benchmark-targets`, `collect`, `draft`, `emit`, `mine`, `rule-lane`, `sweep` |
 | `triage` | Core-backed triage | `check`, `intake`, `prepare`, `record`, `render` |
 | `util` | Utility commands | `elf`, `redact`, `safe-exec` |
 | `validation` | Core-backed machine validation evidence | `record` |

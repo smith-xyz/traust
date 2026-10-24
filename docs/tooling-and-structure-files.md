@@ -31,7 +31,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | `schemas/v1/compliance-assessment.schema.json` | JSON Schema for compliance-check assessment reports |
 | `schemas/v1/compliance-mapping.schema.json` | JSON Schema for the control↔check policy mapping |
 | `schemas/v1/doc-variance.schema.json` | JSON Schema for documentation-variance registers (`<repo>-doc-variance.json`) — official docs.redhat.com claims contradicted by code evidence, per doc version; source URL schema-restricted to docs.redhat.com (informal inputs never mint variance records) |
-| `schemas/v1/compliance-scope.schema.json` | JSON Schema for the compliance scope registry (declared boundaries; repo membership resolved via the repo-graph product mapping by `python3 -m traust.cli compliance scope`) |
+| `schemas/v1/compliance-scope.schema.json` | JSON Schema for a compliance boundary declaration (recorded by `python3 -m traust.cli compliance declare`; repo membership resolved from the inventory by `python3 -m traust.cli compliance resolve`) |
 | `schemas/v1/pqc-facts.schema.json` | JSON Schema for the deterministic Layer 1 crypto census (`*-pqc-facts.json`) — the contract `/patch`'s pqc ingest and the Layer 2 prepass consume |
 | `schemas/v1/pqc-readiness.schema.json` | JSON Schema for PQC readiness reports |
 | `schemas/v1/pqc-blockers.schema.json` | JSON Schema for the findings-shaped projection of readiness remediations (`*-pqc-blockers.json`, emitted by `build_pqc_blockers.py`) — mirrors the security-audit findings vocabulary without claiming `report.schema.json` conformance |
@@ -68,7 +68,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | Retired regression router | Formerly converted remediation regressions into event-carried findings; core finding intake owns the replacement, but the skill port is unfinished and there is no executable fallback |
 | Retired FP-precedent corpus CLI | Formerly built a tiered refutation-precedent index for triage and the Precision Gate; core finding precedents own the replacement, but the skill port is unfinished and there is no executable fallback |
 | python3 -m traust.cli sweep | Class-generalization sweep loop: confirmed finding → candidate rule → corpus-wide sweep → triage-ready candidates |
-| python3 -m traust.cli sweep mine | The /mine-ledger miner — confirmed-TP corpus, cluster coverage vs the opengrep pack, per-rule campaign precision |
+| python3 -m traust.cli sweep mine | The /mine-ledger miner on traust-core (`DetectionQualityService.mine_rules`) — confirmed-TP corpus, cluster coverage vs the opengrep pack, per-rule campaign precision |
 | harnessing/mine-ledger/scripts/emit_rule_drafts.py | Regression-rule draft staging from resolved-at-fix-commit findings (pre/post calibration pairs) |
 | python3 -m traust.cli sweep rule-lane | The weekly rule-mining lane runner — miner → sweep collect/draft → bounded draft staging → `lane-delta.{json,md}` vs the previous mine; exit 1 when the delta needs authoring attention |
 | harnessing/census/scripts/check_repo_liveness.py | Census-owned repo-liveness sweep (active/archived/moved/missing, status_since ratcheting) |

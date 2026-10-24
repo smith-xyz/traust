@@ -28,8 +28,8 @@ allowed-tools:
 
 
 Turn the campaign's disposition ledger into rule-authoring fuel: extract
-every ledger-**confirmed** true positive from the cumulative
-`*-findings-current.json` reports, cluster by (primary CWE, language),
+every ledger-**confirmed** true positive from traust-core's recorded
+findings (their folded disposition), cluster by (primary CWE, language),
 match against the Traust opengrep pack (bundled in traust-engine, the only
 copy), and aggregate the
 per-fact judge decisions audits record in `scanner_correlation` into
@@ -38,19 +38,20 @@ campaign-wide per-rule precision.
 This skill is the out-of-band half of a loop the audits feed by default:
 `/secure-code-audit`'s pre-scan records every promote/dismiss decision as a
 structured `scanner_correlation` entry (tool `opengrep`, `rule_id`,
-`result: promoted|dismissed`), and this skill harvests them.
+`result: promoted|dismissed`), and this skill harvests them. (traust-core
+reads them as the rule on each finding's occurrence, judged by the
+finding's disposition.)
 
 ## Input
 
 `$ARGUMENTS` (all optional):
 
-- A findings tree to mine — default `analysis-results/findings` resolved
-  from the campaign workspace (or `AUDIT_RESULTS_ROOT`).
+- A findings tree to mine — *retired*: `sweep mine` reads traust-core's
+  recorded findings.
 - `--pack <dir>` — rule pack to check coverage against (default: the
   pack bundled in traust-engine, `traust_engine/data/secure-code-audit/opengrep-rules/`).
-- `--out <dir>` — output directory. Default for campaign runs:
-  `progress-tracker/metrics/rule-mining/` so the report versions alongside
-  the other dashboards.
+- `--out <file>` — also write the whole mining (with the TP corpus) as
+  JSON; the command prints it without the corpus.
 
 ## Bundled precedent cards
 
@@ -64,26 +65,26 @@ compilation; these fixtures are not findings or production sweep inputs.
 **Step 1 — run the deterministic miner** (all analysis is script-side):
 
 ```bash
-python3 -m traust.cli sweep mine \
-  --root analysis-results/findings \
-  --out progress-tracker/metrics/rule-mining
+python3 -m traust.cli sweep mine [--pack <dir>] [--out <file>]
 ```
 
-Outputs: `tp-corpus.jsonl` (one confirmed TP per line — the rule
-specification material), `rule-mining.json`, `rule-mining.md`.
+Output: `corpus` (one confirmed TP per finding — the rule
+specification material, in `--out`), `covered` / `uncovered` clusters,
+`languages`, `precision`, `worklist`. (`tp-corpus.jsonl` and
+`rule-mining.{json,md}` are still written by the lane, `sweep rule-lane`.)
 
 > **Optional accelerator — findings-db pre-queries.** Cluster-shape
 > questions ("which CWE×language pairs dominate confirmed TPs?", "how
 > many resolved-at-fix-commit findings exist for CWE-78?") can be
 > answered instantly from the C9 projection (`/findings-db`) before
-> committing to a full mine. The miner itself stays file-based — its
+> committing to a full mine. The miner reads the recorded dispositions — its
 > output is rule-authoring material and must reflect the live ledgers,
 > not a projection that may be one census behind. DB for scoping,
 > miner for the corpus of record.
 
 **Step 2 — interpret the backlog.** For the top uncovered clusters, read
-3–5 of the example findings (ids are in the report; fetch their entries
-from the source reports) and answer, per cluster: *is this mechanically
+3–5 of the example findings (ids are in each cluster's `examples`; fetch
+them with `python3 -m traust.cli findings find <id>`) and answer, per cluster: *is this mechanically
 detectable?* Clusters like missing-authentication (CWE-306) or confused
 deputy (CWE-441) usually are not — say so and move on. For detectable
 clusters, propose concrete rule candidates: language, sources/sinks or
@@ -95,7 +96,9 @@ test-and-calibrate gate.
 **Step 3 — review precision.** Precision only counts reports where the
 pre-scan actually ran: check `metadata.additional.deterministic_steps`
 (`"opengrep": "ran"` vs `"skipped: …"`) before treating an absence of
-judge decisions as signal — a skipped scanner is not a quiet rule. Any
+judge decisions as signal — a skipped scanner is not a quiet rule.
+(`mine_rules` counts only occurrences a rule matched; an unjudged hit
+counts as `other`, never as clean.) Any
 rule whose campaign precision (from
 audits' judge decisions) sits below the plan's ~50% gate is flagged: read
 a sample of its dismissal rationales from the source reports and propose a
@@ -264,7 +267,8 @@ never writes to ledgers, and never touches Jira.
 ## Integrations
 
 - **Inputs:** cumulative `*-findings-current.json` ledgers and the
-  `scanner_correlation` judge decisions audits record by default.
+  `scanner_correlation` judge decisions audits record by default
+  (`sweep mine` reads them from traust-core; the lane still reads the files).
 - **Inputs (sweeps):** any prior confirmation artifacts under
   `analysis-results/scan-testing/` (fast-track critical confirmations,
   matrix votes, fresh-only triage) alongside the ledgers.

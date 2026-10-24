@@ -23,7 +23,10 @@ allowed-tools:
   - Bash(python3 *traust* -m traust_engine.adapters.checkov:*)
   - Bash(python3 *traust* -m traust_engine.adapters.yara:*)
   - Bash(python3 *traust* -m traust.cli adapters osv:*)
+  - Bash(python3 *traust* -m traust.cli adapters image-sbom:*)
+  - Bash(python3 *traust* -m traust.cli adapters image-packages:*)
   - Bash(python3 *traust* -m traust.cli reporting validate:*)
+  - Bash(python3 *traust* -m traust.cli reporting record:*)
   - Bash(python3 *traust* -m traust_engine.reporting.render:*)
   - Bash(python3 *traust* -m traust.cli corpus finding-identity:*)
   # Confinement added 2026-07-31 (P1 gate rework — the
@@ -186,16 +189,24 @@ against language packages an RPM installed. On `ubi9/python-311` (measured
 requests and setuptools under `/usr/lib/python3.*`, all carrying Red Hat
 backports. **The CycloneDX file is for the graph**:
 
-**Persist the SBOM for the portfolio graph**: copy it to
-`analysis-results/graph/sboms/<shortdigest>.cdx.json` (first 7+ hex chars
-of the audited digest as the filename stem). `/portfolio-graph`'s artifact
-layer ingests that directory into `ships_module`/`ships_package` edges, so
-every container audit accrues into the graph automatically. The grype JSON
+**Persist the SBOM for the portfolio graph**: record it on the audited
+digest, with the platform and, when Phase 1's `vcs-url`/`vcs-ref` labels
+declare it, the source commit:
+
+```bash
+python3 -m traust.cli adapters image-sbom <name>@<digest> --sbom /tmp/<name>-sbom.cdx.json \
+  --platform linux/amd64 [--repo-url <vcs-url> --sha <vcs-ref>]
+```
+
+traust-core keeps the image's packages as SBOM rows that the portfolio's
+dependency reads walk, so every container audit accrues into the graph
+automatically (image rows are append-only: the same digest again takes the
+same SBOM, platform and source). The grype JSON
 below remains an intermediate — do not persist it.
 
 (`syft` pulls via the registry directly; if Phase 1 already produced an OCI copy, use `syft oci-dir:/tmp/<name>-oci` instead.)
 
-Record in `metadata.additional.sbom_packages` the total package count and the per-ecosystem breakdown (rpm, go-module, npm, python, …).
+Record in `metadata.additional.sbom_packages` the total package count and the per-ecosystem breakdown (rpm, go-module, npm, python, …) (`python3 -m traust.cli adapters image-packages <digest>` prints both from the recorded SBOM).
 
 **Attribution-coverage check (assertive posture trigger).** syft can
 only inventory what it can attribute: static/vendored binaries,
@@ -277,9 +288,9 @@ Each candidate it shares with grype is tagged `also_in_grype: true`.
 When the SBOM/CVE scan reveals crypto-relevant packages or libraries
 (e.g. openssl, gnutls, golang crypto), delegate to the `crypto-analysis`
 skill for full crypto posture extraction. That skill owns invocation of
-`crypto_audit.py image` and all interpretation of its output (governance
+`traust adapters crypto-image` and all interpretation of its output (governance
 chains, PQC classification, FIPS compliance). Do not invoke
-`crypto_audit.py` directly from this skill.
+`adapters crypto-image` directly from this skill.
 
 ## Phase 4 — Cross-Reference Existing Coverage
 
@@ -574,6 +585,8 @@ Identical gate to the other audit profiles — **a report is not complete until 
 python3 -m traust.cli reporting validate <path-to-report.json>
 python3 -m traust.cli reporting validate --strict <path-to-report.json>   # address warnings
 python3 -m traust.cli reporting render <path-to-report.json> -o <path-to-report.md>
+python3 -m traust.cli reporting record <path-to-report.json> --kind container \
+  --repo-url <vcs-url> --sha <vcs-ref>   # when Phase 1's labels declare the source
 ```
 
 Do not begin the next image until the current report passes.

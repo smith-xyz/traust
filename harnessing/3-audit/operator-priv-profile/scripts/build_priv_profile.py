@@ -17,6 +17,10 @@ Usage:
   build_priv_profile.py --repo <checkout> --name <repo-name> --out-dir <dir>
   build_priv_profile.py --repo-url <url> [--ref <ref>] --name <n> --out-dir <dir>
   build_priv_profile.py --rollup <profiles-glob> --rollup-out <dir>
+
+Record each profile with `traust reporting record --kind priv-profile` (AssessmentService.record).
+Legacy kept: --rollup reads the profile files until AssessmentService.privileges carries the
+rollup's columns (container posture, namespaces/install modes, tier-2 surplus and markers).
 """
 
 from __future__ import annotations
@@ -664,8 +668,11 @@ table{{border-collapse:collapse;width:100%;font-size:12px}}td,th{{padding:4px 8p
             env={**os.environ, "GIT_ALLOW_PROTOCOL": "https", "GIT_TERMINAL_PROMPT": "0"},
         )
         root = Path(tmp)
+        commit = subprocess.run(
+            ["git", "-C", tmp, "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
     else:
-        root = Path(args.repo)
+        root, commit = Path(args.repo), None
     prof = profile_repo(root, args.name)
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -676,6 +683,7 @@ table{{border-collapse:collapse;width:100%;font-size:12px}}td,th{{padding:4px 8p
         f"{args.name}: {s['workloads']} workloads, {s['rbac_rules']} rules "
         f"({s['cluster_scoped_rules']} cluster), scc={s['scc_requests'] or 'default'}, "
         f"surplus={prof['tier2_required_vs_granted'].get('shipped_not_declared_count', 'n/a')}"
+        + (f", commit={commit}" if commit else "")
     )
     return 0
 

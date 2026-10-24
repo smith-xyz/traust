@@ -1,7 +1,8 @@
-"""``traust impact find|sbom|symbols|analyze|sweep``: the impact-analysis and dependency-watch
-skills' doors on traust-core.
+"""``traust impact find|package|sbom|symbols|analyze|sweep``: the impact-analysis and
+dependency-watch skills' doors on traust-core.
 
 find     an advisory as its source states it now: identity, aliases, affected packages and ranges
+package  the advisories affecting one package version, as their source lists them now
 sbom     a commit's manifest SBOM (CycloneDX / SPDX JSON from syft or osv-scanner), or syft over a
          checkout of the commit when no document is given
 symbols  the functions the advisory's fix touched: published, or mined from its fix commits
@@ -28,6 +29,7 @@ from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.dependencies import (
     AdvisoryRecord,
     SweepStatus,
+    Version,
     parse_advisory_identifier,
 )
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
@@ -74,6 +76,26 @@ def find(argv: list[str] | None = None) -> int:
         return _advisory(_core(args.config_home).services(), args.advisory).model_dump_json(
             indent=2
         )
+
+    return run(call)
+
+
+def package(argv: list[str] | None = None) -> int:
+    ap = _parser("package", "Print the advisories affecting one package version, as JSON.")
+    ap.add_argument("name", help="the package as its ecosystem names it")
+    ap.add_argument("version")
+    ap.add_argument("--ecosystem", required=True, choices=[e.value for e in Ecosystem])
+    args = ap.parse_args(argv)
+
+    def call() -> str:
+        found = (
+            _core(args.config_home)
+            .services()
+            .exposure.package_advisories(
+                Ecosystem(args.ecosystem), args.name, Version(args.version)
+            )
+        )
+        return found.model_dump_json(indent=2)
 
     return run(call)
 

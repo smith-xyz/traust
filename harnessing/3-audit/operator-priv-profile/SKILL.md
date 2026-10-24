@@ -51,6 +51,15 @@ Emits `<repo>-priv-profile.{json,md}` next to the repo's audit report:
   candidates. Repos without markers get an honest "not derivable
   statically" note — do NOT infer need from silence.
 
+Record each profile as a priv-profile assessment of the profiled commit
+(with `--repo-url`, the script prints it as `commit=`):
+
+```bash
+python3 -m traust.cli reporting record \
+    analysis-results/findings/<product>/<repo>/<repo>-priv-profile.json \
+    --kind priv-profile --repo-url <url> --sha <commit>
+```
+
 Fleet rollup (after profiling a set):
 
 ```bash

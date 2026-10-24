@@ -41,6 +41,8 @@ GROUPS: dict[str, dict[str, object]] = {
         "crypto-source": adapters.CRYPTO_SOURCE,
         "crypto-image": adapters.CRYPTO_IMAGE,
         "crypto-cluster": adapters.CRYPTO_CLUSTER,
+        "image-sbom": adapters.IMAGE_SBOM,
+        "image-packages": adapters.IMAGE_PACKAGES,
     },
     "admin": dict(admin.ADMIN),
     "auth": dict(auth.AUTH),
@@ -49,7 +51,9 @@ GROUPS: dict[str, dict[str, object]] = {
     "cloud-config": dict(cloud_config.CLOUD_CONFIG),
     "compliance": {
         "dashboard": compliance.DASHBOARD,
-        "scope": compliance.SCOPE,
+        "declare": compliance.DECLARE,
+        "scopes": compliance.SCOPES,
+        "resolve": compliance.RESOLVE,
     },
     "dashboard": dict(dashboard.DASHBOARD),
     "feeds": dict(feeds.FEEDS),
@@ -83,6 +87,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "onboard": portfolio.ONBOARD,
         "owner-hints": portfolio.OWNER_HINTS,
         "import-owners": portfolio.IMPORT_OWNERS,
+        "population": portfolio.POPULATION,
     },
     "reporting": {
         "validate": reporting.VALIDATE,
@@ -90,6 +95,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "render": reporting.RENDER,
         "rate-threats": reporting.RATE_THREATS,
         "sarif": reporting.SARIF,
+        "record": reporting.RECORD,
     },
     "sweep": {
         "collect": sweep.COLLECT,
@@ -97,6 +103,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "sweep": sweep.SWEEP,
         "emit": sweep.EMIT,
         "benchmark": sweep.BENCHMARK,
+        "benchmark-targets": sweep.BENCHMARK_TARGETS,
         "rule-lane": sweep.RULE_LANE,
         "mine": sweep.MINE,
     },

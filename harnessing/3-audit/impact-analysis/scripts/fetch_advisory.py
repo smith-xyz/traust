@@ -15,13 +15,14 @@ request forgery against an arbitrary host, the same reason
 config/external-tools.yaml carries a binary allowlist.
 
 Usage:
-  fetch_advisory.py <source> <ident> [--ecosystem ECO]
+  fetch_advisory.py <source> <ident>
 
-  osv             <package-name>   [--ecosystem npm|Go|PyPI|...]
   nvd             <CVE-ID>
   vex             <CVE-ID>         Red Hat per-product impact status
   redhat-csaf     <RHSA-ID>        NOT CVE-keyed — use vex for a CVE
   ossf-scorecard  <host/org/repo>
+
+OSV by package is `traust impact package` (traust-core's ExposureService.package_advisories).
 
 Prints the JSON response to stdout. Exit 1 on HTTP/network failure,
 2 on usage errors.
@@ -30,7 +31,6 @@ Prints the JSON response to stdout. Exit 1 on HTTP/network failure,
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import sys
 import urllib.parse
@@ -55,8 +55,8 @@ _IDENT_RULES = {
 
 
 def _sources() -> dict[str, dict]:
-    """Live sources plus the per-document-fetchable cached ones (vex)."""
-    out = dict(fc.live_sources())
+    """Live sources (but osv, which traust-core queries) plus the per-document cached ones (vex)."""
+    out = {sid: spec for sid, spec in fc.live_sources().items() if sid != "osv"}
     for sid, spec in fc.cached_sources().items():
         if spec.get("doc_url_template"):
             out[sid] = spec
@@ -73,21 +73,14 @@ def _allowed_hosts(sources: dict[str, dict]) -> set[str]:
     return hosts
 
 
-def _get(url: str, allowed: set[str], data: bytes | None = None) -> str:
+def _get(url: str, allowed: set[str]) -> str:
     parts = urllib.parse.urlsplit(url)
     if parts.scheme != "https" or parts.netloc not in allowed:
         raise ValueError(
             f"refusing to fetch {parts.scheme}://{parts.netloc} — not an "
             f"allowlisted advisory host ({', '.join(sorted(allowed))})"
         )
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={
-            "User-Agent": "traust-impact-analysis",
-            **({"Content-Type": "application/json"} if data else {}),
-        },
-    )
+    req = urllib.request.Request(url, headers={"User-Agent": "traust-impact-analysis"})
     with urllib.request.urlopen(req, timeout=60) as resp:  # default TLS verify
         return resp.read().decode("utf-8", errors="replace")
 
@@ -103,7 +96,6 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("source", choices=sorted(sources))
     ap.add_argument("ident")
-    ap.add_argument("--ecosystem", default="Go")
     args = ap.parse_args(argv)
 
     spec = sources[args.source]
@@ -113,12 +105,7 @@ def main(argv=None) -> int:
         ap.error(f"{rule[1]}: {args.ident}")
 
     try:
-        if spec.get("method") == "POST":
-            body = json.dumps(
-                {"package": {"name": args.ident, "ecosystem": args.ecosystem}}
-            ).encode()
-            out = _get(spec["url_template"], allowed, data=body)
-        elif spec.get("doc_url_template"):
+        if spec.get("doc_url_template"):
             ident = args.ident.lower()
             out = _get(
                 spec["doc_url_template"].format(year=ident.split("-")[1], ident_lower=ident),

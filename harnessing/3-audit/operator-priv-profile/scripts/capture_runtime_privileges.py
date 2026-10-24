@@ -15,6 +15,8 @@ campaign's authorization (see validate-findings scope rules).
 Usage:
   capture_runtime_privileges.py --namespace <ns> --name <operator-name> \
       --out-dir <dir> --i-am-authorized [--kubeconfig <path>]
+
+Legacy kept: no traust-core door yet (ClusterProvider.privileges behind ValidationScope.decide).
 """
 
 from __future__ import annotations

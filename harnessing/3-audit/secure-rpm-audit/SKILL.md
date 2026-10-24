@@ -467,12 +467,14 @@ For each RPM01–RPM10 finding, reference the specific RPM risk ID in the findin
 ### Crypto Provider Census & Governance (crypto-analysis)
 
 When the prepared source tree exists **and**
-python3 -m traust.cli adapters crypto-audit is available, run the crypto provider census
-over the tree the package will actually build from:
+python3 -m traust.cli adapters crypto-source is available, run the crypto provider census
+over the tree the package will actually build from (`--sbom` records the
+tree's SBOM from *SBOM & Dependency Scan* below on the dist-git commit first):
 
 ```bash
-python3 -m traust.cli adapters crypto-audit source <prepared-tree> \
-    --component <component> --output /tmp/<component>-crypto-audit.json
+python3 -m traust.cli adapters crypto-source <prepared-tree> \
+    --repo-url <dist-git url> --sha <dist-git commit> [--public] \
+    --sbom /tmp/<component>-sbom.cdx.json --out /tmp/<component>-crypto-audit.json
 ```
 
 Contract (identical in spirit to the other deterministic pre-scans —
@@ -542,7 +544,7 @@ The wrapper runs `yara` against an **explicitly pinned rule pack** — by defaul
 Include any findings that already exist for the component from automated scanning tools and trackers:
 
 - **Red Hat Bugzilla / Jira** — open CVE flaw bugs filed against the component (`component=<name>`, keyword `Security`)
-- **OSV.dev** — query by the upstream package ecosystem and version parsed from `Source0`, through `harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py osv <package> --ecosystem <eco>`. A failed query is a coverage gap (`coverage_gaps`), never "no known CVEs".
+- **OSV.dev** — query by the upstream package ecosystem and version parsed from `Source0`, through `python3 -m traust.cli impact package <package> <version> --ecosystem <eco>`. A failed query is a coverage gap (`coverage_gaps`), never "no known CVEs".
 - **rpminspect** — if a baseline `rpminspect.yaml` exists, note any waived findings and their justification
 - **`traust adapters osv` / govulncheck** — run against vendored lock files extracted in Source Preparation. `status: degraded` (exit 3), `status: failed` (exit 2) or a skipped tool is a coverage gap. Vulnerability claims about bundled libraries cite an advisory one of these tools or feeds supplied; none are named from memory (see `/secure-code-audit` → *No data, no dependency conclusion*).
 - **Portfolio impact artifacts** — when `analysis-results/impact/<cve>-impact-analysis.json` (from `/impact-analysis`) covers a CVE found in the vendored dependencies, cite this package's source repo's classification and evidence block as promote/dismiss context: `affected` at symbol level strengthens promotion, `not_observed` at symbol level is documented dismissal evidence, manifest-level classifications inform but never decide. Record the artifact path in the finding's evidence — same convention as `/secure-code-audit` K07.
@@ -687,6 +689,13 @@ analysis-results/findings/<stream>/<component>/<component>-security-audit.md
 ```
 
 This Markdown file is for human consumption only — the JSON file remains the authoritative report artifact.
+
+**Step 5 — Record it** as an RPM assessment of the audited dist-git commit:
+
+```bash
+python3 -m traust.cli reporting record <path-to-report.json> --kind rpm \
+  --repo-url <dist-git url> --sha <dist-git commit>
+```
 
 **A report is not complete until python3 -m traust.cli reporting validate exits with 0 errors. Do not begin analysis of the next component until the current report passes validation.**
 

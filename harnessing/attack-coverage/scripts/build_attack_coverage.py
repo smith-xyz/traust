@@ -5,8 +5,8 @@ Deterministic join of the three places the harness records technique IDs —
 no agent judgment anywhere in this pipeline:
 
   observed  validations/**/*validation*.json  attack_chains[].mitre_attack_refs
-  modeled   findings roots **/*threat-model*.md / THREAT_MODEL.md
-            section-4 rows' optional attack_refs column
+  modeled   each repository's latest recorded threat model, its threats'
+            ATT&CK techniques (traust-core AssessmentService.threats)
   derived   findings roots **/*security-audit.json finding categories,
             mapped through tables/attack-mapping.json category_map
             (candidates an adversary COULD use against that weakness class
@@ -28,13 +28,17 @@ import argparse
 import collections
 import datetime
 import json
-import re
 import sys
 from pathlib import Path
+
+from traust_core.v1.models.assessment import ThreatFilter
+from traust_core.v1.models.common import every_item
+from traust_core.v1.models.inventory import RepositoryFilter
 
 from traust.context import (
     add_config_home_arg,
     load_engine,
+    load_services,
     progress_tracker_dir,
     resolve_results_root,
 )
@@ -61,51 +65,35 @@ TACTIC_ORDER = [
 ]
 
 
-def _split_row(line):
-    return [c.strip() for c in line.strip().strip("|").split("|")]
-
-
-def scan_threat_models(roots):
-    """{technique: n_threat_rows}, plus file/row counts and dropped IDs."""
+def scan_threat_models(services):
+    """{technique: n_threats}, plus threat-model/threat counts and dropped IDs, from each
+    repository's latest recorded threat model (AssessmentService.threats)."""
+    repository_ids = tuple(
+        r.id
+        for r in every_item(
+            lambda page: services.portfolio.list_repositories(RepositoryFilter(), page)
+        )
+    )
     counts = collections.Counter()
-    files = rows_with_refs = 0
     dropped = collections.Counter()
-    seen = set()
-    for root in roots:
-        for p in list(root.rglob("*threat-model*.md")) + list(root.rglob("THREAT_MODEL.md")):
-            if p.resolve() in seen:
-                continue
-            seen.add(p.resolve())
-            try:
-                text = p.read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                continue
-            files += 1
-            in4 = idx = None
-            for line in text.splitlines():
-                if re.match(r"##\s*4\.", line):
-                    in4, idx = True, None
-                    continue
-                if in4 and re.match(r"##\s*\d", line):
-                    break
-                if not in4 or not line.lstrip().startswith("|"):
-                    continue
-                cells = _split_row(line)
-                if idx is None:
-                    idx = cells.index("attack_refs") if "attack_refs" in cells else -1
-                    continue
-                if idx < 0 or len(cells) <= idx or set("".join(cells)) <= set("-: "):
-                    continue
-                ids = [t for t in re.split(r"[,;]\s*", cells[idx]) if t]
-                if not ids:
-                    continue
-                good = [t for t in ids if not attack_refs.validate_ids([t], TECH)]
-                for t in set(ids) - set(good):
-                    dropped[t] += 1
-                if good:
-                    rows_with_refs += 1
-                    counts.update(set(good))
-    return counts, files, rows_with_refs, dropped
+    models = set()
+    with_refs = 0
+    if repository_ids:
+        threats = every_item(
+            lambda page: services.assessments.threats(
+                ThreatFilter(repository_ids=repository_ids), page
+            )
+        )
+        for threat in threats:
+            models.add(threat.assessment_id)
+            ids = [t.id for t in threat.techniques]
+            good = [t for t in ids if not attack_refs.validate_ids([t], TECH)]
+            for t in set(ids) - set(good):
+                dropped[t] += 1
+            if good:
+                with_refs += 1
+                counts.update(set(good))
+    return counts, len(models), with_refs, dropped
 
 
 def scan_validations(results):
@@ -178,7 +166,7 @@ def main():
     TECH = attack_refs.load_techniques()
     tt = TECH["techniques"]
 
-    modeled, tm_files, tm_rows, tm_drop = scan_threat_models(roots)
+    modeled, tm_files, tm_rows, tm_drop = scan_threat_models(load_services(args.config_home))
     observed, attempted, val_reports, val_chains, val_drop = scan_validations(results)
     derived, audit_reports, _cat_findings = scan_findings(roots)
 
@@ -201,7 +189,7 @@ def main():
         if attempted.get(i):
             parts.append(f"in {attempted[i]} unconfirmed chain(s)")
         if modeled.get(i):
-            parts.append(f"modeled in {modeled[i]} threat row(s)")
+            parts.append(f"modeled in {modeled[i]} threat(s)")
         if derived.get(i):
             parts.append(f"candidate for {derived[i]} finding(s) by weakness class")
         return "; ".join(parts)
@@ -220,7 +208,7 @@ def main():
         "domain": "enterprise-attack",
         "description": (
             "Deterministic fleet coverage: observed (validated "
-            "attack chains), modeled (threat-model attack_refs), "
+            "attack chains), modeled (recorded threat models' techniques), "
             "weakness-derived candidates (finding categories via "
             "attack-mapping.json). " + TECH["attribution"]
         ),
@@ -267,7 +255,7 @@ def main():
         "",
         "**Population:** "
         f"{audit_reports} audit reports · {tm_files} threat models "
-        f"({tm_rows} threat rows carry `attack_refs`) · {val_reports} "
+        f"({tm_rows} threats name a technique) · {val_reports} "
         f"validation reports ({val_chains} chains with technique refs). "
         "Three evidence classes, never blended: **observed** = technique in "
         "a confirmed live-validation chain; **modeled** = named in a threat "

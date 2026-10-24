@@ -23,7 +23,7 @@ count; no agent authors, adds, or reinterprets a technique reference.
 | Class | Source | Meaning |
 |---|---|---|
 | **observed** (score 3) | `validations/**/*validation*.json` → `attack_chains[].mitre_attack_refs` on confirmed chains | adversary behavior demonstrated against a live target |
-| **modeled** (score 2) | threat models' optional `attack_refs` column (section 4) | behavior an owner/bootstrap pass named as a threat |
+| **modeled** (score 2) | each repository's latest recorded threat model: its threats' ATT&CK techniques (`AssessmentService.threats`) | behavior an owner/bootstrap pass named as a threat |
 | **derived** (score 1) | audit finding categories → [`tables/attack-mapping.json`](tables/attack-mapping.json) `category_map` | candidate techniques implied by a weakness class — potential, not behavior |
 
 ## Shared assets (used by other skills)
@@ -40,6 +40,9 @@ count; no agent authors, adds, or reinterprets a technique reference.
   `--validate-tables` (referential integrity, also enforced in tests).
 
 ## Run
+
+(No door yet for the roll-up itself, traust-core's `AttackCoverageView`: the
+builder joins the three classes; only **modeled** is read from traust-core.)
 
 ```bash
 python3 harnessing/attack-coverage/scripts/build_attack_coverage.py \
