@@ -544,11 +544,11 @@ Use when the user asks about SLA compliance, overdue findings, response/remediat
 
 ## threat-register
 
-Use when the user asks for a fleet-wide or portfolio-wide view of threats (not findings) — "how many unmitigated critical threats do we have", "threat register", "which products carry the most open threat exposure", "what class-closing mitigations would pay off fleet-wide" — or asks to (re)build the threat register. Deterministically aggregates every *-threat-model.md (and legacy THREAT_MODEL.md) under analysis-results into progress-tracker/metrics/dashboards/threat-register/threat-register.{json,md,html}, keyed by the stable compound key <model-slug>:<Tn>.
+Use when the user asks for a fleet-wide or portfolio-wide view of threats (not findings) — "how many unmitigated critical threats do we have", "threat register", "which products carry the most open threat exposure", "what class-closing mitigations would pay off fleet-wide" — or asks to (re)build the threat register. Deterministically lists every threat the registered repositories' latest recorded threat models state (traust assessments threats), each keyed by a stable id per model and <Tn>.
 
 - **Stage:** —
 - **Tier:** `secondary`
-- **Invoke:** `/threat-register` — arguments: `[--root <analysis-results>] [--out <dir>]`
+- **Invoke:** `/threat-register` — arguments: `[--status <status>] [--technique <attack-id>]`
 - **Skill:** [harnessing/threat-register/SKILL.md](../harnessing/threat-register/SKILL.md)
 
 ## traust-metrics

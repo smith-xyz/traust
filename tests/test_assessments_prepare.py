@@ -1,4 +1,4 @@
-"""`traust assessments prepare|coverage`: the CLI layer only. URL and commit become a ref, then one
+"""`traust assessments prepare|coverage|threats`: the CLI layer only. URL and commit become a ref, then one
 `AssessmentService.prepare`; a refused diff is exit 3 with the verdict. The door's behaviour
 (baseline, anchor, clusters, hunks, callers, refusals) is traust-core's tests."""
 
@@ -23,8 +23,11 @@ from traust_core.v1.models.assessment import (
     DiffRefused,
     DiffRequest,
     GapSignal,
+    Threat,
+    ThreatFilter,
 )
 from traust_core.v1.models.common import Page
+from traust_core.v1.models.vocabulary import ThreatActor, ThreatStatus
 
 from traust.cli import assessments
 
@@ -197,3 +200,41 @@ def test_coverage_is_one_door_call_over_every_repository(
     assert (body["examined"], body["total"], body["ratio"]) == (1, 2, 0.5)
     assert body["gaps"][0]["examples"] == [URL]
     assert body["gaps"][0]["tool"] == "route-guards"
+
+
+def test_threats_reads_every_repository_through_one_filter(
+    monkeypatch: pytest.MonkeyPatch, home: Path
+) -> None:
+    assessment_id = uuid.uuid4()
+    threat = Threat(
+        assessment_id=assessment_id,
+        repository_id=REPO.id,
+        label="T1",
+        title="Tenant token replay",
+        status=ThreatStatus.UNMITIGATED,
+        actor=ThreatActor.REMOTE_UNAUTH,
+    )
+    threats_door = Door(Page(items=[threat]))
+    services = SimpleNamespace(
+        assessment=SimpleNamespace(threats=threats_door),
+        portfolio=SimpleNamespace(
+            list_repositories=lambda _filter, _page: Page(
+                items=[SimpleNamespace(id=REPO.id, url=URL)]
+            )
+        ),
+    )
+    monkeypatch.setattr(Context, "services", lambda self: services)
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        rc = assessments.threats(
+            ["--config-home", str(home), "--status", "unmitigated", "--technique", "T1550"]
+        )
+    assert rc == 0
+    (scope, _page) = threats_door.calls[0]
+    assert scope == ThreatFilter(
+        repository_ids=(REPO.id,), statuses=(ThreatStatus.UNMITIGATED,), technique="T1550"
+    )
+    body = json.loads(out.getvalue())
+    assert body["total"] == 1
+    row = body["threats"][0]
+    assert (row["id"], row["repository"], row["label"]) == (str(threat.id), URL, "T1")
