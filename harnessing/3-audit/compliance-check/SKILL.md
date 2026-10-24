@@ -66,8 +66,8 @@ ledger, SLA clocks, and dashboards as every other finding.
 
 `$ARGUMENTS`: `<target> --framework <id>[,<id>…]|all` plus flags.
 
-- **Target**: a product name (resolved to repos via repo-graph `ships`
-  edges), a `--repos org/a org/b` list, and/or an environment (needs a
+- **Target**: a product name (resolved to repos via its boundary,
+  `traust compliance resolve <boundary>`), a `--repos org/a org/b` list, and/or an environment (needs a
   mode-1 `targets.yaml` for the collectors). FedRAMP and GDPR verdicts
   **require an environment target** — the runner skips them on
   product-only runs, with the reason named.
@@ -78,7 +78,7 @@ ledger, SLA clocks, and dashboards as every other finding.
 
 ## Procedure
 
-1. **Resolve the target.** Product → repo set via repo-graph;
+1. **Resolve the target.** Product → repo set via `traust compliance resolve`;
    environment → confirm the `targets.yaml` scope file exists. For
    environment topology context, an IaC-declaration adapter (the deployment's own; Red Hat's lives in
    the internal extension repo as `extract_app_interface_env.py`) supplies
@@ -256,7 +256,7 @@ validated artifacts, and NOTHING else:
    first** (`resolves_via: deployment-iac` — does the owner have an IaC
    declaration of what deploys for this service? Every resolved repo then carries its IaC citation;
    traust-core refuses it until the model has a home for deployment inventories);
-   repo-graph product mapping second (an organizational assertion, not
+   the product mapping (`resolves_via: repo-graph`) second (an organizational assertion, not
    evidence — say so to the owner); explicit include-list last. Then
    walk the RESOLVED repo list (`traust compliance resolve <boundary>`) with the owner: additions and removals
    each need a stated reason, which becomes the include/exclude
