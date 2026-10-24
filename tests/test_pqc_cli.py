@@ -16,6 +16,13 @@ import yaml
 from traust_core.v1.context import Context
 from traust_core.v1.errors import NotFoundError, ValidationError
 from traust_core.v1.models.artifacts import PqcReadinessArtifact
+from traust_core.v1.models.insight import (
+    FindingsRollup,
+    FindingTally,
+    RenderedView,
+    ViewFilter,
+    ViewName,
+)
 from traust_core.v1.models.pqc import PqcDimension, PqcFilter
 from traust_core.v1.models.vocabulary import PqcReadinessBucket, PqcRemediationCategory
 
@@ -26,6 +33,13 @@ URL = "https://github.com/acme/widget"
 SHA = "f1b29843254b34f95ee1b36f1accca0380070962"
 REF = uuid.uuid4()
 PRODUCT = SimpleNamespace(id=uuid.uuid4(), slug="widget")
+RENDERED = RenderedView(
+    view=ViewName.PQC,
+    stem="pqc",
+    model=FindingsRollup(total=FindingTally()),
+    markdown="# PQC readiness\n",
+    html="<!doctype html><title>PQC readiness</title>",
+)
 
 
 class Door:
@@ -63,6 +77,7 @@ def doors(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         blockers=Door([SimpleNamespace(model_dump=lambda **_: {"id": "R1"}, patchable=True)]),
         find_repository=Door(repo),
         find_ref=Door(ref),
+        publish=Door(RENDERED),
     )
     services = SimpleNamespace(
         pqc=SimpleNamespace(
@@ -79,6 +94,7 @@ def doors(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
             inventory=SimpleNamespace(find_ref=stub.find_ref),
             find_product=lambda slug: PRODUCT if str(slug) == "widget" else None,
         ),
+        insight=SimpleNamespace(publish=stub.publish),
     )
     monkeypatch.setattr(Context, "services", lambda self: services)
     return stub
@@ -232,3 +248,34 @@ def test_blockers_take_one_anchoring_flag(doors: SimpleNamespace, home: Path) ->
         call("blockers", home, "--patchable", "--not-patchable")
     assert e.value.code == 2
     assert not doors.blockers.calls
+
+
+@pytest.mark.parametrize(
+    ("flags", "products"), [((), ()), (("--product", "widget", "--product", "widget"), (1,))]
+)
+def test_dashboard_writes_the_pqc_view(
+    doors: SimpleNamespace,
+    home: Path,
+    tmp_path: Path,
+    flags: tuple[str, ...],
+    products: tuple[int, ...],
+) -> None:
+    rc, out = call("dashboard", home, "--out", str(tmp_path / "d"), *flags)
+    assert rc == 0
+    product_ids = tuple(PRODUCT.id for _ in products)
+    assert doors.publish.calls == [(ViewName.PQC, ViewFilter(product_ids=product_ids))]
+    written = [Path(p) for p in out["written"]]
+    assert [p.name for p in written] == [
+        "pqc-dashboard.md",
+        "pqc-dashboard.html",
+        "pqc-dashboard.json",
+    ]
+    assert written[0].read_text() == "# PQC readiness\n"
+
+
+def test_dashboard_of_an_unknown_product_writes_nothing(
+    doors: SimpleNamespace, home: Path, tmp_path: Path
+) -> None:
+    rc, err = call("dashboard", home, "--out", str(tmp_path / "d"), "--product", "nope")
+    assert rc == 2 and "nope" in err
+    assert not doors.publish.calls and not (tmp_path / "d").exists()
