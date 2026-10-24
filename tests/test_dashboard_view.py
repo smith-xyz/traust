@@ -16,17 +16,9 @@ import pytest
 import yaml
 from traust_core.v1.context import Context
 from traust_core.v1.errors import ValidationError
+from traust_core.v1.models import insight
 from traust_core.v1.models.common import TimeBucket, TimeWindow
-from traust_core.v1.models.insight import (
-    ExecutiveSummary,
-    FindingsRollup,
-    FindingsTrend,
-    FindingTally,
-    LeastPrivilege,
-    RenderedView,
-    ViewFilter,
-    ViewName,
-)
+from traust_core.v1.models.insight import FindingsTrend, RenderedView, ViewFilter, ViewName
 
 from traust.cli import dashboard_view
 
@@ -144,9 +136,9 @@ def test_executive_summary_as_of_writes_its_files(
     publish.result = RenderedView(
         view=ViewName.EXECUTIVE_SUMMARY,
         stem="executive-summary-findings",
-        model=ExecutiveSummary(
-            rollup=FindingsRollup(as_of=AS_OF, total=FindingTally()),
-            privileges=LeastPrivilege(
+        model=insight.ExecutiveSummary(
+            rollup=insight.FindingsRollup(as_of=AS_OF, total=insight.FindingTally()),
+            privileges=insight.LeastPrivilege(
                 profiles=0,
                 privileged=0,
                 scc_requesting=0,
