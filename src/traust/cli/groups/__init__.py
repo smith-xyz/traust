@@ -94,6 +94,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "render": reporting.RENDER,
         "rate-threats": reporting.RATE_THREATS,
         "sarif": reporting.SARIF,
+        "record": reporting.RECORD,
     },
     "sweep": {
         "collect": sweep.COLLECT,
