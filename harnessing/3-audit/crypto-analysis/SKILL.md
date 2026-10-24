@@ -62,7 +62,7 @@ from `syft` first); with none recorded the command stops and says so.
 ```bash
 # Tier 1 — source (build-time / repo census)
 python3 -m traust.cli adapters crypto-source /path/to/repo \
-  --repo-url https://github.com/org/my-operator --sha <commit> \
+  --repo-url https://github.com/org/my-operator --sha <commit> --branch <branch> \
   --sbom my-operator.cdx.json --out my-operator-source.json
 
 # Tier 2 — binary (container image, no cluster)
@@ -125,7 +125,7 @@ Otherwise run the unified extraction tool:
 
 ```bash
 python3 -m traust.cli adapters crypto-source $REPO --repo-url $REPO_URL --sha $SHA \
-  --sbom $SBOM --out crypto-facts.json
+  --branch $BRANCH --sbom $SBOM --out crypto-facts.json
 ```
 
 Provider census probes:

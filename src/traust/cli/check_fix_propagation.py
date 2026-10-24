@@ -26,10 +26,10 @@ import json
 from pathlib import Path
 
 from traust_core.v1.models.dependencies import Version
-from traust_core.v1.models.values import GitSha, HttpsRepoUrl
+from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import Ecosystem
 
-from traust.cli._doors import parser, run
+from traust.cli._doors import add_branch_arg, parser, register_commit, run
 from traust.context import load_core
 
 
@@ -37,6 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = parser("check", "fix-propagation", "Has the original commit consumed the fixed version?")
     ap.add_argument("--repo-url", required=True, help="https URL of the ORIGINAL repository")
     ap.add_argument("--sha", required=True, help="the commit to check")
+    add_branch_arg(ap)
     ap.add_argument("--ecosystem", required=True, choices=[e.value for e in Ecosystem])
     ap.add_argument("--module", required=True, help="the package the fix landed in")
     ap.add_argument("--fixed-version", required=True)
@@ -49,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, False)
-        ref = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None)
+        ref = register_commit(services, repo.id, args.sha, args.branch)
         if args.sbom is not None:
             services.exposure.ingest_sbom(args.sbom.read_bytes(), ref.id)
         found = services.exposure.consumes_fix(

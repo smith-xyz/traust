@@ -27,9 +27,9 @@ from traust_core.v1.models.validation import (
     ScopeBindingMode,
     ValidationScope,
 )
-from traust_core.v1.models.values import GitSha, HttpsRepoUrl
+from traust_core.v1.models.values import HttpsRepoUrl
 
-from traust.cli._doors import parser, run
+from traust.cli._doors import add_branch_arg, parser, register_commit, run
 from traust.context import load_core, load_services
 
 
@@ -53,6 +53,7 @@ def source(argv: list[str] | None = None) -> int:
     ap.add_argument("--repo-url", required=True, help="https URL of the repository")
     ap.add_argument("--sha", required=True, help="the checked-out commit")
     ap.add_argument("--public", action="store_true", help="the repository is public")
+    add_branch_arg(ap)
     ap.add_argument(
         "--sbom", type=Path, help="the commit's manifest SBOM (syft dir:<checkout>), recorded first"
     )
@@ -63,7 +64,7 @@ def source(argv: list[str] | None = None) -> int:
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, args.public)
-        ref = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None)
+        ref = register_commit(services, repo.id, args.sha, args.branch)
         assert ref.id is not None
         if args.sbom is not None:
             services.exposure.ingest_sbom(args.sbom.read_bytes(), ref.id)

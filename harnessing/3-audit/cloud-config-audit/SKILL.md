@@ -232,7 +232,7 @@ never add, remove, or reword facts.
 
 - Confirmed critical/high findings enter the standard flow (`python3 -m
   traust.cli cloud-config record <target>-cloud-config-audit.json --repo-url
-  <metadata.repository> --sha <target_head>` records the audit, every finding
+  <metadata.repository> --sha <target_head> [--branch <scanned branch>]` records the audit, every finding
   and its disposition as a decision): cross-file
   via `/track-findings` disposition events and `/file-security-defect`
   for embargoed Jira filing — IaC misconfigurations never get a

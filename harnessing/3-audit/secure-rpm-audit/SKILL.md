@@ -473,7 +473,7 @@ tree's SBOM from *SBOM & Dependency Scan* below on the dist-git commit first):
 
 ```bash
 python3 -m traust.cli adapters crypto-source <prepared-tree> \
-    --repo-url <dist-git url> --sha <dist-git commit> [--public] \
+    --repo-url <dist-git url> --sha <dist-git commit> [--branch <stream>] [--public] \
     --sbom /tmp/<component>-sbom.cdx.json --out /tmp/<component>-crypto-audit.json
 ```
 
@@ -694,7 +694,7 @@ This Markdown file is for human consumption only — the JSON file remains the a
 
 ```bash
 python3 -m traust.cli reporting record <path-to-report.json> --kind rpm \
-  --repo-url <dist-git url> --sha <dist-git commit>
+  --repo-url <dist-git url> --sha <dist-git commit> [--branch <stream>]
 ```
 
 **A report is not complete until python3 -m traust.cli reporting validate exits with 0 errors. Do not begin analysis of the next component until the current report passes validation.**

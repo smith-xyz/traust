@@ -182,7 +182,7 @@ Parse from `$ARGUMENTS`:
 - `--symbols <s1,s2>` — vulnerable symbols you identified (Step 1); they
   join any the advisory publishes or its fix commits yield.
 - `--feature-desc "..."` — what capability must be in use.
-- `--repo-url <url> --sha <commit>` — assess one commit instead of every
+- `--repo-url <url> --sha <commit> [--branch <branch>]` — assess one commit instead of every
   commit the advisory reaches.
 - `--scan` — clone undecided commits and run the deep scan; without it,
   SBOM evidence only, no cloning or scanning.
@@ -238,7 +238,7 @@ finding for each `affected` commit.
 
 Leave out `--scan` for a fast SBOM-only pass (no cloning). A commit
 with no recorded SBOM is not in the blast radius; record one with
-`python3 -m traust.cli impact sbom <file> --repo-url <url> --sha <commit>`.
+`python3 -m traust.cli impact sbom <file> --repo-url <url> --sha <commit> [--branch <branch>]`.
 
 ### Step 3: Validate and review
 

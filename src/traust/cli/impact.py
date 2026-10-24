@@ -32,7 +32,7 @@ from traust_core.v1.models.dependencies import (
     Version,
     parse_advisory_identifier,
 )
-from traust_core.v1.models.values import GitSha, HttpsRepoUrl
+from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import (
     Ecosystem,
     ImpactClassification,
@@ -40,7 +40,7 @@ from traust_core.v1.models.vocabulary import (
     SourceType,
 )
 
-from traust.cli._doors import parser, run
+from traust.cli._doors import add_branch_arg, parser, register_commit, run
 from traust.context import load_core
 from traust.paths import HARNESS_ROOT
 from traust.registry.feeds_config import registry_path
@@ -108,6 +108,7 @@ def sbom(argv: list[str] | None = None) -> int:
     ap.add_argument("--repo-url", required=True, help="https URL of the repository")
     ap.add_argument("--sha", required=True, help="the commit the SBOM was read from")
     ap.add_argument("--public", action="store_true", help="the repository is public")
+    add_branch_arg(ap)
     args = ap.parse_args(argv)
 
     def call() -> dict:
@@ -115,7 +116,7 @@ def sbom(argv: list[str] | None = None) -> int:
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, args.public)
-        ref = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None)
+        ref = register_commit(services, repo.id, args.sha, args.branch)
         if args.sbom is not None:
             kept = services.exposure.ingest_sbom(args.sbom.read_bytes(), ref.id)
             return {"repository_ref_id": ref.id, "sbom_id": kept.id}
@@ -150,6 +151,7 @@ def analyze(argv: list[str] | None = None) -> int:
     ap.add_argument("advisory")
     ap.add_argument("--repo-url", help="assess only this repository's commit (with --sha)")
     ap.add_argument("--sha", help="the commit to assess (with --repo-url)")
+    add_branch_arg(ap)
     ap.add_argument(
         "--scan",
         action="store_true",
@@ -164,6 +166,8 @@ def analyze(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if bool(args.repo_url) != bool(args.sha):
         ap.error("--repo-url and --sha go together")
+    if args.branch and not args.sha:
+        ap.error("--branch names the assessed commit's branch: give --repo-url and --sha")
 
     def call() -> dict:
         core = _core(args.config_home)
@@ -175,9 +179,7 @@ def analyze(argv: list[str] | None = None) -> int:
         if args.repo_url:
             url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
             repo = services.portfolio.register_repository(url, False)
-            commits = [
-                services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None).id
-            ]
+            commits = [register_commit(services, repo.id, args.sha, args.branch).id]
         else:
             commits = list(
                 dict.fromkeys(
