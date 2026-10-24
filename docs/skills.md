@@ -485,7 +485,7 @@ Use when the user asks to mine the disposition ledger for confirmed true positiv
 
 ## portfolio-graph
 
-Use when the user asks code-level portfolio questions or to build/refresh/query the portfolio source-code graph — "which products depend on module X" / CVE blast radius, "top shared libraries", "internal library coupling", "rebuild the portfolio graph", "query the code graph". Distinct from /repo-graph (the organizational coverage graph): this one holds the code-level layers — module dependencies (L1), Kubernetes interfaces (L2), artifacts/SBOM (L3), and symbols (L4), all implemented — in a queryable SQLite database built by python3 -m traust.cli portfolio.
+Use when the user asks code-level portfolio questions or to build/refresh/query the portfolio source-code graph — "which products depend on module X" / CVE blast radius, "top shared libraries", "internal library coupling", "rebuild the portfolio graph", "query the code graph". Distinct from the retired /repo-graph (the organizational coverage graph): this one holds the code-level layers — module dependencies (L1), Kubernetes interfaces (L2), artifacts/SBOM (L3), and symbols (L4), all implemented — in a queryable SQLite database built by python3 -m traust.cli portfolio.
 
 - **Stage:** —
 - **Tier:** `secondary`
