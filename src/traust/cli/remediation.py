@@ -1,5 +1,7 @@
 """``traust remediation …``: the remediation loop's doors on traust-core.
 
+next                 a repository's oldest work item still waiting for a patch
+prepare              what a patch of one work item fixes (findings, decisions, strategy, fork)
 verify-sweep         which repositories are worth re-verifying, by tier, and why the rest are not
 verify-prepare       what a verification of one work item re-checks, as JSON
 verify-differential  the scanner that backed a work item's findings, compared on a patched commit
@@ -20,7 +22,7 @@ from traust_core.v1.errors import NotFoundError
 from traust_core.v1.models.artifacts import VerificationArtifact
 from traust_core.v1.models.common import Provenance, every_item
 from traust_core.v1.models.inventory import Repository, RepositoryFilter
-from traust_core.v1.models.remediation import VerificationFilter
+from traust_core.v1.models.remediation import VerificationFilter, WorkItemFilter
 from traust_core.v1.models.values import GitSha, ProductSlug
 from traust_core.v1.models.vocabulary import SourceType
 
@@ -38,6 +40,33 @@ def _emit(text: str, out: Path | None) -> str | None:
         return text
     out.write_text(text + "\n", encoding="utf-8")
     return None
+
+
+def next_(argv: list[str] | None = None) -> int:
+    ap = _parser("next", "Print a repository's oldest work item still waiting for a patch.")
+    ap.add_argument("--repo-url", required=True)
+    args = ap.parse_args(argv)
+
+    def call() -> dict | str:
+        core = load_core(args.config_home)
+        repo = _repository(core, args.repo_url)
+        item = core.services().remediation.next_pending(WorkItemFilter(repository_id=repo.id))  # type: ignore[arg-type]
+        return "null" if item is None else item.model_dump(mode="json")
+
+    return run(call)
+
+
+def prepare(argv: list[str] | None = None) -> int:
+    ap = _parser("prepare", "Print what a patch of one work item fixes.")
+    ap.add_argument("work_item_id", type=uuid.UUID)
+    ap.add_argument("-o", "--out", type=Path, help="write the JSON here instead of stdout")
+    args = ap.parse_args(argv)
+
+    def call() -> str | None:
+        prepared = load_core(args.config_home).services().remediation.prepare(args.work_item_id)
+        return _emit(prepared.model_dump_json(indent=2), args.out)
+
+    return run(call)
 
 
 def verify_sweep(argv: list[str] | None = None) -> int:

@@ -5,6 +5,8 @@ from __future__ import annotations
 from traust.cli.groups._registry import passthrough_op
 
 REMEDIATION: dict[str, object] = {
+    "next": passthrough_op("remediation", "A repository's next work item to patch.", "next_"),
+    "prepare": passthrough_op("remediation", "What a patch of one work item fixes.", "prepare"),
     "verify-sweep": passthrough_op(
         "remediation", "Which repositories are worth re-verifying.", "verify_sweep"
     ),
