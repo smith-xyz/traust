@@ -23,6 +23,7 @@ from traust_core.v1.models.artifacts import (
     SecurityAuditArtifact,
 )
 from traust_core.v1.models.assessment import AssessmentFilter, AssessmentKind
+from traust_core.v1.models.integrity import FingerprintInput
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import SourceType
 
@@ -263,3 +264,41 @@ def test_record_on_core_rerecording_a_report_is_the_same_run(core_home, tmp_path
         assert rc == 0, out
         ids.add(out["id"])
     assert len(ids) == 1
+
+
+@pytest.mark.parametrize("kind", ["container", "rpm"])
+def test_record_on_core_takes_a_reports_findings_in(core_home, tmp_path, kind):
+    body = security_audit()
+    rc, out = run(
+        core_home, str(document(tmp_path, body)), "--kind", kind, "--repo-url", URL, "--sha", SHA
+    )
+    assert rc == 0, out
+    core = Context.from_file(core_home / "core.yaml")
+    services = core.services()
+    repo = services.portfolio.find_repository(HttpsRepoUrl.parse(URL, core.config.forge_hosts))
+    found = {
+        services.findings.intake.match(repo.id, FingerprintInput.from_report(entry, repo.url))
+        for entry in body["findings"]
+    }
+    assert None not in found and len(found) == len(body["findings"])
+
+
+def test_record_on_core_refuses_a_finding_at_the_root_and_files_nothing(core_home, tmp_path):
+    body = security_audit()
+    body["findings"][0]["locations"] = [{"path": "/"}]
+    rc, err = run(
+        core_home,
+        str(document(tmp_path, body)),
+        "--kind",
+        "container",
+        "--repo-url",
+        URL,
+        "--sha",
+        SHA,
+    )
+    assert rc == 2, err
+    core = Context.from_file(core_home / "core.yaml")
+    services = core.services()
+    repo = services.portfolio.find_repository(HttpsRepoUrl.parse(URL, core.config.forge_hosts))
+    ref = services.portfolio.register_ref(repo.id, GitSha.parse(SHA), None, None)
+    assert services.assessment.latest(ref.id, AssessmentKind.CONTAINER) is None

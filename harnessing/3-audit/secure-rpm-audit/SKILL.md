@@ -645,7 +645,7 @@ Key profile obligations for this skill:
 - `metadata.repository` = dist-git URL; upstream Source0/Version/Release/patches under `metadata.additional`.
 - `category` uses the `RPM01`–`RPM10` packaging taxonomy; digit-leading slugs take the `RPM_` prefix.
 - Emit `review_surface_coverage`, one entry per review surface (see *Review surfaces* above). Required from traust 0.21.0; the validator checks every entry against the rest of the report.
-- After validation, run python3 -m traust.cli corpus finding-identity fingerprint <report.json> --write.
+- After validation, `reporting record` (Step 5) takes the report's findings in as findings of the assessment, each by its fingerprint; a finding located only at `.`, `./` or `/` refuses the whole record.
 
 ### Report Validation
 

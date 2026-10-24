@@ -28,7 +28,6 @@ allowed-tools:
   - Bash(python3 *traust* -m traust.cli reporting validate:*)
   - Bash(python3 *traust* -m traust.cli reporting record:*)
   - Bash(python3 *traust* -m traust_engine.reporting.render:*)
-  - Bash(python3 *traust* -m traust.cli corpus finding-identity:*)
   # Confinement added 2026-07-31 (P1 gate rework — the
   # widened S1 privilege tokens made this skill's missing
   # allowlist visible; assessment root-cause 3). Never
@@ -575,7 +574,7 @@ Key profile obligations for this skill:
 - `dependency_audit` populated from Phase 3; findings only for reachable/shipping vulnerabilities.
 - `peach_isolation_review` always emitted — normally `{"applicable": false, "rationale": …}` pointing at the source repo's code-profile report.
 - No `loc_breakdown`; record `metadata.additional.sbom_packages` instead.
-- After validation: python3 -m traust.cli corpus finding-identity fingerprint <report.json> --write.
+- After validation, `reporting record` (below) takes the report's findings in as findings of the assessment, each by its fingerprint; a finding located only at `.`, `./` or `/` refuses the whole record.
 
 ### Report Validation
 
@@ -612,7 +611,7 @@ regenerates the cumulative view. Container-specific rules:
   image rebuild is a **new digest → new report → new finding IDs**.
   Dispositions do not carry forward by editing the old report: re-audit
   the new digest (the container analog of `/verify-remediation`) and
-  let the python3 -m traust.cli corpus finding-identity fingerprint match ladder join
+  record it: the same finding in the new report is the same finding (fingerprint), which joins
   old dispositions to the new baseline — the same mechanism branch
   re-audits use. A CVE absent from the rebuilt image's report resolves
   the old finding through that join, not through a hand edit.
