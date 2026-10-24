@@ -4,7 +4,7 @@
 # Pure shell/python — sets up the fork, working tree, and fix branch, then
 # stops.  The actual code change is produced by the AI-driven
 # `remediate-finding` skill (see SKILL.md), which calls this script for
-# Phase 1 and ``emit_remediation_report.py`` + ``run_checks.sh`` for
+# Phase 1 and ``run_checks.sh`` + ``traust remediation assemble`` for
 # Phases 4–5.  Mirrors the structure of validate-operator-live/run_one.sh.
 #
 # Usage:

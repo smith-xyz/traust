@@ -14,6 +14,12 @@ REMEDIATION: dict[str, object] = {
     "mutation-evidence": passthrough_op(
         "remediation", "A mewt campaign as one patch_evidence item.", "mutation_evidence_"
     ),
+    "assemble": passthrough_op(
+        "remediation", "Draft a work item's report from its worktree.", "assemble"
+    ),
+    "candidates": passthrough_op(
+        "remediation", "A product's findings no work item covers yet.", "candidates"
+    ),
     "record": passthrough_op("remediation", "Record a validated remediation report.", "record"),
     "verify-sweep": passthrough_op(
         "remediation", "Which repositories are worth re-verifying.", "verify_sweep"

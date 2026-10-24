@@ -7,7 +7,9 @@ prepare              what a patch of one work item fixes (findings, decisions, s
 fork                 the private fork a repository's fixes are pushed to
 progress             move a work item to a status (forward only)
 mutation-evidence    a mewt campaign's status JSON as one patch_evidence item
+assemble             a work item's remediation report from its worktree (not recorded)
 record               a validated remediation report on its work item
+candidates           a product's confirmed, open findings no work item covers, by repository
 verify-sweep         which repositories are worth re-verifying, by tier, and why the rest are not
 verify-prepare       what a verification of one work item re-checks, as JSON
 verify-differential  the scanner that backed a work item's findings, compared on a patched commit
@@ -24,11 +26,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from traust_core.v1.errors import NotFoundError
+import pydantic
+from traust_core.v1.errors import NotFoundError, ValidationError
 from traust_core.v1.models.artifacts import RemediationArtifact, VerificationArtifact
 from traust_core.v1.models.common import Provenance, every_item
 from traust_core.v1.models.inventory import Repository, RepositoryFilter
 from traust_core.v1.models.remediation import (
+    Check,
+    EvidenceItem,
+    PatchNarrative,
     VerificationFilter,
     WorkItemFilter,
     mutation_evidence,
@@ -36,8 +42,9 @@ from traust_core.v1.models.remediation import (
 from traust_core.v1.models.values import GitSha, ProductSlug
 from traust_core.v1.models.vocabulary import RemediationStatus, SourceType
 
-from traust.cli._doors import parser, run
+from traust.cli._doors import parser, products, run
 from traust.cli.findings import _repository
+from traust.cli.impact import harness_version
 from traust.context import load_core
 
 
@@ -129,6 +136,72 @@ def mutation_evidence_(argv: list[str] | None = None) -> int:
             args.target, args.rc, args.tool_version, args.log, status, args.boundary
         )
         return found.model_dump(mode="json", exclude_none=True)
+
+    return run(call)
+
+
+def _items(path: Path) -> list[Any]:
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    return doc if isinstance(doc, list) else [doc]
+
+
+def assemble(argv: list[str] | None = None) -> int:
+    ap = _parser("assemble", "Draft a work item's remediation report from its worktree.")
+    ap.add_argument("work_item_id", type=uuid.UUID)
+    ap.add_argument("--worktree", type=Path, required=True, help="the fix branch's checkout")
+    ap.add_argument("--product", required=True, help="metadata.logical_product")
+    ap.add_argument("--out", type=Path, required=True, help="the report; the diff goes beside it")
+    ap.add_argument("--checks", type=Path, required=True, help="run_checks.sh's checks.json")
+    ap.add_argument("--strategy", default="other")
+    ap.add_argument("--rationale", required=True)
+    ap.add_argument("--behaviour", default="none")
+    ap.add_argument("--residual")
+    ap.add_argument("--tests-added", default="", help="comma-separated")
+    ap.add_argument("--evidence", type=Path, action="append", default=[], help="repeatable")
+    ap.add_argument("--status", choices=[s.value for s in RemediationStatus])
+    ap.add_argument("--notes")
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        try:
+            narrative = PatchNarrative(
+                logical_product=args.product,
+                harness_version=harness_version(),
+                strategy=args.strategy,
+                rationale=args.rationale,
+                behaviour_change=args.behaviour,
+                residual_risk=args.residual,
+                tests_added=tuple(t.strip() for t in args.tests_added.split(",") if t.strip()),
+                evidence=tuple(
+                    EvidenceItem.model_validate(e) for p in args.evidence for e in _items(p)
+                ),
+                status=args.status,
+                notes=args.notes,
+            )
+            checks = [Check.model_validate(c) for c in _items(args.checks)]
+        except (json.JSONDecodeError, pydantic.ValidationError) as e:
+            raise ValidationError(f"assemble {args.work_item_id}: {e}") from e
+        remediation = load_core(args.config_home).services().remediation
+        draft = remediation.assemble(args.work_item_id, args.worktree, narrative, checks)
+        diff = args.out.parent / draft.report.patch.diff_path
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        diff.write_bytes(draft.diff)
+        args.out.write_bytes(draft.report.payload)
+        return {"report": str(args.out), "diff": str(diff), "status": draft.report.summary.status}
+
+    return run(call)
+
+
+def candidates(argv: list[str] | None = None) -> int:
+    ap = _parser("candidates", "A product's confirmed, open findings no work item covers yet.")
+    ap.add_argument("--product", required=True, help="a product slug")
+    args = ap.parse_args(argv)
+
+    def call() -> list:
+        services = load_core(args.config_home).services()
+        (product,) = products(services, [args.product])
+        found = services.remediation.candidates(product.id)
+        return [c.model_dump(mode="json") for c in found]
 
     return run(call)
 
