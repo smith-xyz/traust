@@ -100,7 +100,7 @@ def build_stages(
             "consumer",
             [PYTHON, "-m", "traust.cli", "compliance", "dashboard", *path_args],
         ),
-        # no door: AttackCoverageView (AssessmentService.threats)
+        # no door: AttackCoverageView; its modeled leg reads AssessmentService.threats
         (
             "attack-coverage",
             "consumer",
