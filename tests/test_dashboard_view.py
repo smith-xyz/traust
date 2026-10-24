@@ -20,6 +20,7 @@ from traust_core.v1.models import insight
 from traust_core.v1.models.common import TimeBucket, TimeWindow
 from traust_core.v1.models.insight import FindingsTrend, RenderedView, ViewFilter, ViewName
 
+from tests.test_products_doors import _postgres
 from traust.cli import dashboard_view
 
 ALPHA = SimpleNamespace(id=uuid.uuid4(), slug="alpha", name="Alpha")
@@ -238,3 +239,42 @@ def test_an_unresolvable_sla_policy_is_exit_2_and_writes_nothing(
         dashboard_view.main(["--config-home", str(home), *argv])
     assert exit.value.code == 2 and "SLA policy not resolvable" in err.getvalue()
     assert policies == [] and not out.exists()
+
+
+def test_threat_register_writes_its_files(publish: Door, home: Path, tmp_path: Path) -> None:
+    publish.result = RenderedView(
+        view=ViewName.THREAT_REGISTER,
+        stem="threat-register",
+        model=insight.ThreatRegister(as_of=AS_OF, repository_urls={}, models=0),
+        markdown="# Threat register\n",
+        html="<!doctype html><title>Threat register</title>",
+    )
+    out = tmp_path / "threat-register"
+    argv = ("--product", "alpha", "--as-of", AS_OF.isoformat(), "--out", str(out))
+    rc, answer = run(home, "threat-register", *argv)
+    assert rc == 0
+    assert publish.calls == [
+        (ViewName.THREAT_REGISTER, ViewFilter(product_ids=(ALPHA.id,), as_of=AS_OF))
+    ]
+    assert sorted(p.name for p in out.iterdir()) == [
+        "threat-register.html",
+        "threat-register.json",
+        "threat-register.md",
+    ]
+    assert (answer["model"]["models"], answer["model"]["threats"]) == (0, [])
+
+
+@pytest.mark.parametrize("database", ["sqlite", "postgres"])
+def test_threat_register_on_core_renders_an_empty_fleet(tmp_path: Path, database: str) -> None:
+    config = tmp_path / "config"
+    config.mkdir()
+    core: dict[str, Any] = {"home": str(tmp_path / "store")}
+    with contextlib.ExitStack() as stack:
+        if database == "postgres":
+            core["database"] = {"url": stack.enter_context(_postgres())}
+        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        out = tmp_path / "out"
+        rc, answer = run(config, "threat-register", "--out", str(out))
+    assert rc == 0, answer
+    assert answer["model"]["threats"] == [] and answer["model"]["quick_wins"] == []
+    assert "_No threat models recorded._" in (out / "threat-register.md").read_text()
