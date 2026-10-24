@@ -85,6 +85,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "onboard": portfolio.ONBOARD,
         "owner-hints": portfolio.OWNER_HINTS,
         "import-owners": portfolio.IMPORT_OWNERS,
+        "import-release": portfolio.IMPORT_RELEASE,
         "population": portfolio.POPULATION,
     },
     "reporting": {

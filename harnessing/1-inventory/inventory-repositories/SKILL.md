@@ -98,11 +98,13 @@ All output goes under the target segment of `locations.inputs`:
 ```
 
 These are the layouts `repo-graph` reads for the two kinds; the CSV column
-schemas are in each procedure. The CSVs keep the release version, payload
-images and categories (traust-core has no release-import door yet); the
+schemas are in each procedure. The CSVs keep the payload images and
+categories (traust-core has no column for them yet); the
 repositories themselves are registered with
 `traust portfolio onboard --product <segment or product> --repo <URL>…`
-(needs `traust auth local`; base images have no repository).
+(needs `traust auth local`; base images have no repository), and a release
+payload's version with the commits it ships with
+`traust portfolio import-release` (release-payload Step 7).
 
 ---
 
@@ -205,6 +207,7 @@ When the same repository appears across multiple versions:
   under `locations.inputs`, read by `repo-graph` (graph nodes,
   release/product-version layers), `executive-summary-findings --by-segment`
   and the coverage dashboards; `repository` and `ownership` rows in
-  traust-core (`traust portfolio onboard`, `import-owners`).
+  traust-core (`traust portfolio onboard`, `import-owners`); a release
+  payload's `release` and `component` rows (`traust portfolio import-release`).
 - **Counterpart**: `/add-inputs` for hand-registered repos in `groups`
   segments; `/corpus-intake` registers the *output* tree audits will write to.

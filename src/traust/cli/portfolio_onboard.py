@@ -1,4 +1,4 @@
-"""``traust portfolio plan|onboard|owner-hints|import-owners``: add-inputs' and
+"""``traust portfolio plan|onboard|owner-hints|import-owners|import-release``: add-inputs' and
 inventory-repositories' doors on traust-core (onboarding and portfolio sync).
 
 plan           what onboard would register and order, writing nothing (the dry run)
@@ -6,11 +6,13 @@ onboard        register the product (when --label names a new one), the reposito
                organisation's non-archived, non-fork repositories; re-runs are no-ops
 owner-hints    OWNERS / CODEOWNERS approvers, then top contributors: hints, never stored
 import-owners  mirror the declared ownership source onto every registered repository
+import-release a product version and the commits it ships (a payload's commit URLs)
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 from typing import Any
 
@@ -19,10 +21,19 @@ import yaml
 from traust_core.v1.context import Context
 from traust_core.v1.errors import ValidationError
 from traust_core.v1.models.base import Dto, Model
-from traust_core.v1.models.inventory import OrgName, OwnerAssignment, OwnershipSource, TeamName
+from traust_core.v1.models.inventory import (
+    OrgName,
+    OwnerAssignment,
+    OwnershipSource,
+    RefName,
+    ReleaseCommit,
+    TeamName,
+    VersionLabel,
+)
 from traust_core.v1.models.onboarding import OnboardingRequest, RepositorySpec
-from traust_core.v1.models.values import HttpsRepoUrl, ProductSlug
+from traust_core.v1.models.values import GitSha, HttpsRepoUrl, ProductSlug
 
+from traust.cli import _doors
 from traust.cli._doors import parser, run
 from traust.context import load_caller, load_core
 
@@ -140,5 +151,47 @@ def import_owners(argv: list[str] | None = None) -> int:
     def call() -> Any:
         core = load_core(args.config_home)
         return _json(core.services().sync.import_owners(_source(core, args.source)))
+
+    return run(call)
+
+
+_COMMIT_URL = re.compile(r"(?P<repo>https://\S+?)(?:/-)?/commit/(?P<sha>[0-9a-f]{40})/?")
+
+
+def _commits(core: Context, path: Path, branch: str | None) -> list[ReleaseCommit]:
+    """One commit per non-blank line whose last field is a commit URL (`oc adm release info
+    --commit-urls`: `<image> <commit URL>`)."""
+    commits = []
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        found = _COMMIT_URL.fullmatch(line.split()[-1])
+        if found is None:
+            raise ValidationError(f"{path}:{n}: not a commit URL: {line.strip()!r}")
+        commits.append(
+            ReleaseCommit(
+                url=_url(core, found["repo"]),
+                sha=GitSha.parse(found["sha"]),
+                branch=None if branch is None else RefName(branch),
+            )
+        )
+    return commits
+
+
+def import_release(argv: list[str] | None = None) -> int:
+    ap = parser("portfolio", "import-release", "Record a product version and its commits.")
+    ap.add_argument("--product", required=True, help="the product slug")
+    ap.add_argument("--version", required=True, help="the release version, e.g. 4.21.3")
+    ap.add_argument("--commits", type=Path, required=True, help="lines of `<image> <commit URL>`")
+    ap.add_argument("--branch", help="the branch every commit was built from (release-4.21)")
+    args = ap.parse_args(argv)
+
+    def call() -> Any:
+        core = load_core(args.config_home)
+        services = core.services()
+        commits = _commits(core, args.commits, args.branch)
+        [product] = _doors.products(services, [args.product])
+        release = services.portfolio.import_release(product.id, VersionLabel(args.version), commits)
+        return release.model_dump(mode="json")
 
     return run(call)
