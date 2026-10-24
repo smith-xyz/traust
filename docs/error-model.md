@@ -155,7 +155,7 @@ consumable without archaeology:
 
 | Signal | Capture channel | Feeds |
 |---|---|---|
-| Confirmed TPs in the ledger | python3 -m traust.cli sweep mine → `rule-mining.{json,md}` + `tp-corpus.jsonl` | The opengrep rule-authoring backlog (uncovered CWE×language clusters) and per-rule precision |
+| Confirmed TPs in the ledger | python3 -m traust.cli sweep mine (over traust-core's recorded findings); `rule-mining.{json,md}` + `tp-corpus.jsonl` from `sweep rule-lane` | The opengrep rule-authoring backlog (uncovered CWE×language clusters) and per-rule precision |
 | Syntactic-shaped confirmations | `python3 -m traust.cli sweep rule-lane` (rule-expressibility routing) | Draft rules swept corpus-wide; hits enter `/triage` as candidates |
 | Semantic-shaped confirmations (authn/authz/ordering — never rule-expressible) | Precedent cards (python3 -m traust.ops.compile_precedent_cards): predicate over a shipped enumerator's output schema, or REJECTED | The semantic sweep tier — `sweep-candidates-semantic.json` into `/triage` |
 | What the enumerators could NOT cover | Structured `metadata.additional.coverage_gaps` in every report (recording convention in the enumerator pre-scan sections) + skipped `deterministic_steps` | build_coverage_gap_rollup.py (retired with the traust-core hub) → the coverage-gaps rollup under the metrics tree — the repos-affected-ranked enumerator-expansion backlog |
