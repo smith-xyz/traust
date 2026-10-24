@@ -146,7 +146,7 @@
     "engine-internal": 5
   },
   "src/traust/cli/groups/util.py": {
-    "engine-internal": 3
+    "engine-internal": 2
   },
   "src/traust/cli/query_index.py": {
     "database": 1
