@@ -26,6 +26,7 @@ allowed-tools:
   - Bash(python3 *traust* -m traust.cli adapters image-sbom:*)
   - Bash(python3 *traust* -m traust.cli adapters image-packages:*)
   - Bash(python3 *traust* -m traust.cli reporting validate:*)
+  - Bash(python3 *traust* -m traust.cli reporting record:*)
   - Bash(python3 *traust* -m traust_engine.reporting.render:*)
   - Bash(python3 *traust* -m traust.cli corpus finding-identity:*)
   # Confinement added 2026-07-31 (P1 gate rework — the
@@ -584,6 +585,8 @@ Identical gate to the other audit profiles — **a report is not complete until 
 python3 -m traust.cli reporting validate <path-to-report.json>
 python3 -m traust.cli reporting validate --strict <path-to-report.json>   # address warnings
 python3 -m traust.cli reporting render <path-to-report.json> -o <path-to-report.md>
+python3 -m traust.cli reporting record <path-to-report.json> --kind container \
+  --repo-url <vcs-url> --sha <vcs-ref>   # when Phase 1's labels declare the source
 ```
 
 Do not begin the next image until the current report passes.
