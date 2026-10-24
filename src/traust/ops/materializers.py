@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from pathlib import Path
 from uuid import UUID
 
 from traust_core.v1.context import Services
 from traust_core.v1.errors import ConfigError, NotFoundError, ValidationError
 from traust_core.v1.models.dependencies import FeedName
+from traust_core.v1.models.insight import RenderedView, ViewFilter, ViewName
 from traust_core.v1.models.observation import ComparisonStatus
 from traust_core.v1.models.operations import AssetRequest, JobResult
 from traust_core.v1.models.values import HttpsRepoUrl
@@ -92,3 +94,43 @@ class LedgerAuditMaterializer:
         return JobResult.partly(
             {k: n for k, n in (("failed", failed), ("unverified", unverified)) if n}
         )
+
+
+def write_view(view: RenderedView, directory: Path, stem: str | None = None) -> tuple[Path, ...]:
+    """`<stem>.md`, `.html` and `.json` (the model) under `directory`; core stores no view."""
+    directory.mkdir(parents=True, exist_ok=True)
+    base = directory / (stem or view.stem)
+    out = {
+        base.with_suffix(".md"): view.markdown,
+        base.with_suffix(".html"): view.html,
+        base.with_suffix(".json"): view.model.model_dump_json(indent=2),
+    }
+    for path, text in out.items():
+        path.write_text(text, encoding="utf-8")
+    return tuple(out)
+
+
+class DashboardsMaterializer:
+    """`dashboards`: render every built insight view (or the one in ``partition``) under
+    ``<out>/<view>/``. A view that fails is degraded; the rest are still written."""
+
+    asset = "dashboards"
+
+    def __init__(self, services: Services, out: Path) -> None:
+        self._insight = services.insight
+        self._out = out
+
+    def materialize(self, request: AssetRequest) -> JobResult:
+        try:
+            views = None if request.partition is None else [ViewName(request.partition)]
+            result = self._insight.refresh(views, ViewFilter())
+        except (ValueError, ConfigError) as e:
+            return JobResult.failed(f"bad request: {e}")
+        written = tuple(
+            str(path)
+            for view in result.rendered.values()
+            for path in write_view(view, self._out / view.view)
+        )
+        reason = "; ".join(f"{name}: {why}" for name, why in result.failed.items()) or None
+        degraded = {name.value: 1 for name in result.failed}
+        return JobResult.partly(degraded, written).model_copy(update={"reason": reason})

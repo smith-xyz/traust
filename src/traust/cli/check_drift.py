@@ -1969,7 +1969,7 @@ def _check_each_builder(metrics: Path) -> list[dict]:
     try:
         from traust.cli.refresh_dashboards import build_stages
 
-        stages = build_stages(Path("/nonexistent"), Path("/nonexistent"), "", False)
+        stages = build_stages(Path("/nonexistent"), Path("/nonexistent"), False)
     except Exception as e:
         return [item("dashboards:builders", "unavailable", f"cannot read the stage list: {e}")]
 
