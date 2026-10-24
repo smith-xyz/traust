@@ -33,6 +33,7 @@ RECORDS: dict[AssessmentKind, tuple[str, type[ArtifactDocument]]] = {
     AssessmentKind.ISOLATION_REVIEW: ("isolation-review", IsolationReviewArtifact),
     AssessmentKind.PRIV_PROFILE: ("operator-priv-profile", PrivProfileArtifact),
     AssessmentKind.VULN_SCAN: ("vuln-scan", VulnFindingsArtifact),
+    AssessmentKind.SECURE_CODE: ("secure-code-audit", SecurityAuditArtifact),
 }
 
 
