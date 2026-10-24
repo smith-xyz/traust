@@ -8,7 +8,7 @@ metadata:
 
 # Compliance Check — Evidence-Gated Control Assessment
 
-> **Being ported to traust-core** (progress-tracker skill port 32, compliance-check): compliance_scope_intake.py retired with the traust-core hub (it ran on the old ledger / corpus code). The steps marked RETIRED don't run until the port lands.
+> **Being ported to traust-core** (progress-tracker skill port 32, compliance-check): boundaries are declared and resolved in traust-core (`traust compliance declare|scopes|resolve`). The runner, gate and dashboard still run from files until traust-core can publish the control mapping.
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in
@@ -32,8 +32,8 @@ is **policy data**, not prompt text
 `data/compliance/` beside the NIST spine, profiles and framework catalogs;
 schema-gated; changing a mapping is a reviewed change, and a deployment
 that needs a different one passes `--registry`). Org parameters
-(`org-parameters.yaml`) and the scope registry (`compliance-scope.yaml`) are
-deployment config in the config home. The
+(`org-parameters.yaml`) are deployment config in the config home; boundary
+declarations are recorded in traust-core (`traust compliance declare`). The
 chain for every deterministic verdict:
 
 ```
@@ -209,10 +209,10 @@ target is the labeled-fiction efficacy fixture. Its job is to extract what only 
 edges, data flows, environments, compensating controls) into two
 validated artifacts, and NOTHING else:
 
-1. a scope-registry entry, written ONLY via
-   `RETIRED:compliance_scope_intake.py` (schema-validated,
-   dry-run-resolved, overwrite-refused — never hand-edit the YAML from
-   this mode), and
+1. a boundary declaration, recorded ONLY via
+   `traust compliance declare <scope.yaml>` (schema-validated,
+   resolved before it is recorded, overwrite-refused without `--replace` —
+   never hand-edit a recorded declaration from this mode), and
 2. an attestation bundle rendered into the assessment's
    `metadata.owner_attestations` when a run follows.
 
@@ -228,12 +228,13 @@ validated artifacts, and NOTHING else:
    `satisfied` is never directly settable from an interview answer:
    a team's "we have a compensating control" is a claim to assess,
    not accept (the verify-remediation rule, applied to intake).
-2. **The boundary declarant is identity-verified.** Run the intake
-   writer with `--verify-identity`; a declaration whose signer fails
-   (or skips) LDAP verification records as `draft:<id>` and every
+2. **The boundary declarant is identity-verified.** `traust compliance
+   declare` signs only when the verified caller (`traust auth`) is the
+   declarant; a declaration whose signer fails
+   (or skips) verification records as `draft:<id>` and every
    downstream consumer labels its output DRAFT. "Doesn't-apply"
    exclusions are boundary claims: each requires its rationale (the
-   writer enforces this) and rides the same signature — this is where
+   schema enforces this) and rides the same signature — this is where
    self-service compliance historically rots, so it is the one place
    the interview slows down on purpose.
 3. **Intake and assessment stay separable.** The interview always ends
@@ -243,19 +244,21 @@ validated artifacts, and NOTHING else:
 
 ### Question sequence (bounded — one pass, no fishing)
 
-1. **Who are you** — kerberos id; attempt verification up front so the
+1. **Who are you** — kerberos id; attempt verification up front
+   (`traust auth status`) so the
    draft/signed outcome is known before any declaration is made.
 2. **Which frameworks** — from the supported set; note the
    environment-kind preconditions (FedRAMP/GDPR need a deployed
    environment) so the owner isn't surprised by skips.
-3. **The boundary** — `resolve_compliance_scope.py --list` first
-   (never duplicate an existing boundary; extend with --update). Then
+3. **The boundary** — `traust compliance scopes` first
+   (never duplicate an existing boundary; extend with `declare --replace`). Then
    the membership source, in preference order: **deployment evidence
    first** (`resolves_via: deployment-iac` — does the owner have an IaC
-   declaration of what deploys for this service? Every resolved repo then carries its IaC citation);
+   declaration of what deploys for this service? Every resolved repo then carries its IaC citation;
+   traust-core refuses it until the model has a home for deployment inventories);
    repo-graph product mapping second (an organizational assertion, not
    evidence — say so to the owner); explicit include-list last. Then
-   walk the RESOLVED repo list with the owner: additions and removals
+   walk the RESOLVED repo list (`traust compliance resolve <boundary>`) with the owner: additions and removals
    each need a stated reason, which becomes the include/exclude
    rationale verbatim.
 4. **Owner context for evidence_review** — per assessable domain the
@@ -264,7 +267,7 @@ validated artifacts, and NOTHING else:
    answer = one attestation with a `topic` and, where the owner can
    name them, `applies_to` control refs. Do not lead the witness:
    record what they said, not what would satisfy the control.
-5. **Close** — write the scope entry (intake writer), render the
+5. **Close** — record the declaration (`traust compliance declare`), render the
    attestation bundle, state what was recorded and its draft/signed
    status, then offer the run-now/hand-off choice (rail 3).
 

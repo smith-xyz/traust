@@ -38,7 +38,6 @@ from __future__ import annotations
 
 import argparse
 import datetime
-import hashlib
 import json
 import re
 import sqlite3
@@ -47,11 +46,14 @@ import sys
 import uuid
 from pathlib import Path
 
+from traust_core.v1.errors import TraustError
 from traust_engine.assets import compliance_data_dir
 
+from traust.cli.compliance import current
 from traust.context import (
     add_config_home_arg,
     findings_db,
+    load_core,
     load_engine,
 )
 from traust.paths import HARNESS_ROOT, config_path
@@ -438,12 +440,11 @@ def main(argv=None) -> int:
     ap.add_argument(
         "--boundary",
         default=None,
-        help="declared boundary id from the compliance scope "
-        "registry (compliance-scope.yaml) — resolves the "
+        help="declared boundary (name or scope id) from traust-core "
+        "(`traust compliance declare`) — resolves the "
         "repo set, defaults frameworks and target-kind, "
         "and stamps scope provenance into the artifact",
     )
-    ap.add_argument("--scope-registry", type=Path, default=None)
     ap.add_argument("--product", default=None)
     ap.add_argument("--repos", nargs="*", default=[])
     ap.add_argument("--environment", default=None)
@@ -461,7 +462,6 @@ def main(argv=None) -> int:
     engine = load_engine(args.config_home)
     # Scope and org parameters are deployment config (the config home); the
     # control-to-check mapping ships with traust-engine.
-    args.scope_registry = args.scope_registry or engine.compliance.scope_registry()
     args.registry = args.registry or (compliance_data_dir() / "compliance-mapping.yaml")
     args.org_parameters = args.org_parameters or config_path("org-parameters.yaml")
     args.findings_db = args.findings_db or findings_db(engine)
@@ -470,16 +470,21 @@ def main(argv=None) -> int:
 
     scope_res = None
     if args.boundary:
-        # Phase 6: scope declared at boundary level, resolved
-        # via the repo-graph product mapping. Fail-loud on any resolution
+        # The boundary's current declaration in traust-core. Fail-loud on any resolution
         # problem — a mis-scoped compliance run is worse than no run.
-        from resolve_compliance_scope import ScopeError, load_scope
-        from resolve_compliance_scope import resolve as resolve_scope
-
         try:
-            scope_res = resolve_scope(load_scope(args.scope_registry), args.boundary)
-        except ScopeError as e:
+            services = load_core(args.config_home).services()
+            scope = current(services, args.boundary)
+            assert scope.scope_id is not None
+            resolved = services.compliance.resolve(scope.scope_id)
+        except TraustError as e:
             sys.exit(f"--boundary: {e}")
+        scope_res = {
+            **scope.model_dump(mode="json"),
+            "repos": list(resolved.repos),
+            "draft": scope.draft,
+            "excluded": [e.model_dump() for e in scope.exclude],
+        }
         if args.repos:
             sys.exit(
                 "--boundary and --repos are mutually exclusive: the "
@@ -547,10 +552,8 @@ def main(argv=None) -> int:
             "declared_at": scope_res["declared_at"],
             "excluded": scope_res["excluded"],
             "draft": scope_res["draft"],
-            # raw-bytes hash: the declaration AS WRITTEN is the provenance
-            # unit (sha_file's canonical-JSON identity chokes on bare YAML
-            # dates and would also mask whitespace edits to a signed doc)
-            "registry_hash": hashlib.sha256(args.scope_registry.read_bytes()).hexdigest(),
+            # the declaration is a recorded document now: its scope id is the provenance unit
+            "registry_hash": None,
         }
     if args.product:
         target["product"] = args.product

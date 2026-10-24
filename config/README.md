@@ -55,9 +55,9 @@ ships a template for each such file:
 | `reachability-watch.example.yaml` | `reachability-watch.yaml` | `/drift-watch` (`reachability-watch:review`) |
 | `benchmark-targets.example.yaml` | `benchmark-targets.yaml` | `/recall-benchmark` (the answer key; canary and seeded sources sit beside it in `recall-benchmark/`) |
 
-The compliance scope registry, `compliance-scope.yaml`, also lives in the
-config home. It has no template: the scope intake (`/compliance-check`
-interview) writes it from the system owner's own declaration.
+Compliance boundaries are not config files: the scope intake (`/compliance-check`
+interview) records each from the system owner's own declaration in traust-core
+(`traust compliance declare`).
 
 ### How the harness finds the deployment directory
 
