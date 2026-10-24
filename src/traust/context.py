@@ -17,6 +17,10 @@ from traust_core.v1.context import Config, Context, Services
 from traust_core.v1.errors import AuthenticationError, ConfigError
 from traust_core.v1.models.identity import Credential, Principal
 from traust_engine import HarnessEngine, locations
+from traust_engine.adapters.compliance_sources import register_compliance_sources
+from traust_engine.adapters.detection_quality import register_detection_quality
+from traust_engine.adapters.fleet_fix import register_fleet_fix
+from traust_engine.adapters.opengrep import load_supplemental_packs
 
 CORE_CONFIG = "core.yaml"
 
@@ -86,6 +90,32 @@ def load_core(config_home: Path | None = None) -> Context:
     except ConfigError as e:
         print(f"core config not resolvable: {e}", file=sys.stderr)
         raise SystemExit(2) from e
+
+
+def load_engine_core(config_home: Path | None = None, *, canaries: str = "canaries") -> Context:
+    """traust-core with traust-engine's providers for its protocols: ADR and docs sources, the
+    rule-pack source and canary materialiser (``canaries``: the ``recall-benchmark/<canaries>``
+    source dir), the fleet-fix applier and golden runner."""
+    core, engine = load_core(config_home), load_engine(config_home)
+    home = config_home or deployment_config_dir()
+    assert home is not None  # load_engine exits when there is no config home
+    cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "recall-bench"
+    # NEED(config: product -> docs slug/version): no DocsTarget map yet, so every product's
+    # docs lookup is refused by name until one has a home.
+    register_compliance_sources(core, {})
+    try:
+        pack = engine.adapters.rule_pack_dir()
+    except ValueError as e:
+        raise ConfigError(str(e)) from e
+    register_detection_quality(
+        core,
+        pack=pack,
+        supplements=load_supplemental_packs(),
+        canary_sources=home / "recall-benchmark" / canaries,
+        canary_repos=cache / canaries,
+    )
+    register_fleet_fix(core)
+    return core
 
 
 def load_services(config_home: Path | None = None) -> Services:
