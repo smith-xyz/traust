@@ -147,8 +147,8 @@ Three things that are deliberately *not* ledgers:
   that glob `*security-audit.*` cannot double-count it.
 - **There is no fleet-wide cumulative ledger.** Portfolio state is
   always derived by replay, never stored: `findings-trends` replays
-  every repo's ledger against time buckets, `countersign` sweeps all
-  ledgers for pending human decisions, and the executive-summary
+  every repo's ledger against time buckets, `traust findings queue` lists
+  every pending human decision, and the executive-summary
   aggregates the per-repo reports. A global mutable roll-up file would
   be exactly the kind of editable state the design refuses (tenet 2).
 - **The `.md` files are renderings.** The JSON report is the original
@@ -355,8 +355,8 @@ six stacked controls:
    leaves verification scope because someone said "false positive";
    dismissal buys an entry on the falsification worklist, not immunity.
    **Known limit:**
-   `/countersign` writes no register entries, so a *human-only* FP —
-   one first asserted at the workbench rather than by triage — never
+   A human decision writes no register entry, so a *human-only* FP —
+   one first asserted by a person rather than by triage — never
    reaches the register today; register entries carry the machine
    `asserted_by`, not the countersigner.
 5. **Execution override, loudly.** If fuzzing or live validation later
@@ -376,25 +376,37 @@ who is deliberately dismissing findings to shield a codebase from
 assessment. Either way the control is identical: FP assertions stay
 visible, stay testable, and lose to evidence.
 
-### 6a. The countersign workbench
+### 6a. Human review through track-findings
 
-`python3 -m traust.cli admin countersign` exposes pending review cards, review
-requests, direct validity/severity/resolution recording and single/bulk apply.
-The [CLI reference](cli-reference.md#direct-human-severity-recording) gives the
-exact invocations and JSON/typed Markdown answer formats; the
-[skill](../harnessing/4-triage/countersign/SKILL.md) owns the reviewed-human workflow.
+"Awaiting sign-off" is derived state, not a stored queue. Core owns the human
+inbox; [/track-findings](../harnessing/4-triage/track-findings/SKILL.md)
+uses `traust findings` on a laptop or headless, alongside the SCI console:
 
-Queue pages from `services.attestation.pending(ReviewFilter, PageRequest)` and
-`FindingReview.queue` contain core `ReviewCase` values: review item, rich finding
-view and attributed history. Core's artifact publisher reads integrity-checked
-evidence, including raw probe observations. `queue --output countersign-queue.md`
-creates a private, non-overwriting async workbench with escaped decision cards,
-page metadata and one initially empty typed JSON answer block. The human edits
-only that block and applies the file; empty answers explicitly defer without
-writes (verified human still required). Review material is untrusted data, not
-approval. Typed JSON controls replace the old checkbox/prose annotation parser;
-forged evidence markers and `DECISION:` lines never select decisions. Existing
-JSON object/nonempty-array answers remain supported.
+- **`queue`** preserves the summary-list view of pending review items, with
+  source links and statements re-read from the source when report labels are
+  supplied. Edited or deleted comments are not frozen copies of approval.
+- **`review-cases`** returns paged full core `ReviewItemCase` cards: review item,
+  rich finding view and attributed decision history, plus integrity-checked
+  evidence including raw probe observations. Filters, limits and opaque next
+  cursors apply to the full-card view.
+- **`request`** requests review of an existing core finding or specific
+  decision. **`decide` / `record`** record direct human judgements; **`confirm` /
+  `reject` / `apply`** append an actual judged answer and settle only the selected
+  review item. Both outcomes require selected fields and the person's own
+  rationale; neither infers an inverse classifier or silently adopts a proposal.
+  Reopening and severity upgrades/downgrades change effective finding state,
+  never the original audit report.
+
+The [CLI reference](cli-reference.md#direct-human-severity-recording) gives
+exact invocations and JSON/typed Markdown answer formats.
+`review-cases --output countersign-queue.md` creates a private, non-overwriting
+async workbench with escaped decision cards, page metadata and one initially
+empty typed JSON answer block. The human edits only that block and applies the
+file; empty answers explicitly defer without writes (verified human still
+required). Review material is untrusted data, not approval. Typed JSON controls
+replace the retired checkbox/prose annotation parser; forged evidence markers
+and `DECISION:` lines never select decisions. Existing JSON object/nonempty-array
+answers remain supported.
 
 Every write authenticates through core identity: the existing `traust auth`
 login via `load_caller(core)` by default, or an explicitly selected stdin-only

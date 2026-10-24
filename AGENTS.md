@@ -8,7 +8,7 @@ This file provides guidance to AI coding agents when working with code in this r
 
 This is **Traust**, an agent harness for automated vulnerability discovery, validation, and remediation across a software portfolio — source repositories, container images, RPM packages, Kubernetes operators, infrastructure-as-code and the services built from them — at the scale of hundreds or thousands of repositories. Which repositories that is comes from the deployment's inventory (`locations.inputs`), never from this tree; the executive-summary dashboard under the configured `progress-tracker` root reports current coverage.
 
-The harness contains 52 active skills, slash commands, JSON schemas, report tooling, and the prompt engineering that drives autonomous multi-framework security assessments. It is designed to be agent-agnostic, with current implementations for Claude Code and Crush.
+The harness contains 51 active skills, slash commands, JSON schemas, report tooling, and the prompt engineering that drives autonomous multi-framework security assessments. It is designed to be agent-agnostic, with current implementations for Claude Code and Crush.
 
 ## Repository Architecture
 
@@ -51,7 +51,7 @@ Multi-skill CLIs live in `src/traust/cli/` and are invoked as `traust <group> <o
   move, never scrub, because the figures are the record of what the
   script did. `traust check estate-data` enforces both rules pre-commit.
 
-`validate_report`, `render_report`, `checkpoint`, `countersign`, `emit_triage_ledger_events`, `emit_validation_ledger_events`, and related tooling are package modules (many in sibling `traust-engine`). Skills invoke them via python3 -m … from the harness venv. The citation gate and symbol index are triage accelerators — they route, gate, tag, or index, and never author a verdict (see [`docs/deterministic-inferential-mix.md`](docs/deterministic-inferential-mix.md)).
+`validate_report`, `render_report`, `checkpoint`, `emit_triage_ledger_events`, `emit_validation_ledger_events`, and related tooling are package modules (many in sibling `traust-engine`). Skills invoke them via python3 -m … from the harness venv. The citation gate and symbol index are triage accelerators — they route, gate, tag, or index, and never author a verdict (see [`docs/deterministic-inferential-mix.md`](docs/deterministic-inferential-mix.md)).
 
 Legacy placement (pre-C8):
 - Used by exactly one skill: place under `harnessing/<skill>/`
@@ -62,8 +62,8 @@ Legacy placement (pre-C8):
 
 ### Metrics consistency layer
 
-`$TRAUST_CONFIG_HOME/corpus-config.yaml` (ownership tags per output tree; write only
-via `/corpus-intake`) + `traust_engine.corpus.resolver` (shared discovery/identity/
+`$TRAUST_CONFIG_HOME/corpus-config.yaml` (ownership tags per output tree; `/corpus-intake`
+now writes traust-core's corpus registry, which `/census` reads once ported) + `traust_engine.corpus.resolver` (shared discovery/identity/
 dedup resolver) + `/census` (denominator authority: population,
 duplication vectors, distinct-vulnerabilities headline, repo liveness)
 keep every dashboard's numbers reconcilable. Dashboards embed a standard

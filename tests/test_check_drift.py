@@ -81,7 +81,7 @@ def _engine_for_ws(tmp_path, ws, monkeypatch):
 def _product_definitions_configured(monkeypatch):
     """product-definitions is the canonical optional/internal feed these tests
     exercise; it is config-gated (locations.product_definitions) since it targets
-    a deployment-specific registry. Configure it + reset the lazy feeds cache."""
+    a deployment-specific registry."""
     from traust_contracts import Locations
 
     from traust.cli import fetch_feeds as _ff
@@ -91,46 +91,33 @@ def _product_definitions_configured(monkeypatch):
         "configured_locations",
         lambda: Locations(product_definitions="https://feeds.test/product-definitions.json"),
     )
-    monkeypatch.setattr(_ff, "_FEEDS_CACHE", None)
-    yield
-    _ff._FEEDS_CACHE = None
+
+
+def _feed(name, retrieved=None):
+    from datetime import timedelta
+
+    from traust_core.v1.providers.feeds import FeedStatus
+
+    return FeedStatus(name=name, fetched_at=retrieved, max_age=timedelta(hours=24))
 
 
 def test_feeds_fresh_and_stale(tmp_path, monkeypatch):
     ws = _mk_ws(tmp_path)
-    monkeypatch.setenv("FEEDS_CACHE_DIR", str(ws / "progress-tracker/feeds"))
     now = cd._now()
     old = now - datetime.timedelta(hours=200)
-    (ws / "progress-tracker/feeds/feeds-meta.json").write_text(
-        json.dumps({"epss": {"retrieved_at": _iso(now)}, "kev": {"retrieved_at": _iso(old)}})
-    )
-    items = {i["item"]: i for i in cd.check_feeds(_engine_for_ws(tmp_path, ws, monkeypatch))}
+    statuses = [_feed("epss", now), _feed("kev", old)]
+    items = {
+        i["item"]: i for i in cd.check_feeds(_engine_for_ws(tmp_path, ws, monkeypatch), statuses)
+    }
     assert items["feeds:epss"]["status"] == "fresh"
     assert items["feeds:kev"]["status"] == "stale"
-    assert "fetch_feeds" in items["feeds:kev"]["refresh"]
+    assert items["feeds:kev"]["refresh"] == "traust feeds fetch"
 
 
 def test_feeds_absent_is_pending(tmp_path, monkeypatch):
     ws = _mk_ws(tmp_path)
-    monkeypatch.setenv("FEEDS_CACHE_DIR", str(ws / "progress-tracker/feeds"))
-    (ws / "analysis-results/feeds").rmdir()
-    (ws / "progress-tracker/feeds").rmdir()
-    assert cd.check_feeds(_engine_for_ws(tmp_path, ws, monkeypatch))[0]["status"] == "pending"
-
-
-def test_feeds_falls_back_to_the_legacy_cache_for_one_release(tmp_path, monkeypatch):
-    """The cache moved out of analysis-results/ on 2026-08-25. A workspace
-    that has not re-fetched yet must keep reporting real ages instead of
-    going pending and hiding a genuinely stale cache."""
-    ws = _mk_ws(tmp_path)
-    monkeypatch.setenv("FEEDS_CACHE_DIR", str(ws / "progress-tracker/feeds"))
-    (ws / "progress-tracker/feeds").rmdir()
-    old = cd._now() - datetime.timedelta(hours=200)
-    (ws / "analysis-results/feeds/feeds-meta.json").write_text(
-        json.dumps({"epss": {"retrieved_at": _iso(old)}})
-    )
-    items = {i["item"]: i for i in cd.check_feeds(_engine_for_ws(tmp_path, ws, monkeypatch))}
-    assert items["feeds:epss"]["status"] == "stale"
+    engine = _engine_for_ws(tmp_path, ws, monkeypatch)
+    assert cd.check_feeds(engine, [_feed("epss")])[0]["status"] == "pending"
 
 
 def test_optional_feed_never_fetched_is_pending_not_unavailable(tmp_path, monkeypatch):
@@ -142,13 +129,13 @@ def test_optional_feed_never_fetched_is_pending_not_unavailable(tmp_path, monkey
     ws = _mk_ws(tmp_path)
     monkeypatch.setenv("FEEDS_CACHE_DIR", str(ws / "progress-tracker/feeds"))
     now = cd._now()
-    (ws / "progress-tracker/feeds/feeds-meta.json").write_text(
-        json.dumps({"epss": {"retrieved_at": _iso(now)}, "kev": {"retrieved_at": _iso(now)}})
-    )
-    items = {i["item"]: i for i in cd.check_feeds(_engine_for_ws(tmp_path, ws, monkeypatch))}
+    statuses = [_feed("epss", now), _feed("kev", now)]
+    items = {
+        i["item"]: i for i in cd.check_feeds(_engine_for_ws(tmp_path, ws, monkeypatch), statuses)
+    }
     pd_item = items["registry:product-definitions"]
     assert pd_item["status"] == "pending"
-    assert "--feed product-definitions" in pd_item["refresh"]
+    assert pd_item["refresh"] == "traust feeds fetch-products"
 
 
 def test_optional_feed_uses_its_own_threshold(tmp_path, monkeypatch):
@@ -158,40 +145,33 @@ def test_optional_feed_uses_its_own_threshold(tmp_path, monkeypatch):
     now = cd._now()
     ten_days = now - datetime.timedelta(days=3)
     (ws / "progress-tracker/feeds/feeds-meta.json").write_text(
-        json.dumps(
-            {
-                "epss": {"retrieved_at": _iso(ten_days)},
-                "kev": {"retrieved_at": _iso(now)},
-                "product-definitions": {"retrieved_at": _iso(ten_days)},
-            }
-        )
+        json.dumps({"product-definitions": {"retrieved_at": _iso(ten_days)}})
     )
-    items = {i["item"]: i for i in cd.check_feeds(_engine_for_ws(tmp_path, ws, monkeypatch))}
+    engine = _engine_for_ws(tmp_path, ws, monkeypatch)
+    items = {
+        i["item"]: i for i in cd.check_feeds(engine, [_feed("epss", ten_days), _feed("kev", now)])
+    }
     assert items["feeds:epss"]["status"] == "stale"
     assert items["registry:product-definitions"]["status"] == "fresh"
 
     forty_days = now - datetime.timedelta(days=40)
     (ws / "progress-tracker/feeds/feeds-meta.json").write_text(
-        json.dumps(
-            {
-                "epss": {"retrieved_at": _iso(now)},
-                "kev": {"retrieved_at": _iso(now)},
-                "product-definitions": {"retrieved_at": _iso(forty_days)},
-            }
-        )
+        json.dumps({"product-definitions": {"retrieved_at": _iso(forty_days)}})
     )
-    items = {i["item"]: i for i in cd.check_feeds(_engine_for_ws(tmp_path, ws, monkeypatch))}
+    items = {i["item"]: i for i in cd.check_feeds(engine, [_feed("epss", now)])}
     assert items["registry:product-definitions"]["status"] == "stale"
-    assert "--feed product-definitions" in items["registry:product-definitions"]["refresh"]
+    assert items["registry:product-definitions"]["refresh"] == "traust feeds fetch-products"
 
 
-def test_watched_feeds_is_driven_from_fetch_feeds(tmp_path):
-    """Guards the bug this replaced: a literal feed tuple here meant a
-    newly added feed was never monitored at all."""
-    watched = dict(cd.watched_feeds())
-    assert "product-definitions" in watched
-    assert watched["product-definitions"] is True
-    assert watched["epss"] is False
+def test_unconfigured_product_definitions_has_no_row(tmp_path, monkeypatch):
+    from traust_contracts import Locations
+
+    from traust.cli import fetch_feeds as _ff
+
+    monkeypatch.setattr(_ff.locations, "configured_locations", lambda: Locations())
+    ws = _mk_ws(tmp_path)
+    items = cd.check_feeds(_engine_for_ws(tmp_path, ws, monkeypatch), [_feed("epss")])
+    assert [i["item"] for i in items] == ["feeds:epss"]
 
 
 def test_rule_mining_pending_fresh_stale(tmp_path):
@@ -292,22 +272,44 @@ def test_provenance_review_due(tmp_path):
     assert items["provenance:sla-policy"]["status"] == "review_due"
 
 
+def _core_snapshots(tmp_path, ages):
+    """Feed snapshots in a core store under the test's config home, `ages` hours old."""
+    from traust_core.v1.providers.base import Acquisition, Readiness, Result
+
+    from traust.context import load_core
+
+    (_home() / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    core = load_core(_home())
+
+    class Feed:
+        filename, max_age = "payload.json", datetime.timedelta(hours=24)
+
+        def __init__(self, name, hours):
+            self.name, self.at = name, cd._now() - datetime.timedelta(hours=hours)
+
+        def check(self):
+            return Readiness(ready=True)
+
+        def fetch(self, previous=lambda: None):
+            return Result(b"{}", Acquisition(provider=self.name, acquired_at=self.at))
+
+    for name, hours in ages.items():
+        feed = Feed(name, hours)
+        core.feeds.register(name, lambda feed=feed: feed)
+    core.services().exposure.refresh_feeds()
+
+
 def test_main_writes_report_and_fail_on(tmp_path, monkeypatch):
     ws = _mk_ws(tmp_path)
-    now = cd._now()
-    (ws / "progress-tracker/feeds/feeds-meta.json").write_text(
-        json.dumps(
-            {
-                "epss": {"retrieved_at": _iso(now)},
-                "kev": {"retrieved_at": _iso(now - datetime.timedelta(hours=999))},
-            }
-        )
-    )
+    _core_snapshots(tmp_path, {"epss": 0, "kev": 999})
     rc = cd.main(["--workspace", str(ws)])
     assert rc == 0
     report = json.loads((ws / "progress-tracker/metrics/drift/drift-report.json").read_text())
     assert report["metadata"]["artifact"] == "staleness-drift-report"
     assert report["summary"].get("stale", 0) >= 1
+    rows = {i["item"]: i["status"] for i in report["items"]}
+    assert (rows["feeds:epss"], rows["feeds:kev"]) == ("fresh", "stale")
+    assert {f"feeds:{n}" for n in ("rh-cve", "vex")} <= set(rows)
     md = (ws / "progress-tracker/metrics/drift/drift-report.md").read_text()
     assert "Refresh queue" in md and "never concludes" in md
     assert cd.main(["--workspace", str(ws), "--fail-on", "stale"]) == 1
@@ -325,7 +327,7 @@ def test_checker_error_never_kills_run(tmp_path, monkeypatch):
         raise RuntimeError("kaput")
 
     monkeypatch.setattr(cd, "CHECKS", (boom,))
-    monkeypatch.setattr(cd, "check_feeds", lambda _engine: [])
+    monkeypatch.setattr(cd, "check_feeds", lambda _engine, _statuses: [])
     rc = cd.main(["--workspace", str(ws)])
     assert rc == 0
     report = json.loads((ws / "progress-tracker/metrics/drift/drift-report.json").read_text())
@@ -1478,40 +1480,22 @@ def test_unloadable_registry_is_one_loud_row(tmp_path, monkeypatch):
     assert len(rows) == 1 and rows[0]["status"] == "unavailable"
 
 
-def test_every_watched_feed_comes_from_the_registry():
-    """A hardcoded feed list is how a newly added feed goes unmonitored."""
+def test_every_cached_source_in_the_registry_gets_a_row():
+    """A hardcoded feed list is how a newly added feed goes unmonitored: the rows come from the
+    feeds core registers from the same registry."""
+    from traust_core.v1.context import Config, Context
+
     from traust.registry import feeds_config as fc
 
-    watched = {n for n, _ in cd.watched_feeds()}
-    assert set(fc.cached_sources()) <= watched
+    core = Context(Config())
+    core.register_feeds(fc.registry_path())
+    assert set(core.feeds.names()) == set(fc.cached_sources())
 
 
 def test_feed_stale_threshold_matches_the_daily_job():
     """A backstop looser than the cadence it guards cannot catch a dead
     job: at 168h a daily job could die and stay green for six days."""
     assert cd.FEED_STALE_HOURS == 48
-
-
-def test_feed_row_prefix_follows_the_category_not_the_mechanism():
-    """`product-definitions` is fetched by fetch_feeds but is a product/
-    ownership registry, not a security feed. Naming its row `feeds:` kept
-    re-merging two categories config/feeds.yaml exists to separate."""
-    from traust.registry import feeds_config as fc
-
-    for name in fc.cached_sources():
-        assert cd._feed_row_prefix(name) == "feeds", name
-    assert cd._feed_row_prefix("product-definitions") == "registry"
-
-
-def test_unclassifiable_source_reports_as_a_feed(monkeypatch):
-    """Under-reporting a security source is the worse error, so an
-    unreadable registry falls back to `feeds:`, never `registry:`."""
-    from traust.registry import feeds_config as fc
-
-    monkeypatch.setattr(
-        fc, "cached_sources", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom"))
-    )
-    assert cd._feed_row_prefix("anything") == "feeds"
 
 
 # --- floor-only tool rows ---------------------------------------------------

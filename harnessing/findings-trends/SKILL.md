@@ -92,7 +92,7 @@ Direction = last bucket vs the mean of up to three prior buckets, with a
 2. Resolve arguments; run the builder (above). It walks
    `findings/**/*-security-audit.json` (plus `oss-findings/`), pairs each
    audit with its sibling `*-findings-layer.json`, and replays. When the
-   feeds cache is present, CVE-bearing findings gain an
+   feed snapshots are present, CVE-bearing findings gain an
    **exploitation-evidence likelihood factor** (KEV membership / EPSS
    band — `threat_intel_factor` in `risk-rating-methodology.json`); the
    dashboard's methodology note records feed versions and staleness.

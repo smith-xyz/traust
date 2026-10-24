@@ -6,10 +6,12 @@ idempotence and provenance requirements for the core skill ports.
 Core owns finding identity and intake; the ledger supplies proof, not a second
 state writer. Current ownership is in [components.md](components.md).
 
-The active human countersign workbench and machine-validation record door use
-core services; neither routes new findings or recreates layers. See the
-[record protocol](cli-reference.md#machine-validation-recording). Novel/impact/
-regression intake ports remain separate. Legacy shapes below are not write APIs.
+The active track-findings human review workflow and machine-validation record
+door use core services; neither recreates layers. See the
+[record protocol](cli-reference.md#machine-validation-recording).
+Impact intake now belongs to core exposure/finding services; the historical
+impact router below is not its API. Novel/regression skill ports remain separate.
+Legacy shapes below are not write APIs.
 
 ### It is *not* the only kind of routing here
 
@@ -80,9 +82,10 @@ independent producer logic.
 | `route_impact_findings.py` | `/dependency-watch`, `/impact-analysis` | Record advisory-impact findings |
 | `rebaseline()` | re-audit | Link a replacement baseline without rewriting history |
 
-The current reviewed-human countersign workbench is documented in the
-[CLI reference](cli-reference.md#direct-human-severity-recording). Its queue,
-request, record and apply use core services, never retired layer-writing paths.
+The current track-findings human review workflow is documented in the
+[CLI reference](cli-reference.md#direct-human-severity-recording). Its findings
+queue, request, direct judgement and apply use core services, never retired
+layer-writing paths.
 
 ---
 

@@ -585,10 +585,10 @@ disposition state — the same invariant as every audit profile. Post-audit
 truth flows through core findings
 ([`docs/disposition-ledger.md`](../../../docs/disposition-ledger.md)).
 `traust triage record` records triage verdicts and queues human review;
-`/track-findings` reads derived state and `/countersign` records explicit
-human judgements. The former layer emitters and cumulative-file rebuild
-are **retired, not executable**. Validation ingestion and container-specific
-output ports remain unfinished: retain their reports and provenance,
+`/track-findings` reads derived state and records explicit human judgements
+through `traust findings`. The former layer emitters and cumulative-file rebuild
+are **retired, not executable**. Bound machine validation uses `traust validation
+record`; container-specific cumulative output ports remain unfinished: retain reports and provenance,
 never hand-write events or claim a regenerated cumulative view.
 Historical container-specific output requirements:
 

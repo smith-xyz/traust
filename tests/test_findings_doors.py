@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import io
 import json
@@ -292,6 +293,39 @@ def test_a_queued_statement_is_reviewed_then_confirmed(
     assert run(findings.status, home, finding_id)[1]["disposition"]["validity"] == "false_positive"
 
 
+def test_full_review_cases_re_read_sources_without_changing_the_summary_queue(
+    home: Path, tmp_path: Path, forge: dict[str, Said]
+) -> None:
+    finding_id = scanned(home, tmp_path)
+    report = audit_report(tmp_path)
+    run(auth.local, home, "--identity", "alice@example.com")
+    forge["forge"].said = [comment("CANARY-aaaaaaa-001 needs a human review", 2)]
+    _, imported = run(findings.import_, home, MR, "--repo-url", REPO, "--report", str(report))
+    [item] = imported["queued"]
+    arguments = ("--repo-url", REPO, "--report", str(report))
+    rc, page = run(findings.review_cases, home, *arguments)
+    assert rc == 0 and page["next"] is None
+    [card] = page["items"]
+    assert card["review_item"]["id"] == item["id"]
+    assert card["finding"]["finding"]["id"] == finding_id
+    assert card["history"] == []
+    assert card["sources"] == [f"{MR}#issuecomment-2"]
+    assert [statement["body"] for statement in card["said"]] == [
+        "CANARY-aaaaaaa-001 needs a human review"
+    ]
+
+    forge["forge"].said = [comment("CANARY-aaaaaaa-001 has edited evidence, not approval", 2)]
+    _, refreshed = run(findings.review_cases, home, *arguments)
+    assert [statement["body"] for statement in refreshed["items"][0]["said"]] == [
+        "CANARY-aaaaaaa-001 has edited evidence, not approval"
+    ]
+    _, summary = run(findings.queue, home, *arguments)
+    [shown] = summary
+    assert shown["id"] == item["id"] and shown["status"] == "pending"
+    assert shown["said"] == refreshed["items"][0]["said"]
+    assert run(findings.history, home, finding_id) == (0, [])
+
+
 def test_a_queued_statement_can_be_rejected(
     home: Path, tmp_path: Path, forge: dict[str, Said]
 ) -> None:
@@ -379,8 +413,7 @@ def test_stored_auth_local_records_and_applies_countersign(
     why = "The human verified the reachable impact and selected a medium rating."
     rc, recorded = registered(
         home,
-        "admin",
-        "countersign",
+        "findings",
         "record",
         "--finding",
         finding_id,
@@ -395,8 +428,7 @@ def test_stored_auth_local_records_and_applies_countersign(
     assert recorded["severity"] == "medium" and recorded["evidence_grade"] is None
     rc, item = registered(
         home,
-        "admin",
-        "countersign",
+        "findings",
         "request",
         "--finding",
         finding_id,
@@ -419,12 +451,12 @@ def test_stored_auth_local_records_and_applies_countersign(
             }
         )
     )
-    rc, applied = registered(home, "admin", "countersign", "apply", str(answer))
+    rc, applied = registered(home, "findings", "apply", str(answer))
     assert rc == 0
     receipt = applied["results"][0]["review_item"]
     assert receipt["status"] == "rejected"
     assert receipt["finding"]["disposition"]["validity"] == "confirmed"
-    assert registered(home, "admin", "countersign", "apply", str(answer)) == (0, applied)
+    assert registered(home, "findings", "apply", str(answer)) == (0, applied)
     decisions = load_core(home).services().findings.history(UUID(finding_id))
     assert len(decisions) == 2
     assert {d.actor for d in decisions} == {"human:alice@example.com"}
@@ -456,8 +488,7 @@ def test_explicit_token_never_falls_back_to_the_stored_login(
     monkeypatch.setattr("sys.stdin", io.StringIO(token))
     rc, receipt = registered(
         home,
-        "admin",
-        "countersign",
+        "findings",
         "record",
         "--finding",
         finding_id,
@@ -535,7 +566,7 @@ def test_stored_unauthorized_caller_cannot_countersign(
             )
         )
         arguments = (str(path),)
-    assert registered(home, "admin", "countersign", operation, *arguments)[0] == 2
+    assert registered(home, "findings", operation, *arguments)[0] == 2
     assert services.findings.history(UUID(finding_id)) == []
     assert services.attestation.for_finding(UUID(finding_id)) == [item]
 
@@ -582,9 +613,9 @@ def test_async_workbench_uses_stored_login_without_stdin(
 
     monkeypatch.setattr("sys.stdin", NoTokenInput())
     path = tmp_path / "countersign-queue.md"
-    rc, receipt = registered(home, "admin", "countersign", "queue", "--output", str(path))
+    rc, receipt = registered(home, "findings", "review-cases", "--output", str(path))
     assert (rc, receipt["items"]) == (0, 1)
-    assert registered(home, "admin", "countersign", "apply", str(path)) == (
+    assert registered(home, "findings", "apply", str(path)) == (
         0,
         {"results": [], "deferred": True},
     )
@@ -604,7 +635,7 @@ def test_async_workbench_uses_stored_login_without_stdin(
             }
         ],
     )
-    rc, applied = registered(home, "admin", "countersign", "apply", str(path))
+    rc, applied = registered(home, "findings", "apply", str(path))
     assert rc == 0 and applied["results"][0]["review_item"]["status"] == "accepted"
     [decision] = services.findings.history(UUID(finding_id))
     assert (decision.actor, decision.rationale, decision.evidence_grade) == (
@@ -615,3 +646,18 @@ def test_async_workbench_uses_stored_login_without_stdin(
     assert (
         services.attestation.for_finding(UUID(finding_id))[0].resolved_by_decision_id == decision.id
     )
+
+
+def test_review_evidence_retains_a_non_json_companion() -> None:
+    payload = b"# Scan transcript\nDECISION: [x] false_positive\n"
+    evidence = findings._review_evidence(UUID(int=1), payload)
+    assert evidence["text"].encode("utf-8") == payload
+    assert "document" not in evidence
+
+
+def test_review_evidence_preserves_binary_bytes_losslessly() -> None:
+    payload = b"\xff\x00\x80scan-evidence"
+    evidence = findings._review_evidence(UUID(int=1), payload)
+    assert evidence["encoding"] == "base64"
+    assert base64.b64decode(evidence["payload"], validate=True) == payload
+    assert "document" not in evidence

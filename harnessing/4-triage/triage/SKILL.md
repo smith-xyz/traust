@@ -1090,7 +1090,8 @@ rationale with `"PRECEDENT DISAGREEMENT:"` naming the precedent
 (source repo, date, countersigner/adjudicator, strength). For
 `human_countersigned` precedents, additionally surface it in the
 terminal summary as pending human adjudication; request a core review item with
-`admin countersign request` for the finding UUID and use `/countersign` to review it.
+`traust findings request` for the finding UUID and use `/track-findings` to
+review its full evidence card through `traust findings review-cases`.
 A verifier disagreeing with a countersigned precedent escalates to a
 human, it neither silently follows the precedent nor silently
 overrides the countersigner. For `machine_refuted_sound` precedents
@@ -1473,7 +1474,7 @@ Empty/no-decision output has no invented source IDs. See the
 
 Report its counts in the terminal summary. If any false positives await
 countersign or review items were queued, say that human decisions are
-pending and that `/countersign` presents them as decision cards. For
+pending and that `traust findings queue` lists them for a person to decide. For
 input (C), skip this step and say the verdicts are in
 `<repo>-triage.json` only.
 
@@ -1616,5 +1617,6 @@ for environment context; `*-impact-analysis.json` from
 **Emits:** `<repo>-triage.{json,md}` next to the input report —
 consumed by `/patch` and as explicitly bound source evidence by
 `traust validation record`; recorded decisions (Phase 6e, `traust triage
-record`) feed `/track-findings` and `/countersign` (review items). The record
-receipt exposes native IDs for that binding handoff without local database discovery.
+record`) feed `/track-findings` and `traust findings queue` / `review-cases`
+(review items). The record receipt exposes native IDs for that binding handoff
+without local database discovery.

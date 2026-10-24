@@ -9,7 +9,7 @@ is callable without contacting any live target.
 ## Recording owner and gates
 
 `traust validation record` parses exact report bytes as core's
-`ValidationArtifact`, then calls `load_services().validation.record` with explicit
+`ValidationArtifact`, then calls `Context.services().validation.record` with explicit
 stored source/finding bindings and the actual producer run's provenance. It does
 not discover baselines, reinterpret source labels as UUIDs, walk source paths,
 authenticate a machine as a human, or write a second ledger/state format.
@@ -32,8 +32,8 @@ second app implementation of the rules.
 Soundness flags are retained in immutable core evidence and linked to the finding
 through existing external references, including voided verdicts with no decision
 row. Review uses the canonical review-reason vocabulary; detailed causes stay in
-the evidence, not invented registry values. Countersign cards expose those linked
-observations for human inspection.
+the evidence, not invented registry values. Human review cards expose those linked
+observations for inspection.
 
 ## Current and historical admission
 
@@ -64,7 +64,7 @@ explicit authorized scope + actual preflight observations
     -> traust validation record + stored source bindings + actual provenance
     -> core immutable validation artifact + recording evidence
     -> canonical decision OR retained-cause review item
-    -> core ReviewCase -> verified human countersign when required
+    -> core ReviewItemCase -> verified human countersign when required
 ```
 
 `run.py` performs that report/record handoff and records an actual run UUID/start
@@ -84,6 +84,11 @@ The runner does not fabricate controls, grades, replay artifacts or novel intake
 that the unfinished live execution port has not produced: missing required
 observations route safely to review.
 
+Supplied CVSS observations and chain context remain evidence for a human's
+severity review, including downgrades as well as upgrades. They do not change the
+rating methodology or authorize a machine severity override. Core retains a
+supplied severity proposal as review-only evidence rather than writing severity.
+
 ## Remaining boundaries
 
 This is the step19 machine-recording producer/readiness slice, not completion of
@@ -94,6 +99,6 @@ mapping acceptance and live portfolio counts are separate gates and are not
 certified here.
 
 Related references: [error model](error-model.md),
-[human review workbench](../harnessing/4-triage/countersign/SKILL.md),
+[human review workflow](../harnessing/4-triage/track-findings/SKILL.md),
 [artifact catalog](artifacts.md), and
 [benchmark fixtures](../harnessing/5-validate/validate-findings/benchmark/expected.json).

@@ -10,8 +10,7 @@ allowed-tools:
   # Scoped per A11 — exactly the chain's scripts, never a bare interpreter.
   - Bash(python3 *-m traust.cli feeds fetch:*)
   - Bash(python3 *-m traust.cli impact analyze:*)
-  - Bash(python3 *-m traust.cli route impact-findings:*)
-  - Bash(python3 *harnessing/3-audit/dependency-watch/scripts/fleet_sweep.py:*)
+  - Bash(python3 *-m traust.cli impact sweep:*)
   - Read
   - Glob
   - Grep
@@ -44,9 +43,9 @@ executive summaries, SCI) already read.
 ## Procedure
 
 1. **Refresh feeds** (deterministic):
-   `python3 -m traust.cli feeds fetch` — the cached feeds (EPSS, CISA KEV,
-   vendor CVE and VEX data). OSV is not cached: it is queried live
-   through the shared OSV client. A feed the fetch reports `STALE` is
+   `python3 -m traust.cli feeds fetch` — snapshots the feeds (EPSS, CISA KEV,
+   vendor CVE and VEX data) into traust-core. OSV is not cached: it is queried live
+   through the shared OSV client. A feed the fetch reports under `degraded` is
    named in the run's report; `/drift-watch` flags stale caches
    independently.
 
@@ -60,40 +59,40 @@ executive summaries, SCI) already read.
 
    **Bootstrap / full-baseline mode (`bootstrap` argument, first run,
    quarterly re-baseline, or after portfolio-graph rebuilds):** run
-   `python3 traust/harnessing/3-audit/dependency-watch/scripts/fleet_sweep.py`
-   — clone-free fleet inventory (graph `depends_on` pairs × the OSV
-   batch API, deduped by advisory display id — CVE alias when present,
+   `python3 -m traust.cli impact sweep --out analysis-results/impact/fleet-osv-worklist-<date>.json`
+   — clone-free fleet inventory (every package version in the recorded
+   SBOMs × the OSV batch API, deduped by advisory display id — CVE alias when present,
    else the OSV id itself, so CVE-less malicious-package (`MAL-`)
    advisories are never dropped — the Shai-Hulud class — severity-banded,
    with `malicious` rows forced CRITICAL and sorted first) persisted to
    `analysis-results/impact/fleet-osv-worklist-<date>.json` with a staged
    worklist of ready-to-run impact/filing commands. `--ecosystem` defaults
-   to `all` and sweeps every ecosystem present in the graph per-ecosystem
+   to `all` and sweeps every ecosystem present in the SBOMs per-ecosystem
    against OSV (Go plus npm, PyPI, Maven, Cargo, RubyGems, NuGet, GitHub
    Actions); pass a comma list (e.g. `--ecosystem Go,npm`) to scope a run
    to specific ecosystems. Docker and Helm carry blast-radius edges in the
-   graph but have no OSV-by-name lane (no ecosystem covers a base-image
-   tag or a chart version) — they are graph-only and skipped from the OSV
-   sweep by design, logged rather than silently dropped. Staging discipline is built in: CVEs whose in-range blast radius exceeds
-   `--deep-scan-cap` (default 100 repos) get graph-only impact
+   SBOMs but have no OSV-by-name lane (no ecosystem covers a base-image
+   tag or a chart version) — they are blast-radius-only and skipped from the OSV
+   sweep by design, logged rather than silently dropped (counted in `skipped`). Staging discipline is built in: CVEs whose in-range blast radius exceeds
+   `--deep-scan-cap` (default 100 commits) get SBOM-only impact
    artifacts (exposure dashboard-visible immediately) with deep scans
    left to explicit operator staging; bounded CVEs get deep-scan +
    filing commands. Worklist rows carry **argv arrays**
-   (`impact_argv`) — module names originate in target
-   repos' go.mod and versions in OSV, both attacker-influenceable, so
+   (`impact_argv`) — advisory ids originate in OSV,
+   attacker-influenceable, so
    rows are executed as argument vectors exactly as given (one Bash
    call per array, no shell string joining, no edits) in order
    (severity, then blast radius). Inputs failing the charset gates are
-   listed under `rejected_inputs` — review them, never hand-repair
+   listed under `rejected` — review them, never hand-repair
    them into commands (assessment 2026-07-31 H1). Commit the sweep
    artifact.
 
    **A degraded sweep is not a quiet day.** Exit 3 with
    `status: degraded` means some (name, version) pairs were never
-   answered (`pairs_unanswered`, listed in `unanswered_pairs`) or some
+   answered (listed in `unanswered`) or some
    advisory details are missing. Report the counts; the unanswered pairs
    are re-run, never read as "no advisories". Exit 2 with
-   `status: failed` means OSV could not be used at all (`failure` says
+   `status: failed` means OSV could not be used at all (`detail` says
    why, including `air-gapped`: the sweep needs the OSV API): nothing was
    checked, the worklist is empty, and the day is reported as not swept.
 
@@ -102,51 +101,38 @@ executive summaries, SCI) already read.
    aliasing: a manifest line `"legacy-swc-helpers": "npm:@swc/helpers@0.4.14"`
    declares the *legitimate* `@swc/helpers` under a local alias name, not
    the malicious registry package — an OSV name-match false positive that
-   historically only manual source inspection caught. With `--verify`, each
-   `malicious` worklist hit is checked against its recorded `manifest`
-   provenance BEFORE emission (`harnessing/3-audit/dependency-watch/scripts/verify_dep_provenance.py`): the exact
-   source manifest is fetched and re-parsed (npm aliases resolved to their
-   real package), and each row is annotated `verification: {status,
-   evidence, checks}`. A **positively refuted** hit (present only as an alias
-   to a different package, or genuinely absent from every recorded manifest,
-   with no confirmation anywhere) is moved out of the actionable worklist
-   into `refuted_findings` with its reason — an alias/false-positive is
-   auto-dropped *with a paper trail*, never silently and never as a live
-   finding. Confirmed hits and `unverifiable` ones (no provenance recorded,
-   or fetch/parse failed) stay actionable (fail-safe — a finding is never
-   dropped for lack of data). `--verify` is **off by default** (preserves
-   the deterministic offline sweep); it adds `gh api
-   repos/<org>/<name>/contents/<path>` raw fetches — the sweep's only
-   network egress, routed through the same vetted argv-list fetcher the
-   portfolio-graph build uses (no shell string, no secret in argv). Enable
-   it when a run surfaces malicious hits worth confirming before they page
-   an owner.
+   historically only manual source inspection caught. *Retired:* the
+   SBOMs now come from a standard tool (syft), which records an alias as
+   the package it installs (`legacy-swc-helpers` above is recorded as
+   `@swc/helpers`), so the OSV match is on the real package and this false
+   positive no longer reaches the sweep; `--verify` and
+   `verify_dep_provenance.py` are gone.
 
 3. **Blast radius + reachability** per advisory affecting a module the
    portfolio uses: run `/impact-analysis` (or its script directly):
-   `python3 -m traust.cli impact analyze <CVE>
-   --module <m> --vulnerable-range '<r>' --fixed-version <v> ...` —
-   writes `analysis-results/impact/<cve>-impact-analysis.json`.
-   **Precondition:** a fresh portfolio graph — the graph is the blast
-   radius; check `/drift-watch`'s `portfolio-graph` item first and say
-   so if stale rather than silently analyzing against old topology.
+   `python3 -m traust.cli impact analyze <CVE> --scan` — records an
+   `impact` assessment per commit in traust-core (the bootstrap
+   worklist's `impact_argv` rows are this command).
+   **Precondition:** current SBOMs for the commits — the SBOMs are the
+   blast radius; say so if they are missing or stale rather than silently
+   analyzing against old topology.
 
 4. **Severity from the advisory, never invented:** take severity from
    the OSV/advisory record (CVSS mapping: 9.0+ critical / 7.0+ high /
    4.0+ medium / else low), noting KEV listing in the rationale if
-   present (KEV escalates dispatch urgency, not severity).
+   present (KEV escalates dispatch urgency, not severity). (`analyze`
+   files with the severity the advisory declares, `unrated` when it
+   declares none; report this mapping alongside.)
 
-5. **File** (deterministic, idempotent):
-   `python3 -m traust.cli route impact-findings
-   analysis-results/impact/<cve>-impact-analysis.json --severity <s>
-   [--include-likely] [--dry-run]` — for every `affected` repo with a
-   baseline: campaign-ID finding carried on its ledger event (`event.finding`, contracts >= 0.4.4; the baseline is never written — gate A15)
-   (`origin: impact-analysis`, `category: supply-chain`,
-   `validation_status: not_verified`), claim hash pinned, ledger birth
-   event (`source.type: impact_report`, machine-static class 3),
-   cumulative `*-findings-current.{json,md}` rebuilt. Repos without a
-   baseline are listed, never silently dropped — they are unaudited
-   inventory, which is a census matter, not a filing one.
+5. **File** (deterministic, idempotent): step 3's `analyze` files them
+   (*was* `route impact-findings`, retired) — for every `affected` commit:
+   a dependency finding through traust-core's intake (the baseline is
+   never written — gate A15) (`origin: impact-analysis`,
+   `category: supply-chain`, `validation_status: not_verified`), keyed by
+   repository + advisory + package so a re-run adds nothing
+   (`source.type: impact_report`, machine-static class 3).
+   `--include-likely` is retired: only `affected` is filed. (*Now:* every
+   affected commit is filed; there is no baseline precondition.)
 
 6. **Report** what was routed: per CVE — affected/filed/already-filed/
    no-baseline counts and the finding IDs, so the run's output is
@@ -167,19 +153,19 @@ executive summaries, SCI) already read.
 ## Integrations
 
 Consumes: advisory feed caches (producer: python3 -m traust.cli feeds fetch);
-`analysis-results/impact/*-impact-analysis.json` (producer:
-`/impact-analysis` — python3 -m traust.cli impact analyze); portfolio graph
-(producer: `/portfolio-graph`; freshness gated via `/drift-watch`);
+`impact` assessments in traust-core (producer: `/impact-analysis` —
+python3 -m traust.cli impact analyze); commits' SBOMs (producer:
+`traust impact sbom`);
 findings.db `repos` baselines (producer: python3 -m traust.cli corpus findings-db).
 
 Produces: `analysis-results/impact/fleet-osv-worklist-<date>.json` —
 terminal beyond this skill (a staging inventory consumed by the same
 run's worklist execution and by operator review of deep-scan staging;
-no downstream skill reads it; carries a `refuted_findings` list of
-malicious hits auto-refuted against their source manifests under
-`--verify`, via `harnessing/3-audit/dependency-watch/scripts/verify_dep_provenance.py`); baseline appends +
-disposition-ledger birth events via
-python3 -m traust.cli route impact-findings (consumers: `/track-findings`
+read by `/refresh-dashboards`' `build_dependency_exposure.py`, which
+still expects the old row shape and moves with that skill's port;
+*retired:* the `refuted_findings` list of `--verify`); baseline appends +
+dependency findings filed in traust-core by
+python3 -m traust.cli impact analyze (consumers: `/track-findings`
 cumulative rebuild, `/triage` adjudication, `/verify-remediation`
 (resolution), owner routing / SLA view / team reports /
 `/executive-summary-findings` / `/file-security-defect`, and any ledger

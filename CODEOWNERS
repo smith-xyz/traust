@@ -21,7 +21,6 @@
 /config/safe-exec-profiles.example.yaml @traust-security/traust-admins
 
 # Ledger integrity / two-person rule
-/src/traust/cli/countersign.py @traust-security/traust-admins
 
 # The boundary itself
 /.githooks/ @traust-security/traust-admins

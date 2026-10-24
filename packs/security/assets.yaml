@@ -1,0 +1,95 @@
+# The security pack's asset graph (contracts config/v1/pack.schema.json), read by traust-engine to
+# plan and admit, and by runners to execute from their pinned copy. Rows come from the
+# standing-jobs table in docs/continuous-operations.md; tests/test_security_pack.py maps every
+# row to an asset here or to an exclusion with its reason.
+# PENDING(labels): runner labels are a proposed vocabulary, `deterministic` (a command) and `llm`
+# (a skill session), until the engine's label set is agreed.
+pack: security
+assets:
+  feeds_cache:  # ExposureService.refresh_feeds; a source that doesn't answer is degraded
+    run: [python3, -m, traust.cli, feeds, fetch, --feed, all]
+    trigger: {every: 24h}
+    priority: 10
+    freshness: {fail: 48h}
+    runner: {labels: [deterministic]}
+
+  repo_state:  # PortfolioService.record_forge_facts through traust.ops.materializers
+    run: [python3, -m, traust.cli, portfolio, observe, --repo, "{repo_url}"]
+    params: {repo_url: HttpsRepoUrl}
+    partitions: dynamic:repo
+    trigger: {every: 24h}
+    priority: 20
+    freshness: {fail: 72h}
+    runner: {labels: [deterministic]}
+
+  release_events:
+    run: [python3, harnessing/2-threat-model/threat-model/scripts/build_release_events.py]
+    trigger: {every: 24h}
+    priority: 30
+    freshness: {fail: 48h}
+    runner: {labels: [deterministic]}
+
+  # A skill session is `model: {role: <model-registry role>}`, not a `run` (traust-engine counts
+  # either as runnable). Each gets its role when a runner can start a session (*Shadow run and
+  # cutover*); until then the engine reports them unrunnable. dependency-watch is also broken
+  # until its port lands.
+  dependency_watch:
+    deps: [feeds_cache]
+    trigger: {every: 24h}
+    priority: 40
+    freshness: {fail: 48h}
+    runner: {labels: [llm]}
+
+  rule_mining:  # then the scheduled /mine-ledger session
+    run: [python3, -m, traust.cli, sweep, rule-lane]
+    trigger: {every: 7d}
+    priority: 50
+    freshness: {fail: 14d}
+    runner: {labels: [deterministic]}
+
+  verify_remediation:  # skill session: build_verify_sweep.py → /verify-remediation full-sweep
+    trigger: {every: 7d}
+    priority: 50
+    freshness: {fail: 14d}
+    runner: {labels: [llm]}
+
+  spend_capture:  # skill session: /financial-tracking capture; lossy when late
+    trigger: {every: 7d}
+    priority: 50
+    freshness: {fail: 8d}
+    runner: {labels: [llm]}
+
+  ledger_audit:  # LedgerService.audit: an edit to stored events is found within a week
+    run: [python3, -m, traust.cli, ledger, audit]
+    trigger: {every: 7d}
+    priority: 50
+    freshness: {fail: 8d}
+    runner: {labels: [deterministic]}
+
+  dashboards:  # InsightService.refresh through traust.ops.materializers, then the builders of
+    # views core lacks; spend dashboards go stale after 4d, the scoreboard after 7d
+    run: [python3, -m, traust.cli, dashboard, refresh]
+    trigger: {every: 3d}
+    priority: 60
+    freshness: {warn: 4d, fail: 7d}
+    runner: {labels: [deterministic]}
+
+  validation_benchmark:  # the monthly half; the release-cut half has no trigger form yet
+    run: [python3, -m, traust.cli, sweep, benchmark, plan]
+    trigger: {every: 30d}
+    priority: 70
+    freshness: {fail: 35d}
+    runner: {labels: [deterministic]}
+
+  # PENDING(quarterly): `90d` stands for quarterly (durations are minutes, hours or days).
+  recall_benchmark:  # skill session: /recall-benchmark run; release scoring has no trigger form yet
+    trigger: {every: 90d}
+    priority: 70
+    freshness: {fail: 180d}
+    runner: {labels: [llm]}
+
+  class_sweep:  # skill session: targeted class-sweep
+    trigger: {every: 90d}
+    priority: 70
+    freshness: {fail: 180d}
+    runner: {labels: [llm]}

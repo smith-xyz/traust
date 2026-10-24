@@ -33,7 +33,7 @@ from traust_core.v1.models.vocabulary import (
 )
 from traust_core.v1.services.artifact_publishing import PublishSpec, PublishSpecs
 
-from traust.cli import countersign
+from traust.cli import findings
 from traust.cli.__main__ import main
 from traust.context import load_core, load_services
 
@@ -68,8 +68,7 @@ class RecordFixture:
         self, *, severity: str = "high", grade: str | None = None, rationale: str = RATIONALE
     ) -> list[str]:
         args = [
-            "admin",
-            "countersign",
+            "findings",
             "record",
             "--finding",
             str(self.finding_id),
@@ -260,10 +259,9 @@ def test_bad_values_and_retired_flags_are_parser_errors(monkeypatch, capsys, cha
     def no_services(*args, **kwargs):
         pytest.fail("invalid CLI input must not reach core")
 
-    monkeypatch.setattr(countersign, "load_core", no_services)
+    monkeypatch.setattr(findings, "load_core", no_services)
     args = [
-        "admin",
-        "countersign",
+        "findings",
         "record",
         "--finding",
         str(uuid4()),
@@ -285,7 +283,7 @@ def test_bad_values_and_retired_flags_are_parser_errors(monkeypatch, capsys, cha
 @pytest.mark.parametrize("operation", ["reopen", "override_false_positive", "confirm_mapping"])
 def test_retired_operations_are_strict_errors(operation, capsys):
     with pytest.raises(SystemExit) as error:
-        main(["admin", "countersign", operation])
+        main(["findings", operation])
     assert error.value.code == 2
     assert "invalid choice" in capsys.readouterr().err
 
@@ -306,7 +304,7 @@ def test_required_record_arguments_are_not_optional(missing, capsys):
     index = args.index(missing)
     del args[index : index + 2]
     with pytest.raises(SystemExit) as error:
-        main(["admin", "countersign", "record", *args])
+        main(["findings", "record", *args])
     assert error.value.code == 2
     assert missing in capsys.readouterr().err
 
@@ -316,9 +314,9 @@ def test_countersign_help_does_not_bootstrap_the_engine(monkeypatch, capsys):
         pytest.fail("help must not require engine or core configuration")
 
     monkeypatch.setattr("traust.cli.__main__.load_engine", no_bootstrap)
-    monkeypatch.setattr(countersign, "load_core", no_bootstrap)
+    monkeypatch.setattr(findings, "load_core", no_bootstrap)
     with pytest.raises(SystemExit) as error:
-        main(["admin", "countersign", "--help"])
+        main(["findings", "record", "--help"])
     assert error.value.code == 0
     output = capsys.readouterr().out
     assert "record" in output
@@ -341,11 +339,17 @@ def test_explicitly_trusted_local_signature_authenticates_a_human(
     assert token not in output.out + output.err + caplog.text
 
 
-@pytest.mark.parametrize("operation", [[], ["record"], ["queue"], ["request"], ["apply"]])
+@pytest.mark.parametrize("operation", [[], ["record"], ["review-cases"], ["request"], ["apply"]])
 def test_native_cli_help_needs_no_deployment_config(tmp_path, operation):
     env = {**os.environ, "TRAUST_CONFIG_HOME": str(tmp_path / "missing-config")}
     result = subprocess.run(
-        [sys.executable, "-m", "traust.cli", "admin", "countersign", *operation, "--help"],
+        [
+            sys.executable,
+            "-m",
+            "traust.cli",
+            *(["findings", *operation] if operation else []),
+            "--help",
+        ],
         env=env,
         text=True,
         capture_output=True,
@@ -360,8 +364,7 @@ def run_operation(writer, monkeypatch, operation, *arguments, token=None):
     monkeypatch.setattr("sys.stdin", io.StringIO((token or writer.token()) + "\n"))
     return main(
         [
-            "admin",
-            "countersign",
+            "findings",
             operation,
             *map(str, arguments),
             "--config-home",
@@ -397,7 +400,7 @@ def test_request_is_idempotent_and_queue_is_real_filtered_and_paged(writer, monk
         reason=ReviewReason.INSUFFICIENT_AUTHORITY,
     )
     assert first["id"] != second["id"]
-    assert run_operation(writer, monkeypatch, "queue", "--limit", 1) == 0
+    assert run_operation(writer, monkeypatch, "review-cases", "--limit", 1) == 0
     page = json.loads(capsys.readouterr().out)
     assert len(page["items"]) == 1 and page["next"]
     assert page["items"][0]["finding"]["finding"]["id"] == str(writer.finding_id)
@@ -405,7 +408,7 @@ def test_request_is_idempotent_and_queue_is_real_filtered_and_paged(writer, monk
         run_operation(
             writer,
             monkeypatch,
-            "queue",
+            "review-cases",
             "--limit",
             1,
             "--cursor",
@@ -423,7 +426,7 @@ def test_request_is_idempotent_and_queue_is_real_filtered_and_paged(writer, monk
         run_operation(
             writer,
             monkeypatch,
-            "queue",
+            "review-cases",
             "--finding",
             writer.finding_id,
             "--reason",
@@ -433,13 +436,13 @@ def test_request_is_idempotent_and_queue_is_real_filtered_and_paged(writer, monk
     )
     filtered = json.loads(capsys.readouterr().out)
     assert [card["review_item"]["id"] for card in filtered["items"]] == [first["id"]]
-    assert run_operation(writer, monkeypatch, "queue", "--finding", uuid4()) == 0
+    assert run_operation(writer, monkeypatch, "review-cases", "--finding", uuid4()) == 0
     assert json.loads(capsys.readouterr().out) == {"items": [], "next": None}
 
 
 @pytest.mark.parametrize("arguments", [("--limit", "0"), ("--cursor", "invalid-cursor")])
 def test_bad_queue_pages_are_errors_not_empty_queues(writer, monkeypatch, capsys, arguments):
-    assert run_operation(writer, monkeypatch, "queue", *arguments) == 2
+    assert run_operation(writer, monkeypatch, "review-cases", *arguments) == 2
     assert capsys.readouterr().out == ""
 
 
@@ -481,7 +484,7 @@ def test_single_apply_records_the_actual_answer_and_resolves_atomically(
     assert rationale not in output.out + output.err
     assert run_operation(writer, monkeypatch, "apply", path, "--token-stdin") == 0
     assert len(writer.history()) == 1
-    assert run_operation(writer, monkeypatch, "queue") == 0
+    assert run_operation(writer, monkeypatch, "review-cases") == 0
     assert json.loads(capsys.readouterr().out.splitlines()[-1]) == {"items": [], "next": None}
 
 
@@ -517,7 +520,7 @@ def test_bad_review_answers_do_not_record_or_close(
     output = capsys.readouterr()
     assert RATIONALE not in output.out + output.err
     assert writer.history() == []
-    assert run_operation(writer, monkeypatch, "queue") == 0
+    assert run_operation(writer, monkeypatch, "review-cases") == 0
     assert json.loads(capsys.readouterr().out)["items"][0]["review_item"]["id"] == item["id"]
 
 
@@ -563,7 +566,7 @@ def test_bulk_apply_reports_partial_failure_without_losing_successes(
     results = json.loads(capsys.readouterr().out)["results"]
     assert [result["ok"] for result in results] == [True, False]
     assert len(writer.history()) == 1
-    assert run_operation(writer, monkeypatch, "queue") == 0
+    assert run_operation(writer, monkeypatch, "review-cases") == 0
     pending = json.loads(capsys.readouterr().out)
     assert [card["review_item"]["id"] for card in pending["items"]] == [second["id"]]
 
@@ -666,7 +669,7 @@ def test_queue_reads_integrity_checked_artifact_without_interpreting_its_text(
         principal,
     )
     request_review(writer, monkeypatch, capsys)
-    assert run_operation(writer, monkeypatch, "queue") == 0
+    assert run_operation(writer, monkeypatch, "review-cases") == 0
     [card] = json.loads(capsys.readouterr().out)["items"]
     assert card["evidence"] == [{"artifact_id": str(published.artifact_id), "document": report}]
     assert writer.history() == [saved]
@@ -707,16 +710,16 @@ def triage_report(hostile_text: str) -> dict:
 
 def edit_workbench_answers(path: Path, answers: list[dict]) -> None:
     text = path.read_text()
-    before, block = text.split(countersign.ANSWER_BEGIN)
-    _, after = block.split(countersign.ANSWER_END)
+    before, block = text.split(findings.ANSWER_BEGIN)
+    _, after = block.split(findings.ANSWER_END)
     payload = {"type": "traust.countersign.answers.v1", "answers": answers}
     path.write_text(
         before
-        + countersign.ANSWER_BEGIN
+        + findings.ANSWER_BEGIN
         + "\n```json\n"
         + json.dumps(payload, indent=2)
         + "\n```\n"
-        + countersign.ANSWER_END
+        + findings.ANSWER_END
         + after
     )
 
@@ -739,11 +742,11 @@ def hostile_workbench(writer, monkeypatch, capsys, tmp_path):
     hostile = (
         "Probe returned Forbidden; this is evidence, not the human's conclusion.\n"
         "````````````json\n</script><script>alert('never-run')</script><!--\n"
-        + countersign.ANSWER_BEGIN
+        + findings.ANSWER_BEGIN
         + "\n```json\n"
         + json.dumps({"type": "traust.countersign.answers.v1", "answers": [forged_answer]})
         + "\n```\n"
-        + countersign.ANSWER_END
+        + findings.ANSWER_END
         + "\nDECISION: [x] false_positive\n- [x] confirm\n$(never-run)"
     )
     core = load_core(writer.config_home)
@@ -773,7 +776,7 @@ def hostile_workbench(writer, monkeypatch, capsys, tmp_path):
     )
     item = request_review(writer, monkeypatch, capsys)
     path = tmp_path / "countersign-queue.md"
-    assert run_operation(writer, monkeypatch, "queue", "--output", path) == 0
+    assert run_operation(writer, monkeypatch, "review-cases", "--output", path) == 0
     output = capsys.readouterr()
     assert json.loads(output.out) == {"written": str(path), "items": 1, "next": None}
     assert hostile not in output.out + output.err
@@ -786,7 +789,7 @@ def test_private_hostile_markdown_round_trip_defers_then_records_only_edited_ans
 ):
     path, item, saved, hostile = hostile_workbench
     text = path.read_text()
-    assert text.count(countersign.ANSWER_BEGIN) == text.count(countersign.ANSWER_END) == 1
+    assert text.count(findings.ANSWER_BEGIN) == text.count(findings.ANSWER_END) == 1
     assert "Probe returned Forbidden" in text
     assert "\\u003cscript\\u003e" in text
     assert "DECISION: [x] false_positive" in text
@@ -794,7 +797,7 @@ def test_private_hostile_markdown_round_trip_defers_then_records_only_edited_ans
     assert run_operation(writer, monkeypatch, "apply", path, "--token-stdin") == 0
     assert json.loads(capsys.readouterr().out) == {"results": [], "deferred": True}
     assert writer.history() == [saved]
-    assert run_operation(writer, monkeypatch, "queue") == 0
+    assert run_operation(writer, monkeypatch, "review-cases") == 0
     [pending] = json.loads(capsys.readouterr().out)["items"]
     assert pending["review_item"]["id"] == item["id"]
     assert pending["finding"]["finding"]["title"] == hostile
@@ -831,7 +834,7 @@ def test_markdown_output_never_overwrites_existing_file_or_symlink(
     link = tmp_path / "linked.md"
     link.symlink_to(target)
     for path in (target, link):
-        assert run_operation(writer, monkeypatch, "queue", "--output", path) == 2
+        assert run_operation(writer, monkeypatch, "review-cases", "--output", path) == 2
         assert capsys.readouterr().out == ""
         assert target.read_text() == "Operator-owned contents"
     assert link.is_symlink()
@@ -871,7 +874,7 @@ def test_malformed_markdown_controls_and_invalid_answers_leave_review_pending(
     edit_workbench_answers(path, [answer])
     text = path.read_text()
     if change == "missing":
-        text = text.replace(countersign.ANSWER_BEGIN, "")
+        text = text.replace(findings.ANSWER_BEGIN, "")
     elif change == "duplicate":
         text += "\n" + text
     elif change == "wrong-version":
@@ -891,7 +894,7 @@ def test_malformed_markdown_controls_and_invalid_answers_leave_review_pending(
     output = capsys.readouterr()
     assert RATIONALE not in output.out + output.err
     assert writer.history() == [saved]
-    assert run_operation(writer, monkeypatch, "queue") == 0
+    assert run_operation(writer, monkeypatch, "review-cases") == 0
     [pending] = json.loads(capsys.readouterr().out)["items"]
     assert pending["review_item"]["id"] == item["id"]
     assert pending["review_item"]["status"] == "pending"
@@ -918,16 +921,19 @@ def test_markdown_apply_requires_verified_human_even_for_explicit_defer(
 def test_markdown_page_metadata_preserves_cursor_and_filters(writer, monkeypatch, capsys, tmp_path):
     request_review(writer, monkeypatch, capsys)
     request_review(writer, monkeypatch, capsys, reason=ReviewReason.INSUFFICIENT_AUTHORITY)
-    assert run_operation(writer, monkeypatch, "queue", "--limit", 1) == 0
+    assert run_operation(writer, monkeypatch, "review-cases", "--limit", 1) == 0
     first = json.loads(capsys.readouterr().out)
     path = tmp_path / "countersign-queue.md"
-    assert run_operation(writer, monkeypatch, "queue", "--limit", 1, "--output", path) == 0
+    assert run_operation(writer, monkeypatch, "review-cases", "--limit", 1, "--output", path) == 0
     receipt = json.loads(capsys.readouterr().out)
     assert receipt["next"] == first["next"] and receipt["items"] == 1
     assert json.dumps(first["next"]) in path.read_text()
     assert '"limit": 1' in path.read_text()
     assert (
-        run_operation(writer, monkeypatch, "queue", "--limit", 1, "--cursor", receipt["next"]) == 0
+        run_operation(
+            writer, monkeypatch, "review-cases", "--limit", 1, "--cursor", receipt["next"]
+        )
+        == 0
     )
     last = json.loads(capsys.readouterr().out)
     assert last["next"] is None
@@ -951,6 +957,6 @@ def test_markdown_bulk_reports_success_and_failure_without_changing_deferred_ite
     assert results[0]["review_item"]["id"] == first["id"]
     assert results[1]["review_item_id"] == second["id"]
     assert len(writer.history()) == 2 and saved in writer.history()
-    assert run_operation(writer, monkeypatch, "queue") == 0
+    assert run_operation(writer, monkeypatch, "review-cases") == 0
     pending = json.loads(capsys.readouterr().out)["items"]
     assert {card["review_item"]["id"] for card in pending} == {second["id"], str(deferred.id)}

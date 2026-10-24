@@ -17,7 +17,7 @@
 # Consumers:
 #   - traust.registry.feeds_config — the loader; every other
 #     consumer goes through it rather than parsing this file directly.
-#   - traust.cli.fetch_feeds — refreshes `tier: cached`.
+#   - traust feeds fetch (traust-core's ExposureService.refresh_feeds) — snapshots `tier: cached`.
 #   - harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py — resolves
 #     `tier: live` sources; its `source` argument is generated from the
 #     ids here, so a new live source needs no code change.
@@ -37,7 +37,7 @@
 #     Hat product/ownership/notification registry) is NOT a security feed
 #     — it carries ps_products, contacts and cc_lists, zero vulnerability
 #     data — and is excluded from this file for that reason. It remains
-#     wired in fetch_feeds.py under a `pending relocation` block, with
+#     fetched by fetch_feeds.py (`traust feeds fetch-products`), with
 #     its five consumers untouched, until its destination is decided.
 #
 # Every entry MUST carry a `license` block — docs/external-dependencies.md
@@ -132,7 +132,7 @@ sources:
     # The index is synced on cadence; individual documents are fetched on
     # demand and cached, because our access pattern is advisory-at-a-time
     # and the full corpus is a 293 MB zstd archive whose products are
-    # mostly ones we do not ship. `--mirror` on fetch_feeds opts into the
+    # mostly ones we do not ship. a `--mirror` mode would opt into the
     # complete local mirror when an offline fleet-wide query is needed.
     index_url: https://access.redhat.com/security/data/csaf/v2/vex/changes.csv
     index_file: vex/changes.csv
@@ -195,10 +195,9 @@ sources:
       ecosystem: npm
       expect_status: 200
     consumers:
-      - harnessing/3-audit/dependency-watch/scripts/fleet_sweep.py
       - harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py
       - harnessing/3-audit/secure-code-audit/scripts/run_fork_advisory_lag.py
-      - traust.cli.resolve_advisory_symbols
+      - traust.cli.impact
       - traust.ops.cve_replay_monitor
       - traust.cli adapters osv (traust_engine.adapters.osv, the dependency pre-scan)
     license:

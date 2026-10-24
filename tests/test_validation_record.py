@@ -252,6 +252,43 @@ def test_current_invalid_environment_retains_review_without_decision(
     assert retained.payload == (recording["root"] / "report.json").read_bytes()
 
 
+def test_voided_validation_full_review_card_retains_report_and_recording_companion(
+    recording, capsys
+):
+    report = copy.deepcopy(recording["report"])
+    report["metadata"]["target_attestation"] = {
+        "attested": False,
+        "checks": [{"name": "pods-ready", "ok": False, "detail": "actual failed observation"}],
+    }
+    code, receipt, error = invoke(recording, capsys, report=report)
+    assert code == 0, error
+    services = load_services(recording["config"])
+    assert services.findings.history(recording["finding_id"]) == []
+    assert (
+        main(
+            [
+                "findings",
+                "review-cases",
+                "--config-home",
+                str(recording["config"]),
+                "--finding",
+                str(recording["finding_id"]),
+            ]
+        )
+        == 0
+    )
+    page = json.loads(capsys.readouterr().out)
+    [card] = page["items"]
+    assert card["history"] == []
+    evidence = {entry["artifact_id"]: entry["document"] for entry in card["evidence"]}
+    assert evidence[receipt["artifact_ids"][0]] == report
+    evidence_id = receipt["evidence_artifact_ids"][0]
+    assert evidence[evidence_id] == services.validation.evidence(
+        UUID(evidence_id), finding_id=recording["finding_id"]
+    ).model_dump(mode="json")
+    assert services.findings.history(recording["finding_id"]) == []
+
+
 @pytest.mark.parametrize(
     "change", ["unknown-finding", "wrong-digest", "opaque-reference", "truthy-attestation"]
 )

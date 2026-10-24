@@ -46,7 +46,6 @@ field on every skill.
 | [secure-rpm-audit](#secure-rpm-audit) | ③ Audit | `primary` | `/secure-rpm-audit` |
 | [security-audit-phased](#security-audit-phased) | ③ Audit | `primary` | `/security-audit-cvss`, `/security-audit-follow-up-seeds`, `/security-audit-init`, `/security-audit-p2`, `/security-audit-p3`, `/security-audit-p4`, `/security-audit-p6`, `/security-audit-review` |
 | [vuln-scan](#vuln-scan) | ③ Audit | `primary` | `/vuln-scan` |
-| [countersign](#countersign) | ④ Triage | `primary` | `/countersign` |
 | [track-findings](#track-findings) | ④ Triage | `primary` | `/track-findings` |
 | [triage](#triage) | ④ Triage | `primary` | `/triage` |
 | [validate-browser-finding](#validate-browser-finding) | ⑤ Validation | `primary` | `/validate-browser-finding` |
@@ -84,16 +83,16 @@ field on every skill.
 
 ## add-inputs
 
-Use when the user asks to add one or more GitHub/GitLab repositories or an entire GitHub organization to the repository inventory (`locations.inputs`). Adds entries to the appropriate segment CSV files and generates matching owners.csv rows.
+Use when the user asks to add one or more GitHub/GitLab repositories or an entire GitHub organization to the repository inventory (traust-core). Registers them under a product with `traust portfolio onboard` and imports their owners.
 
 - **Stage:** ① Inventory
 - **Tier:** `secondary`
-- **Invoke:** `/add-inputs` — arguments: `<repo-or-org-url> [--segment <segment>] [--inventory <path-or-url>]`
+- **Invoke:** `/add-inputs` — arguments: `<repo-or-org-url> --product <slug> [--label <name>] [--dry-run]`
 - **Skill:** [harnessing/1-inventory/add-inputs/SKILL.md](../harnessing/1-inventory/add-inputs/SKILL.md)
 
 ## corpus-intake
 
-Use when the user wants to register, update, or review a corpus tree or scan engagement — "add a new BU engagement", "register this tree", "onboard <name> scanning work", "why is this tree unregistered", "update the ownership of X" — or when any census/dashboard run reports an unregistered-tree drift warning. Interactively interviews for the registration fields (or takes them as arguments), validates and updates $TRAUST_CONFIG_HOME/corpus-config.yaml through corpus_intake.py (never hand-edited), then re-runs /census so the corpus manifest reflects the change immediately.
+Use when the user wants to register, update, or review a corpus tree or scan engagement — "add a new BU engagement", "register this tree", "onboard <name> scanning work", "why is this tree unregistered", "update the ownership of X" — or when any census/dashboard run reports an unregistered-tree drift warning. Interactively interviews for the registration fields (or takes them as arguments), validates and records them in traust-core (products and the corpus registry) through `traust products`, then re-runs /census so the corpus manifest reflects the change immediately.
 
 - **Stage:** ① Inventory
 - **Tier:** `secondary`
@@ -102,7 +101,7 @@ Use when the user wants to register, update, or review a corpus tree or scan eng
 
 ## inventory-repositories
 
-Use when the user asks to list, discover, inventory, or extract the source repositories that ship in a release payload image or an OLM operator bundle/catalog — e.g. "inventory release 4.21", "which repos ship in the foo operator 2.3", "refresh the payload inventory". Writes the per-segment CSV inventory and owners.csv that repo-graph and the dashboards read.
+Use when the user asks to list, discover, inventory, or extract the source repositories that ship in a release payload image or an OLM operator bundle/catalog — e.g. "inventory release 4.21", "which repos ship in the foo operator 2.3", "refresh the payload inventory". Writes the per-segment CSV inventory that repo-graph and the dashboards read, and registers the repositories and their owner teams in traust-core.
 
 - **Stage:** ① Inventory
 - **Tier:** `secondary`
@@ -140,7 +139,7 @@ Use when the user asks to assess compliance of a product or deployed cloud envir
 
 ## crypto-analysis
 
-Use when you need to understand a crypto decision point — probe what crypto is configured, trace who owns the decision (governance chain), and confirm with runtime evidence. Probe-driven via python3 -m traust.cli adapters crypto-audit.
+Use when you need to understand a crypto decision point — probe what crypto is configured, trace who owns the decision (governance chain), and confirm with runtime evidence. Probe-driven via python3 -m traust.cli adapters crypto-source|crypto-image|crypto-cluster.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -159,11 +158,11 @@ Use on the daily continuous-operations cadence, or when the user asks to "check 
 
 ## impact-analysis
 
-Use when determining which portfolio repositories are affected by an advisory (CVE, GHSA, MAL-/malicious-package, or another OSV-native id). Queries the portfolio graph for blast radius, then runs language-specific analysis (govulncheck + ELF reachability for Go, the strongest tier; manifest-level analyzers for npm, PyPI, Maven, Cargo, RubyGems, and NuGet; a manifest-level SurfaceAnalyzer for the universal Docker/GitHub Actions/Helm surfaces) to classify every importing repo. Emits a schema-validated artifact consumed by /triage and /verify-remediation.
+Use when determining which portfolio repositories are affected by an advisory (CVE, GHSA, MAL-/malicious-package, or another OSV-native id). Walks the commits' recorded SBOMs for blast radius, then runs language-specific analysis (govulncheck reachability for Go, the strongest tier; manifest-level analyzers for npm, PyPI, Maven, Cargo, RubyGems, and NuGet; manifest-level evidence for the universal Docker/GitHub Actions/Helm surfaces) to classify every importing repo. Records a schema-validated artifact per commit in traust-core, consumed by /triage and /verify-remediation.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
-- **Invoke:** `/impact-analysis` — arguments: `<advisory-id> --module <mod> [--ecosystem go|npm|pypi|maven|cargo|ruby|nuget|actions|docker|helm] [--packages <p1,p2>] [--vulnerable-range '<v'] [--fixed-version v1.0.1] [--feature-desc '...'] [--skip-scan] [--jobs N]`
+- **Invoke:** `/impact-analysis` — arguments: `<advisory-id> [--repo-url <url> --sha <commit>] [--symbols <s1,s2>] [--feature-desc '...'] [--scan]`
 - **Skill:** [harnessing/3-audit/impact-analysis/SKILL.md](../harnessing/3-audit/impact-analysis/SKILL.md)
 
 ## isolation-review
@@ -244,19 +243,9 @@ Static source-code vulnerability scan. Reads a target directory (and its threat 
 - **Skill:** [harnessing/3-audit/vuln-scan/SKILL.md](../harnessing/3-audit/vuln-scan/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/3-audit/vuln-scan/SKILL.md#integrations)
 
-## countersign
-
-Review core finding decision cards and record verified-human judgements. Supports a private asynchronous countersign-queue.md round trip and single or bulk JSON answers using shared traust auth or explicit stdin tokens, with rationale and core evidence admission.
-
-- **Stage:** ④ Triage
-- **Tier:** `primary`
-- **Invoke:** `/countersign` — arguments: `[core-finding-UUID | queue | countersign-queue.md | reviewed-answers.json]`
-- **Skill:** [harnessing/4-triage/countersign/SKILL.md](../harnessing/4-triage/countersign/SKILL.md)
-- **Produces / consumes:** [Integrations](../harnessing/4-triage/countersign/SKILL.md#integrations)
-
 ## track-findings
 
-Use when the user wants to record human triage feedback against audit findings from forge comments, commits, Jira tickets or an interactive session, or asks for current finding state. Uses shared traust auth and core decisions, with genuine judged answers and the reviewer's own rationale for both confirm and reject. Reports validity, resolution, assurance, severity, SLA and review surfaces, and exports SARIF. Machine reports record through their own skills.
+Use when the user wants to record human feedback against audit findings, review core decision cards, countersign machine verdicts, or inspect current finding state. Imports forge/Jira statements and supports private asynchronous countersign-queue.md review, typed single/bulk answers and direct verified-human judgements through shared traust auth or explicit stdin tokens. Requires genuine judged fields and the reviewer's own rationale; core owns evidence admission. Reports validity, resolution, assurance, severity, SLA and review surfaces, and exports SARIF. Machine reports record through their own skills.
 
 - **Stage:** ④ Triage
 - **Tier:** `primary`
@@ -450,7 +439,7 @@ Use when the user asks what the campaign or harness is costing, how spend is tre
 
 ## findings-db
 
-Use when the user asks an ad-hoc question over the findings corpus that reads like a query — "open criticals by business unit", "which repos have the most confirmed findings", "distinct CWE-1104 exposure across products", "how many findings were validated live" — or asks to build/refresh/query the findings database. Queries the SQLite projection (analysis-results/graph/findings.db) instead of walking 8k JSON files.
+Use when the user asks an ad-hoc question over the findings corpus that reads like a query — "open criticals by business unit", "which repos have the most confirmed findings", "distinct CWE-1104 exposure across products", "how many findings were validated live" — or asks to build/refresh/query the findings database. Queries traust-core's finding doors (traust findings summary / timeline / baseline) instead of walking 8k JSON files.
 
 - **Stage:** —
 - **Tier:** `secondary`
@@ -525,11 +514,11 @@ Use when the user asks to measure the auditor's detection recall, run the recall
 
 ## refresh-dashboards
 
-Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: projections first (findings.db, census), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, dependency-exposure, spend), then the leadership scoreboard last because it harvests the others. Deterministic, ~$0, no agents.
+Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, dependency-exposure, spend), then the leadership scoreboard last because it harvests the others. Deterministic, ~$0, no agents.
 
 - **Stage:** —
 - **Tier:** `secondary`
-- **Invoke:** `/refresh-dashboards` — arguments: `[--only <stage...>] [--skip <stage>] [--spend-actuals] [--note <text>]`
+- **Invoke:** `/refresh-dashboards` — arguments: `[--only <stage...>] [--skip <stage>] [--spend-actuals] [--view <name>] [--out <dir>]`
 - **Skill:** [harnessing/refresh-dashboards/SKILL.md](../harnessing/refresh-dashboards/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/refresh-dashboards/SKILL.md#integrations)
 

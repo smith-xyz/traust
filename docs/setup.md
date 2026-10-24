@@ -38,12 +38,15 @@ contract: [config/README.md](../config/README.md).
 - Git access to this repository and, for the multi-repository pipeline, the
   sibling data repositories (§3)
 - Network access to the forge holding the repositories you audit
-- For direct human severity recording, a bearer token accepted by the trusted
-  issuers in `core.yaml`'s `identity:` section. Core verifies the signature,
-  caller and any configured directory policy; the command reads the token only
-  from stdin. Local identity is trusted only when core explicitly enables it.
-  Retired `ledger auth` commands and `HARNESS_COUNTERSIGN_ALLOW_LOCAL` do not
-  configure this writer. See [the command contract](cli-reference.md#direct-human-severity-recording).
+- A core-verified human identity for anyone who countersigns: `traust auth login`
+  against the trusted issuers in `core.yaml`'s `identity:` section, or
+  `traust auth local --identity you@example.com` on a solo installation with
+  `identity: {trust_local: true}` explicitly configured. Core verifies the
+  signature, caller and any deployment directory policy on writes. Review
+  commands may instead read an explicitly selected token from stdin, never argv
+  or agent-visible logs. Retired `ledger auth` commands,
+  `HARNESS_COUNTERSIGN_ALLOW_LOCAL` and `LAAS_*` do not configure this workflow.
+  See [the command contract](cli-reference.md#direct-human-severity-recording).
 
 Scanner tools are per capability, not global: nothing beyond the baseline is
 needed until a skill calls for it. What each capability needs is the table in
@@ -135,7 +138,7 @@ Tools with no standalone upstream binary come from a package manager:
 | `skopeo` | `brew install skopeo` (macOS), `dnf install skopeo` (Fedora/RHEL) |
 | `yara` | `brew install yara`, or build from the [yara release](https://github.com/VirusTotal/yara/releases) |
 | `pip-audit` | `pipx install pip-audit` |
-| `checkov` | `pipx install checkov==<pin>` — the pin is `PINNED_CHECKOV_VERSION` in `harnessing/3-audit/cloud-config-audit/scripts/run_checkov.py`, which hard-fails on a mismatch |
+| `checkov` | `pipx install checkov==<pin>` — the pin is `CHECKOV_VERSION` in traust-core's `models/cloud_config.py`; `traust cloud-config run` hard-fails on a mismatch |
 
 Vulnerability databases (grype, govulncheck) are populated by `setup`; to
 refresh them, or to bundle them for an air-gapped host:
@@ -224,7 +227,7 @@ osv-scanner reports no Go standard-library advisories (measured on etcd,
 run govulncheck, which carries its own database, for Go. The other OSV
 consumers query the API and do not run air-gapped: the fleet sweep
 (`dependency-watch`) writes a `failed` worklist and exits 2, and advisory
-fetches (`fetch_advisory.py`, `resolve-advisory-symbols`, the CVE-replay
+fetches (`traust impact find` / `symbols`, `fetch_advisory.py`, the CVE-replay
 monitor) report their lookups as failed.
 
 ### Container image (CI, platform worker, air gap)
@@ -326,10 +329,10 @@ operator catalog to inventory (`/inventory-repositories` writes those).
 
 Three ways to populate it:
 
-- **`/add-inputs`** appends a repository or a whole GitHub/GitLab org to a
-  segment and derives `owners.csv` rows from `OWNERS` / `approvers` files in
-  the repos. Point it at your inventory with `--inventory` or let it use
-  `locations.inputs`.
+- **`/add-inputs`** registers a repository or a whole GitHub/GitLab org in
+  traust-core under a product (`traust portfolio onboard`) and imports owning
+  teams from `org_teams:` (`traust portfolio import-owners`). It no longer
+  writes this CSV tree; readers of the tree move to traust-core with their ports.
 - **Export from your own source of truth** into the CSV shape above; a
   spreadsheet export is enough.
 - **Keep the inventory in its own repository**, as this project does, so that
@@ -403,17 +406,20 @@ A local path needs the same protection from the disk it sits on.
 Cached vulnerability data (EPSS, CISA KEV, vendor CVE and VEX feeds) is a
 mirror of third-party licensed data: a different provenance class from the
 findings you author, with opposite retention and redistribution properties, so
-it lives outside the findings tree and is never committed. Set
-`locations.yaml` → `feeds_cache` — there is **no default**; unset, feed fetch
-fails closed. The metrics tree is the conventional place:
+it lives outside the findings tree and is never committed. `traust feeds fetch`
+snapshots it into traust-core's store (`core.yaml`):
+
+```bash
+python3 -m traust.cli feeds fetch --feed all
+```
+
+`locations.yaml` → `feeds_cache` (**no default**) now holds only the
+product-definitions registry (`traust feeds fetch-products`), when the
+deployment configures one:
 
 ```yaml
 # locations.yaml
 feeds_cache: /path/to/progress-tracker/feeds
-```
-
-```bash
-python3 -m traust.cli feeds fetch --feed all
 ```
 
 ## 6. Environment variables

@@ -52,8 +52,8 @@ is silent and terminal.** Every control below follows from it.
   identical-looking negative transcripts. So a machine `refuted` verdict
   never sets state: it is recorded as evidence and the finding pends as
   `refuted_awaiting_signoff` until an identity-verified human countersigns
-  (`/countersign`), with the **raw probe output rendered verbatim on the
-  decision card** so the signer sees what "refuted" actually looked like.
+  (`traust findings review-cases` / `confirm` or `apply`), with **raw probe output
+  on the full evidence card** so the signer sees what "refuted" actually meant.
 - **The bounded exception (auto-accept tier):** triage may set
   `false_positive` without countersign only for claims of severity
   **low/informational** that clear the corroboration, citation-lint and

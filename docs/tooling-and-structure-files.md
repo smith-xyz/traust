@@ -7,7 +7,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | Component | Purpose |
 |---|---|
 | python3 -m traust.cli util safe-exec + `$TRAUST_CONFIG_HOME/safe-exec-profiles.yaml` | Enforced sandbox for target-derived commands (argv allowlists, env scrub, shell-free pipelines) — gate rule S10; [docs/safe-exec.md](safe-exec.md) |
-| python3 -m traust.cli dashboard refresh | Rebuilds the remaining registered dashboard stages; retired corpus projections and dashboard builders are not part of this job — see [continuous-operations.md](continuous-operations.md#standing-jobs--the-complete-inventory) |
+| python3 -m traust.cli dashboard refresh | The packaged dashboards rebuild (core views → remaining registered builders → scoreboard); retired corpus projections/builders are not restored — see [continuous-operations.md](continuous-operations.md#standing-jobs--the-complete-inventory) |
 | `traust_engine.escaping` | Shared untrusted-text helpers every emitter uses (HTML, inline-script JSON, md cells, CSV, slugs) — library import, not a CLI |
 | `schemas/v1/report.schema.json` | JSON Schema (draft 2020-12) for security-audit reports |
 | `schemas/v1/triage.schema.json` | JSON Schema for TRIAGE.json validation |
@@ -21,6 +21,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | `schemas/v1/layer.schema.json` | JSON Schema for findings-disposition layers (track-findings ledger) |
 | `schemas/v1/refuted-register.schema.json` | JSON Schema for the refuted-finding register: triage or validation refutations kept, integrity-bound, for later execution evidence and countersign |
 | `schemas/v1/threat-model.schema.json` | JSON Schema for one subject's threat model contract (`<repo>-threat-model.json`), alongside the authored Markdown (`<repo>-threat-model.md`); the former JSON emitter is retired and the core assessment/artifact skill port is unfinished, with no executable fallback |
+| `schemas/v1/run-manifest.schema.json` | JSON Schema for an order's run manifest (`run_order.artifact_id`): config digests in force (the pack version), the budget verdict at admission, the approval, progress and degraded keys (traust-core `OpsService`) |
 | `schemas/v1/corpus-registry.schema.json` | JSON Schema for the corpus ownership registry — the subject→owner/business-unit mapping that every denominator divides by |
 | `schemas/v1/operator-priv-profile.schema.json` | JSON Schema for per-operator least-privilege profiles (`*-priv-profile.json`), parsed from shipped manifests — declared state, never a live cluster read |
 | `traust_core.v1.services.findings.identity.IdentityPolicy` | Core-owned finding fingerprint recipe and version attribution, moved from traust-ledger. Reuse core identity handling; never invent a second recipe or substitute a fingerprint for the finding UUID required by the severity writer. |
@@ -53,9 +54,8 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | python3 -m traust.cli admin query-index | Queries the symbol index |
 | Retired baseline-claim workflow | Formerly pinned legacy baseline claim hashes; core finding intake/baseline services own the unfinished skill port, with no executable fallback |
 | python3 -m traust.cli triage record | Records validated triage decisions through core; human review items feed the countersign queue |
-| python3 -m traust.cli admin countersign | Core ReviewCase cards with evidence; private async `queue --output countersign-queue.md` / typed-block `apply`, review requests, direct judgements and JSON single/bulk apply (verified human via shared auth or explicit stdin token) |
 | `traust auth` | Core-owned stored login, local/device-code/token-file authentication, machine service accounts, status, refresh and logout |
-| `traust findings` | Core finding reads, forge/Jira import and explicit human decide/confirm/reject, refuted findings, review surfaces, SARIF and ticket links; both review outcomes require a judged decision and own rationale |
+| `traust findings` | Core finding reads, forge/Jira import, full review cards/evidence, review requests, direct human judgements, typed Markdown/JSON batch apply and confirm/reject, refuted findings, review surfaces, SARIF and ticket links; both review outcomes require a judged decision and own rationale |
 | python3 -m traust.cli check docs-consistency | Doc-drift detection for harness docs |
 | python3 -m traust.cli impact cluster-state-diff | P5 discovery sweep 1 — before/after security-state snapshots (RBAC, SCCs, webhooks, NetworkPolicies, Services/Routes) diffed into validation-discovery candidates for /triage |
 | python3 -m traust.cli sweep benchmark | P7 validation-lane benchmark — vulnerable/safe-twin fixtures, confirm-recall + refute-precision + severity-accuracy floors, hybrid release-cut/monthly cadence (check-trigger + drift-watch) |
@@ -63,8 +63,8 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | `traust validation record` | Typed machine-report recording via core `ValidationService.record`; explicit stored source bindings/provenance, full target-attestation/install observations, core-owned soundness and canonical decisions or review items |
 | python3 -m traust.cli registry models | Model-registry loader/resolver — role→model resolution with floor enforcement, routing stamps, spend recording (docs/model-routing.md) |
 | python3 -m traust.cli admin checkpoint | Agent checkpoint support |
-| python3 -m traust.cli check fix-propagation | Deterministic cross-repo fix-propagation check — has the original repo consumed the fixed module version (go.mod/vendor, lockfiles, shipped-image SBOMs)? Feeds verify-remediation's two-legged rule |
-| python3 -m traust.cli impact analyze | CVE impact analysis across the portfolio graph — blast radius, L4 refinement, language-specific deep scan (GoAnalyzer: govulncheck + ELF, the strongest reachability tier; other ecosystems get manifest-level analyzers); `--ecosystem` seeds a non-Go blast radius, `--skip-scan` for graph-only, `--jobs N` for parallel workers |
+| python3 -m traust.cli check fix-propagation | Deterministic cross-repo fix-propagation check on traust-core (`ExposureService.consumes_fix`) — has the original commit consumed the fixed version, by its manifest SBOM and the images built from it? Feeds verify-remediation's two-legged rule |
+| python3 -m traust.cli impact find / sbom / symbols / analyze / sweep | The impact-analysis and dependency-watch doors on traust-core (`ExposureService`): source advisories, recorded commit SBOMs, fix symbols, per-commit analysis (`--scan` for govulncheck/source tiers) saved as `impact` assessments, dependency finding intake for `affected` commits, and fleet OSV sweep over recorded SBOMs; no fabricated classifier or severity |
 | Retired regression router | Formerly converted remediation regressions into event-carried findings; core finding intake owns the replacement, but the skill port is unfinished and there is no executable fallback |
 | Retired FP-precedent corpus CLI | Formerly built a tiered refutation-precedent index for triage and the Precision Gate; core finding precedents own the replacement, but the skill port is unfinished and there is no executable fallback |
 | python3 -m traust.cli sweep | Class-generalization sweep loop: confirmed finding → candidate rule → corpus-wide sweep → triage-ready candidates |

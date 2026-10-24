@@ -1,0 +1,200 @@
+{
+  "harnessing/3-audit/compliance-check/scripts/collect_cloud_inventory.py": {
+    "engine-internal": 1
+  },
+  "harnessing/3-audit/compliance-check/scripts/run_compliance_check.py": {
+    "database": 1,
+    "engine-internal": 2
+  },
+  "harnessing/3-audit/compliance-check/scripts/validate_compliance_assessment.py": {
+    "contracts": 1
+  },
+  "harnessing/3-audit/pqc-readiness/scripts/build_pqc_blockers.py": {
+    "contracts": 1
+  },
+  "harnessing/3-audit/pqc-readiness/scripts/build_pqc_product_reports.py": {
+    "database": 1,
+    "engine-internal": 1,
+    "state-file": 1
+  },
+  "harnessing/3-audit/pqc-readiness/scripts/build_pqc_rollup.py": {
+    "database": 1,
+    "state-file": 1
+  },
+  "harnessing/3-audit/pqc-readiness/scripts/build_pqc_vendor_tracker.py": {
+    "database": 1,
+    "state-file": 1
+  },
+  "harnessing/3-audit/pqc-readiness/scripts/build_pqc_worklist.py": {
+    "engine-internal": 1
+  },
+  "harnessing/3-audit/pqc-readiness/scripts/pqc_facts.py": {
+    "contracts": 1
+  },
+  "harnessing/3-audit/pqc-readiness/scripts/scan_crypto_deps_graph.py": {
+    "database": 1,
+    "state-file": 1
+  },
+  "harnessing/3-audit/pqc-readiness/scripts/scan_pqc_dependencies.py": {
+    "database": 1,
+    "state-file": 1
+  },
+  "harnessing/3-audit/secure-code-audit/scripts/enrich_findings_cves.py": {
+    "state-file": 1
+  },
+  "harnessing/3-audit/secure-code-audit/scripts/enumerate_route_guards.py": {
+    "database": 1
+  },
+  "harnessing/3-audit/vuln-scan/scripts/resolve_baseline.py": {
+    "database": 1,
+    "engine-internal": 1
+  },
+  "harnessing/7-remediate/fleet-fix/scripts/apply_fleet_fix.py": {
+    "contracts": 1
+  },
+  "harnessing/7-remediate/fleet-fix/scripts/fleet_targets.py": {
+    "database": 1,
+    "state-file": 2
+  },
+  "harnessing/7-remediate/remediate-finding/scripts/build_remediation_manifest.py": {
+    "engine-internal": 1
+  },
+  "harnessing/8-verify/verify-remediation/scripts/build_verify_sweep.py": {
+    "engine-internal": 1,
+    "state-file": 1
+  },
+  "harnessing/financial-tracking/scripts/build_financial_report.py": {
+    "database": 1,
+    "engine-internal": 7
+  },
+  "harnessing/portfolio-graph/scripts/smoke_deps_multi.py": {
+    "database": 1,
+    "engine-internal": 2
+  },
+  "harnessing/refresh-dashboards/scripts/build_dependency_exposure.py": {
+    "database": 1,
+    "engine-internal": 2,
+    "state-file": 1
+  },
+  "harnessing/traust-metrics/scripts/collect_harness_metrics.py": {
+    "database": 1,
+    "engine-internal": 1,
+    "state-file": 1
+  },
+  "src/traust/cli/auth.py": {
+    "core-internal": 1
+  },
+  "src/traust/cli/budget_shadow.py": {
+    "engine-internal": 1
+  },
+  "src/traust/cli/build_rescan_worklist.py": {
+    "database": 2,
+    "engine-internal": 1,
+    "state-file": 2
+  },
+  "src/traust/cli/build_symbol_index.py": {
+    "database": 1
+  },
+  "src/traust/cli/calibrate_rule_pack.py": {
+    "engine-internal": 1
+  },
+  "src/traust/cli/check_docs_consistency.py": {
+    "contracts": 1,
+    "state-file": 2
+  },
+  "src/traust/cli/check_drift.py": {
+    "contracts": 1,
+    "database": 1,
+    "engine-internal": 1,
+    "state-file": 5
+  },
+  "src/traust/cli/check_skill_alignment.py": {
+    "state-file": 1
+  },
+  "src/traust/cli/fetch_feeds.py": {
+    "engine-internal": 1
+  },
+  "src/traust/cli/findings.py": {
+    "core-internal": 2
+  },
+  "src/traust/cli/groups/_registry.py": {
+    "engine-internal": 1
+  },
+  "src/traust/cli/groups/adapters.py": {
+    "engine-internal": 3
+  },
+  "src/traust/cli/groups/compliance.py": {
+    "contracts": 1,
+    "engine-internal": 1
+  },
+  "src/traust/cli/groups/metrics.py": {
+    "contracts": 1,
+    "engine-internal": 2
+  },
+  "src/traust/cli/groups/portfolio.py": {
+    "engine-internal": 3
+  },
+  "src/traust/cli/groups/registry.py": {
+    "contracts": 1,
+    "engine-internal": 1
+  },
+  "src/traust/cli/groups/reporting.py": {
+    "contracts": 1,
+    "engine-internal": 4,
+    "state-file": 1
+  },
+  "src/traust/cli/groups/sweep.py": {
+    "contracts": 1,
+    "engine-internal": 5,
+    "state-file": 1
+  },
+  "src/traust/cli/groups/util.py": {
+    "engine-internal": 3
+  },
+  "src/traust/cli/query_index.py": {
+    "database": 1
+  },
+  "src/traust/cli/toolchain.py": {
+    "engine-internal": 1
+  },
+  "src/traust/context.py": {
+    "contracts": 2,
+    "engine-internal": 1
+  },
+  "src/traust/lib/__init__.py": {
+    "engine-internal": 1
+  },
+  "src/traust/lib/event_time.py": {
+    "contracts": 1
+  },
+  "src/traust/ops/build_critical_misses.py": {
+    "state-file": 1
+  },
+  "src/traust/ops/build_crown_jewel_tiers.py": {
+    "database": 1,
+    "state-file": 4
+  },
+  "src/traust/ops/build_iac_inventory.py": {
+    "state-file": 1
+  },
+  "src/traust/ops/build_org_index.py": {
+    "state-file": 1
+  },
+  "src/traust/ops/calibrate_compliance.py": {
+    "engine-internal": 1
+  },
+  "src/traust/ops/doctor.py": {
+    "contracts": 1
+  },
+  "src/traust/ops/score_compliance_efficacy.py": {
+    "database": 1,
+    "state-file": 1
+  },
+  "src/traust/paths.py": {
+    "contracts": 3
+  },
+  "src/traust/registry/feeds_config.py": {
+    "contracts": 1,
+    "engine-internal": 1
+  }
+}

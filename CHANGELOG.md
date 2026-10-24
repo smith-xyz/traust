@@ -33,10 +33,12 @@ All notable changes to Traust are documented here.
   preparation/authorization/live execution, novel intake, scanner adapters or
   historical portfolio certification. OWASP risk rating is unchanged.
 
-- Complete the service-backed countersign workbench: paged/filterable `queue`,
-  idempotent `request`, direct canonical validity/severity/resolution `record`,
-  and single/bulk `apply` from typed reviewed-answer JSON. Every write uses
-  core identity and requires a verified human; both review outcomes append the
+- Consolidate the completed core-backed human review workflow under
+  `/track-findings` and `traust findings`, honoring the retirement of the
+  countersign skill/wrapper and admin command/module. Paged/filterable
+  `review-cases`, idempotent `request`, direct validity/severity/resolution
+  `record`, and single/bulk `apply` retain the reviewed-answer protocol.
+  Every write uses core identity and requires a verified human; both review outcomes append the
   person's explicit judgement and rationale atomically with queue resolution.
   Queue cards include finding state, attributed history and integrity-checked
   evidence documents, including raw probe observations. Core owns proof
@@ -51,14 +53,14 @@ All notable changes to Traust are documented here.
   neither outcome can close a review without an atomically recorded decision.
 - Keep the app and engine's core pins aligned so the `postgres` extra installs
   core's PostgreSQL driver; a bare dependency override discarded that extra.
-- Add the async `countersign-queue.md` round trip: `queue --output` creates a
+- Retain the async `countersign-queue.md` round trip: `findings review-cases --output` creates a
   private 0600, non-overwriting Markdown workbench with real decision cards and
   cursor metadata. `apply` accepts only its single bounded typed JSON answer
   block; an empty answer list explicitly defers without writes after human
   authentication. Escaped evidence cannot forge controls; malformed/duplicate
   controls and invalid rows fail. Existing JSON single/bulk answers still work.
-  Countersign and `findings queue` now consume core `ReviewCase` queue values
-  without rebuilding finding views/history or per-card domain queries.
+  Full `findings review-cases` cards and the unchanged flat `findings queue`
+  summary list consume core `ReviewItemCase` values without rebuilding domain policy.
 
 - **Breaking: traust-core is the hub.** traust depends on traust-core and
   traust-engine only; traust-contracts and traust-ledger come through core's

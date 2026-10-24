@@ -52,7 +52,7 @@ Rules:
   A10 integrations    A skill emitting non-terminal artifacts must carry
                       an Integrations/Downstream section documenting who
                       consumes them.
-  A8 checkov-contract A skill that RUNS run_checkov.py must carry the
+  A8 checkov-contract A skill that RUNS `traust cloud-config run` must carry the
                       recording conventions: `deterministic_steps` plus
                       the declared-configuration labeling (a
                       declared-only assessment never claims
@@ -225,7 +225,7 @@ BASELINE_WRITE_MD_NEG_RE = re.compile(
 )
 RUNS_OPENGREP_RE = re.compile(r"run_opengrep\.py")
 RUNS_KHS_RE = re.compile(r"scan_k8s_hardening\.py")
-RUNS_CHECKOV_RE = re.compile(r"run_checkov\.py")
+RUNS_CHECKOV_RE = re.compile(r"run_checkov\.py|cloud-config run")
 DECLARED_RE = re.compile(r"declared[ -](configuration|layer)", re.IGNORECASE)
 JUDGE_RE = re.compile(
     r"scanner_correlation|promote-or-dismiss|"
@@ -265,7 +265,7 @@ ARTIFACT_SKIP_RE = re.compile(
 # machine consumer
 # Shrunk 2026-07-31 (wiring F1): `-plan\.`, `queue`, `owners`,
 # `-repos\.` and `manifest` auto-exempted real pipeline artifacts
-# (attack-plan.yaml, countersign-queue, owners.csv, *-repos.csv,
+# (attack-plan.yaml, owners.csv, *-repos.csv,
 # findings.db) that all HAVE consumers — they must prove their
 # wiring like everything else.
 ARTIFACT_TERMINAL_RE = re.compile(
@@ -476,11 +476,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
         "harnessing/check-licensing/SKILL.md",
     ): "mentions run_opengrep.py only as the swappable-input example in "
     "the never-vendor constraint; runs no scan and writes no report",
-    (
-        "A8",
-        "harnessing/drift-watch/SKILL.md",
-    ): "names run_checkov.py only as the checkov-pin check target; "
-    "runs no scan and writes no report",
     # (A11 grandfather set RETIRED 2026-07-31 P1-W4: census,
     # corpus-intake, insecure-patterns and repo-graph now carry
     # per-script anchored grants.)
@@ -1161,7 +1156,7 @@ def alignment_failures(repo: Path = REPO, exemptions_used: list | None = None) -
             if not DECLARED_RE.search(text):
                 missing.append("declared-configuration labeling")
             if missing and not _exempt("A8", rel, used):
-                failures.append(f"A8 {rel}: runs run_checkov.py without {' or '.join(missing)}")
+                failures.append(f"A8 {rel}: runs Checkov without {' or '.join(missing)}")
 
         # A4 — audit profiles link the shared structure doc
         if (

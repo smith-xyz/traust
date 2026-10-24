@@ -16,23 +16,25 @@ python3 -m traust.cli check skill-alignment      # equivalent
 
 ## Command groups
 
-19 groups (plus the deprecated `tools` group below).
+21 groups (plus the deprecated `tools` group below).
 
 | Group | Description | Operations |
 |---|---|---|
-| `adapters` | Scanner adapters (deterministic pre-scans) | `checkov`, `crypto-audit`, `crypto-probe`, `gitleaks`, `govulncheck`, `joern`, `opengrep`, `osv`, `yara` |
-| `admin` | Operator tooling | `attest-target`, `checkpoint`, `countersign`, `query-index`, `scan-internal-refs`, `toolchain` |
+| `adapters` | Scanner adapters (deterministic pre-scans) | `checkov`, `crypto-audit`, `crypto-cluster`, `crypto-image`, `crypto-probe`, `crypto-source`, `gitleaks`, `govulncheck`, `joern`, `opengrep`, `osv`, `yara` |
+| `admin` | Operator tooling | `attest-target`, `checkpoint`, `query-index`, `scan-internal-refs`, `toolchain` |
 | `auth` | Who you act as, over traust-core's identity provider | `local`, `login`, `logout`, `refresh`, `service-account`, `status`, `token` |
 | `build` | Deterministic builders | `rescan-worklist`, `skills-reference`, `symbol-index` |
 | `check` | Deterministic gates | `citations`, `content-licenses`, `docs-consistency`, `estate-data`, `drift`, `fix-propagation`, `location-paths`, `reference-integrity`, `skill-alignment`, `skill-security` |
+| `cloud-config` | The cloud-config-audit skill's doors on traust-core | `check`, `record`, `run` |
 | `compliance` | Compliance reporting | `dashboard`, `scope` |
 | `dashboard` | Dashboard rebuilds | `refresh` |
-| `feeds` | Feed management | `fetch` |
-| `findings` | track-findings' doors on traust-core | `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `refuted`, `reject`, `sarif`, `status`, `surfaces`, `tickets` |
-| `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `resolve-advisory-symbols`, `sweep` |
-| `ledger` | Doc-variance register | `doc-variance` |
+| `feeds` | Security feed snapshots (traust-core) and the product-definitions cache | `fetch`, `fetch-products` |
+| `findings` | track-findings' and findings-db's doors on traust-core | `apply`, `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `record`, `refuted`, `reject`, `request`, `review-cases`, `sarif`, `status`, `summary`, `surfaces`, `tickets`, `timeline` |
+| `impact` | Impact analysis | `analyze`, `calibrate-rule-pack`, `cluster-state-diff`, `find`, `sbom`, `sweep`, `symbols` |
+| `ledger` | Ledger audit (traust-core) and the doc-variance register | `audit`, `doc-variance` |
 | `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `sla`, `spend` |
-| `portfolio` | Portfolio graph | `artifacts`, `build`, `deps-multi`, `freshness`, `interfaces`, `parsers`, `query`, `stats`, `symbols` |
+| `portfolio` | Portfolio graph; `observe` is the `repo_state` materializer; `plan` / `onboard` / `owner-hints` / `import-owners` are add-inputs' doors on traust-core | `artifacts`, `build`, `deps-multi`, `freshness`, `import-owners`, `interfaces`, `observe`, `onboard`, `owner-hints`, `parsers`, `plan`, `query`, `stats`, `symbols` |
+| `products` | corpus-intake's doors on traust-core: products and their corpus ownership | `add`, `list`, `update` |
 | `registry` | Model/product registry | `models`, `products` |
 | `reporting` | Report validation & rendering | `lint`, `rate-threats`, `render`, `sarif`, `validate` |
 | `sweep` | Class-generalization sweep | `benchmark`, `collect`, `draft`, `emit`, `mine`, `rule-lane`, `sweep` |
@@ -119,17 +121,19 @@ only that review item. Reject never infers an inverse or means "close without
 a decision". No judgement means defer, leaving the item pending.
 `--evidence-grade` is optional and never inferred. Exact replay is idempotent;
 cross-finding answers or altered replay are refused without an orphan decision.
-For full evidence cards, requests and typed single/bulk apply, use countersign.
+For full evidence cards, requests and typed single/bulk apply, use
+`findings review-cases`, `request` and `apply` below. `findings queue` keeps its
+summary-list format, including re-read source statements with report labels.
 
 ## Direct human severity recording
 
-The countersign workbench now includes direct validity/severity/resolution
-judgements, pending review cards, review requests and single/bulk reviewed apply.
-All commands use core domain services; no legacy layer/corpus/db reads or
-cumulative-file rebuilds are performed.
+The track-findings human review workflow includes direct
+validity/severity/resolution judgements, pending review cards, review requests
+and single/bulk reviewed apply. All commands use core domain services; no legacy
+layer/corpus/db reads or cumulative-file rebuilds are performed.
 
 ```bash
-traust admin countersign record \
+traust findings record \
     --finding 31dcc9b8-b569-4340-9032-3b335d53a9ef \
     --decision severity --severity high \
     --rationale 'Reviewed the reachable call path and impact with the operator.' \
@@ -147,24 +151,30 @@ Core owns evidence precedence, actor, clock, admission, persistence and replay.
 ### Review queue and requests
 
 ```bash
-traust admin countersign queue --limit 25 --config-home /path/to/private-config
-traust admin countersign queue --finding 31dcc9b8-b569-4340-9032-3b335d53a9ef
-traust admin countersign queue --limit 25 \
+traust findings review-cases --limit 25 --config-home /path/to/private-config
+traust findings review-cases --finding 31dcc9b8-b569-4340-9032-3b335d53a9ef
+traust findings review-cases --limit 25 \
     --output /path/to/private-review/countersign-queue.md
-traust admin countersign request \
+traust findings request \
     --finding 31dcc9b8-b569-4340-9032-3b335d53a9ef \
     --reason ambiguous_statement --token-stdin \
     < /path/to/private-identity-token
 ```
 
-Without `--output`, queue returns JSON `{"items":[...],"next":null-or-cursor}`.
-Core `ReviewCase` provides `review_item`, rich `finding` and attributed `history`;
-the client adds `evidence` (integrity-checked artifact
-documents, including raw probe observations). `--finding`, `--reason` and
-`--status` filter the read; status defaults to pending, limit to 100. Resume with
+Without `--output`, review-cases returns JSON `{"items":[...],"next":null-or-cursor}`.
+Core `ReviewItemCase` provides `review_item`, rich `finding`, attributed `history`
+and `evidence_artifact_ids`. The client exports those IDs' integrity-checked
+payloads, including raw probe observations and validation-recording companions;
+core selects evidence, including retained voided recordings, rather than App policy.
+`--finding`, `--reason` and `--status` filter the read; status defaults to pending,
+limit to 100. Resume with
 `--cursor <returned-next>` and unchanged filters/limit until next is null.
 Invalid cursors or nonpositive limits fail, not an empty queue. Canonical reason
-and status choices come from `queue --help`.
+and status choices come from `review-cases --help`.
+
+`--repo-url URL --report REPORT` (repeat `--report` as needed) adds source links
+and live re-read `said` statements to each card, as in the summary queue. These
+arguments resolve source labels; they do not replace finding/reason/status filters.
 
 `--output` explicitly creates a new Markdown workbench with permissions 0600;
 existing files and symlinks are refused, never overwritten. It includes the same
@@ -180,7 +190,7 @@ item for the same finding/proposal.
 
 ### Single and bulk apply
 
-`traust admin countersign apply /path/to/reviewed-answers.json --token-stdin`
+`traust findings apply /path/to/reviewed-answers.json --token-stdin`
 reads **one answer object or a nonempty array**, with this shape:
 
 ```json
@@ -217,7 +227,7 @@ single marked typed JSON block, adding the above answer objects to `answers`:
 <!-- traust:countersign-answers:v1:end -->
 ````
 
-Then run `traust admin countersign apply /path/to/private-review/countersign-queue.md`
+Then run `traust findings apply /path/to/private-review/countersign-queue.md`
 (optionally `--token-stdin`). The exact markers, JSON fence and type are required;
 the payload is limited to one MiB. Missing, duplicate or malformed controls,
 duplicate JSON fields and invalid rows fail rather than being silently ignored.
@@ -248,7 +258,7 @@ Every successful write receipt includes `finding` with core-derived
 `disposition`, `is_open` and effective severity. Review acceptance does not imply
 finding closure. If the first E0 dismissal leaves it open, another independent
 human must review a new pending item. Re-read accepted cards using
-`queue --status accepted --finding <UUID>`.
+`review-cases --status accepted --finding <UUID>`.
 
 ### Identity and receipts
 
@@ -270,9 +280,9 @@ the connection directly.
 Write receipts/errors omit submitted rationale and tokens. Queue history and
 evidence deliberately expose prior judgements for review: they are sensitive
 review material, not publication receipts. Reload through
-`services.findings.history/get`, core `ReviewCase` queues and
+`services.findings.history/get`, core `ReviewItemCase` pages and
 `services.attestation.for_finding`.
-The [skill](../harnessing/4-triage/countersign/SKILL.md#legacy-parity-and-retirement)
+The [skill](../harnessing/4-triage/track-findings/SKILL.md#legacy-parity-and-retirement)
 accounts for retired checkbox/prose approval parsing, scan-ID mapping and
 file-based state; the typed async workbench does not restore those paths.
 
@@ -375,7 +385,7 @@ assessment/finding/artifact services before recording.
 
 Use the real run UUID/time, retained for replay; this command never invents a run,
 plan, timestamp, human actor or auto-accept flag. `ValidationArtifact.parse`
-validates the exact input bytes; `load_services().validation.record` owns
+validates the exact input bytes; `Context.services().validation.record` owns
 assessment/artifact persistence, identity, soundness and machine decisions/review.
 The JSON receipt includes assessment/artifact/evidence IDs and per-finding
 decision/review IDs and flags. Exit 2 means input/config/domain refusal; submitted

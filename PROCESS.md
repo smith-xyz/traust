@@ -61,16 +61,16 @@ in the Hybrid Platforms portfolio: OpenShift release payloads, OLM
 operator bundles, and managed services.
 
 For repos or whole orgs outside those discovery paths, `add-inputs`
-appends them (plus `owners.csv` rows) to a segment CSV directly —
-default segment `adhoc/`. When the addition is a new scan engagement,
+registers them in traust-core under a product (`traust portfolio onboard`). When the addition is a new scan engagement,
 `corpus-intake` registers the matching *output* tree in
-`$TRAUST_CONFIG_HOME/corpus-config.yaml` and records the inventory path, linking the
+traust-core's corpus registry, linking the
 two sides. The full sequence — both registrations, census confirmation,
 repo-graph rebuild — is a deployment procedure; each step is its own skill
 (`/add-inputs`, `/corpus-intake`, `/census`, `/repo-graph`).
 
-**Output:** CSV inventories, Markdown analysis reports, and `owners.csv`
-files pushed to the **inventory repository** (see Repository Map).
+**Output:** CSV inventories and Markdown analysis reports pushed to the
+**inventory repository** (see Repository Map); repositories and owner teams
+registered in traust-core.
 
 ---
 
@@ -127,11 +127,11 @@ cited evidence, duplicate collapse, derived-exploitability re-ranking,
 and owner tagging. Verdicts land as `<repo>-triage.{json,md}` next to
 the audit report; Phase 6e (`traust triage record`) records them through core
 finding decisions. True positives become machine-`confirmed` decisions, false
-positives enter the tiered countersign flow, and hardening findings take the
-`hardening` validity. `/track-findings` reads current state and records human
-source statements through shared `traust auth`; `/countersign` exposes full
-review cards, requests and explicit human single/bulk answers. Neither restores
-the retired layer emitter or cumulative-file rebuild.
+positives enter the tiered countersign flow. Hardening is a confirmed weakness
+kind, never a separate validity. `/track-findings` reads current state, imports
+human source statements and exposes full review cards, requests and explicit
+single/bulk human answers through `traust findings` and shared `traust auth`.
+It never restores the retired layer emitter or cumulative-file rebuild.
 The full contract: [docs/disposition-ledger.md](docs/disposition-ledger.md) §6b.
 
 ---
@@ -282,18 +282,22 @@ in `progress-tracker/tracking/opened-tickets.md`.
 
 Historically, stages ③–⑦ fed one append-only evidence stream per repo
 (`<repo>-findings-layer.json`), replayed into
-`<repo>-findings-current.{json,md}`. Machine refutations normally required
-verified-human countersign, and refuted-register artifacts fed fuzzing and
-live-validation target selection. Those legacy ingestion and cumulative-file
+`<repo>-findings-current.{json,md}`. Those ingestion and cumulative-file
 workflows remain retired, with no file fallback. Core owns finding state.
 
-The countersign workbench reads paged core review cards and evidence, requests
-sign-off, and records explicit verified-human validity/severity/resolution
-judgements. Single/bulk reviewed apply atomically appends the actual answer and
-settles the selected item. Every write authenticates a stdin-only credential;
-core owns proof precedence, independent reviewers and integrity. No legacy
-layers or cumulative reports are changed. Invocation and identity/secret
-guidance: [CLI reference](docs/cli-reference.md#direct-human-severity-recording).
+[`track-findings`](.claude/skills/track-findings/SKILL.md) owns human review
+through `traust findings`: paged core review cards and evidence, review requests,
+direct validity/severity/resolution judgements and single/bulk reviewed answers.
+Selected-review apply atomically appends the person's actual judgement and
+settles only the selected item. Core verifies the shared `traust auth` login or
+an explicitly selected stdin credential and owns proof precedence, independent
+reviewers and integrity. Machine refutations await human sign-off except for
+core's auto-accept tier and salted audit sample; execution proof requires two
+independent later E0 human dismissals. Refuted findings remain validation and
+fuzzing targets through core reads, not rebuilt register files.
+
+Invocation and identity/secret guidance:
+[CLI reference](docs/cli-reference.md#direct-human-severity-recording).
 Historical design rationale: [disposition ledger](docs/disposition-ledger.md);
 artifact chain: [artifacts](docs/artifacts.md);
 error doctrine: [error model](docs/error-model.md).
@@ -323,14 +327,14 @@ Every campaign number flows through one consistency spine
   ownership tag — `owned` (`findings/`, Hybrid Platforms), `upstream`
   (`oss-findings/`, community code HP depends on; reported adjacent,
   never folded into the owned headline), `external-bu` (scan engagements
-  for other business units; work-performed only). Updated only via
-  `/corpus-intake`.
+  for other business units; work-performed only). `/corpus-intake`
+  writes traust-core's corpus registry instead; `/census` reads it once ported.
 - **The retired corpus CLI** supplied report discovery, identity
   (branch-ref stripping, symlink aliasing), dedup and the `findings.db`
   projection. Core assessment/population and finding services own the
-  replacement; the corpus/census skill ports are unfinished and there is no
-  executable fallback. Existing population artifacts are historical inputs,
-  not proof that the current corpus has been refreshed.
+  replacement; the census skill port is unfinished and there is no executable
+  fallback. Existing population artifacts are historical inputs, not proof
+  that the current corpus has been refreshed.
 - **Three-lens taxonomy** — every reported number carries a lens: Lens 1
   work performed (occurrences/throughput; a defect shipped in N products
   counts N times), Lens 2 distinct exposure (unique finding fingerprints
