@@ -10,9 +10,9 @@ import argparse
 from collections import Counter
 from pathlib import Path
 
-from traust_core.v1.models.values import GitSha, HttpsRepoUrl
+from traust_core.v1.models.values import HttpsRepoUrl
 
-from traust.cli._doors import parser, run
+from traust.cli._doors import add_branch_arg, parser, register_commit, run
 from traust.context import load_core, load_services
 
 
@@ -31,10 +31,13 @@ def sbom(argv: list[str] | None = None) -> int:
     ap.add_argument("--repo-url", help="declared source (vcs-url label); with --sha")
     ap.add_argument("--sha", help="declared source commit (vcs-ref label); with --repo-url")
     ap.add_argument("--public", action="store_true", help="the declared source is public")
+    add_branch_arg(ap)
     args = ap.parse_args(argv)
     digest = _digest(ap, args.image)
     if (args.repo_url is None) != (args.sha is None):
         ap.error("--repo-url and --sha go together (the image's declared source)")
+    if args.branch and args.sha is None:
+        ap.error("--branch names the declared source's branch: give --repo-url and --sha")
 
     def call() -> dict:
         core = load_core(args.config_home)
@@ -43,7 +46,7 @@ def sbom(argv: list[str] | None = None) -> int:
         if args.repo_url is not None:
             url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
             repo = services.portfolio.register_repository(url, args.public)
-            ref_id = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None).id
+            ref_id = register_commit(services, repo.id, args.sha, args.branch).id
         image = services.exposure.ingest_image_sbom(
             args.sbom.read_bytes(), digest, args.platform, ref_id
         )

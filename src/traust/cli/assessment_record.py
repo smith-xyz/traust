@@ -19,10 +19,10 @@ from traust_core.v1.models.artifacts import (
 )
 from traust_core.v1.models.assessment import AssessmentKind
 from traust_core.v1.models.common import Provenance
-from traust_core.v1.models.values import GitSha, HttpsRepoUrl
+from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import SourceType
 
-from traust.cli._doors import parser, run, when
+from traust.cli._doors import add_branch_arg, parser, register_commit, run, when
 from traust.context import load_core
 
 # The kind of assessment each audit skill records, and its document's contract type.
@@ -50,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--repo-url", required=True, help="https URL of the audited repository")
     ap.add_argument("--sha", required=True, help="the audited commit")
     ap.add_argument("--public", action="store_true", help="the repository is public")
+    add_branch_arg(ap)
     args = ap.parse_args(argv)
     kind = AssessmentKind(args.kind)
     skill, artifact = RECORDS[kind]
@@ -60,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, args.public)
-        ref = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None)
+        ref = register_commit(services, repo.id, args.sha, args.branch)
         assessment = services.assessment.record(
             doc,
             ref.id,
