@@ -233,6 +233,13 @@ def test_import_owners_refuses_a_malformed_source(
     assert rc == 2 and reason in err, err
 
 
+def test_import_owners_refuses_a_file_that_is_not_yaml(home: Path, tmp_path: Path) -> None:
+    path = tmp_path / "owners.yaml"
+    path.write_text("org_teams: {unclosed\n")
+    rc, err = run(portfolio_onboard.import_owners, home, "--source", str(path))
+    assert rc == 2 and "not an ownership source" in err
+
+
 def test_import_owners_needs_the_source_file(home: Path, tmp_path: Path) -> None:
     rc, err = run(portfolio_onboard.import_owners, home, "--source", str(tmp_path / "missing.yaml"))
     assert rc == 2 and "missing.yaml" in err

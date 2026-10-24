@@ -116,7 +116,7 @@ class _SourceFile(Dto):
 def _source(core: Context, path: Path) -> OwnershipSource:
     try:
         doc = _SourceFile.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")) or {})
-    except pydantic.ValidationError as e:
+    except (yaml.YAMLError, pydantic.ValidationError) as e:
         raise ValidationError(f"{path}: not an ownership source: {e}") from e
     return OwnershipSource(
         assignments=tuple(
