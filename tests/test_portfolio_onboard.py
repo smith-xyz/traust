@@ -1,81 +1,73 @@
-"""`traust portfolio plan|onboard|owner-hints|import-owners` end to end on traust-core, in-process
-on SQLite and Postgres; the forge CLI is replayed from recorded answers."""
+"""`traust portfolio plan|onboard|owner-hints|import-owners`: the CLI layer only. Arguments become
+one door call with the right request; the answer is printed as JSON; a typed error is exit 2 with
+its reason. The doors themselves (forge parsing, dedupe, mirroring) are traust-core's tests."""
 
 from __future__ import annotations
 
-import base64
 import contextlib
 import io
 import json
-from collections.abc import Iterator
+import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 import yaml
-from traust_core.v1.providers.process import ProcessResult, ProcessRunner
+from traust_core.v1.context import Context
+from traust_core.v1.errors import AuthenticationError, NotFoundError, ValidationError
+from traust_core.v1.models.inventory import OwnerAssignment, OwnershipSource, SyncReport
+from traust_core.v1.models.observation import ComparisonStatus
+from traust_core.v1.models.onboarding import (
+    Gap,
+    OnboardingPlan,
+    OnboardingRequest,
+    OnboardingResult,
+    RepositorySpec,
+)
+from traust_core.v1.models.values import HttpsRepoUrl, ProductSlug
+from traust_core.v1.providers.sources import OwnerHint, OwnerOrigin, SourceError
 
-from tests.test_products_doors import _postgres
-from traust.cli import auth, portfolio_onboard, products
+from traust.cli import portfolio_onboard
 
-FIXTURES = Path(__file__).parent / "fixtures" / "inventory"
-ORG = "example-org"
-LISTED = [
-    json.loads(line)["url"]
-    for line in (FIXTURES / "github-org-repos.jsonl").read_text().splitlines()
-    if not json.loads(line)["archived"]
-]
-EXTRA = "https://github.com/other-org/tool"
+REPO = "https://github.com/example-org/app"
+URL = HttpsRepoUrl("github.com", "example-org/app")
+CALLER = object()
+PRODUCT_ID, REPO_ID = uuid.uuid4(), uuid.uuid4()
 
 
-def _endpoint(argv: list[str]) -> str:
-    return next(a for a in argv[2:] if "/" in a and a[0] not in "-.{")
-
-
-class Forge:
-    """`gh api` answers by endpoint; `fail` makes every call exit like an expired login."""
+class Door:
+    """Records each call; answers with `result`, or raises it when it is an exception."""
 
     def __init__(self) -> None:
-        self.calls: list[list[str]] = []
-        self.fail = False
+        self.calls: list[tuple[Any, ...]] = []
+        self.result: Any = None
 
-    def __call__(self, argv: list[str], **_: Any) -> ProcessResult:
-        self.calls.append(list(argv))
-        if self.fail:
-            return ProcessResult(tuple(argv), 1, b"", b"HTTP 401: Bad credentials", 0)
-        endpoint = _endpoint(argv)
-        if endpoint.startswith(f"orgs/{ORG}/repos"):
-            out = (FIXTURES / "github-org-repos.jsonl").read_text()
-        elif endpoint.endswith("/contents/OWNERS"):
-            out = base64.b64encode((FIXTURES / "OWNERS").read_bytes()).decode()
-        elif endpoint.endswith("/contributors?per_page=10"):
-            out = (FIXTURES / "github-contributors.txt").read_text()
-        elif endpoint.count("/") == 2:
-            out = json.dumps(
-                {"visibility": "private" if endpoint == "repos/other-org/tool" else "public"}
-            )
-        else:
-            return ProcessResult(tuple(argv), 1, b"", b"HTTP 404: Not Found", 0)
-        return ProcessResult(tuple(argv), 0, out.encode(), b"", 0)
+    def __call__(self, *args: Any) -> Any:
+        self.calls.append(args)
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
 
 
 @pytest.fixture
-def forge(monkeypatch: pytest.MonkeyPatch) -> Forge:
-    fake = Forge()
-    monkeypatch.setattr(ProcessRunner, "run", fake)
-    return fake
+def doors(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
+    stub = SimpleNamespace(plan=Door(), onboard=Door(), owner_hints=Door(), import_owners=Door())
+    services = SimpleNamespace(
+        onboarding=SimpleNamespace(plan=stub.plan, onboard=stub.onboard),
+        sync=SimpleNamespace(owner_hints=stub.owner_hints, import_owners=stub.import_owners),
+    )
+    monkeypatch.setattr(Context, "services", lambda self: services)
+    monkeypatch.setattr(portfolio_onboard, "load_caller", lambda core: CALLER)
+    return stub
 
 
-@pytest.fixture(params=["sqlite", "postgres"])
-def home(request: pytest.FixtureRequest, tmp_path: Path, forge: Forge) -> Iterator[Path]:
+@pytest.fixture
+def home(tmp_path: Path) -> Path:
     config = tmp_path / "config"
     config.mkdir()
-    core: dict[str, Any] = {"home": str(tmp_path / "store"), "identity": {"trust_local": True}}
-    with contextlib.ExitStack() as stack:
-        if request.param == "postgres":
-            core["database"] = {"url": stack.enter_context(_postgres())}
-        (config / "core.yaml").write_text(yaml.safe_dump(core))
-        yield config
+    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    return config
 
 
 def run(door: Any, home: Path, *argv: str) -> tuple[int, Any]:
@@ -86,57 +78,64 @@ def run(door: Any, home: Path, *argv: str) -> tuple[int, Any]:
     return rc, json.loads(text) if text else err.getvalue()
 
 
-def logged_in(home: Path) -> None:
-    rc, made = run(auth.local, home, "--identity", "alice@example.com")
-    assert rc == 0, made
+def request(**fields: Any) -> OnboardingRequest:
+    return OnboardingRequest(product=ProductSlug.parse("example"), **fields)
 
 
-REQUEST = ("--product", "example", "--org", ORG, "--repo", EXTRA)
+@pytest.mark.parametrize(
+    "argv,expected",
+    [
+        (
+            ("--repo", REPO),
+            request(repositories=(RepositorySpec(url=URL),)),
+        ),
+        (
+            ("--repo", REPO + ".git/", "--label", "Example"),
+            request(label="Example", repositories=(RepositorySpec(url=URL),)),
+        ),
+        (("--org", "example-org"), request(org="example-org")),
+        (
+            ("--org", "grp/sub", "--host", "gitlab.com", "--repo", REPO),
+            request(repositories=(RepositorySpec(url=URL),), org="grp/sub", host="gitlab.com"),
+        ),
+    ],
+)
+@pytest.mark.parametrize("command", ["plan", "onboard"])
+def test_arguments_become_one_onboarding_request(
+    home: Path, doors: SimpleNamespace, command: str, argv: tuple[str, ...], expected: Any
+) -> None:
+    door = getattr(doors, command)
+    door.result = OnboardingPlan() if command == "plan" else OnboardingResult(product_id=PRODUCT_ID)
+    rc, _ = run(getattr(portfolio_onboard, command), home, "--product", "example", *argv)
+    assert rc == 0
+    assert door.calls == [(expected,) if command == "plan" else (expected, CALLER)]
 
 
-def test_plan_lists_what_onboard_would_add_and_writes_nothing(home: Path) -> None:
-    rc, plan = run(portfolio_onboard.plan, home, *REQUEST)
-    assert rc == 0, plan
-    assert sorted(s["url"] for s in plan["new"]) == sorted([EXTRA, *LISTED])
-    assert plan["existing_repository_ids"] == []
-    assert [g["subject"] for g in plan["gaps"]] == ["example"]
-    rc, again = run(portfolio_onboard.plan, home, *REQUEST)
-    assert again == plan
+def test_plan_prints_urls_ids_and_gaps(home: Path, doors: SimpleNamespace) -> None:
+    doors.plan.result = OnboardingPlan(
+        new=(RepositorySpec(url=URL),),
+        existing_repository_ids=(REPO_ID,),
+        gaps=(Gap(subject="example", reason="product is not registered"),),
+    )
+    rc, out = run(portfolio_onboard.plan, home, "--product", "example", "--repo", REPO)
+    assert (rc, out) == (
+        0,
+        {
+            "new": [{"url": REPO, "refs": [], "team": None}],
+            "existing_repository_ids": [str(REPO_ID)],
+            "gaps": [{"subject": "example", "reason": "product is not registered"}],
+            "orders": [],
+        },
+    )
 
 
-def test_onboard_registers_once_and_reruns_are_no_ops(home: Path, forge: Forge) -> None:
-    logged_in(home)
-    rc, first = run(portfolio_onboard.onboard, home, *REQUEST, "--label", "Example")
-    assert rc == 0, first
-    assert len(first["repository_ids"]) == len(LISTED) + 1 == 12
-    assert first["order_ids"] == []
-
-    rc, second = run(portfolio_onboard.onboard, home, *REQUEST)
-    assert (rc, second) == (0, first)
-    rc, plan = run(portfolio_onboard.plan, home, *REQUEST)
-    assert (plan["new"], plan["gaps"]) == ([], [])
-    assert sorted(plan["existing_repository_ids"]) == sorted(first["repository_ids"])
-
-    rc, listed = run(products.list_, home)
-    assert [(p["name"], p["label"], p["ownership"]) for p in listed] == [
-        ("example", "Example", None)
-    ]
-    assert not any(a in c for c in forge.calls for a in ("curl", "clone"))
-
-
-def test_onboard_refuses_an_unregistered_product_without_a_label(home: Path) -> None:
-    logged_in(home)
-    rc, err = run(portfolio_onboard.onboard, home, *REQUEST)
-    assert rc == 2 and "product is not registered" in err
-    rc, plan = run(portfolio_onboard.plan, home, *REQUEST)
-    assert len(plan["new"]) == 12
-
-
-def test_onboard_needs_a_login(home: Path) -> None:
-    rc, err = run(portfolio_onboard.onboard, home, *REQUEST, "--label", "Example")
-    assert rc == 2 and "traust auth" in err
-    rc, plan = run(portfolio_onboard.plan, home, *REQUEST)
-    assert len(plan["new"]) == 12
+def test_onboard_prints_the_result(home: Path, doors: SimpleNamespace) -> None:
+    doors.onboard.result = OnboardingResult(product_id=PRODUCT_ID, repository_ids=(REPO_ID,))
+    rc, out = run(portfolio_onboard.onboard, home, "--product", "example", "--repo", REPO)
+    assert (rc, out) == (
+        0,
+        {"product_id": str(PRODUCT_ID), "repository_ids": [str(REPO_ID)], "order_ids": []},
+    )
 
 
 @pytest.mark.parametrize(
@@ -145,48 +144,83 @@ def test_onboard_needs_a_login(home: Path) -> None:
         (("--product", "example"), "--repo or --org"),
         (("--product", "example", "--repo", "https://example.com/a/b"), "host not allowed"),
         (("--product", "example", "--repo", "http://github.com/a/b"), "must be https"),
-        (("--product", "example", "--org", "bad org"), "cannot list"),
-        (("--product", "not a slug", "--repo", EXTRA), "slug"),
+        (("--product", "not a slug", "--repo", REPO), "slug"),
     ],
 )
-def test_bad_input_is_refused_before_any_write(
-    home: Path, argv: tuple[str, ...], reason: str
+@pytest.mark.parametrize("command", ["plan", "onboard"])
+def test_bad_input_is_refused_before_any_door_call(
+    home: Path, doors: SimpleNamespace, command: str, argv: tuple[str, ...], reason: str
 ) -> None:
-    logged_in(home)
-    rc, err = run(portfolio_onboard.onboard, home, *argv, "--label", "Example")
+    rc, err = run(getattr(portfolio_onboard, command), home, *argv)
     assert rc == 2 and reason in err, err
+    assert doors.plan.calls == doors.onboard.calls == []
 
 
-def test_a_forge_refusal_surfaces_and_registers_nothing(home: Path, forge: Forge) -> None:
-    logged_in(home)
-    forge.fail = True
-    rc, err = run(portfolio_onboard.onboard, home, *REQUEST, "--label", "Example")
-    assert rc == 2 and "Bad credentials" in err
-    forge.fail = False
-    rc, plan = run(portfolio_onboard.plan, home, *REQUEST)
-    assert len(plan["new"]) == 12
+@pytest.mark.parametrize(
+    "command,error",
+    [
+        ("plan", SourceError("HTTP 401: Bad credentials", ComparisonStatus.NO_CREDENTIALS)),
+        ("plan", ValidationError("cannot list 'bad org' on 'github.com'")),
+        ("onboard", ValidationError("example: product is not registered")),
+        ("onboard", SourceError("HTTP 401: Bad credentials", ComparisonStatus.NO_CREDENTIALS)),
+    ],
+)
+def test_a_door_refusal_is_exit_2_with_its_reason(
+    home: Path, doors: SimpleNamespace, command: str, error: Exception
+) -> None:
+    getattr(doors, command).result = error
+    rc, err = run(getattr(portfolio_onboard, command), home, "--product", "example", "--org", "o")
+    assert rc == 2 and str(error) in err
 
 
-def test_owner_hints_are_approvers_then_contributors_without_bots(home: Path) -> None:
-    rc, hints = run(portfolio_onboard.owner_hints, home, "--repo", LISTED[0])
-    assert rc == 0, hints
-    assert [(h["handle"], h["origin"]) for h in hints] == [
-        ("approver-a", "owners-file"),
-        ("approver-b", "owners-file"),
-        ("approver-c", "owners-file"),
-        ("approver-d", "owners-file"),
-        ("person-a", "contributor"),
-        ("person-b", "contributor"),
-        ("person-c", "contributor"),
-        ("approver-b", "contributor"),
-        ("person-d", "contributor"),
+def test_onboard_needs_a_login(
+    home: Path, doors: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(core: Any) -> Any:
+        raise AuthenticationError("not logged in: run `traust auth login` or `traust auth local`")
+
+    monkeypatch.setattr(portfolio_onboard, "load_caller", refuse)
+    rc, err = run(portfolio_onboard.onboard, home, "--product", "example", "--repo", REPO)
+    assert rc == 2 and "traust auth" in err
+    assert doors.onboard.calls == []
+
+
+def test_owner_hints_asks_for_one_repository_and_prints_the_hints(
+    home: Path, doors: SimpleNamespace
+) -> None:
+    doors.owner_hints.result = [
+        OwnerHint(handle="alice", origin=OwnerOrigin.OWNERS_FILE, file="OWNERS"),
+        OwnerHint(handle="bob", origin=OwnerOrigin.CONTRIBUTOR),
     ]
+    rc, out = run(portfolio_onboard.owner_hints, home, "--repo", REPO)
+    assert doors.owner_hints.calls == [(URL,)]
+    assert (rc, out) == (
+        0,
+        [
+            {"handle": "alice", "origin": "owners-file", "file": "OWNERS"},
+            {"handle": "bob", "origin": "contributor", "file": None},
+        ],
+    )
 
 
-def test_owner_hints_surface_a_forge_refusal(home: Path, forge: Forge) -> None:
-    forge.fail = True
-    rc, err = run(portfolio_onboard.owner_hints, home, "--repo", LISTED[0])
-    assert rc == 2 and "Bad credentials" in err
+@pytest.mark.parametrize(
+    "repo,error,reason",
+    [
+        ("https://example.com/a/b", None, "host not allowed"),
+        (
+            REPO,
+            SourceError("HTTP 401: Bad credentials", ComparisonStatus.NO_CREDENTIALS),
+            "Bad credentials",
+        ),
+        (REPO, NotFoundError("no such repository"), "no such repository"),
+    ],
+)
+def test_owner_hints_refusals_are_exit_2(
+    home: Path, doors: SimpleNamespace, repo: str, error: Exception | None, reason: str
+) -> None:
+    doors.owner_hints.result = error
+    rc, err = run(portfolio_onboard.owner_hints, home, "--repo", repo)
+    assert rc == 2 and reason in err
 
 
 def source(tmp_path: Path, doc: Any) -> str:
@@ -195,51 +229,60 @@ def source(tmp_path: Path, doc: Any) -> str:
     return str(path)
 
 
-def test_import_owners_mirrors_the_declared_source(home: Path, tmp_path: Path) -> None:
-    logged_in(home)
-    run(portfolio_onboard.onboard, home, *REQUEST, "--label", "Example")
-    descriptor = {
-        "segments": {"services": {"kind": "services"}},
-        "org_teams": {ORG: "Platform Team"},
-        "assignments": [
-            {"repo": EXTRA, "teams": ["Tools Team"]},
-            {"repo": "https://github.com/other-org/unknown", "teams": ["Nobody"]},
-        ],
-    }
-    rc, first = run(portfolio_onboard.import_owners, home, "--source", source(tmp_path, descriptor))
-    assert rc == 0, first
-    assert (len(first["added"]), first["removed"]) == (12, [])
-    assert first["skipped"] == ["https://github.com/other-org/unknown"]
-
-    rc, again = run(portfolio_onboard.import_owners, home, "--source", source(tmp_path, descriptor))
-    assert (len(again["added"]), sorted(again["unchanged"])) == (0, sorted(first["added"]))
-
-    rc, dropped = run(portfolio_onboard.import_owners, home, "--source", source(tmp_path, {}))
-    assert (dropped["added"], sorted(dropped["removed"])) == ([], sorted(first["added"]))
+@pytest.mark.parametrize(
+    "doc,expected",
+    [
+        ({}, OwnershipSource()),
+        (
+            {"segments": {"svc": {"kind": "services"}}, "org_teams": {"example-org": "Platform"}},
+            OwnershipSource(org_teams={"example-org": "Platform"}),
+        ),
+        (
+            {"assignments": [{"repo": REPO, "teams": ["Tools", "Platform"]}]},
+            OwnershipSource(assignments=(OwnerAssignment(repo=URL, teams=("Tools", "Platform")),)),
+        ),
+    ],
+)
+def test_import_owners_reads_the_source_into_one_call(
+    home: Path, tmp_path: Path, doors: SimpleNamespace, doc: Any, expected: OwnershipSource
+) -> None:
+    doors.import_owners.result = SyncReport(added=(REPO_ID,), skipped=("https://x/y/z",))
+    rc, out = run(portfolio_onboard.import_owners, home, "--source", source(tmp_path, doc))
+    assert doors.import_owners.calls == [(expected,)]
+    assert (rc, out) == (
+        0,
+        {"added": [str(REPO_ID)], "unchanged": [], "removed": [], "skipped": ["https://x/y/z"]},
+    )
 
 
 @pytest.mark.parametrize(
     "doc,reason",
     [
-        ({"assignments": [{"repo": EXTRA}]}, "not an ownership source"),
+        ({"assignments": [{"repo": REPO}]}, "not an ownership source"),
         ({"assignments": [{"repo": "https://example.com/a/b", "teams": ["T"]}]}, "host"),
         (["not", "a", "mapping"], "not an ownership source"),
+        ("org_teams: {unclosed\n", "not an ownership source"),
+        (None, "missing.yaml"),
     ],
 )
-def test_import_owners_refuses_a_malformed_source(
-    home: Path, tmp_path: Path, doc: Any, reason: str
+def test_import_owners_refuses_a_bad_source_before_any_door_call(
+    home: Path, tmp_path: Path, doors: SimpleNamespace, doc: Any, reason: str
 ) -> None:
-    rc, err = run(portfolio_onboard.import_owners, home, "--source", source(tmp_path, doc))
+    if doc is None:
+        path = str(tmp_path / "missing.yaml")
+    elif isinstance(doc, str):
+        path = str(tmp_path / "broken.yaml")
+        Path(path).write_text(doc)
+    else:
+        path = source(tmp_path, doc)
+    rc, err = run(portfolio_onboard.import_owners, home, "--source", path)
     assert rc == 2 and reason in err, err
+    assert doors.import_owners.calls == []
 
 
-def test_import_owners_refuses_a_file_that_is_not_yaml(home: Path, tmp_path: Path) -> None:
-    path = tmp_path / "owners.yaml"
-    path.write_text("org_teams: {unclosed\n")
-    rc, err = run(portfolio_onboard.import_owners, home, "--source", str(path))
-    assert rc == 2 and "not an ownership source" in err
-
-
-def test_import_owners_needs_the_source_file(home: Path, tmp_path: Path) -> None:
-    rc, err = run(portfolio_onboard.import_owners, home, "--source", str(tmp_path / "missing.yaml"))
-    assert rc == 2 and "missing.yaml" in err
+def test_import_owners_door_refusal_is_exit_2(
+    home: Path, tmp_path: Path, doors: SimpleNamespace
+) -> None:
+    doors.import_owners.result = ValidationError("team.name must not be blank")
+    rc, err = run(portfolio_onboard.import_owners, home, "--source", source(tmp_path, {}))
+    assert rc == 2 and "team.name must not be blank" in err
