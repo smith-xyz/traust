@@ -2,8 +2,9 @@
 
 This procedure extracts every container image shipped in an OLM operator
 bundle, maps each image back to its source repository, categorises by
-functional area, and produces a Markdown report, a CSV inventory and
-`owners.csv` in a segment of kind `catalog`.
+functional area, produces a Markdown report and a CSV inventory in a segment
+of kind `catalog`, and registers the repositories and their owner teams in
+traust-core.
 
 `<segment>` below is the descriptor segment resolved by the parent skill;
 `<inputs>` is `locations.inputs`; `<product>` is the operator's package name.
@@ -202,30 +203,19 @@ Structure:
    ```
 4. **Summary statistics** — table of category → unique repos → image count
 
-## Step 9 — Generate or update owners.csv
+## Step 9 — Register the repositories and their owners
 
-Follow the ownership resolution procedure in the
-[parent skill](../SKILL.md#ownership-resolution).
+`traust portfolio onboard --product <product> [--label <name>] --repo <URL>…` (every repository
+in the CSV; base images have none), then follow the ownership resolution
+procedure in the [parent skill](../SKILL.md#ownership-resolution).
 
-Write to `<inputs>/<segment>/<product>/owners.csv` covering all repos across
-all versions of this operator.
-
-**Column schema:**
-```
-Repository,URL,Owner Team,Manager,Individual Owners,Ownership Source,Jira Project,Jira Component,Operator Versions,Escalation Contact
-```
-
-The `Operator Versions` column lists all versions where the repo appears
-(e.g. `2.14.2; 2.15.2; 2.16.1`).
+*Retired*: `<inputs>/<segment>/<product>/owners.csv` (see the parent skill's
+owners.csv schema).
 
 ## Step 10 — Tracker columns
 
-Leave `Jira Project` / `Jira Component` empty unless a deployment extension
-provides a tracker-resolution procedure
-([parent skill](../SKILL.md#deployment-extensions)). Rules an extension
-typically applies: base-image rows stay empty; shared platform images resolve
-to the platform's tracker, not the operator's; sub-operators shipped inside a
-parent bundle resolve to their own tracker when one exists.
+*Retired with `owners.csv`*: traust-core has no `Jira Project` /
+`Jira Component` column.
 
 ---
 
