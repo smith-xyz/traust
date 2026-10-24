@@ -3,7 +3,7 @@
 #
 # Reviewed findings-package / repo -> ps_product mappings for
 # python3 -m traust.cli registry products (consumers: /assign-findings-owners,
-# /reassign-findings-owners, python3 -m traust.cli metrics sla).
+# /reassign-findings-owners).
 #
 # WHY THIS FILE EXISTS
 # The product-definitions registry only carries git repo URLs for managed

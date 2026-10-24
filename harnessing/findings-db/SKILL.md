@@ -106,7 +106,6 @@ or substitute for the ledger):
 | `/verify-remediation` | sweep scoping / accelerator queries |
 | `/dependency-watch` | `impact` table + `repos` baselines |
 | `/compliance-check` | `findings_db` collector — pre-shaped views over ledger conclusions |
-| `/sla-view` | python3 -m traust.cli metrics sla clock inputs |
 | `/fleet-fix` | optional candidate listing (`v_open` + `graph_edges`) |
 | `/mine-ledger` | optional cluster-shape pre-queries (DB for scoping; the miner stays file-based) |
 | `/traust-metrics` | cloud-config lane (`collect_harness_metrics.py`) |
