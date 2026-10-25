@@ -81,9 +81,9 @@ def _run(argv, timeout=30):
         return None
 
 
-def check_core(results, config_home):
+def check_core(results, config_home, network=True):
     """traust-core in-process: the store answers a read, and each registered provider's readiness
-    (ProviderCatalog.readiness)."""
+    (ProviderCatalog.readiness; without `network`, the feed sources' probes are skipped)."""
     try:
         services = load_core(config_home).services()
         services.portfolio.list_products(PageRequest(limit=1))
@@ -91,7 +91,7 @@ def check_core(results, config_home):
         results.append((FAIL, f"traust-core store not reachable — {e or 'core.yaml invalid'}"))
         return
     results.append((OK, "traust-core store reachable"))
-    for binding in services.catalog.readiness(None):
+    for binding in services.catalog.readiness(None, network=network):
         name = f"{binding.capability.kind.value} {binding.capability.name}"
         if binding.readiness.ready:
             results.append((OK, f"provider {name} ready"))
@@ -226,12 +226,14 @@ def check_gates(results):
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     add_config_home_arg(ap)
-    ap.add_argument("--quick", action="store_true", help="skip network/auth checks")
+    ap.add_argument(
+        "--quick", action="store_true", help="skip network/auth checks (feed-source probes too)"
+    )
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
     results: list[tuple[str, str]] = []
-    check_core(results, args.config_home)
+    check_core(results, args.config_home, network=not args.quick)
     check_python(results)
     check_tools(results)
     if not args.quick:
