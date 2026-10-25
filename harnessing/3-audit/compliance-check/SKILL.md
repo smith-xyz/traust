@@ -86,7 +86,7 @@ ledger, SLA clocks, and dashboards as every other finding.
    node type — `the inputs inventory` stays the sole authority for
    repos and ownership.
 2. **Staleness checks — mandatory, frameworks first.** Run
-   python3 -m traust.cli check drift (or read a same-day drift report)
+   python3 -m traust.cli check drift
    and report, before assessing anything:
    - **Framework data**: `framework-spine:upstream` (the vendored
      800-53/800-53B derivations vs the pinned usnistgov/oscal-content

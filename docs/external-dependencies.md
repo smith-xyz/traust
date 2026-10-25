@@ -196,10 +196,9 @@ as a pin.
 
 **Freshness.** Plugins have no binary and no `--version`, so
 `config/external-tools.yaml` cannot describe them. The roster at
-`$TRAUST_CONFIG_HOME/agent-plugins.yaml` drives `check drift`'s
-`agent-plugins:*` rows instead: declared-but-absent reports `pending`,
-installed-behind-the-marketplace reports `stale`. Neither auto-advances a
-version — upstream can change a skill's behaviour *and* its licence terms
+`$TRAUST_CONFIG_HOME/agent-plugins.yaml` drove `check drift`'s
+`agent-plugins:*` rows; *retired* with it (workstation hygiene, not a product
+report). Never auto-advance a version — upstream can change a skill's behaviour *and* its licence terms
 between releases, so a `stale` row means re-read this table, not just
 `/plugin update`.
 
@@ -232,9 +231,9 @@ Code and data license differently — all these feeds permit free
 
 **The machine-readable registry is [`config/feeds.yaml`](../config/feeds.yaml)** —
 every source, cached or live, with its endpoint, cadence, licence block, and
-consumers. The feed fetcher, the advisory fetcher, and `check_drift.py`
-(`feeds:*` freshness + `feed-source:*` liveness) all read it, so adding a
-source is a config change and a dead source is a failing row. The table below
+consumers. The feed fetcher, the advisory fetcher, and traust-core's freshness
+view (`feeds:*` freshness) all read it, so adding a source is a config
+change. The table below
 is the licensing companion, not a second source of truth. HTTP endpoints are
 not covered by the docs gate's subprocess scan — a new feed adds a row here at
 intake.

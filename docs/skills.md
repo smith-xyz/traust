@@ -408,7 +408,7 @@ Use before committing any new or edited skill or script to the traust repo, or w
 
 ## drift-watch
 
-Use when the user asks whether derived artifacts or paired sources are stale or drifting — "is anything stale", "check for drift", "are the feeds/graphs/findings-db current", "did inputs change since the graph was built", "run the drift report" — or on a regular cadence. Runs the deterministic staleness/drift checker over feeds, findings.db, repo-/portfolio-graph vs the inputs inventory, repo-liveness, corpus registration, finding-identity stamping across every audit report, ADR-registry pins, external-tool freshness (installed scanners vs latest upstream releases), docs-product-map version enumeration (declared doc versions vs the live docs.redhat.com landing pages — catches FUTURE product-doc versions the variance lane isn't covering), pqc-facts stamps/schema provenance, and dated policy provenance; writes drift-report.{json,md} to progress-tracker/metrics/drift/.
+Use when the user asks whether derived artifacts or paired sources are stale or drifting — "is anything stale", "check for drift", "are the feeds/graphs/findings-db current", "did inputs change since the graph was built", "run the drift report" — or on a regular cadence. Shows traust-core's freshness view over feeds, scanner readiness and tool databases, the toolchain's versions, threat-model and audit cadence, and audit coverage gaps, plus ADR-registry pins, rule-pack pins, docs-product-map version enumeration (declared doc versions vs the live docs.redhat.com landing pages — catches FUTURE product-doc versions the variance lane isn't covering), framework-spine upstream and dated policy provenance; writes freshness.{md,html,json} where asked.
 
 - **Stage:** —
 - **Tier:** `secondary`

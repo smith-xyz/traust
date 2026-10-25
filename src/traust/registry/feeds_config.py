@@ -138,15 +138,6 @@ def live_sources(path: Path | None = None) -> dict[str, dict]:
     return {k: v for k, v in load(path).items() if v["tier"] == "live"}
 
 
-def probeable_sources(path: Path | None = None) -> dict[str, dict]:
-    """Sources carrying a `probe` — the liveness-checkable set.
-
-    A source without a probe is not a failure; it is simply untracked for
-    liveness, and check_drift reports that rather than assuming health.
-    """
-    return {k: v for k, v in load(path).items() if isinstance(v.get("probe"), dict)}
-
-
 def max_age_hours(spec: dict, override: float | None = None) -> float:
     if override is not None:
         return override
