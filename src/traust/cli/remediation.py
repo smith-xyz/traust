@@ -339,12 +339,7 @@ def fleet_targets(argv: list[str] | None = None) -> int:
             package_id = find_package_id(services, args.ecosystem, args.module)
         named = tuple(_repository(core, u).id for u in args.repo_url or ())
         wanted = FleetScope(cwe=args.cwe, package_id=package_id, repository_ids=named)  # type: ignore[arg-type]
-        owners = services.portfolio.list_owners
-        found = [
-            t.model_dump(mode="json")
-            | {"owner_teams": sorted(o.name for o in owners(t.repository_id))}
-            for t in services.remediation.fleet_targets(wanted)
-        ]
+        found = [t.model_dump(mode="json") for t in services.remediation.fleet_targets(wanted)]
         return _emit(json.dumps(found, indent=2), args.out)
 
     return run(call)
