@@ -42,7 +42,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `remediation` | The remediation loop's doors on traust-core (remediate-finding, patch, property-test, fleet-fix, verify-remediation) | `assemble`, `candidates`, `fleet-apply`, `fleet-record`, `fleet-targets`, `fork`, `mutation-evidence`, `next`, `open`, `prepare`, `progress`, `property-evidence`, `record`, `verifications`, `verify-differential`, `verify-prepare`, `verify-record`, `verify-sweep`, `work-items` |
 | `reporting` | Report validation, rendering & recording | `lint`, `rate-threats`, `record`, `render`, `sarif`, `validate` |
 | `triage` | The triage skill's doors on traust-core | `check`, `intake`, `prepare`, `record`, `render` |
-| `sweep` | Class-generalization sweep; recall-benchmark answer key | `benchmark`, `benchmark-targets`, `build-canaries`, `collect`, `draft`, `emit`, `mine`, `rule-lane`, `sweep` |
+| `sweep` | Class-generalization sweep; recall-benchmark answer key | `benchmark`, `benchmark-targets`, `build-canaries`, `collect`, `draft`, `emit`, `mine`, `rule-lane`, `screen-injection`, `sweep` |
 | `util` | Utility commands | `elf`, `redact`, `safe-exec` |
 
 ## Deprecated forms
