@@ -34,9 +34,9 @@ Ordering is the whole point:
    the others still render.
 2. **Consumers** — executive summary,
    insecure-patterns, validation-fuzz dashboard, RBAC/tenancy rollup,
-   ATT&CK coverage rollup,
    LoC dashboard (cache-only), spend dashboard. (*Retired* here:
-   dependency-exposure, now the `exposure` and `dependency-reach` core views.)
+   dependency-exposure, now the `exposure` and `dependency-reach` core views;
+   ATT&CK coverage rollup, now the `attack-coverage` core view.)
    Each continues on error; failures are collected.
 3. **Scoreboard last** — *retired:* the scoreboard is traust-core's
    `ScoreboardView`, rendered in step 1; it composes the other views in-process,
@@ -104,7 +104,7 @@ Ordering is the whole point:
 | `rbac-tenancy` | consumer | `RETIRED:build_rbac_tenancy_rollup.py` |
 | `sla` | — | *retired:* rendered by the `views` stage (`SlaView`, once `sla-policy.yaml` is in the config home) |
 | `compliance` | — | *retired:* rendered by the `views` stage (`ComplianceDashboardView`) |
-| `attack-coverage` | consumer | `harnessing/attack-coverage/scripts/build_attack_coverage.py` |
+| `attack-coverage` | — | *retired:* rendered by the `views` stage (`AttackCoverageView`) |
 | `loc` | — | *retired:* rendered by the `views` stage (`LocView`) |
 | `dependency-exposure` | — | *retired:* rendered by the `views` stage (`ExposureView` for advisory, MAL- and product exposure; `DependencyReachView` for per-ecosystem coverage and shared-package blast radius) |
 | `spend-actuals` | consumer, opt-in | python3 -m traust.cli metrics collect-spend --append |
