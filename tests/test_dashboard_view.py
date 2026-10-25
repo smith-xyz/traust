@@ -109,6 +109,26 @@ def test_loc_writes_the_lines_of_code_view(publish: Door, home: Path, tmp_path: 
     assert answer["model"]["code"] == 120
 
 
+@pytest.mark.parametrize(
+    ("view", "stem", "model"),
+    [
+        (ViewName.PQC, "pqc-readiness", insight.PqcDashboard()),
+        (ViewName.PQC_PORTFOLIO, "pqc-portfolio-roll-up", insight.PqcPortfolio()),
+    ],
+)
+def test_the_pqc_views_replace_the_skills_report_scripts(
+    publish: Door, home: Path, tmp_path: Path, view: ViewName, stem: str, model: Any
+) -> None:
+    publish.result = RenderedView(
+        view=view, stem=stem, model=model, markdown="# PQC\n", html="<title>PQC</title>"
+    )
+    out = tmp_path / "pqc"
+    rc, _ = run(home, view.value, "--product", "alpha", "--out", str(out))
+    assert rc == 0
+    assert publish.calls == [(view, ViewFilter(product_ids=(ALPHA.id,)))]
+    assert sorted(p.name for p in out.iterdir()) == [f"{stem}.{x}" for x in ("html", "json", "md")]
+
+
 def test_scope_window_and_bucket_go_into_one_filter(
     publish: Door, home: Path, tmp_path: Path
 ) -> None:
@@ -298,3 +318,55 @@ def test_threat_register_on_core_renders_an_empty_fleet(tmp_path: Path, database
     assert rc == 0, answer
     assert answer["model"]["threats"] == [] and answer["model"]["quick_wins"] == []
     assert "_No threat models recorded._" in (out / "threat-register.md").read_text()
+
+
+def test_freshness_reads_the_engines_tools_and_the_feeds_registry(
+    publish: Door, home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    feeds: list[Path] = []
+
+    def engine_core(config_home: Path | None) -> Context:
+        core = Context.from_file(config_home / "core.yaml")  # type: ignore[operator]
+        monkeypatch.setattr(core, "register_feeds", feeds.append)
+        return core
+
+    monkeypatch.setattr(dashboard_view, "load_engine_core", engine_core)
+    monkeypatch.setattr(dashboard_view, "registry_path", lambda: tmp_path / "feeds.yaml")
+    publish.result = RENDERED.model_copy(update={"view": ViewName.FRESHNESS, "stem": "freshness"})
+    rc, answer = run(home, "freshness", "--out", str(tmp_path / "fresh"))
+    assert rc == 0, answer
+    assert feeds == [tmp_path / "feeds.yaml"]
+    assert publish.calls == [(ViewName.FRESHNESS, ViewFilter())]
+    assert (tmp_path / "fresh" / "freshness.md").is_file()
+
+
+@pytest.mark.parametrize("database", ["sqlite", "postgres"])
+def test_attack_coverage_on_core_renders_on_the_pinned_catalog(
+    tmp_path: Path, database: str
+) -> None:
+    config = tmp_path / "config"
+    config.mkdir()
+    core: dict[str, Any] = {"home": str(tmp_path / "store")}
+    with contextlib.ExitStack() as stack:
+        if database == "postgres":
+            core["database"] = {"url": stack.enter_context(_postgres())}
+        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        out = tmp_path / "out"
+        rc, answer = run(config, "attack-coverage", "--out", str(out))
+    assert rc == 0, answer
+    assert answer["model"]["attack_version"] == "19.1" and answer["model"]["techniques"] == []
+    layer = json.loads((out / "attack-coverage.json").read_text())["navigator_layer"]
+    assert layer["versions"]["layer"] == "4.5" and "MITRE" in layer["description"]
+    assert "not yet recorded in core" in (out / "attack-coverage.md").read_text()
+
+
+def test_an_unresolvable_attack_catalog_is_exit_2(
+    publish: Door, home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from traust import context
+
+    monkeypatch.setattr(context, "ATTACK_TABLES", (tmp_path / "t.json", tmp_path / "m.json"))
+    with pytest.raises(SystemExit) as exit, contextlib.redirect_stderr(io.StringIO()) as err:
+        dashboard_view.main(["--config-home", str(home), "attack-coverage", "--out", str(tmp_path)])
+    assert exit.value.code == 2 and "ATT&CK catalog not resolvable" in err.getvalue()
+    assert publish.calls == []

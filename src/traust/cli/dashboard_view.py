@@ -8,13 +8,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from traust_core.v1.context import Context
 from traust_core.v1.models.common import TimeBucket, TimeWindow
 from traust_core.v1.models.insight import ViewFilter, ViewName
 
 from traust.cli import _doors
 from traust.cli._doors import parser, run, when
-from traust.context import load_insight_core
+from traust.context import load_engine_core, load_insight_core
 from traust.ops.materializers import write_view
+from traust.registry.feeds_config import registry_path
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -35,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     def call() -> dict[str, Any]:
         as_of, since = when(args.as_of), when(args.since)
         until = when(args.until) or as_of or datetime.now(UTC)
-        services = load_insight_core(args.config_home, args.sla_policy).services()
+        services = _core(ViewName(args.view), args.config_home, args.sla_policy).services()
         scope = ViewFilter(
             product_ids=tuple(p.id for p in _doors.products(services, args.product)),
             team_ids=tuple(args.team_id),
@@ -49,3 +51,12 @@ def main(argv: list[str] | None = None) -> int:
         return {"written": [str(p) for p in written], "model": model}
 
     return run(call)
+
+
+def _core(view: ViewName, config_home: Path | None, sla_policy: Path | None) -> Context:
+    if view is not ViewName.FRESHNESS:
+        return load_insight_core(config_home, sla_policy)
+    # freshness reads the feed snapshots and the scanners' readiness, databases and versions
+    core = load_engine_core(config_home)
+    core.register_feeds(registry_path())
+    return core

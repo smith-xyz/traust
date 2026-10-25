@@ -146,9 +146,9 @@ def test_a_degraded_refresh_exits_with_its_outcome(insight: Insight, tmp_path: P
     assert rc == 4
 
 
-def test_views_run_first_and_the_scoreboard_last() -> None:
+def test_views_run_first_and_render_the_scoreboard() -> None:
     stages = refresh_dashboards.build_stages(Path("/w"), Path("/r"), False)
-    assert stages[0][0] == "views" and stages[-1][0] == "scoreboard"
+    assert stages[0][0] == "views" and "scoreboard" not in [name for name, _, _ in stages]
 
 
 def test_the_views_stage_builds_the_sla_view_on_the_config_homes_policy(

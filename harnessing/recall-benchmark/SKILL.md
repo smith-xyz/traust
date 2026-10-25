@@ -11,6 +11,7 @@ allowed-tools:
   # repos, so it IS target-facing and gets anchored grants like triage).
   - Bash(python3 -m traust.cli sweep build-canaries:*)
   - Bash(python3 -m traust.cli sweep benchmark-targets:*)
+  - Bash(python3 -m traust.cli sweep screen-injection:*)
   - Bash(git clone:*)
   - Bash(git -C * rev-parse:*)
   - Bash(git -C * checkout:*)
@@ -25,7 +26,7 @@ allowed-tools:
 
 # Detection-Recall Benchmark
 
-> **Being ported to traust-core** (progress-tracker skill port 35, recall-benchmark): bootstrap_benchmark_targets.py, match_benchmark.py retired with the traust-core hub (it ran on the old ledger / corpus code). The answer key is recorded in traust-core (`traust sweep benchmark-targets`, `build-canaries`); the steps marked RETIRED don't run until traust-core can record benchmark audit runs.
+> **Being ported to traust-core** (progress-tracker skill port 35, recall-benchmark): bootstrap_benchmark_targets.py, match_benchmark.py retired with the traust-core hub (it ran on the old ledger / corpus code). The answer key is recorded in traust-core (`traust sweep benchmark-targets`, `build-canaries`); the steps marked RETIRED don't run: `score` needs each benchmark run recorded against its answer-key target (NEED(core: `DetectionQualityService.record_run(target_id, report, provenance)`; `AssessmentService.record` needs a registered commit, which would put CVE-replay and canary targets into the campaign inventory), after which `scorecards` scores them), and `bootstrap` needs the harvest from resolved-at-fix-commit findings (NEED(core: benchmark candidate harvest)).
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in
@@ -113,7 +114,7 @@ neutralized as a false positive. Tokens quoted inside a finding that
 itself reports the injection attempt count as vigilance
 (`injection_reported`), not obedience. Canaries are always development
 split: injection resistance must never regress silently. The post-hoc
-field screen is `harnessing/recall-benchmark/scripts/screen_injection.py` (report-only; every hit is
+field screen is `traust sweep screen-injection <report artifact id>…` (report-only; every hit is
 a human review item).
 
 ### Seeded fixtures — synthetic apps with several known defects

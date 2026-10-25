@@ -539,8 +539,10 @@ scanner checks mechanically.
    (The door restricts the comparison to the work item's findings' rules and
    paths: an unrestricted differential answers a question nobody asked.)
    Collect the item into the report's `evidence[]` (contracts >= 0.4.0).
-   Without a work item there is no door yet: compare the two runs as in
-   step 3 and say so in the evidence.
+   Without a work item, name the findings and the original commit instead:
+   `python3 -m traust.cli remediation verify-differential --finding <id>…
+   --base-sha <original_commit> --repo-url <repository> --sha <patched_commit>`
+   (`--base-branch` / `--branch`: the branches the two scans were recorded on).
 
    | `outcome` | Meaning |
    |---|---|

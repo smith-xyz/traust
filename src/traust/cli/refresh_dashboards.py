@@ -3,9 +3,8 @@
 
 Packages the "Dashboards rebuild" job from docs/continuous-operations.md
 as one command: first traust-core's insight views (`DashboardsMaterializer`,
-one `InsightService.refresh`), then the builders of the dashboards core has
-no view for yet, then the leadership scoreboard last because it
-harvests from the other dashboards' output.
+one `InsightService.refresh`, the leadership scoreboard among them), then the
+builders of the dashboards core has no view for yet.
 
 All stages are deterministic (~$0, no agent). A failure is recorded and
 the remaining stages still run; the exit code is non-zero if anything failed.
@@ -20,7 +19,7 @@ Usage:
   python3 -m traust.cli.refresh_dashboards --list        # show stages
   python3 -m traust.cli.refresh_dashboards --only views spend
   python3 -m traust.cli.refresh_dashboards --view findings-rollup --out /tmp/dashboards
-  python3 -m traust.cli.refresh_dashboards --skip scoreboard
+  python3 -m traust.cli.refresh_dashboards --skip spend
   python3 -m traust.cli.refresh_dashboards --dry-run
   python3 -m traust.cli.refresh_dashboards --spend-actuals
 """
@@ -92,33 +91,6 @@ def build_stages(
                 *path_args,
             ],
         ),
-        # no door: ComplianceDashboardView
-        (
-            "compliance",
-            "consumer",
-            [PYTHON, "-m", "traust.cli", "compliance", "dashboard", *path_args],
-        ),
-        # no door: AttackCoverageView; its modeled leg reads AssessmentService.threats
-        (
-            "attack-coverage",
-            "consumer",
-            [
-                PYTHON,
-                str(h / "harnessing/attack-coverage/scripts/build_attack_coverage.py"),
-                *path_args,
-            ],
-        ),
-        # no door: ExposureView (ExposureService.summary). Reads the portfolio graph's
-        # dependency layer + impact/fleet-OSV artifacts; degrades when they are absent.
-        (
-            "dependency-exposure",
-            "consumer",
-            [
-                PYTHON,
-                str(h / "harnessing/refresh-dashboards/scripts/build_dependency_exposure.py"),
-                *path_args,
-            ],
-        ),
     ]
     if spend_actuals:
         stages.append(
@@ -145,16 +117,6 @@ def build_stages(
             [PYTHON, "-m", "traust.cli", "metrics", "spend", *cfg, "--workspace", str(workspace)],
         )
     )
-    # Last on purpose: the scoreboard harvests from the dashboards above. no door: a scoreboard
-    # view (its sources wait on their own views).
-    scoreboard = [
-        PYTHON,
-        str(h / "harnessing/traust-metrics/scripts/collect_harness_metrics.py"),
-        *path_args,
-        "--workspace-root",
-        str(workspace),
-    ]
-    stages.append(("scoreboard", "consumer", scoreboard))
     return stages
 
 
@@ -171,7 +133,7 @@ def run_views(args, out: Path) -> int:
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description="Rebuild all deterministic dashboards: traust-core's views, "
-        "then the remaining builders, the scoreboard last."
+        "then the remaining builders."
     )
     add_config_home_arg(ap)
     ap.add_argument(

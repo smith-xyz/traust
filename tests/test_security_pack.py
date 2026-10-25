@@ -43,7 +43,7 @@ EXCLUDED = {
     "Threat-model re-model lanes": "routed lanes, added with the pack router",
     "/drift-watch": "replaced by each asset's freshness (FreshnessQuery.stale)",
     "Feed-source liveness": "cached sources: feeds_cache degrades per source; live-tier probes "
-    "stay in check drift (feed-source:*)",
+    "retired, back as core readiness once the live sources are core providers",
     "CVE-replay FN monitor": "retired with the hub; Detection quality rebuilds it",
     "Census + repo-liveness refresh": "intake-triggered; the schema has no event trigger",
     "FP-precedent cache rebuild": "drift-triggered; the schema has no event trigger",

@@ -270,9 +270,10 @@ TM_SURFACE_RX = re.compile(
 # here so the router never depends on the feeder being importable.
 RELEASE_REMODEL_CHANGES = ("major", "minor")
 # Phase 3: calendar backstop for repos whose code is quiet but whose
-# threat landscape isn't. Held in LOCKSTEP with check_drift.py's
-# THREAT_MODEL_STALE_DAYS — the drift row is the dead-timer that fires
-# only if this lane stops draining, so the two must not diverge.
+# threat landscape isn't. Held in LOCKSTEP with traust-core's
+# THREAT_MODEL_MAX_AGE — the freshness view's threat-model row is the
+# dead-timer that fires only if this lane stops draining, so the two
+# must not diverge.
 THREAT_MODEL_QUARTERLY_DAYS = 92
 THREAT_MODEL_DRAIN_WEEKS = 13  # spread the pool over one quarter
 _TM_TAIL_BYTES = 8192  # provenance is section 7, near EOF
@@ -2209,8 +2210,8 @@ def main(argv=None) -> int:
         default=THREAT_MODEL_QUARTERLY_DAYS,
         help="calendar backstop threshold for the "
         "threat-model-quarterly lane (default 92; keep "
-        "in lockstep with check_drift.py's "
-        "THREAT_MODEL_STALE_DAYS)",
+        "in lockstep with traust-core's freshness view "
+        "THREAT_MODEL_MAX_AGE)",
     )
     ap.add_argument(
         "--threat-model-drain-rate",

@@ -14,7 +14,7 @@ from traust_core.v1.errors import NotFoundError, TraustError, ValidationError
 from traust_core.v1.models.inventory import Product, RefName, RepositoryRef
 from traust_core.v1.models.operations import JobResult, Outcome
 from traust_core.v1.models.values import GitSha, ProductSlug
-from traust_core.v1.models.vocabulary import RefKind
+from traust_core.v1.models.vocabulary import Ecosystem, RefKind
 
 from traust.context import add_config_home_arg
 
@@ -83,3 +83,11 @@ def answer(result: JobResult) -> int:
     """A materializer's door: print the JobResult; the exit code is its outcome."""
     print(result.model_dump_json())
     return EXIT_CODES[result.outcome]
+
+
+def package_id(services: Any, ecosystem: str, name: str) -> uuid.UUID:
+    """The recorded package's id by ecosystem and name (Exposure's ``find_package``)."""
+    found = services.exposure.find_package(Ecosystem(ecosystem), name)
+    if found is None:
+        raise NotFoundError(f"no {ecosystem} package named {name} is recorded")
+    return found.id

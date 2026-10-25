@@ -234,7 +234,7 @@ Use when a reviewer wants to steer a security code audit between phases — Phas
 
 ## vuln-scan
 
-Static source-code vulnerability scan. Reads a target directory (and its threat model — <repo>-threat-model.md, or legacy THREAT_MODEL.md — if present), spawns parallel review subagents per focus area, and writes <repo>-vuln-findings.{json,md} with campaign finding IDs ({REPO_SLUG}-{SHORTSHA}-{NNN}) and the shared severity enum, for /triage to consume. When a <repo>-security-audit.json baseline exists, the scan supplements it: known findings are deduped against the baseline and new verified findings enter the disposition ledger directly (as findings-carrying events; the baseline is never written — gate A15) at not_verified (no triage precondition; triage adjudicates downstream) — /secure-code-audit remains the preferred baseline and /verify-remediation the way to update it after fixes. Read-only — no building, running, or network. Use when asked to "scan for vulns", "review this code for security issues", "find bugs in <dir>", "re-sweep an audited repo", or as the step between /threat-model and /triage.
+Static source-code vulnerability scan. Reads a target directory (and its threat model — <repo>-threat-model.md, or legacy THREAT_MODEL.md — if present), spawns parallel review subagents per focus area, and writes <repo>-vuln-findings.{json,md} with campaign finding IDs ({REPO_SLUG}-{SHORTSHA}-{NNN}) and the shared severity enum, for /triage to consume. When a <repo>-security-audit.json baseline exists, the scan supplements it: known findings are deduped against the baseline and new verified findings enter traust-core directly (as findings of the scan's assessment; the baseline is never written — gate A15) at not_verified (no triage precondition; triage adjudicates downstream) — /secure-code-audit remains the preferred baseline and /verify-remediation the way to update it after fixes. Read-only — no building, running, or network. Use when asked to "scan for vulns", "review this code for security issues", "find bugs in <dir>", "re-sweep an audited repo", or as the step between /threat-model and /triage.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -353,7 +353,7 @@ Use when the user asks to generate a shareable findings folder, executive summar
 
 ## attack-coverage
 
-Use when the user asks for MITRE ATT&CK coverage of the portfolio — "which ATT&CK techniques/tactics do our threats or validated chains cover", "build the ATT&CK Navigator layer", "ATT&CK heat map", or after updating threat models/validations to refresh the coverage roll-up. Deterministically joins validated attack chains, threat-model attack_refs, and finding-category-derived candidates against the pinned vendored ATT&CK table and emits a Navigator layer JSON plus a tactic/technique coverage one-pager.
+Use when the user asks for MITRE ATT&CK coverage of the portfolio — "which ATT&CK techniques/tactics do our threats or validated chains cover", "build the ATT&CK Navigator layer", "ATT&CK heat map", or after updating threat models/validations to refresh the coverage roll-up. Deterministically joins threat-model attack_refs and finding-category-derived candidates (validated attack chains once traust-core records them) against the pinned vendored ATT&CK table and emits a Navigator layer JSON plus a tactic/technique coverage one-pager.
 
 - **Stage:** —
 - **Tier:** `secondary`
@@ -408,7 +408,7 @@ Use before committing any new or edited skill or script to the traust repo, or w
 
 ## drift-watch
 
-Use when the user asks whether derived artifacts or paired sources are stale or drifting — "is anything stale", "check for drift", "are the feeds/graphs/findings-db current", "did inputs change since the graph was built", "run the drift report" — or on a regular cadence. Runs the deterministic staleness/drift checker over feeds, findings.db, repo-/portfolio-graph vs the inputs inventory, repo-liveness, corpus registration, finding-identity stamping across every audit report, ADR-registry pins, external-tool freshness (installed scanners vs latest upstream releases), docs-product-map version enumeration (declared doc versions vs the live docs.redhat.com landing pages — catches FUTURE product-doc versions the variance lane isn't covering), pqc-facts stamps/schema provenance, and dated policy provenance; writes drift-report.{json,md} to progress-tracker/metrics/drift/.
+Use when the user asks whether derived artifacts or paired sources are stale or drifting — "is anything stale", "check for drift", "are the feeds/graphs/findings-db current", "did inputs change since the graph was built", "run the drift report" — or on a regular cadence. Shows traust-core's freshness view over feeds, scanner readiness and tool databases, the toolchain's versions, threat-model and audit cadence, and audit coverage gaps, plus ADR-registry pins, rule-pack pins, docs-product-map version enumeration (declared doc versions vs the live docs.redhat.com landing pages — catches FUTURE product-doc versions the variance lane isn't covering), framework-spine upstream and dated policy provenance; writes freshness.{md,html,json} where asked.
 
 - **Stage:** —
 - **Tier:** `secondary`
@@ -513,7 +513,7 @@ Use when the user asks to measure the auditor's detection recall, run the recall
 
 ## refresh-dashboards
 
-Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, dependency-exposure, spend), then the leadership scoreboard last because it harvests the others. Deterministic, ~$0, no agents.
+Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, spend); the leadership scoreboard is a core view. Deterministic, ~$0, no agents.
 
 - **Stage:** —
 - **Tier:** `secondary`
@@ -542,7 +542,7 @@ Use when the user asks for a fleet-wide or portfolio-wide view of threats (not f
 
 ## traust-metrics
 
-Use when the user asks for campaign metrics, a leadership scoreboard, or to (re)build/refresh progress-tracker/metrics/traust-metrics.md. Deterministically harvests headline numbers from the campaign's derived artifacts (executive summary, validation/fuzz dashboard, threat register, progress-tracker control files) and the harness's own tree/git metadata into one consistently-updatable Markdown scoreboard.
+Use when the user asks for campaign metrics, a leadership scoreboard, or to (re)build/refresh progress-tracker/metrics/dashboards/scoreboard/traust-metrics.md. Deterministically harvests headline numbers from traust-core's executive summary, findings trend and threat register views into one consistently-updatable Markdown scoreboard.
 
 - **Stage:** —
 - **Tier:** `secondary`

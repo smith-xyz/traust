@@ -203,8 +203,7 @@ multi-tenant services that carry a section 10:
   models): comma-separated MITRE ATT&CK technique IDs (`T1611`,
   `T1552.007`) naming the adversary behavior the threat describes. **Bounded selection, not narrative**: IDs must exist and be
   non-revoked/non-deprecated in the harness's pinned ATT&CK table — check
-  with `python3 traust/harnessing/attack-coverage/scripts/attack_refs.py
-  --validate <ids>`; sub-technique preferred over parent when one fits;
+  with `traust attack validate <ids>`; sub-technique preferred over parent when one fits;
   2 IDs is typical, more than 4 means the threat row is too broad — split
   it. Leave the cell empty rather than guessing: the `/attack-coverage`
   roll-up treats an explicit ID as *modeled* coverage, so a wrong ID

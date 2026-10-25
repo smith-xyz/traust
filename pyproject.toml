@@ -40,12 +40,12 @@ dev = ["ruff>=0.6", "pytest-xdist>=3", "psycopg[binary]>=3.1"]
 # traust's traust-core pin wins over the engine's, so a core bump needs no engine PR.
 [tool.uv]
 override-dependencies = [
-  "traust-core @ git+https://github.com/traust-security/traust-core.git@dff458090db830a20c9d089bc30e5ec92ee6f568",
+  "traust-core @ git+https://github.com/traust-security/traust-core.git@0aaf7b3d94eff7166b17da8e7aaacb891ed9b97d",
 ]
 
 [tool.uv.sources]
-traust-core = { git = "https://github.com/traust-security/traust-core.git", rev = "dff458090db830a20c9d089bc30e5ec92ee6f568" }
-traust-engine = { git = "https://github.com/traust-security/traust-engine.git", rev = "b2a2d07c35161f699cd606683742d646e257ab52" }
+traust-core = { git = "https://github.com/traust-security/traust-core.git", rev = "0aaf7b3d94eff7166b17da8e7aaacb891ed9b97d" }
+traust-engine = { git = "https://github.com/traust-security/traust-engine.git", rev = "6f69e7b18d7db6f26bfc93c8627dd7effcfdaf42" }
 
 # Multi-skill CLIs live under src/traust/; harnessing/<skill>/ for single-skill
 # scripts. Install for deps + importable path helpers.
@@ -79,7 +79,6 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 "harnessing/**/build_fuzz_rollup.py" = ["E501"]
 "harnessing/**/build_loc_dashboard.py" = ["E501"]
 "harnessing/**/build_rbac_tenancy_rollup.py" = ["E501"]
-"harnessing/**/collect_harness_metrics.py" = ["E501"]
 "harnessing/**/build_executive_summary.py" = [
     "E501",
     "PTH123",

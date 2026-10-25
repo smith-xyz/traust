@@ -16,7 +16,7 @@ fleet-record         a fleet-fix transform spec, once its golden tests pass
 fleet-targets        the repositories a fleet fix targets, widest product reach first, with owners
 verify-sweep         which repositories are worth re-verifying, by tier, and why the rest are not
 verify-prepare       what a verification of one work item re-checks, as JSON
-verify-differential  the scanner that backed a work item's findings, compared on a patched commit
+verify-differential  the scanner that backed a work item's (or named) findings, on a patched commit
 verify-record        a validated verification report: verdicts as decisions, regressions as findings
 verifications        a repository's recorded verifications
 """
@@ -52,9 +52,10 @@ from traust_core.v1.models.remediation import (
     property_evidence,
 )
 from traust_core.v1.models.values import GitSha, ProductSlug
-from traust_core.v1.models.vocabulary import RemediationStatus, SourceType
+from traust_core.v1.models.vocabulary import Ecosystem, RemediationStatus, SourceType
 
-from traust.cli._doors import parser, products, run
+from traust.cli._doors import add_branch_arg, parser, products, register_commit, run
+from traust.cli._doors import package_id as find_package_id
 from traust.cli.findings import _repository
 from traust.cli.impact import harness_version
 from traust.context import load_core, load_engine_core
@@ -288,7 +289,7 @@ def fleet_record(argv: list[str] | None = None) -> int:
         doc = FleetFixArtifact.parse(json.dumps(raw, default=str).encode())
         when = datetime.now(UTC)
         made = (
-            load_core(args.config_home)
+            load_engine_core(args.config_home)
             .services()
             .remediation.record(
                 doc,
@@ -322,21 +323,23 @@ def fleet_targets(argv: list[str] | None = None) -> int:
     scope = ap.add_mutually_exclusive_group(required=True)
     scope.add_argument("--cwe", type=_cwe, help="repositories with an open finding of this CWE")
     scope.add_argument("--package-id", type=uuid.UUID, help="repositories depending on it")
+    scope.add_argument("--module", help="repositories depending on this package (--ecosystem)")
     scope.add_argument("--repo-url", action="append", help="named repositories, repeatable")
+    ap.add_argument("--ecosystem", choices=[e.value for e in Ecosystem], help="with --module")
     ap.add_argument("-o", "--out", type=Path, help="write the JSON here instead of stdout")
     args = ap.parse_args(argv)
+    if (args.module is None) != (args.ecosystem is None):
+        ap.error("--module and --ecosystem go together")
 
     def call() -> str | None:
         core = load_core(args.config_home)
-        named = tuple(_repository(core, u).id for u in args.repo_url or ())
-        wanted = FleetScope(cwe=args.cwe, package_id=args.package_id, repository_ids=named)  # type: ignore[arg-type]
         services = core.services()
-        owners = services.portfolio.list_owners
-        found = [
-            t.model_dump(mode="json")
-            | {"owner_teams": sorted(o.name for o in owners(t.repository_id))}
-            for t in services.remediation.fleet_targets(wanted)
-        ]
+        package_id = args.package_id
+        if args.module is not None:
+            package_id = find_package_id(services, args.ecosystem, args.module)
+        named = tuple(_repository(core, u).id for u in args.repo_url or ())
+        wanted = FleetScope(cwe=args.cwe, package_id=package_id, repository_ids=named)  # type: ignore[arg-type]
+        found = [t.model_dump(mode="json") for t in services.remediation.fleet_targets(wanted)]
         return _emit(json.dumps(found, indent=2), args.out)
 
     return run(call)
@@ -423,19 +426,30 @@ def verify_prepare(argv: list[str] | None = None) -> int:
 def verify_differential(argv: list[str] | None = None) -> int:
     ap = _parser(
         "verify-differential",
-        "Compare the scanner that backed a work item's findings on a patched commit.",
+        "Compare the scanner that backed a work item's (or named) findings on a patched commit.",
     )
-    ap.add_argument("work_item_id", type=uuid.UUID)
-    ap.add_argument("--repo-url", required=True, help="https URL of the work item's repository")
+    ap.add_argument("work_item_id", type=uuid.UUID, nargs="?", help="or --finding + --base-sha")
+    ap.add_argument("--repo-url", required=True, help="https URL of the findings' repository")
     ap.add_argument("--sha", required=True, help="the patched commit")
+    add_branch_arg(ap)
+    ap.add_argument("--finding", type=uuid.UUID, action="append", help="without a work item")
+    ap.add_argument("--base-sha", help="without a work item: the commit the findings were on")
+    ap.add_argument("--base-branch", help="the branch --base-sha was scanned on, as --branch")
     args = ap.parse_args(argv)
+    loose = (args.finding, args.base_sha, args.base_branch)
+    if not all(loose[:2]) if args.work_item_id is None else any(loose):
+        ap.error("give a work item, or --finding and --base-sha instead of one")
 
     def call() -> dict:
         core = load_core(args.config_home)
         services = core.services()
         repo = _repository(core, args.repo_url)
-        ref = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None)  # type: ignore[arg-type]
-        found = services.verification.differential(args.work_item_id, ref.id)  # type: ignore[arg-type]
+        ref = register_commit(services, repo.id, args.sha, args.branch)  # type: ignore[arg-type]
+        if args.work_item_id is not None:
+            found = services.verification.differential(args.work_item_id, ref.id)  # type: ignore[arg-type]
+        else:
+            base = register_commit(services, repo.id, args.base_sha, args.base_branch)  # type: ignore[arg-type]
+            found = services.verification.differential_of(args.finding, base.id, ref.id)  # type: ignore[arg-type]
         return found.model_dump(mode="json")
 
     return run(call)

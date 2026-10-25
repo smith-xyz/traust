@@ -2,13 +2,14 @@
 """Environment preflight for the harness (VVAH comparative plan P8).
 
 One command that answers "why doesn't my session work" before an hour
-is lost to it — checks the top onboarding failure modes: workspace
-layout, venv + locked deps, pinned external tools, forge auth, VPN
-reachability, and the harness's own gates.
+is lost to it — checks the top onboarding failure modes: traust-core's
+store and provider readiness (in-process, SQLite by default), venv +
+locked deps, pinned external tools, forge auth, VPN reachability, and
+the harness's own gates.
 
 Usage:
-  python3 -m traust.cli.doctor            # full report
-  python3 -m traust.cli.doctor --quick    # skip network checks
+  traust admin doctor            # full report
+  traust admin doctor --quick    # skip network checks
 
 Exit 0 = all required checks pass (warnings allowed); 1 otherwise.
 Deterministic output; safe to run anytime (read-only, no mutations).
@@ -24,7 +25,10 @@ import socket
 import subprocess
 import sys
 
-from traust.context import DeploymentConfigMissing, add_config_home_arg, load_core, workspace_dir
+from traust_core.v1.errors import TraustError
+from traust_core.v1.models.common import PageRequest
+
+from traust.context import add_config_home_arg, load_core
 from traust.paths import HARNESS_ROOT, skill_dir
 
 HARNESS = HARNESS_ROOT
@@ -49,12 +53,6 @@ TOOLS = [
     ("oc", False),
     ("tokei", False),
 ]
-
-SIBLINGS = [
-    "inputs",
-    "analysis-results",
-    "progress-tracker",
-]  # default names; locations.yaml overrides
 
 
 # Reachability probes for a private network the harness needs (a forge on a
@@ -83,20 +81,22 @@ def _run(argv, timeout=30):
         return None
 
 
-def check_workspace(results, core):
+def check_core(results, config_home, network=True):
+    """traust-core in-process: the store answers a read, and each registered provider's readiness
+    (ProviderCatalog.readiness; without `network`, the feed sources' probes are skipped)."""
     try:
-        workspace = workspace_dir(core)
-    except DeploymentConfigMissing as e:
-        results.append((FAIL, f"workspace not resolvable — {e}"))
+        services = load_core(config_home).services()
+        services.portfolio.list_products(PageRequest(limit=1))
+    except (SystemExit, TraustError, OSError) as e:
+        results.append((FAIL, f"traust-core store not reachable — {e or 'core.yaml invalid'}"))
         return
-    for sib in SIBLINGS:
-        p = workspace / sib
-        if (p / ".git").is_dir():
-            results.append((OK, f"sibling {sib}/ present"))
+    results.append((OK, "traust-core store reachable"))
+    for binding in services.catalog.readiness(None, network=network):
+        name = f"{binding.capability.kind.value} {binding.capability.name}"
+        if binding.readiness.ready:
+            results.append((OK, f"provider {name} ready"))
         else:
-            results.append(
-                (WARN, f"sibling {sib}/ missing — campaign skills need it (docs/setup.md)")
-            )
+            results.append((WARN, f"provider {name} not ready — {binding.readiness.detail}"))
 
 
 def check_python(results):
@@ -226,13 +226,14 @@ def check_gates(results):
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     add_config_home_arg(ap)
-    ap.add_argument("--quick", action="store_true", help="skip network/auth checks")
+    ap.add_argument(
+        "--quick", action="store_true", help="skip network/auth checks (feed-source probes too)"
+    )
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
-    core = load_core(args.config_home)
     results: list[tuple[str, str]] = []
-    check_workspace(results, core)
+    check_core(results, args.config_home, network=not args.quick)
     check_python(results)
     check_tools(results)
     if not args.quick:

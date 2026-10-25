@@ -1099,10 +1099,8 @@ def model_class_failures(repo: Path = REPO) -> list[str]:
 # graphs used" unanswerable before the doc existed.
 _GRAPHS_DOC = "docs/graphs.md"
 _GRAPH_ARTIFACTS = ("portfolio-graph.db", "repo-graph.json")
-# This module names both artifacts as check data, and check_drift is
-# documented under its skill name rather than its module name.
+# This module names both artifacts as check data.
 _GRAPH_CONSUMER_SKIP = {"check_docs_consistency"}
-_GRAPH_CONSUMER_ALIASES = {"check_drift": "drift-watch"}
 
 
 def _graph_consumers(repo: Path, artifact: str) -> set[str]:
@@ -1140,9 +1138,7 @@ def graph_consumer_failures(repo: Path = REPO) -> list[str]:
         actual = _graph_consumers(repo, artifact)
         # the graph skills themselves are the producers, not consumers to list
         actual -= {"portfolio-graph", "repo-graph"} | _GRAPH_CONSUMER_SKIP
-        missing = sorted(
-            n for n in actual if n not in text and _GRAPH_CONSUMER_ALIASES.get(n, n) not in text
-        )
+        missing = sorted(n for n in actual if n not in text)
         if missing:
             out.append(
                 f"{_GRAPHS_DOC}: {artifact} is read by {', '.join(missing)} "

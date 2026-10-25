@@ -104,8 +104,9 @@ owners (`SlaView`); `$TRAUST_CONFIG_HOME/sla-policy.yaml`
 (human-curated policy data); `analysis-results/feeds/product_definitions.json`
 (producer: python3 -m traust.cli feeds fetch-products, read via
 python3 -m traust.cli registry products) plus `$TRAUST_CONFIG_HOME/product-definitions-map.yaml`
-for the accountable-contact join (no door yet: the view reports contacts
-unavailable).
+for the accountable-contact join (NEED(core: a product-definitions provider
+giving `SlaView` each product's accountable contacts; until then the view
+reports contacts unavailable)).
 
 **Emits:** `progress-tracker/metrics/dashboards/sla/sla-view-<policy>.{md,html,json}` —
 read by humans and quoted by the executive dashboards; the escalation

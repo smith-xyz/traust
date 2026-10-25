@@ -1,7 +1,8 @@
 """``traust portfolio dependencies|dependents``: portfolio-graph's dependency reads on traust-core.
 
 dependencies  the packages in a commit's manifest SBOM (record it with ``traust impact sbom``)
-dependents    the commits a package reaches: directly, through a base image or an internal library
+dependents    the commits a package (by id, or ecosystem + name) reaches: directly, through a base
+              image or an internal library
 """
 
 from __future__ import annotations
@@ -11,7 +12,9 @@ from typing import Any
 
 from traust_core.v1.errors import NotFoundError
 from traust_core.v1.models.values import HttpsRepoUrl
+from traust_core.v1.models.vocabulary import Ecosystem
 
+from traust.cli._doors import package_id as find_package_id
 from traust.cli._doors import parser, run
 from traust.context import load_core
 
@@ -46,15 +49,21 @@ def dependencies(argv: list[str] | None = None) -> int:
 
 def dependents(argv: list[str] | None = None) -> int:
     ap = parser("portfolio", "dependents", "The commits a package reaches (its blast radius).")
-    ap.add_argument(
-        "--package-id", required=True, type=uuid.UUID, help="from `traust portfolio dependencies`"
+    package = ap.add_mutually_exclusive_group(required=True)
+    package.add_argument(
+        "--package-id", type=uuid.UUID, help="from `traust portfolio dependencies`"
     )
+    package.add_argument("--name", help="the package name, e.g. golang.org/x/net")
+    ap.add_argument("--ecosystem", choices=[e.value for e in Ecosystem], default="go")
+    ap.add_argument("--version", help="start only from SBOMs holding this version")
     args = ap.parse_args(argv)
 
     def call() -> Any:
         services = load_core(args.config_home).services()
+        package_id = args.package_id or find_package_id(services, args.ecosystem, args.name)
+        narrowed = () if args.version is None else (args.version,)
         out = []
-        for ref_id in services.exposure.dependents(args.package_id):
+        for ref_id in services.exposure.dependents(package_id, *narrowed):
             ref, repo = services.portfolio.inventory.resolve(ref_id)
             out.append({"repository_ref_id": str(ref_id), "repository": repo.url, "sha": ref.sha})
         return out

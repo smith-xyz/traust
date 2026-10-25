@@ -86,7 +86,7 @@ ledger, SLA clocks, and dashboards as every other finding.
    node type — `the inputs inventory` stays the sole authority for
    repos and ownership.
 2. **Staleness checks — mandatory, frameworks first.** Run
-   python3 -m traust.cli check drift (or read a same-day drift report)
+   python3 -m traust.cli check drift
    and report, before assessing anything:
    - **Framework data**: `framework-spine:upstream` (the vendored
      800-53/800-53B derivations vs the pinned usnistgov/oscal-content
@@ -188,14 +188,12 @@ ledger, SLA clocks, and dashboards as every other finding.
    pinned snapshot) and rebuild:
 
    ```bash
-   python3 -m traust.cli compliance dashboard
+   python3 -m traust.cli dashboard view compliance --out <metrics-root>/dashboards
    ```
 
-   The dashboard carries the corpus population block, per-framework
-   coverage with transparency rows, the per-team `control_refs` table,
-   and a trend that renders only once ≥2 snapshots exist. Commit the
-   assessment artifact to analysis-results and the dashboard pair to
-   progress-tracker.
+   traust-core's compliance view: declared vs assessed pairs and
+   coverage per framework and per boundary, read live from the
+   recorded assessments (nothing stored, no snapshot history).
 
 ## Interview mode (self-service intake — Phase 7)
 

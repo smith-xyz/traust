@@ -502,7 +502,7 @@ weekly tranche the orchestrator dispatches headless:
 | model older than 92d with no change-triggered re-model | `threat-model-quarterly` lane row (trickle-drained over a quarter) | `review <clone> --auto` |
 
 The provenance `date:` this skill stamps in section 7 is what the
-router and `check_drift.py`'s `threat-model` row both measure — that
+router and traust-core's freshness view (`assessments:threat-model`) both measure — that
 row is the dead-timer that fires if the quarterly lane stops draining.
 Auto-applying `update` is deliberately NOT wired: Phase 1 is
 report-only pending a calibration window.

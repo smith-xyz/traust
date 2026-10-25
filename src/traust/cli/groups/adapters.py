@@ -869,6 +869,19 @@ CRYPTO_CLUSTER = passthrough_op(
     "crypto", "A cluster's runtime crypto census, scope-gated.", "cluster"
 )
 
+# secure-code-audit's pre-scans on traust-core's code facts (traust.cli.code_facts)
+ROUTE_GUARDS = passthrough_op("code_facts", "A checkout's route x guard matrix.", "route_guards")
+CONFIG_MATRIX = passthrough_op(
+    "code_facts", "A checkout's effective deployed defaults.", "config_matrix"
+)
+SANITIZERS = passthrough_op("code_facts", "A checkout's sanitizer-shaped functions.", "sanitizers")
+FORK_LAG = passthrough_op(
+    "code_facts", "A checkout's fork signals and in-range upstream advisories.", "fork_lag"
+)
+PRIV_PROFILE = passthrough_op(
+    "code_facts", "A checkout's operator privilege profile (tiers 1-2).", "priv_profile"
+)
+
 # secure-container-audit's image doors on traust-core (traust.cli.image)
 IMAGE_SBOM = passthrough_op("image", "Record an image's SBOM, keyed by digest.", "sbom")
 IMAGE_PACKAGES = passthrough_op("image", "The packages an image's recorded SBOM holds.", "packages")

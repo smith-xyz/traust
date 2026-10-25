@@ -40,24 +40,24 @@ allowed-tools:
   # execution (audit D3, remediation plan P1.6). Scope every script
   # individually — the A11 alignment gate blocks broad entries.
   - Bash(python3 *-m traust.cli reporting validate:*)
-  - Bash(python3 *-m traust_engine.reporting.render:*)
+  - Bash(python3 *-m traust.cli reporting render:*)
   - Bash(python3 *-m traust.cli adapters opengrep:*)
-  - Bash(python3 *-m traust_engine.adapters.checkov:*)
-  - Bash(python3 *-m traust_engine.adapters.gitleaks:*)
+  - Bash(python3 *-m traust.cli adapters checkov:*)
+  - Bash(python3 *-m traust.cli adapters gitleaks:*)
   - Bash(python3 *-m traust.cli adapters osv:*)
   - Bash(python3 *-m traust.cli reporting record:*)
-  - Bash(python3 *harnessing/3-audit/secure-code-audit/scripts/run_fork_advisory_lag.py:*)
-  - Bash(python3 *harnessing/3-audit/secure-code-audit/scripts/expand_config_matrix.py:*)
-  - Bash(python *harnessing/3-audit/secure-code-audit/scripts/expand_config_matrix.py:*)
-  - Bash(python3 *harnessing/3-audit/secure-code-audit/scripts/enumerate_route_guards.py:*)
-  - Bash(python *harnessing/3-audit/secure-code-audit/scripts/enumerate_route_guards.py:*)
+  - Bash(python3 *-m traust.cli adapters fork-lag:*)
+  - Bash(python3 *-m traust.cli adapters config-matrix:*)
+  - Bash(python3 *-m traust.cli adapters route-guards:*)
+  - Bash(python3 *-m traust.cli adapters sanitizers:*)
+  - Bash(python3 *-m traust.cli adapters priv-profile:*)
   - Bash(python3 *harnessing/3-audit/secure-code-audit/scripts/probe_sanitizers.py:*)
   - Bash(python *harnessing/3-audit/secure-code-audit/scripts/probe_sanitizers.py:*)
   - Bash(python3 *-m traust.cli.check_citations:*)
   - Bash(python3 *-m traust.cli corpus finding-identity:*)
-  - Bash(python3 *harnessing/3-audit/secure-code-audit/scripts/enrich_findings_cves.py:*)
+  - Bash(python3 *-m traust.cli impact enrich:*)
   - Bash(python3 *-m traust.cli.emit_triage_ledger_events:*)
-  - Bash(python3 *-m traust_engine.sweep.mining:*)
+  - Bash(python3 *-m traust.cli sweep mine:*)
   - Bash(python3 *-m traust.cli corpus:*)
 ---
 
@@ -696,11 +696,11 @@ Rules of engagement:
 When the pre-scan above found Kubernetes manifests or a ClusterServiceVersion (i.e. the repo ships an operator/controller), also build the least-privilege inventory:
 
 ```bash
-python harnessing/3-audit/operator-priv-profile/scripts/build_priv_profile.py \
-    --repo <local-path> --name <repo> --out-dir <report-output-dir>/
+python3 -m traust.cli adapters priv-profile <local-path> --name <repo> \
+    --out <report-output-dir>/<repo>-priv-profile.json
 ```
 
-This persists `<repo>-priv-profile.{json,md}` beside the report — SCC requests (RBAC `use` on `securitycontextconstraints`, with restricted-v2-default semantics), per-container securityContext, namespaces/install modes, the complete RBAC enumeration, and the `+kubebuilder:rbac` required-vs-granted diff. Rules of engagement:
+This persists `<repo>-priv-profile.json` beside the report — SCC requests (RBAC `use` on `securitycontextconstraints`, with restricted-v2-default semantics), per-container securityContext, namespaces/install modes, the complete RBAC enumeration, and the `+kubebuilder:rbac` required-vs-granted diff. Rules of engagement:
 
 1. **The profile is an inventory, not findings.** Judge its flags in repository context under the standard promote/dismiss protocol: `scc_use` with empty `resourceNames` (eligibility for ANY SCC), wildcard grants, `rbac_write`/`escalate_bind_impersonate`, privileged workloads with no SCC request, and tier-2 surplus (`shipped_not_declared`) are candidate authorization findings — verify surplus against non-kubebuilder call sites before promoting.
 2. Record `"priv-profile": "ran"` (or `"skipped: <reason>"` — e.g. no manifests, helm-templated tree) in `metadata.additional.deterministic_steps`.
@@ -893,8 +893,8 @@ Contract (identical in spirit to the govulncheck stage):
    `scanner_correlation` entries like the other pre-scans. The step's key
    is `osv-scanner` whichever path ran (the OSV API or, air-gapped, the
    binary): it is the key the report schema and earlier reports use. For
-   prioritization context, `harnessing/3-audit/secure-code-audit/scripts/enrich_findings_cves.py --in
-   <artifact>` joins EPSS scores and CISA-KEV membership onto every
+   prioritization context, `python3 -m traust.cli impact enrich --in
+   <artifact> --repo-url <url>` joins EPSS scores and CISA-KEV membership onto every
    CVE-bearing candidate (an enrichment tagger — routes attention, never
    changes a severity).
 3. **Read `metadata.status`.** Exit 3 and `status: degraded` mean some
@@ -947,7 +947,7 @@ database:
   (facts), but never judge whether they are vulnerable from memory: no CVE
   ids, affected ranges or fixed versions that a tool or feed didn't supply.
 
-#### Deterministic fork advisory-lag pre-scan (run_fork_advisory_lag.py)
+#### Deterministic fork advisory-lag pre-scan (traust adapters fork-lag)
 
 When a local checkout exists, run the fork detector before the
 supply-chain review — pinned forks that never diff their fork point
@@ -956,7 +956,7 @@ pattern** in the CVE-replay backfill (≥21 of 51 missed CVEs: CoreDNS
 forks 15, oauth2-proxy fork 4, prometheus 2, envoy):
 
 ```bash
-python harnessing/3-audit/secure-code-audit/scripts/run_fork_advisory_lag.py --repo <local-path> --out /tmp/<repo>-fork-advisory-lag.json
+python3 -m traust.cli adapters fork-lag <local-path> --out /tmp/<repo>-fork-advisory-lag.json
 ```
 
 Stage 1 is pure-local and deterministic (go.mod module-path vs checkout
@@ -998,7 +998,7 @@ Contract — this pre-scan is deliberately NOT like the dependency ones:
    `skipped`/`error: …` — file what stage 1 proved (the fork point) and
    continue; the pre-scan is an accelerator, never a precondition.
 
-#### Deterministic config-matrix pre-scan (expand_config_matrix.py)
+#### Deterministic config-matrix pre-scan (traust adapters config-matrix)
 
 When a local checkout exists, expand the tree's **effective deployed
 defaults** before the configuration/deployment review — composed
@@ -1008,7 +1008,7 @@ syntactic rules alone did not close (config/DSN recall 0.25–0.50 after
 the yaml rule pack; fn-analysis §4, deep-fn plan Phase B1):
 
 ```bash
-python harnessing/3-audit/secure-code-audit/scripts/expand_config_matrix.py <local-path> --out /tmp/<repo>-config-matrix.json
+python3 -m traust.cli adapters config-matrix <local-path> --out /tmp/<repo>-config-matrix.json
 ```
 
 The expansion is pure-static and offline (no helm/kustomize execution —
@@ -1059,7 +1059,7 @@ Judging protocol — bounded, and every verdict is judged, never bulk-set:
    `metadata.additional.coverage_gaps` as
    `{tool: "config-matrix", system, reason, count}` — the structured
    record `traust assessments coverage` aggregates fleet-wide. The pre-scan is an
-   accelerator, never a precondition — if PyYAML or the checkout is
+   accelerator, never a precondition — if the checkout is
    missing, perform the manual configuration review and move on.
 4. **No cross-product enumeration**: the artifact deliberately carries
    shipped defaults plus single documented overrides. Do not expand
@@ -1067,7 +1067,7 @@ Judging protocol — bounded, and every verdict is judged, never bulk-set:
    load-bearing, file the base-default finding and name the combination
    in its description.
 
-#### Deterministic route×guard pre-scan (enumerate_route_guards.py)
+#### Deterministic route×guard pre-scan (traust adapters route-guards)
 
 When a local checkout exists, enumerate the route×guard matrix before
 the authentication/authorization review — enforcement asymmetries (one
@@ -1076,7 +1076,7 @@ false-negative for narrative review lanes (the AWX probe's dominant
 miss shape; deep-fn plan Phase B2):
 
 ```bash
-python harnessing/3-audit/secure-code-audit/scripts/enumerate_route_guards.py <local-path> --out /tmp/<repo>-route-guards.json [--index <symbols.db>]
+python3 -m traust.cli adapters route-guards <local-path> --out /tmp/<repo>-route-guards.json [--resolve-handlers]
 ```
 
 It enumerates go-http (net/http, gorilla, chi/echo/gin verb styles,
@@ -1133,8 +1133,8 @@ sanitizer-shaped functions statically, and — only on explicit request —
 executes them against a curated bypass corpus:
 
 ```bash
-python harnessing/3-audit/secure-code-audit/scripts/probe_sanitizers.py <local-path> --out /tmp/<repo>-sanitizer-probes.json          # discovery only (default)
-python harnessing/3-audit/secure-code-audit/scripts/probe_sanitizers.py <local-path> --run --out /tmp/<repo>-sanitizer-probes.json    # EXECUTES repo code
+python3 -m traust.cli adapters sanitizers <local-path> --out /tmp/<repo>-sanitizer-candidates.json          # discovery only (default)
+python harnessing/3-audit/secure-code-audit/scripts/probe_sanitizers.py <local-path> --run --candidates /tmp/<repo>-sanitizer-candidates.json --out /tmp/<repo>-sanitizer-probes.json    # EXECUTES repo code
 ```
 
 `--run` **executes repository code** (module import runs top-level
@@ -1142,7 +1142,7 @@ statements) in isolated subprocesses (`python3 -I`, cleared env,
 CPU/memory rlimits, timeout, scratch cwd). Use it only on the cloned,
 authorized audit target — same doctrine as /create-fuzzing. In
 environments where target-code execution is not sanctioned, stay in
-`--list` mode and judge the discovered candidates by reading them; record
+discovery (`traust adapters sanitizers`) and judge the discovered candidates by reading them; record
 that choice.
 
 Judging protocol:
@@ -1478,7 +1478,7 @@ Include the Kubernetes frameworks only when the repo ships manifests, charts, or
 - **Default checkout** (bare repo URL, no branch/tag requested): `ref` = the default branch's name as checked out (`git rev-parse --abbrev-ref HEAD`, e.g. `main`), `ref_kind` = `"default"`.
 - **Bare commit SHA input** (`commit:<sha>`, detached — no branch/tag name known): omit both fields; `metadata.commit` already pins the state. Do not guess a branch name.
 
-These fields are how `traust_engine.corpus.resolver` distinguishes branch re-audits from HEAD audits for new reports; the legacy `__release-X.Y` report-slug suffix remains a fallback for old reports only — keep naming reports per the Deduplication section, but never rely on the slug alone to carry the ref.
+These fields (passed to `reporting record` as `--branch <metadata.ref>`) are how traust-core distinguishes branch re-audits from HEAD audits for new reports; the legacy `__release-X.Y` report-slug suffix remains a fallback for old reports only — keep naming reports per the Deduplication section, but never rely on the slug alone to carry the ref.
 
 **`asvs_references`** — populate on findings in application-security categories (`injection`, `authentication`, `authorization`, `input-validation`, `cross-site-scripting`, `ssrf`, `cryptography`); ASVS is the primary framework and unreferenced findings weaken traceability.
 
@@ -1570,7 +1570,8 @@ This Markdown file is for human consumption only — the JSON file remains the a
 
 ```bash
 python3 -m traust.cli reporting record <path-to-report.json> --kind secure-code \
-    --repo-url <https URL of the repository> --sha <metadata.commit, full SHA>
+    --repo-url <https URL of the repository> --sha <metadata.commit, full SHA> \
+    [--branch <metadata.ref, when ref_kind is branch or default>]
 ```
 
 It records a secure-code assessment of that commit with the report as its

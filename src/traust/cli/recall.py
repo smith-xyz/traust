@@ -1,4 +1,4 @@
-"""``traust sweep benchmark-targets|build-canaries``: recall-benchmark's answer-key doors on
+"""``traust sweep benchmark-targets|build-canaries|screen-injection``: recall-benchmark's doors on
 traust-core.
 
 benchmark-targets  record the benchmark-targets manifest (YAML or JSON) as a new answer-key
@@ -6,6 +6,8 @@ benchmark-targets  record the benchmark-targets manifest (YAML or JSON) as a new
                    targets are refused
 build-canaries     commit every canary (or seeded-fixture) source into a deterministic local repo
                    (traust-engine's materialiser) and record them as targets of a new version
+screen-injection   screen recorded audit reports for the shape of obeyed prompt injection; every
+                   signal is a human review item, never a verdict. Exit 1 when any is flagged
 """
 
 from __future__ import annotations
@@ -57,6 +59,26 @@ def canaries(argv: list[str] | None = None) -> int:
         ]
 
     return run(call)
+
+
+def screen(argv: list[str] | None = None) -> int:
+    ap = parser("sweep", "screen-injection", "Screen recorded audit reports for prompt injection.")
+    ap.add_argument("artifact", nargs="+", type=uuid.UUID, help="a recorded audit report's id")
+    args = ap.parse_args(argv)
+    flagged = False
+
+    def call() -> dict:
+        nonlocal flagged
+        quality = load_services(args.config_home).detection_quality
+        screens = [quality.screen_injection(a) for a in args.artifact]
+        flagged = any(s.flagged for s in screens)
+        return {
+            "screened": len(screens),
+            "flagged": [s.model_dump(mode="json") for s in screens if s.flagged],
+        }
+
+    rc = run(call)
+    return 1 if rc == 0 and flagged else rc
 
 
 def _provenance() -> Provenance:

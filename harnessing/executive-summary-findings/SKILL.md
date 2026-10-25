@@ -48,7 +48,7 @@ python3 -m traust.cli dashboard view executive-summary \
 
 What it does (traust-core's `ExecutiveSummaryView`, one `InsightService.publish`):
 
-1. *Retired:* file discovery, MD/JSON parsing and the `findings-current` precedence; each finding's state comes from the decision fold (human-confirmed false positives, resolved, risk-accepted and hardening are counted apart from open). No door yet for the "Remediation Status" closure rate or per-month remediation chart (the trend is `traust dashboard view findings-trend`). Was: walks `<results-root>/findings/` and `<results-root>/oss-findings/` for every `*security-audit.json` (preferred) or `*security-audit.md` (fallback when no JSON sibling exists). The `_manifest/` directory is skipped. When a sibling `*-findings-current.json` (cumulative report from the `track-findings` skill) exists, it is used **instead of** the audit by default: human-confirmed false positives are excluded from every figure, severity counts are recomputed from the surviving findings, and per-finding resolution status feeds a "Remediation Status" section (Markdown) / KPIs + cards (HTML): closure rate across dispositioned repos, a "Findings remediated" count broken down by severity, and a per-month remediation trend (stacked resolved / partially-resolved bar chart, bucketed by each finding's last disposition event date).
+1. *Retired:* file discovery, MD/JSON parsing and the `findings-current` precedence; each finding's state comes from the decision fold (human-confirmed false positives, resolved, risk-accepted and hardening are counted apart from open). The view renders the "Remediation Status" closure rate and the remediated count by severity; *retired:* the per-month remediation chart (the trend is `traust dashboard view findings-trend`). Was: walks `<results-root>/findings/` and `<results-root>/oss-findings/` for every `*security-audit.json` (preferred) or `*security-audit.md` (fallback when no JSON sibling exists). The `_manifest/` directory is skipped. When a sibling `*-findings-current.json` (cumulative report from the `track-findings` skill) exists, it is used **instead of** the audit by default: human-confirmed false positives are excluded from every figure, severity counts are recomputed from the surviving findings, and per-finding resolution status feeds a "Remediation Status" section (Markdown) / KPIs + cards (HTML): closure rate across dispositioned repos, a "Findings remediated" count broken down by severity, and a per-month remediation trend (stacked resolved / partially-resolved bar chart, bucketed by each finding's last disposition event date).
 2. Resolves each repository's primary language from the lines the code-facts scan measured (`CodeFactsService.language_stats`); an unmeasured repository is `unknown`.
 3. Aggregates:
    - Per-severity totals (Critical / High / Medium / Low / Informational)
@@ -57,7 +57,7 @@ What it does (traust-core's `ExecutiveSummaryView`, one `InsightService.publish`
      re-audits), falling back to the component slug with any `__<branch>`
      suffix stripped — so "N reports across M unique repositories"
      reads correctly even though totals remain per-report occurrences
-   - *Retired* (the fold counts each finding once; no door yet for the upstream cut or release-branch confirmations): a **Distinct Vulnerabilities** section (Lens 2, the canonical exposure
+   - *Retired* (the fold counts each finding once; the upstream cut is a product/team scope; a release branch is the same finding by repository fingerprint, so there are no separate confirmations): a **Distinct Vulnerabilities** section (Lens 2, the canonical exposure
      headline): unique finding fingerprints at HEAD across `findings/`,
      disposition-adjusted, FP-excluded, hardening separate — computed with
      census-identical semantics so the two tools can never diverge; the
@@ -70,13 +70,13 @@ What it does (traust-core's `ExecutiveSummaryView`, one `InsightService.publish`
    - A dedicated **"Hardening Backlog (Posture Debt)"** section + KPI card:
      `validation_status: hardening` findings are excluded from the severity
      totals but never dropped — total count, CWE-theme breakdown, and the
-     largest per-repo backlogs (no door yet) render in both outputs, with the framing that
+     largest per-repo backlogs render in both outputs, with the framing that
      absent hardening amplifies co-located vulnerabilities (λ-weighted in
      findings-trends) and files via `/file-security-defect --hardening`
    - Common risk themes — CWE → bucket clustering (Injection, Path Traversal, Secrets, Crypto, AuthN/Z, SSRF, TLS, RBAC, Supply-Chain, XSS, DoS, …)
    - Per-language severity matrix and repo counts
    - *Retired* (scope is product or team): with `--by-segment`, a per-input-segment severity matrix. Every `*-repos.csv` under every segment of the inputs inventory (`locations.inputs`; the `ansible` input and any `--exclude-segment` skipped; `owners*.csv` ignored) is read into a canonical-URL → segment map; each report's `metadata.repository` resolves to its first matching segment in priority order — the declaration order of `<inputs>/inventory.yaml`, undeclared segments after by name (totals stay additive; the multi-segment overlap count is reported), and repos absent from the inventories — including all of `oss-findings/` — land in `unmapped`. Renders as a Markdown table and an HTML stacked-bar card + table. `--inputs-root` defaults to `locations.inputs`.
-4. No door yet for the harness version stamp.
+4. Stamps the traust-core version in the population block.
 5. Writes `executive-summary-findings.{md,html,json}` in `--out`:
    - `.md` — leadership one-pager
    - `.html` — self-contained dashboard (summary, Critical/High table, credential-leak table, risk themes, per-language table)
@@ -108,7 +108,7 @@ If `summary` was requested, also print the full severity table and the top-10 Cr
 | `executive-summary-findings.md` | Markdown one-pager: severity table, top Critical/High, credential leaks, risk themes, per-language matrix. Suitable for pasting into a doc or Slack. |
 | `executive-summary-findings.html` | Self-contained dashboard with summary and tables. Suitable for sharing with leadership or attaching to a coordination meeting. |
 
-Both files are written to `--out`, normally `progress-tracker/metrics/dashboards/` (dashboards live with the metrics, separate from findings data), and are overwritten on every run — the headline series is the view at an earlier `--as-of`. No door yet for the standard population block.
+Both files are written to `--out`, normally `progress-tracker/metrics/dashboards/` (dashboards live with the metrics, separate from findings data), and are overwritten on every run — the headline series is the view at an earlier `--as-of`. The view renders the standard population block.
 
 ---
 
@@ -142,15 +142,15 @@ model, carrying every headline number (replaces the
 `Executive-summary-findings.metrics.json` sidecar).
 
 **Consumed by:** `/traust-metrics`
-(`collect_harness_metrics.py`) reads the sidecar as scoreboard source
+(traust-core's `ScoreboardView`) reads this view as scoreboard source
 row #1 — the earlier "no skill reads it back" claim here was false
 (docs-verification 2026-07-31, wiring c3), and worse, the collector
 was regex-parsing the markdown *sentences*, so rewording the prose
 silently blanked leadership metrics. The sidecar is now the contract:
 change a headline number's meaning → update the sidecar key and the
-collector together; the md/html prose can be reworded freely. (No door yet: the
-collector still reads the retired `.metrics.json` sidecar; it moves to
-the model JSON with the traust-metrics port.)
+collector together; the md/html prose can be reworded freely. (*Retired:*
+the sidecar; traust-core's `ScoreboardView` composes this view
+in-process.)
 
 Upstream inputs are traust-core's recorded findings, code facts,
 privilege profiles and impact analyses; regenerate after any batch that

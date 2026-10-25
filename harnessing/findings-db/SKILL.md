@@ -107,7 +107,6 @@ or substitute for the ledger):
 | `/compliance-check` | `findings_db` collector — pre-shaped views over ledger conclusions |
 | `/fleet-fix` | optional candidate listing (`v_open` + `graph_edges`) |
 | `/mine-ledger` | optional cluster-shape pre-queries (DB for scoping; the miner stays file-based) |
-| `/traust-metrics` | cloud-config lane (`collect_harness_metrics.py`) |
 | `/refresh-dashboards` | downstream dashboard builders read the fresh projection |
 | `/drift-watch` | staleness sentinel (`built_at` vs newest ledger/report mtime) — watches the DB, never queries findings from it |
 

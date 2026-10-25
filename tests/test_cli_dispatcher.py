@@ -24,6 +24,7 @@ def test_all_planned_groups_registered():
         "adapters",
         "admin",
         "assessments",
+        "attack",
         "auth",
         "build",
         "check",
@@ -43,7 +44,6 @@ def test_all_planned_groups_registered():
         "remediation",
         "reporting",
         "sweep",
-        "tools",
         "triage",
         "util",
     }
@@ -80,18 +80,6 @@ def test_traust_portfolio_and_sweep_help():
 def test_traust_feeds_fetch_help():
     proc = subprocess.run(
         [sys.executable, "-m", "traust.cli", "feeds", "fetch", "--help"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert proc.returncode == 0, proc.stderr
-    assert "--config-home" in proc.stdout
-    assert "Snapshot the security feeds" in proc.stdout
-
-
-def test_traust_tools_fetch_feeds_help():
-    proc = subprocess.run(
-        [sys.executable, "-m", "traust.cli", "tools", "fetch-feeds", "--help"],
         capture_output=True,
         text=True,
         check=False,

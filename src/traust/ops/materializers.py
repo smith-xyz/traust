@@ -12,7 +12,7 @@ from traust_core.v1.errors import ConfigError, NotFoundError, ValidationError
 from traust_core.v1.models.dependencies import FeedName
 from traust_core.v1.models.insight import RenderedView, ViewFilter, ViewName
 from traust_core.v1.models.observation import ComparisonStatus
-from traust_core.v1.models.operations import AssetRequest, JobResult, OrderReason
+from traust_core.v1.models.operations import AssetRequest, DegradedKey, JobResult, OrderReason
 from traust_core.v1.models.values import HttpsRepoUrl
 
 log = logging.getLogger(__name__)
@@ -105,17 +105,26 @@ class LedgerAuditMaterializer:
         failed = sum(1 for r in results if r.errors)
         unverified = sum(1 for r in results if r.warnings and not r.errors)
         return JobResult.partly(
-            {k: n for k, n in (("failed", failed), ("unverified", unverified)) if n}
+            {
+                key.value: count
+                for key, count in (
+                    (DegradedKey.FAILED, failed),
+                    (DegradedKey.UNVERIFIED, unverified),
+                )
+                if count
+            }
         )
 
 
 def write_view(view: RenderedView, base: Path, model: bool = False) -> tuple[Path, ...]:
-    """The rendered pair, `<base>.md` and `<base>.html` (and its model as `<base>.json`);
-    core stores no view."""
+    """The rendered pair, `<base>.md` and `<base>.html` (its model as `<base>.json`, and its
+    export table as `<base>.csv` when the view has one); core stores no view."""
     base.parent.mkdir(parents=True, exist_ok=True)
     out = {base.with_suffix(".md"): view.markdown, base.with_suffix(".html"): view.html}
     if model:
         out[base.with_suffix(".json")] = view.model.model_dump_json(indent=2)
+    if view.csv is not None:
+        out[base.with_suffix(".csv")] = view.csv
     for path, text in out.items():
         path.write_text(text, encoding="utf-8")
     return tuple(out)

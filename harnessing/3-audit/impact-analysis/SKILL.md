@@ -25,7 +25,7 @@ allowed-tools:
   - Bash(python3 *-m traust.cli impact analyze:*)
   # (Bash(git:*) dropped 2026-07-31 P1-W4: no git invocation in this skill's flow)
   - Bash(jq:*)
-  - Bash(python3 *harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py:*)
+  - Bash(python3 *-m traust.cli impact document:*)
 ---
 
 # Impact Analysis
@@ -196,7 +196,7 @@ symbols/packages, and feature description. `traust impact find` returns the
 OSV record `analyze` itself works from:
 
 All advisory fetches go through the scoped fetcher — the skill's only
-network egress (three fixed hosts, default TLS; a raw `curl` grant
+network egress (the hosts registered in `config/feeds.yaml`, default TLS; a raw `curl` grant
 would be an arbitrary-destination exfiltration channel under
 injection — audit D7):
 
@@ -205,10 +205,10 @@ injection — audit D7):
 python3 -m traust.cli impact find <ADVISORY-ID>
 
 # NVD
-python3 harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py nvd <CVE-ID>
+python3 -m traust.cli impact document nvd <CVE-ID>
 
-# Red Hat CSAF
-python3 harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py csaf <cve-id>
+# Red Hat CSAF VEX (CVE-keyed)
+python3 -m traust.cli impact document vex <cve-id>
 ```
 
 When symbols aren't in the advisory, read the fix commit diff to identify
