@@ -77,6 +77,7 @@ def doors(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         sweep=Door(SWEEP),
         prepare=Door(SimpleNamespace(model_dump_json=lambda indent: '{"work_item": "w"}')),
         differential=Door(EVIDENCE),
+        differential_of=Door(EVIDENCE),
         record=Door(VERIFICATION),
         list=Door(Page(items=(VERIFICATION,))),
         list_repositories=Door(Page(items=tuple(repos.values()))),
@@ -92,6 +93,7 @@ def doors(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
             sweep=stub.sweep,
             prepare=stub.prepare,
             differential=stub.differential,
+            differential_of=stub.differential_of,
             record=stub.record,
             list=stub.list,
         ),
@@ -208,6 +210,47 @@ def test_differential_refuses_before_the_door(
     rc, err = run(remediation.verify_differential, home, str(ITEM_ID), *argv)
     assert rc == 2 and reason in err.lower()
     assert doors.differential.calls == []
+
+
+BASE_SHA = "0123456789abcdef0123456789abcdef01234567"
+
+
+def test_differential_without_a_work_item_compares_the_callers_base(
+    doors: SimpleNamespace, home: Path
+) -> None:
+    finding = uuid.uuid4()
+    rc, out = run(
+        remediation.verify_differential,
+        home,
+        *("--repo-url", REPO, "--sha", SHA, "--branch", "fix/cve"),
+        *("--finding", str(finding), "--base-sha", BASE_SHA, "--base-branch", "main"),
+    )
+    assert (rc, out) == (0, EVIDENCE.model_dump(mode="json"))
+    assert [(r, str(s), n, k and k.value) for r, s, n, k in doors.register_ref.calls] == [
+        (REPO_ID, SHA, "fix/cve", "branch"),
+        (REPO_ID, BASE_SHA, "main", "branch"),
+    ]
+    assert doors.differential_of.calls == [([finding], REF_ID, REF_ID)]
+    assert doors.differential.calls == []
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        (),
+        ("--finding", str(ITEM_ID)),
+        ("--base-sha", BASE_SHA),
+        (str(ITEM_ID), "--finding", str(ITEM_ID)),
+        (str(ITEM_ID), "--base-branch", "main"),
+        (str(ITEM_ID), "--finding", str(ITEM_ID), "--base-sha", BASE_SHA),
+    ],
+)
+def test_differential_needs_a_work_item_or_findings_and_a_base(
+    doors: SimpleNamespace, home: Path, argv: tuple[str, ...]
+) -> None:
+    with pytest.raises(SystemExit):
+        run(remediation.verify_differential, home, *argv, "--repo-url", REPO, "--sha", SHA)
+    assert doors.differential.calls == doors.differential_of.calls == []
 
 
 def test_differential_refusal_is_exit_2(doors: SimpleNamespace, home: Path) -> None:

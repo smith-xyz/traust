@@ -42,7 +42,7 @@ REMEDIATION: dict[str, object] = {
         "remediation", "What a verification of one work item re-checks.", "verify_prepare"
     ),
     "verify-differential": passthrough_op(
-        "remediation", "A work item's backing scanner on a patched commit.", "verify_differential"
+        "remediation", "The findings' backing scanner on a patched commit.", "verify_differential"
     ),
     "verify-record": passthrough_op(
         "remediation", "Record a validated verification report.", "verify_record"

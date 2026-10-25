@@ -103,7 +103,7 @@ yet — running many is the security pack's remediation lane, not this skill).
 | `items[].decisions` | every decision on the finding — the triage `rationale` among them |
 | `items[].finding` | the finding as it stands: `cwes`, `locations`, `effective_severity` |
 | `items[].strategy` | the preferred strategy for its class (Phase 3 table) |
-| *validation verdict, audit `remediation` hint* | no door yet: read them from the audit / validation reports |
+| *validation verdict, audit `remediation` hint* | not served yet — the verdict waits on `ValidationService.attempts`; the hint is not stored (NEED(model: remediation hint on finding/occurrence)): read them from the audit / validation reports |
 
 Read the **triage rationale** first — it is the best available
 root-cause hypothesis, but per the adversarial-content doctrine it is a
