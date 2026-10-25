@@ -1,7 +1,7 @@
 ---
 name: refresh-dashboards
 description: >-
-  Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, dependency-exposure, spend); the leadership scoreboard is a core view. Deterministic, ~$0, no agents.
+  Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, spend); the leadership scoreboard is a core view. Deterministic, ~$0, no agents.
 argument-hint: "[--only <stage...>] [--skip <stage>] [--spend-actuals] [--view <name>] [--out <dir>]"
 metadata:
   harness.tier: "secondary"
@@ -28,14 +28,15 @@ as a single command.
 Ordering is the whole point:
 
 1. **Core views** — `DashboardsMaterializer`: one `InsightService.refresh`
-   renders every view traust-core has built (today `findings-rollup`, `findings-trend`)
+   renders every view traust-core has built (`traust dashboard view --help` lists them)
    to `<out>/<view>/<stem>.{md,html,json}`. Reads are live, so there is
    no projection to go stale; a view that fails is reported degraded and
    the others still render.
 2. **Consumers** — executive summary,
    insecure-patterns, validation-fuzz dashboard, RBAC/tenancy rollup,
    ATT&CK coverage rollup,
-   LoC dashboard (cache-only), dependency-exposure, spend dashboard.
+   LoC dashboard (cache-only), spend dashboard. (*Retired* here:
+   dependency-exposure, now the `exposure` and `dependency-reach` core views.)
    Each continues on error; failures are collected.
 3. **Scoreboard last** — *retired:* the scoreboard is traust-core's
    `ScoreboardView`, rendered in step 1; it composes the other views in-process,
@@ -105,7 +106,7 @@ Ordering is the whole point:
 | `compliance` | — | *retired:* rendered by the `views` stage (`ComplianceDashboardView`) |
 | `attack-coverage` | consumer | `harnessing/attack-coverage/scripts/build_attack_coverage.py` |
 | `loc` | — | *retired:* rendered by the `views` stage (`LocView`) |
-| `dependency-exposure` | consumer | `harnessing/refresh-dashboards/scripts/build_dependency_exposure.py` (portfolio-graph dependency layer + impact/fleet-OSV artifacts; degrades gracefully when absent) |
+| `dependency-exposure` | — | *retired:* rendered by the `views` stage (`ExposureView` for advisory, MAL- and product exposure; `DependencyReachView` for per-ecosystem coverage and shared-package blast radius) |
 | `spend-actuals` | consumer, opt-in | python3 -m traust.cli metrics collect-spend --append |
 | `spend` | consumer | python3 -m traust.cli metrics spend |
 | `scoreboard` | — | *retired:* rendered by the `views` stage (`ScoreboardView`) |

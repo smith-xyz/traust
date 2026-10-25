@@ -23,11 +23,6 @@
     "database": 1,
     "engine-internal": 7
   },
-  "harnessing/refresh-dashboards/scripts/build_dependency_exposure.py": {
-    "database": 1,
-    "engine-internal": 2,
-    "state-file": 1
-  },
   "src/traust/cli/auth.py": {
     "core-internal": 1
   },
