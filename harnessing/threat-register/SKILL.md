@@ -17,13 +17,14 @@ allowed-tools:
   - Glob
   - Bash(python3 *-m traust_engine.reporting.lint:*)
   - Bash(python3 *-m traust.cli assessments threats:*)
+  - Bash(python3 *-m traust.cli dashboard view:*)
   - Bash(ls:*)
   - Bash(wc:*)
 ---
 
 # threat-register
 
-> **Being ported to traust-core** (progress-tracker skill port 13, threat-register): build_threat_register.py retired with the traust-core hub (it ran on the old ledger / corpus code). Run now lists the register's threats from traust-core; the steps marked RETIRED (the roll-ups and the json/md/html register) don't run until traust-core's threat-register view lands.
+> **Ported to traust-core** (progress-tracker skill port 13, threat-register): build_threat_register.py retired with the traust-core hub (it ran on the old ledger / corpus code). Run lists the register's threats from traust-core; Output's roll-ups and json/md/html register are traust-core's threat-register view (`traust dashboard view threat-register`). The parts marked *Retired* or *No door yet* don't run.
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in
@@ -62,20 +63,25 @@ rows. It never edits a model.
 
 ## Output
 
-RETIRED until traust-core's threat-register view lands (`assessments threats` prints `total` and the threat rows as JSON meanwhile):
+```bash
+python3 -m traust.cli dashboard view threat-register \
+    [--product <slug>]... [--team-id <uuid>]... [--as-of <ISO time>] \
+    --out <progress-tracker>/metrics/dashboards/threat-register
+```
 
-`progress-tracker/metrics/dashboards/threat-register/threat-register.{json,md,html}` (legacy fallback `<root>/threat-register/` when the progress-tracker sibling is absent). Each run also appends a `threat-register` snapshot (threat models, total/unmitigated/partially-mitigated/open threats, quick wins) to the central hash-chained metrics ledger — no-op when unchanged — and injects a trend-vs-previous banner into the md/html, so threat trends are visible per-register and in Executive-Trends:
+`progress-tracker/metrics/dashboards/threat-register/threat-register.{json,md,html}` (traust-core's `ThreatRegisterView`: each repository's latest threat model as of `--as-of`, else now). *Retired* (a point in time is `--as-of`; nothing is stored): the legacy fallback `<root>/threat-register/` and the `threat-register` snapshot appended to the central hash-chained metrics ledger with its trend-vs-previous banner in the md/html.
 
-- **json** — full register (every threat with key, product, model,
-  actors, surface, asset, severity, severity_source, likelihood, impact,
-  and for rated threats the scores and impact basis, status, controls,
-  evidence) plus totals, per-product roll-up, and quick wins.
+- **json** — full register (every threat with id, repository, label,
+  actors, surface, asset, severity, band, crosswalked, likelihood, impact,
+  status, controls, evidence, techniques, mitigations) plus the open
+  doc variances and quick wins.
 - **md** — leadership summary: status/severity totals, how many threats are
   rated with OWASP, top-25 open threats,
-  top quick wins, products by open-threat exposure.
+  top quick wins, risk acceptances, repositories by open-threat severity,
+  open documentation variances.
 - **html** — self-contained dashboard, no external assets.
 
-The md/html outputs embed the standard population block (roots, unit,
+*Retired* (scope is product or team: `--product`, `--team-id`): The md/html outputs embed the standard population block (roots, unit,
 filters, denominator) for cross-dashboard reconciliation, and include an
 Ownership cuts table splitting models/threats/open/open-critical
 between owned (`findings/`, Hybrid Platforms) and upstream (`oss-findings/`)
@@ -83,12 +89,13 @@ between owned (`findings/`, Hybrid Platforms) and upstream (`oss-findings/`)
 
 **Ranking.** Threats are ranked by their **OWASP Risk Rating Methodology**
 severity (<https://owasp.org/www-community/OWASP_Risk_Rating_Methodology>),
-then impact score, then likelihood score (`meta.scoring`). A threat whose
+then status, then repository and `<Tn>`. A threat whose
 model hasn't been re-rated yet still carries legacy labels. It is ordered
 by a fixed crosswalk onto the OWASP severity table
-(`traust_engine.reporting.threat_rating`) and marked
-`severity_source: legacy-crosswalk`, shown as "(legacy crosswalk)". The
-crosswalk orders rows and is never reported as a rating. Products are
+(traust-core's `RatingPolicy.threat_rating`) and marked
+`crosswalked`, shown as "(legacy crosswalk)". The
+crosswalk orders rows and is never reported as a rating. A threat with
+neither is `unknown` and ranks last. Repositories are
 ordered by their counts of open critical, then high, and so on: counts,
 never a weighted sum. None of this is CVSS, and none of it feeds the
 portfolio risk index, which remains the ledger's job
@@ -109,15 +116,16 @@ only, wording original; vocabulary shared with
 **optional per-row fields** — absent on every row of a model without the
 lens, so registers built from boundary-free portfolios are unchanged:
 
-- `isolation_dimensions` — which of the five hardening dimensions
+- *No door yet:* `isolation_dimensions` — which of the five hardening dimensions
   (`privilege`, `encryption`, `authentication`, `connectivity`, `hygiene`)
   the threat stresses;
-- `isolation_boundaries` — the section 10 boundary/interface id(s)
+- `boundary_ids` — the section 10 boundary/interface id(s)
   (`IF-n`) whose `threat_ids` tag the threat;
-- `isolation_review_ref` — the `analysis-results/isolation/<service-slug>/`
+- *No door yet:* `isolation_review_ref` — the `analysis-results/isolation/<service-slug>/`
   artifact of the full `/isolation-review`, when one exists.
 
-**Aggregation — which tenant boundaries are weakest.** When any model
+**Aggregation — which tenant boundaries are weakest.** *No door yet* (a
+threat carries its `boundary_ids` only; no door gives boundary dimensions). When any model
 carries boundaries, the JSON gains a `tenant_boundaries` list (and the md
 a "Weakest tenant boundaries" table), keyed `<product>/<model-slug>:<IF-n>`
 and ordered weakest-first: failed (`no`) dimensions weigh 2, `partial`
