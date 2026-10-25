@@ -59,6 +59,7 @@ One deterministic command — never hand-grep:
 ```bash
 python3 -m traust.cli remediation fleet-targets \
     (--cwe CWE-1104 | --package-id <package-uuid> | \
+     --module <name> --ecosystem <eco> | \
      --repo-url https://github.com/org/a --repo-url https://github.com/org/b) \
     -o /tmp/fleet-fix/<id>/fleet.json
 ```
@@ -77,8 +78,8 @@ class (CWE-class fleets); `--rollup` (PROGRESS.md) is *retired* — the
 CWE and package scopes read the findings themselves; `--package-id`
 reads the package's dependents in traust-core — dependency fleets: every
 repo depending on it directly, through a base image or an internal
-library. (No door looks a package up by name yet: `--module` /
-`--ecosystem` are gone until one exists.)
+library. `--module` (with `--ecosystem`) names the same package by its
+name instead of its id.
 Every target is enriched
 with **product reach** (fix highest-blast-radius repos
 first — the output is already sorted by it) and **owner team** (MR

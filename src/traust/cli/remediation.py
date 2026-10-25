@@ -52,8 +52,9 @@ from traust_core.v1.models.remediation import (
     property_evidence,
 )
 from traust_core.v1.models.values import GitSha, ProductSlug
-from traust_core.v1.models.vocabulary import RemediationStatus, SourceType
+from traust_core.v1.models.vocabulary import Ecosystem, RemediationStatus, SourceType
 
+from traust.cli._doors import package_id as find_package_id
 from traust.cli._doors import parser, products, run
 from traust.cli.findings import _repository
 from traust.cli.impact import harness_version
@@ -288,7 +289,7 @@ def fleet_record(argv: list[str] | None = None) -> int:
         doc = FleetFixArtifact.parse(json.dumps(raw, default=str).encode())
         when = datetime.now(UTC)
         made = (
-            load_core(args.config_home)
+            load_engine_core(args.config_home)
             .services()
             .remediation.record(
                 doc,
@@ -322,15 +323,22 @@ def fleet_targets(argv: list[str] | None = None) -> int:
     scope = ap.add_mutually_exclusive_group(required=True)
     scope.add_argument("--cwe", type=_cwe, help="repositories with an open finding of this CWE")
     scope.add_argument("--package-id", type=uuid.UUID, help="repositories depending on it")
+    scope.add_argument("--module", help="repositories depending on this package (--ecosystem)")
     scope.add_argument("--repo-url", action="append", help="named repositories, repeatable")
+    ap.add_argument("--ecosystem", choices=[e.value for e in Ecosystem], help="with --module")
     ap.add_argument("-o", "--out", type=Path, help="write the JSON here instead of stdout")
     args = ap.parse_args(argv)
+    if (args.module is None) != (args.ecosystem is None):
+        ap.error("--module and --ecosystem go together")
 
     def call() -> str | None:
         core = load_core(args.config_home)
-        named = tuple(_repository(core, u).id for u in args.repo_url or ())
-        wanted = FleetScope(cwe=args.cwe, package_id=args.package_id, repository_ids=named)  # type: ignore[arg-type]
         services = core.services()
+        package_id = args.package_id
+        if args.module is not None:
+            package_id = find_package_id(services, args.ecosystem, args.module)
+        named = tuple(_repository(core, u).id for u in args.repo_url or ())
+        wanted = FleetScope(cwe=args.cwe, package_id=package_id, repository_ids=named)  # type: ignore[arg-type]
         owners = services.portfolio.list_owners
         found = [
             t.model_dump(mode="json")
