@@ -364,6 +364,9 @@ BENCHMARK_TARGETS = passthrough_op(
 BUILD_CANARIES = passthrough_op(
     "recall", "Materialise canaries (or --seeded fixtures) as answer-key targets.", "canaries"
 )
+CARDS = passthrough_op(
+    "precedent_cards", "Validate semantic precedent cards; sweep them over a checkout.", "main"
+)
 SCREEN_INJECTION = passthrough_op(
     "recall", "Screen recorded audit reports for prompt injection (report-only).", "screen"
 )
