@@ -24,7 +24,7 @@ allowed-tools:
 
 # threat-register
 
-> **Ported to traust-core** (progress-tracker skill port 13, threat-register): build_threat_register.py retired with the traust-core hub (it ran on the old ledger / corpus code). Run lists the register's threats from traust-core; Output's roll-ups and json/md/html register are traust-core's threat-register view (`traust dashboard view threat-register`). The parts marked *Retired* or *No door yet* don't run.
+> **Ported to traust-core** (progress-tracker skill port 13, threat-register): build_threat_register.py retired with the traust-core hub (it ran on the old ledger / corpus code). Run lists the register's threats from traust-core; Output's roll-ups and json/md/html register are traust-core's threat-register view (`traust dashboard view threat-register`). The parts marked *Retired* or NEED don't run.
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in
@@ -116,16 +116,18 @@ only, wording original; vocabulary shared with
 **optional per-row fields** — absent on every row of a model without the
 lens, so registers built from boundary-free portfolios are unchanged:
 
-- *No door yet:* `isolation_dimensions` — which of the five hardening dimensions
+- NEED(core: `Threat.isolation_dimensions`, read from the threat table's column 12; the threat-model schema carries it, `Threat.of` drops it): `isolation_dimensions` — which of the five hardening dimensions
   (`privilege`, `encryption`, `authentication`, `connectivity`, `hygiene`)
   the threat stresses;
 - `boundary_ids` — the section 10 boundary/interface id(s)
   (`IF-n`) whose `threat_ids` tag the threat;
-- *No door yet:* `isolation_review_ref` — the `analysis-results/isolation/<service-slug>/`
+- NEED(core: a tenant-boundary read model carrying the section 10 row's `isolation_review_ref`): `isolation_review_ref` — the `analysis-results/isolation/<service-slug>/`
   artifact of the full `/isolation-review`, when one exists.
 
-**Aggregation — which tenant boundaries are weakest.** *No door yet* (a
-threat carries its `boundary_ids` only; no door gives boundary dimensions). When any model
+**Aggregation — which tenant boundaries are weakest.** NEED(core: the
+section 10 boundaries — dimensions, complexity, tagged threats — as a read
+model, ranked weakest-first in `ThreatRegisterView`; a threat carries its
+`boundary_ids` only, and the threat-model schema already has the rest). When any model
 carries boundaries, the JSON gains a `tenant_boundaries` list (and the md
 a "Weakest tenant boundaries" table), keyed `<product>/<model-slug>:<IF-n>`
 and ordered weakest-first: failed (`no`) dimensions weigh 2, `partial`
