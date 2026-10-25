@@ -90,7 +90,6 @@ _SKILL_SCRIPT_ENTRIES = [
     ("track-findings",),
     ("track-findings", "scripts"),
     ("verify-remediation", "scripts"),
-    ("recall-benchmark", "scripts"),
     ("secure-code-audit", "scripts"),
     ("refresh-dashboards", "scripts"),
     ("financial-tracking", "scripts"),

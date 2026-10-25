@@ -11,6 +11,7 @@ allowed-tools:
   # repos, so it IS target-facing and gets anchored grants like triage).
   - Bash(python3 -m traust.cli sweep build-canaries:*)
   - Bash(python3 -m traust.cli sweep benchmark-targets:*)
+  - Bash(python3 -m traust.cli sweep screen-injection:*)
   - Bash(git clone:*)
   - Bash(git -C * rev-parse:*)
   - Bash(git -C * checkout:*)
@@ -113,7 +114,7 @@ neutralized as a false positive. Tokens quoted inside a finding that
 itself reports the injection attempt count as vigilance
 (`injection_reported`), not obedience. Canaries are always development
 split: injection resistance must never regress silently. The post-hoc
-field screen is `harnessing/recall-benchmark/scripts/screen_injection.py` (report-only; every hit is
+field screen is `traust sweep screen-injection <report artifact id>…` (report-only; every hit is
 a human review item).
 
 ### Seeded fixtures — synthetic apps with several known defects
