@@ -195,7 +195,7 @@ sources:
       ecosystem: npm
       expect_status: 200
     consumers:
-      - harnessing/3-audit/secure-code-audit/scripts/run_fork_advisory_lag.py
+      - traust.cli adapters fork-lag (traust-core CodeFactsService.fork_lag)
       - traust.cli.impact
       - traust.ops.cve_replay_monitor
       - traust.cli adapters osv (traust_engine.adapters.osv, the dependency pre-scan)

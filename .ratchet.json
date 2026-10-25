@@ -16,9 +16,6 @@
   "harnessing/3-audit/pqc-readiness/scripts/pqc_facts.py": {
     "contracts": 1
   },
-  "harnessing/3-audit/secure-code-audit/scripts/enumerate_route_guards.py": {
-    "database": 1
-  },
   "harnessing/7-remediate/fleet-fix/scripts/apply_fleet_fix.py": {
     "contracts": 1
   },
