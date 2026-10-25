@@ -141,7 +141,7 @@ Dimension definitions (original to this repository):
 `yes`): each cited item is either a `file:line` reference in a named repo
 (e.g. `github.com/openshift/foo//pkg/auth/token.go:88`) or a finding/threat
 ID from an existing artifact (e.g. `FOO-1a2b3c4-007`, `foo-threat-model:T3`).
-The validator rejects uncited `partial`/`no` results. Never invent evidence —
+`traust reporting record` rejects uncited `partial`/`no` results. Never invent evidence —
 if nothing supports a score, the score is wrong or the review is incomplete.
 
 ### Step 4 — posture and prioritized gaps
@@ -160,16 +160,10 @@ if nothing supports a score, the score is wrong or the review is incomplete.
    `critical-gap` (any `critical`). Write `posture.summary` as 2–5 sentences
    a service owner can act on: the strongest boundary, the weakest interface,
    and the single highest-payoff fix.
-3. Write `<service-slug>-isolation-review.{json,md}` and validate:
-
-   ```bash
-   python3 harnessing/3-audit/isolation-review/scripts/validate_isolation_review.py \
-     analysis-results/isolation/<service-slug>/<service-slug>-isolation-review.json
-   # must print: isolation review valid: 0 errors
-   ```
-
-   Then record it as an isolation-review assessment of each commit in the
-   repo set (one document, filed on every commit it covers):
+3. Write `<service-slug>-isolation-review.{json,md}` and record it as an
+   isolation-review assessment of each commit in the repo set (one document,
+   filed on every commit it covers). `record` validates it first (the schema,
+   then every gap names a listed interface) and records nothing when it fails:
 
    ```bash
    python3 -m traust.cli reporting record \

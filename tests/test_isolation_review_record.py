@@ -48,3 +48,18 @@ def test_a_review_failing_its_schema_records_nothing(core_home: Path, tmp_path: 
 
     assert rc == 2
     assert "posture" in err
+
+
+def test_a_gap_naming_no_listed_interface_records_nothing(core_home: Path, tmp_path: Path):
+    doc = _valid_report()
+    doc["gaps"][0]["interface_id"] = "IF-99"
+    review = tmp_path / "bad-isolation-review.json"
+    review.write_text(json.dumps(doc))
+    url, sha = REPOS[0]
+
+    rc, err = run(
+        core_home, str(review), "--kind", "isolation-review", "--repo-url", url, "--sha", sha
+    )
+
+    assert rc == 2
+    assert "IF-99" in err

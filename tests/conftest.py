@@ -109,7 +109,6 @@ _SKILL_SCRIPT_ENTRIES = [
     ("fleet-fix", "scripts"),
     ("findings-trends", "scripts"),
     ("executive-summary-findings", "scripts"),
-    ("isolation-review", "scripts"),
     ("validate-browser-finding", "scripts"),
     ("threat-register",),
     ("threat-register", "scripts"),
