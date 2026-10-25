@@ -11,7 +11,7 @@ routing + the budget guard inside it), `budget_shadow.py`,
 `traust_engine.registry.models`, `route_regressions.py`,
 `route_impact_findings.py`, `/assign-findings-owners` (internal extension),
 `/reassign-findings-owners` (internal extension), `/file-security-defect`,
-`emit_drain_tranche.py`, `traust remediation verify-sweep`,
+`traust remediation verify-sweep`,
 `traust impact sweep`, `traust feeds fetch` (`feeds_fetch.py`).
 
 | Kind | Routes | Implementation | Detail |
@@ -32,7 +32,6 @@ work, and none of them authors a finding:
 
 | Builder | Selects | Detail |
 |---|---|---|
-| `emit_drain_tranche.py` | this week's tranche from the router's drain ordering | [continuous-operations.md](continuous-operations.md) |
 | `traust remediation verify-sweep` (traust-core `VerificationService.sweep`) | the `/verify-remediation` full-sweep worklist | `harnessing/8-verify/verify-remediation/SKILL.md` |
 | `traust impact sweep` (traust-core `ExposureService.sweep`) | `/dependency-watch`'s bootstrap / full-baseline OSV sweep | `harnessing/3-audit/dependency-watch/SKILL.md` |
 

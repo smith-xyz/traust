@@ -93,7 +93,6 @@ _SKILL_SCRIPT_ENTRIES = [
     ("secure-code-audit", "scripts"),
     ("refresh-dashboards", "scripts"),
     ("financial-tracking", "scripts"),
-    ("threat-model", "scripts"),
     ("census", "scripts"),
     ("compliance-check", "scripts"),
     ("mine-ledger", "scripts"),

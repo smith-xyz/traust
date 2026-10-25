@@ -264,10 +264,8 @@ TM_SURFACE_RX = re.compile(
     r"|\.proto$",
     re.I,
 )
-# Phase 2: only these release-bump kinds re-model. The feeder classifies
-# (harnessing/2-threat-model/threat-model/scripts/build_release_events.py
-#  REMODEL_CHANGES) — kept as a literal
-# here so the router never depends on the feeder being importable.
+# Phase 2: only these release-bump kinds re-model (traust-core's ReleaseChange.remodels;
+# `traust portfolio release-changes` stamps the bump).
 RELEASE_REMODEL_CHANGES = ("major", "minor")
 # Phase 3: calendar backstop for repos whose code is quiet but whose
 # threat landscape isn't. Held in LOCKSTEP with traust-core's
