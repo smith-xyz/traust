@@ -57,8 +57,8 @@ finding's disposition.)
 ## Bundled precedent cards
 
 [precedent-cards/pilot.yaml](precedent-cards/pilot.yaml) supplies the pilot
-cards used by `tests/test_compile_precedent_cards.py` to check card
-validation and compiler behavior. Consult it when maintaining precedent-card
+cards traust-core's tests use to check card validation and sweep behavior
+(`python3 -m traust.cli sweep cards <cards.yaml> [--checkout <dir>]`). Consult it when maintaining precedent-card
 compilation; these fixtures are not findings or production sweep inputs.
 
 ## Procedure

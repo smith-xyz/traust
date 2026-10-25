@@ -119,6 +119,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "screen-injection": sweep.SCREEN_INJECTION,
         "rule-lane": sweep.RULE_LANE,
         "mine": sweep.MINE,
+        "cards": sweep.CARDS,
     },
     "triage": dict(triage.TRIAGE),
     "util": {
