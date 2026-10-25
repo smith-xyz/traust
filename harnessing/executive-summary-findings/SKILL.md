@@ -142,7 +142,7 @@ model, carrying every headline number (replaces the
 `Executive-summary-findings.metrics.json` sidecar).
 
 **Consumed by:** `/traust-metrics`
-(`collect_harness_metrics.py`) reads the sidecar as scoreboard source
+(traust-core's `ScoreboardView`) reads this view as scoreboard source
 row #1 — the earlier "no skill reads it back" claim here was false
 (docs-verification 2026-07-31, wiring c3), and worse, the collector
 was regex-parsing the markdown *sentences*, so rewording the prose
