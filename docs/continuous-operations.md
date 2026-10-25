@@ -14,6 +14,14 @@ consume its worklist. The deps lane is the exception: its worklist rows are
 coverage classification — the daily `/dependency-watch` run covers that class
 advisory-first without reading the worklist (see rule 3b).
 
+Core owns the new-order classifier gate: order states, registered routing lanes,
+rescan event sources and machine reason codes come from its pinned contracts.
+Asset names such as `feeds_cache` or `dashboards` do not become lanes; an unrouted
+order has no lane. Materializer receipts expose stable reason codes
+(`bad_request`, `not_found`, `snapshot_unavailable`, `source_unavailable`,
+`ledger_unconfigured`); detailed causes are retained in logs with the run id.
+Historical order text and the existing router lane spellings are not rewritten.
+
 The thresholds and tier ceilings in this document are the router's shipped
 defaults. A deployment re-derives them from its own router telemetry on a
 quarterly cadence and records the derivation in its own planning documents;
