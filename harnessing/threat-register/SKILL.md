@@ -116,20 +116,17 @@ only, wording original; vocabulary shared with
 **optional per-row fields** — absent on every row of a model without the
 lens, so registers built from boundary-free portfolios are unchanged:
 
-- NEED(core: `Threat.isolation_dimensions`, read from the threat table's column 12; the threat-model schema carries it, `Threat.of` drops it): `isolation_dimensions` — which of the five hardening dimensions
+- `isolation_dimensions` — which of the five hardening dimensions
   (`privilege`, `encryption`, `authentication`, `connectivity`, `hygiene`)
   the threat stresses;
 - `boundary_ids` — the section 10 boundary/interface id(s)
   (`IF-n`) whose `threat_ids` tag the threat;
-- NEED(core: a tenant-boundary read model carrying the section 10 row's `isolation_review_ref`): `isolation_review_ref` — the `analysis-results/isolation/<service-slug>/`
+- `isolation_review_ref` — the `analysis-results/isolation/<service-slug>/`
   artifact of the full `/isolation-review`, when one exists.
 
-**Aggregation — which tenant boundaries are weakest.** NEED(core: the
-section 10 boundaries — dimensions, complexity, tagged threats — as a read
-model, ranked weakest-first in `ThreatRegisterView`; a threat carries its
-`boundary_ids` only, and the threat-model schema already has the rest). When any model
+**Aggregation — which tenant boundaries are weakest.** When any model
 carries boundaries, the JSON gains a `tenant_boundaries` list (and the md
-a "Weakest tenant boundaries" table), keyed `<product>/<model-slug>:<IF-n>`
+a "Weakest tenant boundaries" table), keyed by repository and `<IF-n>`
 and ordered weakest-first: failed (`no`) dimensions weigh 2, `partial`
 weighs 1, ties broken by interface complexity and tagged open threats.
 Like the threat ranking, this ordering is an aid, not a conclusion — dimension
