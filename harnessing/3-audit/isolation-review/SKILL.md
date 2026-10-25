@@ -174,7 +174,7 @@ if nothing supports a score, the score is wrong or the review is incomplete.
    ```bash
    python3 -m traust.cli reporting record \
      analysis-results/isolation/<service-slug>/<service-slug>-isolation-review.json \
-     --kind isolation-review --repo-url <repo url> --sha <commit>   # once per repo
+     --kind isolation-review --repo-url <repo url> --sha <commit> --branch <branch>   # once per repo
    ```
 
    The JSON shape is `isolation-review.schema.json` in traust-contracts.
