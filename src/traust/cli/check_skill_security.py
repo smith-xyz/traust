@@ -129,11 +129,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
         "harnessing/rbac-tenancy-rollup/SKILL.md",
     ): "reviewed — deterministic rollup; keyword in scope prose",
     # --- S3 git-transport: the P0 fix list; MUST empty when P0 lands ---
-    (
-        "S3",
-        "harnessing/3-audit/pqc-readiness/scripts/bulk_prescan.py",
-    ): "reviewed — https-scheme gate at call site (startswith check) prevents non-https;"
-    " url originates from the harness corpus registry",
     # --- S4: pod-side shells — the sh -c runs INSIDE the scoped target
     # pod/container via runtime exec, never on the harness host; the
     # outer argv is kubeargv-classified and scope-checked (P0-2) ---

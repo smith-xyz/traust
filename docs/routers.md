@@ -1,17 +1,17 @@
 # Routers — the authoritative index
 
 "Router" is overloaded in this harness. **Seven distinct kinds** carry the name,
-implemented across **16 components** (the two tables below are grouped by kind, so
+implemented across **15 components** (the two tables below are grouped by kind, so
 one row can name more than one module). They do different and sometimes opposite
 jobs, and confusing them has caused real defects. This page is the single index:
 what each one is, what it may and may not write, and where the detail lives.
 
-If you are auditing coverage, the 16 are: `build_rescan_worklist.py` (work
+If you are auditing coverage, the 15 are: `build_rescan_worklist.py` (work
 routing + the budget guard inside it), `budget_shadow.py`,
 `traust_engine.registry.models`, `route_regressions.py`,
 `route_impact_findings.py`, `/assign-findings-owners` (internal extension),
 `/reassign-findings-owners` (internal extension), `/file-security-defect`,
-`emit_drain_tranche.py`, `traust remediation verify-sweep`, `build_pqc_worklist.py`,
+`emit_drain_tranche.py`, `traust remediation verify-sweep`,
 `traust impact sweep`, `traust feeds fetch` (`feeds_fetch.py`).
 
 | Kind | Routes | Implementation | Detail |
@@ -34,7 +34,6 @@ work, and none of them authors a finding:
 |---|---|---|
 | `emit_drain_tranche.py` | this week's tranche from the router's drain ordering | [continuous-operations.md](continuous-operations.md) |
 | `traust remediation verify-sweep` (traust-core `VerificationService.sweep`) | the `/verify-remediation` full-sweep worklist | `harnessing/8-verify/verify-remediation/SKILL.md` |
-| `build_pqc_worklist.py` | one entry per unique repo URL for the PQC sweep | `harnessing/3-audit/pqc-readiness/SKILL.md` |
 | `traust impact sweep` (traust-core `ExposureService.sweep`) | `/dependency-watch`'s bootstrap / full-baseline OSV sweep | `harnessing/3-audit/dependency-watch/SKILL.md` |
 
 ---

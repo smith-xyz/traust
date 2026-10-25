@@ -9,32 +9,12 @@
   "harnessing/3-audit/compliance-check/scripts/validate_compliance_assessment.py": {
     "contracts": 1
   },
-  "harnessing/3-audit/pqc-readiness/scripts/build_pqc_product_reports.py": {
-    "database": 1,
-    "engine-internal": 1,
-    "state-file": 1
-  },
-  "harnessing/3-audit/pqc-readiness/scripts/build_pqc_rollup.py": {
-    "database": 1,
-    "state-file": 1
-  },
   "harnessing/3-audit/pqc-readiness/scripts/build_pqc_vendor_tracker.py": {
     "database": 1,
     "state-file": 1
   },
-  "harnessing/3-audit/pqc-readiness/scripts/build_pqc_worklist.py": {
-    "engine-internal": 1
-  },
   "harnessing/3-audit/pqc-readiness/scripts/pqc_facts.py": {
     "contracts": 1
-  },
-  "harnessing/3-audit/pqc-readiness/scripts/scan_crypto_deps_graph.py": {
-    "database": 1,
-    "state-file": 1
-  },
-  "harnessing/3-audit/pqc-readiness/scripts/scan_pqc_dependencies.py": {
-    "database": 1,
-    "state-file": 1
   },
   "harnessing/3-audit/secure-code-audit/scripts/enumerate_route_guards.py": {
     "database": 1
@@ -75,9 +55,8 @@
   },
   "src/traust/cli/check_drift.py": {
     "contracts": 1,
-    "database": 1,
     "engine-internal": 1,
-    "state-file": 4
+    "state-file": 3
   },
   "src/traust/cli/check_skill_alignment.py": {
     "state-file": 1

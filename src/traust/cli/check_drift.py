@@ -1627,88 +1627,6 @@ def check_pqc_facts_provenance(ws: Path) -> list[dict]:
     return out
 
 
-# Graph repo-node $.pqc coverage vs the pqc corpus that feeds it. The
-# backfeed (scan_pqc_dependencies.py) stamps `$.pqc` onto each repo node;
-# a portfolio-graph rebuild that re-upserted repo nodes from the spine
-# used to clobber that whole attrs blob and drop `$.pqc` (3142 repos ->
-# 41 after one rebuild), which zeroed the per-product PQC reports
-# (build_pqc_product_reports.py requires json_extract(attrs,'$.pqc') IS
-# NOT NULL). This row is the drift backstop for that clobber; the
-# structural fix is build_portfolio_graph.ENRICHMENT_ATTR_KEYS. Ratio, not
-# exact match, because normal per-repo re-scan churn moves the count a
-# little.
-PQC_BACKFEED_MIN_RATIO = 0.5
-
-
-def check_pqc_backfeed(ws: Path) -> list[dict]:
-    """Graph PQC enrichment vs the pqc corpus. Compares the count of
-    portfolio-graph repo nodes carrying `$.pqc` against the expected
-    corpus size (pqc-backfeed-summary.json:repos_with_pqc_attrs, else the
-    *-pqc-facts.json corpus count) and flags `drift` when the graph is
-    below PQC_BACKFEED_MIN_RATIO of it — the clobber signature. Read-only;
-    pending/skip when the graph db or corpus is absent, never crashes."""
-    refresh = (
-        "python3 harnessing/3-audit/pqc-readiness/scripts/scan_pqc_dependencies.py "
-        "(re-run the pqc backfeed to re-stamp graph repo nodes)"
-    )
-    db = _ar(ws) / "graph" / "portfolio-graph.db"
-    if not db.is_file():
-        return [item("pqc-backfeed", "pending", "portfolio-graph.db not built yet", refresh)]
-    expected = None
-    summary_p = _ar(ws) / "graph" / "pqc-backfeed-summary.json"
-    if summary_p.is_file():
-        try:
-            expected = int(
-                json.loads(summary_p.read_text(encoding="utf-8")).get("repos_with_pqc_attrs")
-            )
-        except (OSError, json.JSONDecodeError, TypeError, ValueError):
-            expected = None
-    if not expected:
-        corpus = _ar(ws) / "pqc"
-        if corpus.is_dir():
-            expected = len(list(corpus.glob("*/*-pqc-facts.json")))
-    if not expected:
-        return [
-            item(
-                "pqc-backfeed",
-                "pending",
-                "no pqc-backfeed summary or facts corpus to compare against",
-                refresh,
-            )
-        ]
-    try:
-        import sqlite3
-
-        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-        n = con.execute(
-            "SELECT COUNT(*) FROM nodes WHERE kind='repo' "
-            "AND json_extract(attrs,'$.pqc') IS NOT NULL"
-        ).fetchone()[0]
-        con.close()
-    except Exception as e:
-        return [
-            item("pqc-backfeed", "unavailable", f"cannot read portfolio-graph.db: {str(e)[:120]}")
-        ]
-    if n < expected * PQC_BACKFEED_MIN_RATIO:
-        return [
-            item(
-                "pqc-backfeed",
-                "drift",
-                f"graph PQC enrichment stale/clobbered ({n} of {expected} "
-                f"repos) — re-run scan_pqc_dependencies backfeed",
-                refresh,
-            )
-        ]
-    return [
-        item(
-            "pqc-backfeed",
-            "fresh",
-            f"{n} of {expected} corpus repos carry $.pqc in the graph "
-            f"(threshold {PQC_BACKFEED_MIN_RATIO:.0%})",
-        )
-    ]
-
-
 def check_framework_upstream(ws: Path) -> list[dict]:
     """Upstream-content drift for the vendored framework spine: the
     provenance file pins the usnistgov/oscal-content commit the
@@ -3105,7 +3023,6 @@ CHECKS = (
     check_feed_sources,
     check_grype_db,
     check_pqc_facts_provenance,
-    check_pqc_backfeed,
     check_framework_upstream,
     check_policy_provenance,
     check_docs_semantic_sweep,
