@@ -1,10 +1,11 @@
-"""``traust portfolio plan|onboard|owner-hints|import-owners|import-release``: add-inputs' and
+"""``traust portfolio plan|onboard|owner-hints|file|import-owners|import-release``: add-inputs' and
 inventory-repositories' doors on traust-core (onboarding and portfolio sync).
 
 plan           what onboard would register and order, writing nothing (the dry run)
 onboard        register the product (when --label names a new one), the repositories and an
                organisation's non-archived, non-fork repositories; re-runs are no-ops
 owner-hints    OWNERS / CODEOWNERS approvers, then top contributors: hints, never stored
+file           one file's text at a pinned commit, read at the forge: untrusted, never stored
 import-owners  mirror the declared ownership source onto every registered repository
 import-release a product version and the commits it ships (a payload's commit URLs)
 """
@@ -31,7 +32,7 @@ from traust_core.v1.models.inventory import (
     VersionLabel,
 )
 from traust_core.v1.models.onboarding import OnboardingRequest, RepositorySpec
-from traust_core.v1.models.values import GitSha, HttpsRepoUrl, ProductSlug
+from traust_core.v1.models.values import GitSha, HttpsRepoUrl, ProductSlug, RepoPath
 
 from traust.cli import _doors
 from traust.cli._doors import parser, run
@@ -108,6 +109,22 @@ def owner_hints(argv: list[str] | None = None) -> int:
     def call() -> Any:
         core = load_core(args.config_home)
         return [_json(h) for h in core.services().sync.owner_hints(_url(core, args.repo))]
+
+    return run(call)
+
+
+def file(argv: list[str] | None = None) -> int:
+    ap = parser("portfolio", "file", "One file's text at a pinned commit, from its forge.")
+    ap.add_argument("--repo", required=True, help="an https repository URL")
+    ap.add_argument("--sha", required=True, help="the full commit sha to read at")
+    ap.add_argument("path", help="the file's path inside the repository")
+    args = ap.parse_args(argv)
+
+    def call() -> Any:
+        core = load_core(args.config_home)
+        url, sha, path = _url(core, args.repo), GitSha.parse(args.sha), RepoPath.parse(args.path)
+        text = core.services().sync.find_file(url, path, sha)
+        return {"repo": str(url), "sha": str(sha), "path": str(path), "file": text}
 
     return run(call)
 

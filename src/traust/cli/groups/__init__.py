@@ -91,6 +91,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "plan": portfolio.PLAN,
         "onboard": portfolio.ONBOARD,
         "owner-hints": portfolio.OWNER_HINTS,
+        "file": portfolio.FILE,
         "import-owners": portfolio.IMPORT_OWNERS,
         "import-release": portfolio.IMPORT_RELEASE,
         "population": portfolio.POPULATION,

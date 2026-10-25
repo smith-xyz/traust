@@ -26,8 +26,7 @@ allowed-tools:
   - Bash(traust portfolio plan:*)
   - Bash(traust portfolio owner-hints:*)
   - Bash(traust portfolio import-owners:*)
-  # fetch_forge_owners.py stays for --file only (no forge file-read door yet)
-  - Bash(python3 *traust/harnessing/1-inventory/inventory-repositories/scripts/fetch_forge_owners.py:*)
+  - Bash(traust portfolio file:*)
   - Bash(python3 -m traust.cli registry:*)
 ---
 
@@ -202,7 +201,7 @@ When the same repository appears across multiple versions:
 - **Consumes**: `<inputs>/inventory.yaml` (segment kinds, `payload_image`,
   `registries`, `org_teams`); registry data via `oc`/`skopeo`/`podman`; forge
   data only via `traust portfolio owner-hints` (and
-  `harnessing/1-inventory/inventory-repositories/scripts/fetch_forge_owners.py --file`).
+  `traust portfolio file`).
 - **Emits**: `<segment>-<version>-payload-repos.csv` and `*-payload-analysis.md`
   under `locations.inputs`, read by `executive-summary-findings --by-segment`
   and the coverage dashboards; `repository` and `ownership` rows in
