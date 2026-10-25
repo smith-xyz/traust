@@ -6,8 +6,8 @@ add     register a product (name = slug, label = display name) with its ownershi
 update  change a registered product's label, ownership or business unit
 
 The label lives on the product row (products.name); the registry subject's label stays unset.
-NEED(corpus-registry: subject note): the subject has no notes field, so a BU boundary cutting
-through a tree is flagged by the skill, not recorded.
+NEED(contracts: corpus-registry subject `notes`): the subject has no notes field, so a BU
+boundary cutting through a tree is flagged by the skill, not recorded.
 """
 
 from __future__ import annotations

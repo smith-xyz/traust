@@ -26,7 +26,7 @@ allowed-tools:
 
 # Detection-Recall Benchmark
 
-> **Being ported to traust-core** (progress-tracker skill port 35, recall-benchmark): bootstrap_benchmark_targets.py, match_benchmark.py retired with the traust-core hub (it ran on the old ledger / corpus code). The answer key is recorded in traust-core (`traust sweep benchmark-targets`, `build-canaries`); the steps marked RETIRED don't run until traust-core can record benchmark audit runs.
+> **Being ported to traust-core** (progress-tracker skill port 35, recall-benchmark): bootstrap_benchmark_targets.py, match_benchmark.py retired with the traust-core hub (it ran on the old ledger / corpus code). The answer key is recorded in traust-core (`traust sweep benchmark-targets`, `build-canaries`); the steps marked RETIRED don't run: `score` needs each benchmark run recorded against its answer-key target (NEED(core: `DetectionQualityService.record_run(target_id, report, provenance)`; `AssessmentService.record` needs a registered commit, which would put CVE-replay and canary targets into the campaign inventory), after which `scorecards` scores them), and `bootstrap` needs the harvest from resolved-at-fix-commit findings (NEED(core: benchmark candidate harvest)).
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in

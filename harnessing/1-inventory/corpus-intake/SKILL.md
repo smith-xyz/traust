@@ -74,13 +74,13 @@ Collect, one question at a time, anything not already provided:
    dashboards.
 6. **Inventory** (*retired*: core keys the corpus by ids, not paths) — path to the input inventory CSV in
    the inputs inventory (`locations.inputs`) if one exists.
-7. **Notes** (NEED(corpus-registry: subject note): the registry subject has no notes field yet, so nothing records them) — anything non-obvious, especially product-vs-BU
+7. **Notes** (NEED(contracts: a `notes` field on the corpus-registry subject; the schema's subject allows no other field, so nothing records them)) — anything non-obvious, especially product-vs-BU
    dualities (see the `ansible` entry: catalog operators inside
    `findings/` stay owned while the BU engagement is external).
 
 If the answers reveal a BU boundary cutting through an existing tree
 (some products owned, some not), do NOT force a tree-level tag — flag it
-to the user (recording the exception in notes: NEED(corpus-registry: subject note), flag only until then); per-product `overrides`
+to the user (recording the exception in notes: NEED(contracts: corpus-registry subject `notes`), flag only until then); per-product `overrides`
 support lands with a later phase.
 
 ### Step 3 — Apply

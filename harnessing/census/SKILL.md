@@ -15,7 +15,7 @@ allowed-tools:
 
 # Corpus Census — population, duplication, distinct vulnerabilities
 
-> **Ported to traust-core in part** (progress-tracker skill port 09, census): the population is `traust portfolio population`, repo liveness `traust portfolio liveness`. Distinct vulnerabilities, ownership cuts and the census files have no traust-core door yet (portfolio-wide findings summary, `NEED(product-portfolio-extension)`, the coverage view); those steps are marked.
+> **Ported to traust-core in part** (progress-tracker skill port 09, census): the population is `traust portfolio population`, repo liveness `traust portfolio liveness`. Distinct vulnerabilities, ownership cuts and the census files have no traust-core door yet (NEED(core: a census view — distinct vulnerabilities per ownership cut over the recorded findings and the corpus registry's product ownership)); those steps are marked.
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in
@@ -67,9 +67,10 @@ What the script does:
    registered repository, per assessment kind the newest default-line
    assessment, the default-line count and the branch re-audit count, and the
    repositories never assessed. Symlink aliases and unregistered trees are
-   *retired* (one assessment row per run, no tree walk); ownership tags have
-   no storage yet (`NEED(product-portfolio-extension)`).
-2. *No traust-core door yet* (portfolio-wide findings summary; per repository:
+   *retired* (one assessment row per run, no tree walk); ownership is
+   recorded per product in the corpus registry (`traust products add --ownership`)
+   but `population` doesn't cut by it (the census-view NEED above).
+2. *No traust-core door yet* (the census-view NEED above; per repository:
    `traust findings summary`). Loads every report's preferred layer — `*-findings-current.json`
    (disposition-aware) when present, else the audit JSON — and classifies
    each finding: false positives dropped, hardening bucketed separately,
@@ -87,7 +88,7 @@ What the script does:
    exposure — strict tier-1 matching, so branch-only counts are an upper
    bound), layered-artifact restatement, cross-tree slug overlap, and
    duplicate basenames.
-5. *No traust-core door yet* (the coverage view is a stub). Writes the four outputs and appends a snapshot row to the central
+5. *No traust-core door yet* (the census-view NEED above; traust-core's coverage view renders the population and coverage gaps, not these outputs). Writes the four outputs and appends a snapshot row to the central
    metrics ledger (python3 -m traust.cli metrics history, source `census`;
    `--skip-ledger` to suppress), injecting a trend-vs-previous line into
    the Markdown.
@@ -155,8 +156,8 @@ If `open` was requested:
 
 ## Outputs
 
-*No traust-core door yet* for the three census files (the coverage view is a
-stub); `traust portfolio population` prints the population as JSON.
+*No traust-core door yet* for the three census files (the census-view NEED
+above); `traust portfolio population` prints the population as JSON.
 
 | File | Purpose |
 |---|---|
