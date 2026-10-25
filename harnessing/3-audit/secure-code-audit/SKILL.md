@@ -50,6 +50,7 @@ allowed-tools:
   - Bash(python3 *-m traust.cli adapters config-matrix:*)
   - Bash(python3 *-m traust.cli adapters route-guards:*)
   - Bash(python3 *-m traust.cli adapters sanitizers:*)
+  - Bash(python3 *-m traust.cli adapters priv-profile:*)
   - Bash(python3 *harnessing/3-audit/secure-code-audit/scripts/probe_sanitizers.py:*)
   - Bash(python *harnessing/3-audit/secure-code-audit/scripts/probe_sanitizers.py:*)
   - Bash(python3 *-m traust.cli.check_citations:*)
@@ -695,11 +696,11 @@ Rules of engagement:
 When the pre-scan above found Kubernetes manifests or a ClusterServiceVersion (i.e. the repo ships an operator/controller), also build the least-privilege inventory:
 
 ```bash
-python harnessing/3-audit/operator-priv-profile/scripts/build_priv_profile.py \
-    --repo <local-path> --name <repo> --out-dir <report-output-dir>/
+python3 -m traust.cli adapters priv-profile <local-path> --name <repo> \
+    --out <report-output-dir>/<repo>-priv-profile.json
 ```
 
-This persists `<repo>-priv-profile.{json,md}` beside the report — SCC requests (RBAC `use` on `securitycontextconstraints`, with restricted-v2-default semantics), per-container securityContext, namespaces/install modes, the complete RBAC enumeration, and the `+kubebuilder:rbac` required-vs-granted diff. Rules of engagement:
+This persists `<repo>-priv-profile.json` beside the report — SCC requests (RBAC `use` on `securitycontextconstraints`, with restricted-v2-default semantics), per-container securityContext, namespaces/install modes, the complete RBAC enumeration, and the `+kubebuilder:rbac` required-vs-granted diff. Rules of engagement:
 
 1. **The profile is an inventory, not findings.** Judge its flags in repository context under the standard promote/dismiss protocol: `scc_use` with empty `resourceNames` (eligibility for ANY SCC), wildcard grants, `rbac_write`/`escalate_bind_impersonate`, privileged workloads with no SCC request, and tier-2 surplus (`shipped_not_declared`) are candidate authorization findings — verify surplus against non-kubebuilder call sites before promoting.
 2. Record `"priv-profile": "ran"` (or `"skipped: <reason>"` — e.g. no manifests, helm-templated tree) in `metadata.additional.deterministic_steps`.

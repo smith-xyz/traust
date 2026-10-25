@@ -878,6 +878,9 @@ SANITIZERS = passthrough_op("code_facts", "A checkout's sanitizer-shaped functio
 FORK_LAG = passthrough_op(
     "code_facts", "A checkout's fork signals and in-range upstream advisories.", "fork_lag"
 )
+PRIV_PROFILE = passthrough_op(
+    "code_facts", "A checkout's operator privilege profile (tiers 1-2).", "priv_profile"
+)
 
 # secure-container-audit's image doors on traust-core (traust.cli.image)
 IMAGE_SBOM = passthrough_op("image", "Record an image's SBOM, keyed by digest.", "sbom")

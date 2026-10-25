@@ -25,6 +25,7 @@ allowed-tools:
   - Bash(python3 *traust* -m traust.cli adapters osv:*)
   - Bash(python3 *traust* -m traust.cli adapters image-sbom:*)
   - Bash(python3 *traust* -m traust.cli adapters image-packages:*)
+  - Bash(python3 *traust* -m traust.cli adapters priv-profile:*)
   - Bash(python3 *traust* -m traust.cli reporting validate:*)
   - Bash(python3 *traust* -m traust.cli reporting record:*)
   - Bash(python3 *traust* -m traust_engine.reporting.render:*)
@@ -158,8 +159,8 @@ The `KHS-*` facts (exact `file:line` inside the extracted tree — record the la
 **Bundle privilege profile.** For operator **bundle images** specifically, additionally run the least-privilege profiler over the extracted `/manifests` tree so the bundle's SCC requests, securityContexts, and complete RBAC enumeration are persisted (the CSV is the authoritative statement of what the operator ships to clusters — sometimes ahead of or divergent from the source repo):
 
 ```bash
-python harnessing/3-audit/operator-priv-profile/scripts/build_priv_profile.py \
-    --repo <extracted-bundle-root> --name <repo> --out-dir <report-output-dir>/
+python3 -m traust.cli adapters priv-profile <extracted-bundle-root> --name <repo> \
+    --out <report-output-dir>/<repo>-priv-profile.json
 ```
 
 Judge its flags per `/operator-priv-profile`'s interpretation rules (any-SCC `use`, wildcard grants, privileged workloads without SCC requests); the tier-2 kubebuilder diff is n/a for bundles (no Go source in the image) — say so rather than reporting zero surplus. Record `"priv-profile": "ran"`/`"skipped: <reason>"` in `deterministic_steps`.
