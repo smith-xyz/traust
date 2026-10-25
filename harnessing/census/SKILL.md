@@ -6,6 +6,7 @@ metadata:
   harness.tier: "secondary"
 allowed-tools:
   - Bash(python3 *traust* -m traust.cli portfolio population:*)
+  - Bash(python3 *traust* -m traust.cli dashboard view census:*)
   - Bash(ls:*)
   - Bash(open *.html:*)
   - Read
@@ -15,7 +16,7 @@ allowed-tools:
 
 # Corpus Census — population, duplication, distinct vulnerabilities
 
-> **Ported to traust-core in part** (progress-tracker skill port 09, census): the population is `traust portfolio population`, repo liveness `traust portfolio liveness`. Distinct vulnerabilities, ownership cuts and the census files have no traust-core door yet (NEED(core: a census view — distinct vulnerabilities per ownership cut over the recorded findings and the corpus registry's product ownership)); those steps are marked.
+> **Ported to traust-core in part** (progress-tracker skill port 09, census): the population is `traust portfolio population`, repo liveness `traust portfolio liveness`, distinct vulnerabilities, ownership cuts and the census files `traust dashboard view census` (traust-core's census view).
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in
@@ -59,6 +60,9 @@ If neither contains `analysis-results/`, ask the user for the path.
 ```bash
 python3 -m traust.cli portfolio population \
     [--kind secure-code] [--as-of <ISO time>]
+python3 -m traust.cli dashboard view census \
+    --out <workspace-root>/progress-tracker/metrics/dashboards/census \
+    [--product <slug>] [--team-id <id>] [--as-of <ISO time>]
 ```
 
 What the script does:
@@ -69,18 +73,19 @@ What the script does:
    repositories never assessed. Symlink aliases and unregistered trees are
    *retired* (one assessment row per run, no tree walk); ownership is
    recorded per product in the corpus registry (`traust products add --ownership`)
-   but `population` doesn't cut by it (the census-view NEED above).
-2. *No traust-core door yet* (the census-view NEED above; per repository:
-   `traust findings summary`). Loads every report's preferred layer — `*-findings-current.json`
-   (disposition-aware) when present, else the audit JSON — and classifies
+   and the census view cuts by it (a repository takes the ownership of each
+   product that ships it).
+2. (now done by the census view) Reads every recorded finding with its
+   current disposition and classifies
    each finding: false positives dropped, hardening bucketed separately,
-   everything else a vulnerability keyed by its `fingerprint` (computed
-   via python3 -m traust.cli corpus finding-identity when absent).
-3. *No traust-core door yet* (as 2). Computes **distinct vulnerabilities** per ownership cut: unique
-   fingerprints at HEAD (branch re-audits excluded from the headline),
-   severity = max across occurrences, open = any occurrence not
+   everything else a vulnerability keyed by its finding identity
+   (repository + `fingerprint`, recorded at intake).
+3. (now done by the census view) Computes **distinct vulnerabilities** per ownership cut: unique
+   findings on the default line (branch re-audits excluded from the headline),
+   severity = the finding's effective (disposition-adjusted) severity, open = not
    resolved/risk-accepted.
-4. Branch re-audits are `population`'s `branches` count; the other vectors
+4. Branch re-audits are `population`'s `branches` count and the census view's
+   branch line (confirmed on a branch, branch only); the other vectors
    are *retired* (one assessment row per run, no files to alias, restate or
    duplicate). Quantifies the five duplication vectors: symlink aliases (incl.
    ledgers attached to aliased reports), branch re-audits (findings that
@@ -88,10 +93,9 @@ What the script does:
    exposure — strict tier-1 matching, so branch-only counts are an upper
    bound), layered-artifact restatement, cross-tree slug overlap, and
    duplicate basenames.
-5. *No traust-core door yet* (the census-view NEED above; traust-core's coverage view renders the population and coverage gaps, not these outputs). Writes the four outputs and appends a snapshot row to the central
-   metrics ledger (python3 -m traust.cli metrics history, source `census`;
-   `--skip-ledger` to suppress), injecting a trend-vs-previous line into
-   the Markdown.
+5. (now done by `traust dashboard view census --out <dir>`) Writes the three outputs. The
+   metrics-ledger snapshot row and trend-vs-previous line are *retired*: the view
+   is derived on demand, so a trend is the same view at an earlier `--as-of`.
 
 ### Step 2b — Refresh repo liveness (archive-awareness)
 
@@ -145,9 +149,9 @@ Always tell the user:
   C/H/M/L/I split), the adjacent upstream line, and the external-BU
   work-performed count.
 - The duplication-vector summary (the five numbered lines).
-- Any drift warnings (unregistered trees, md-only parse gaps, parse
-  errors).
-- The four output paths.
+- Any drift warnings (repositories no product with a registered ownership
+  ships: the view's "Not in the registry").
+- The three output paths.
 
 If `open` was requested:
 `open progress-tracker/metrics/dashboards/census/census.html`
@@ -156,14 +160,14 @@ If `open` was requested:
 
 ## Outputs
 
-*No traust-core door yet* for the three census files (the census-view NEED
-above); `traust portfolio population` prints the population as JSON.
+`traust dashboard view census --out <dir>` writes the three census files;
+`traust portfolio population` prints the population as JSON.
 
 | File | Purpose |
 |---|---|
-| `census/census.md` | Executive view, population-by-tree table, duplication vectors, parse gaps/drift, standard population block. |
-| `census/census.html` | Self-contained dashboard: stat cards, ownership severity chips, tree + duplication tables, drift warnings. |
-| `census/census.json` | Machine-readable census: population, ownership cuts, duplication vectors, warnings, timings. |
+| `census/census.md` | Executive view, ownership-cut and by-product tables, duplication vectors, drift, standard population block. |
+| `census/census.html` | Self-contained dashboard: the same sections as the Markdown. |
+| `census/census.json` | Machine-readable census: population, ownership cuts, products, branch line, cloud-config and container counts, unregistered repositories. |
 | `findings.db` `repos` | *Retired with `findings.db`*: the resolved record list is `traust portfolio population`. |
 
 ---
@@ -171,10 +175,10 @@ above); `traust portfolio population` prints the population as JSON.
 ## Reading the numbers
 
 - **Distinct vulnerabilities (owned)** is the canonical Lens 2 headline:
-  `findings/` only, HEAD only, fingerprint-deduped,
+  owned products only, HEAD only, fingerprint-deduped,
   disposition-adjusted. Never average it with occurrence counts from
   other dashboards — reconcile via each dashboard's population block.
-- **Upstream (oss-findings/)** is reported adjacent to the owned
+- **Upstream (upstream products)** is reported adjacent to the owned
   headline and is never folded in.
 - **External-BU trees** (ecoengg, OpenStack, future engagements)
   appear only as work performed (Lens 1).
@@ -187,6 +191,5 @@ above); `traust portfolio population` prints the population as JSON.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `error: <ws>/analysis-results not found` | Wrong workspace root | Pass the directory that contains `analysis-results/`. |
-| Unregistered-tree warning | New campaign tree on disk not in `corpus-config.yaml` | Register it via `/corpus-intake` (until that skill ships: edit `$TRAUST_CONFIG_HOME/corpus-config.yaml`). |
-| Distinct counts moved sharply with no new audits | Disposition ledgers landed (findings-current now preferred) | Expected — the census is disposition-aware by design. |
-| `metrics-ledger append skipped` on stderr | progress-tracker not writable/missing | Census still writes all four outputs; fix the sibling checkout to restore trending. |
+| Repository under "Not in the registry" | No product with a registered ownership ships it | Register it via `/corpus-intake` (`traust products add --ownership`). |
+| Distinct counts moved sharply with no new audits | Decisions recorded | Expected — the census is disposition-aware by design. |
