@@ -336,7 +336,6 @@ def add_query_args(ap) -> None:
     ap.add_argument(
         "name",
         choices=[
-            "blast-radius",
             "top-shared",
             "internal-coupling",
             "crd-consumers",
@@ -347,13 +346,6 @@ def add_query_args(ap) -> None:
     )
     ap.add_argument("arg", nargs="?")
     ap.add_argument("--limit", type=int, default=20)
-    ap.add_argument(
-        "--ecosystem",
-        default="go",
-        help="Ecosystem for blast-radius: the positional arg is "
-        "resolved to a node id via dep_node_id (default "
-        "'go' -> module:<path>; e.g. 'npm' -> pkg:npm/<name>).",
-    )
 
 
 def call_query(engine, args) -> int:
@@ -361,13 +353,7 @@ def call_query(engine, args) -> int:
     if db is None:
         return 2
     try:
-        out = graph.query(
-            db,
-            args.name,
-            args.arg,
-            limit=args.limit,
-            ecosystem=args.ecosystem,
-        )
+        out = graph.query(db, args.name, args.arg, limit=args.limit)
     except ValueError as e:
         print(str(e), file=sys.stderr)
         return 2
@@ -378,7 +364,7 @@ def call_query(engine, args) -> int:
 QUERY = OpSpec(
     add_args=add_query_args,
     call=call_query,
-    help="Run a portfolio graph query (blast-radius, top-shared, …)",
+    help="Run a portfolio graph query (top-shared, internal-coupling, …)",
 )
 
 
