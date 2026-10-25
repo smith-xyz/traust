@@ -34,7 +34,9 @@ def stub(monkeypatch: pytest.MonkeyPatch, list_products: Any) -> list[Any]:
     services = SimpleNamespace(
         portfolio=SimpleNamespace(list_products=list_products),
         catalog=SimpleNamespace(
-            readiness=lambda capability: asked.append(capability) or [CHECKOV, OSV]
+            readiness=lambda capability, network: (
+                asked.append((capability, network)) or [CHECKOV, OSV]
+            )
         ),
     )
     monkeypatch.setattr(Context, "services", lambda self: services)
@@ -55,7 +57,7 @@ def test_a_reachable_store_and_every_providers_readiness(
     asked = stub(monkeypatch, lambda page: SimpleNamespace(items=[]))
     results: list[tuple[str, str]] = []
     doctor.check_core(results, home)
-    assert asked == [None]
+    assert asked == [(None, True)]
     assert results == [
         (doctor.OK, "traust-core store reachable"),
         (doctor.OK, "provider tool checkov ready"),
@@ -79,7 +81,7 @@ def test_an_unreachable_store_fails_and_skips_the_catalog(
 def test_main_reports_the_core_rows_and_exits_by_failures(
     monkeypatch: pytest.MonkeyPatch, home: Path
 ) -> None:
-    stub(monkeypatch, lambda page: SimpleNamespace(items=[]))
+    asked = stub(monkeypatch, lambda page: SimpleNamespace(items=[]))
     for check in ("check_python", "check_tools", "check_gates"):
         monkeypatch.setattr(doctor, check, lambda results: None)
     out = io.StringIO()
@@ -87,3 +89,4 @@ def test_main_reports_the_core_rows_and_exits_by_failures(
         rc = doctor.main(["--config-home", str(home), "--quick", "--json"])
     assert rc == 0
     assert json.loads(out.getvalue())[0]["check"] == "traust-core store reachable"
+    assert asked == [(None, False)]  # --quick skips the feed sources' network probes
