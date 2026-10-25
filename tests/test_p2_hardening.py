@@ -142,10 +142,6 @@ def test_p3_sweep_engine_dir_prefix():
     assert "GIT_ALLOW_PROTOCOL" in s
 
 
-def test_p3_gh_api_path_constraints():
-    assert "_GH_NAME_RE" in _src("harnessing/census/scripts/check_repo_liveness.py")
-
-
 def test_p3_agents_md_curl_rule():
     s = _src("AGENTS.md")
     assert "curl --config -" in s and "lab-target-only" in s

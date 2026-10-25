@@ -6,7 +6,6 @@ metadata:
   harness.tier: "secondary"
 allowed-tools:
   - Bash(python3 *traust* -m traust.cli portfolio population:*)
-  - Bash(python3 *traust/harnessing/census/scripts/check_repo_liveness.py:*)
   - Bash(ls:*)
   - Bash(open *.html:*)
   - Read
@@ -16,7 +15,7 @@ allowed-tools:
 
 # Corpus Census — population, duplication, distinct vulnerabilities
 
-> **Ported to traust-core in part** (progress-tracker skill port 09, census): the population is `traust portfolio population`. Distinct vulnerabilities, ownership cuts and the census files have no traust-core door yet (portfolio-wide findings summary, `NEED(product-portfolio-extension)`, the coverage view); those steps are marked.
+> **Ported to traust-core in part** (progress-tracker skill port 09, census): the population is `traust portfolio population`, repo liveness `traust portfolio liveness`. Distinct vulnerabilities, ownership cuts and the census files have no traust-core door yet (portfolio-wide findings summary, `NEED(product-portfolio-extension)`, the coverage view); those steps are marked.
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in
@@ -99,18 +98,18 @@ The census owns **repo liveness** — population metadata recording which
 repos can still act on findings (metrics-improvement plan, Phase 7):
 
 ```bash
-python3 harnessing/census/scripts/check_repo_liveness.py \
-    --spine <workspace-root>/analysis-results/graph/repo-graph.json \
-    --out <workspace-root>/progress-tracker/metrics/repo-liveness.json
+python3 -m traust.cli portfolio liveness \
+    > <workspace-root>/progress-tracker/metrics/repo-liveness.json
 ```
 
-(Stays: traust-core records `archived` only for audited repositories, through
-`traust portfolio observe`; there is no liveness door for the whole population.)
-One GitHub API call per repo (`gh` must be authenticated; ~10 minutes on
-a full sweep) emitting a status per repo — `active | archived | moved |
-missing | unknown` — with `status_since` ratcheted from the previous
-artifact. Skip when `gh` is unauthenticated or the spine is absent, and
-say so in the report-back; a stale liveness artifact means downstream
+traust-core's liveness for every registered repository, as of its last
+`traust portfolio observe` — no forge call, so it is as fresh as the
+observations. `status` per repo is `active | archived | unknown`; an
+`unknown` repo carries `unobserved` (`unsupported-host`; `never-audited` —
+observation covers audited repositories only; `network-skipped` — observe
+it) and a `reason`. `dormant` marks no default-branch push in
+365 days and `observed_at` dates the row. Moved and deleted repositories are
+not detected. A stale liveness artifact means downstream
 consumers (audit stamps, verify-remediation sweep flags, graph attrs,
 dashboard segments) are reading old status. Include the non-`active`
 counts in the report-back — archived-but-shipping components are a

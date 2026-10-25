@@ -68,7 +68,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | python3 -m traust.cli sweep mine | The /mine-ledger miner on traust-core (`DetectionQualityService.mine_rules`) — confirmed-TP corpus, cluster coverage vs the opengrep pack, per-rule campaign precision |
 | harnessing/mine-ledger/scripts/emit_rule_drafts.py | Regression-rule draft staging from resolved-at-fix-commit findings (pre/post calibration pairs) |
 | python3 -m traust.cli sweep rule-lane | The weekly rule-mining lane runner — miner → sweep collect/draft → bounded draft staging → `lane-delta.{json,md}` vs the previous mine; exit 1 when the delta needs authoring attention |
-| harnessing/census/scripts/check_repo_liveness.py | Census-owned repo-liveness sweep (active/archived/moved/missing, status_since ratcheting) |
+| python3 -m traust.cli portfolio liveness | Census-owned repo liveness on traust-core (`PortfolioService.liveness`) — active/archived/unknown per registered repository from stored observations |
 | python3 -m traust.cli check skill-alignment | Pre-commit cross-skill contract gate (A-series rules) |
 | python3 -m traust.cli check skill-security | Pre-commit security-posture gate (S-series rules incl. S9 repo-config isolation) |
 | python3 -m traust.cli adapters crypto-audit | Unopinionated crypto data collector — source/image/cluster tiers emit `crypto-audit/v1` JSON |
