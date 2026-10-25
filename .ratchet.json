@@ -54,9 +54,7 @@
     "state-file": 2
   },
   "src/traust/cli/check_drift.py": {
-    "contracts": 1,
-    "engine-internal": 1,
-    "state-file": 3
+    "engine-internal": 1
   },
   "src/traust/cli/check_skill_alignment.py": {
     "state-file": 1

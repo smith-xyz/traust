@@ -21,9 +21,8 @@
 #   - harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py — resolves
 #     `tier: live` sources; its `source` argument is generated from the
 #     ids here, so a new live source needs no code change.
-#   - traust.cli.check_drift — `feeds:*` rows from the cached
-#     tier, `feed-source:*` liveness rows from every source carrying a
-#     `probe`.
+#   - `traust dashboard view freshness` — `feeds:*` rows from the cached
+#     tier (traust-core's FreshnessQuery.stale).
 #
 # NOT HERE, deliberately:
 #   - Tool-managed vulnerability DBs (grype, govulncheck, osv-scanner):

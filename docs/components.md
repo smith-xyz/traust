@@ -128,7 +128,7 @@ DDL, and APIs can change between commits; exercise affected consumers before
 advancing pins. Adopting core requires working caller migrations, not merely
 adding a package or changing the contracts revision.
 
-`/check-drift` reports installed dependency drift; `uv sync` restores the
+`uv sync --locked` refuses installed dependency drift; `uv sync` restores the
 dependency set selected by this project's manifest and lockfile. Read the
 current sources in `pyproject.toml` and resolved commits in `uv.lock`; a sibling
 checkout or its latest tag is not the installed version.

@@ -52,7 +52,6 @@ ships a template for each such file:
 | `sla-policy.example.yaml` | `sla-policy.yaml` | `traust_engine.metrics` (`/sla-view` default policy), `/drift-watch` provenance |
 | `org-parameters.example.yaml` | `org-parameters.yaml` | `/compliance-check` (organization-defined parameter values), `/drift-watch` provenance |
 | `adr-registry.example.yaml` | `adr-registry.yaml` | `traust ops index-adrs`, `/drift-watch` pin check |
-| `reachability-watch.example.yaml` | `reachability-watch.yaml` | `/drift-watch` (`reachability-watch:review`) |
 | `benchmark-targets.example.yaml` | `benchmark-targets.yaml` | `/recall-benchmark` (the answer key; canary and seeded sources sit beside it in `recall-benchmark/`) |
 
 Compliance boundaries are not config files: the scope intake (`/compliance-check`

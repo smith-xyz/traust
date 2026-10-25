@@ -5,10 +5,9 @@ engines exist, what each may conclude, who consumes the result, and the
 guardrails that bound it. The per-language coverage matrix is in
 [language-support.md](language-support.md).
 
-**Coverage is tracked, not just documented.** `/drift-watch`'s
-`reachability-coverage:*` rows flag any portfolio language dominant across
-many repositories with no symbol-tier engine, and `reachability-watch:review`
-puts a review clock on the revisit triggers that have no machine feed. A
+**Coverage is tracked, not just documented.** `/drift-watch`'s freshness
+view lists the coverage gaps each repository's latest audit reports
+(`AssessmentService.coverage`), a missing symbol-tier engine among them. A
 language with no engine is a standing precision gap, not a neutral absence:
 every dependency hit in it ceilings at `likely_affected` on manifest evidence.
 
