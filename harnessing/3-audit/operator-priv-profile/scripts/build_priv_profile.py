@@ -16,17 +16,14 @@ capture_runtime_privileges.py, executed separately against a live cluster.
 Usage:
   build_priv_profile.py --repo <checkout> --name <repo-name> --out-dir <dir>
   build_priv_profile.py --repo-url <url> [--ref <ref>] --name <n> --out-dir <dir>
-  build_priv_profile.py --rollup <profiles-glob> --rollup-out <dir>
 
-Record each profile with `traust reporting record --kind priv-profile` (AssessmentService.record).
-Legacy kept: --rollup reads the profile files until AssessmentService.privileges carries the
-rollup's columns (container posture, namespaces/install modes, tier-2 surplus and markers).
+Record each profile with `traust reporting record --kind priv-profile` (AssessmentService.record);
+the fleet rollup is `traust dashboard view privileges` (traust-core's PrivilegesView).
 """
 
 from __future__ import annotations
 
 import argparse
-import glob as globmod
 import json
 import os
 import re
@@ -469,184 +466,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--repo"), ap.add_argument("--repo-url"), ap.add_argument("--ref")
     ap.add_argument("--name"), ap.add_argument("--out-dir")
-    ap.add_argument("--rollup", help="glob of *-priv-profile.json to aggregate")
-    ap.add_argument("--rollup-out")
     args = ap.parse_args()
-
-    if args.rollup:
-        profs = [json.loads(Path(f).read_text()) for f in sorted(globmod.glob(args.rollup))]  # noqa: PTH207
-        out = Path(args.rollup_out or ".")
-        out.mkdir(parents=True, exist_ok=True)
-        rows = []
-        for p in profs:
-            s = p["summary"]
-            t2 = p["tier2_required_vs_granted"]
-            # securityContext posture: privileged/host counts + runAsNonRoot coverage
-            n_cont = n_nonroot = n_priv = 0
-            for w in p.get("workloads", []):
-                pod_nr = (w.get("pod_securityContext") or {}).get("runAsNonRoot")
-                for c in w.get("containers", []):
-                    n_cont += 1
-                    sc = c.get("securityContext") or {}
-                    if sc.get("privileged"):
-                        n_priv += 1
-                    if sc.get("runAsNonRoot") or (sc.get("runAsNonRoot") is None and pod_nr):
-                        n_nonroot += 1
-            flags = p.get("rbac_flags") or {}
-            rows.append(
-                {
-                    "repo": p["repo"],
-                    **s,
-                    "containers": n_cont,
-                    "privileged_containers": n_priv,
-                    "runasnonroot_containers": n_nonroot,
-                    "namespaces": p.get("namespaces") or [],
-                    "install_modes": [k for k, v in (p.get("install_modes") or {}).items() if v],
-                    "rbac_risk_flags": {k: len(v) for k, v in flags.items()},
-                    "surplus": t2.get("shipped_not_declared_count"),
-                    "markers": t2.get("kubebuilder_markers", 0),
-                }
-            )
-        rows.sort(
-            key=lambda r: (
-                -(r["surplus"] or 0),
-                -r["wildcard_rules"],
-                -r["privileged_or_host_workloads"],
-            )
-        )
-
-        def _scc_cell(r):
-            reqs = sorted(set(r["scc_requests"]))
-            return ", ".join(reqs) if reqs else "(none — restricted-v2 default)"
-
-        def _sc_cell(r):
-            bits = []
-            if r["privileged_containers"]:
-                bits.append(f"{r['privileged_containers']} privileged")
-            if r["privileged_or_host_workloads"]:
-                bits.append(f"{r['privileged_or_host_workloads']} host-touching wl")
-            bits.append(f"runAsNonRoot {r['runasnonroot_containers']}/{r['containers']}")
-            return ", ".join(bits)
-
-        def _rbac_cell(r):
-            fl = r["rbac_risk_flags"]
-            parts = [
-                f"{r.get('distinct_cluster_triples', r['cluster_scoped_rules'])} cluster / "
-                f"{r.get('distinct_rule_triples', r['rbac_rules'])} total grants"
-            ]
-            risk = ", ".join(f"{k}×{v}" for k, v in sorted(fl.items(), key=lambda kv: -kv[1])[:3])
-            if risk:
-                parts.append(risk)
-            if r["surplus"]:
-                parts.append(f"surplus {r['surplus']}")
-            return "; ".join(parts)
-
-        L = [
-            "# Operator Least-Privilege Rollup (static, tiers 1–2)",
-            "",
-            "_One row per operator, one column per assessment question. **SCC column is "
-            "what the operator REQUESTS** (RBAC `use` on securitycontextconstraints); the "
-            "SCC it actually RUNS WITH is cluster-assigned — tier-3 runtime capture. "
-            "Ranked by RBAC surplus, then wildcards, then privileged workloads. Surplus "
-            "n/a = no kubebuilder markers (needs baseline not statically derivable)._",
-            "",
-            "| Repo | SCCs requested | Security context | Namespaces / install modes | Required roles (RBAC) |",
-            "|---|---|---|---|---|",
-        ]
-        for r in rows:
-            ns = ", ".join(r["namespaces"][:3]) + ("…" if len(r["namespaces"]) > 3 else "")
-            im = ", ".join(r["install_modes"])
-            nscell = " · ".join(x for x in (ns, im) if x) or "—"
-            L.append(
-                f"| {r['repo']} | {_scc_cell(r)} | {_sc_cell(r)} | {nscell} | {_rbac_cell(r)} |"
-            )
-        (out / "priv-profile-rollup.md").write_text("\n".join(L) + "\n")
-        (out / "priv-profile-rollup.json").write_text(json.dumps(rows, indent=1) + "\n")
-
-        import csv
-
-        with (out / "priv-profile-rollup.csv").open("w", newline="") as fh:
-            w = csv.writer(fh)
-            w.writerow(
-                [
-                    "repo",
-                    "sccs_requested",
-                    "privileged_containers",
-                    "host_touching_workloads",
-                    "runasnonroot_containers",
-                    "containers_total",
-                    "namespaces",
-                    "install_modes",
-                    "cluster_grants",
-                    "total_grants",
-                    "wildcard_rules",
-                    "rbac_risk_flags",
-                    "tier2_surplus",
-                    "kubebuilder_markers",
-                ]
-            )
-            for r in rows:
-                w.writerow(
-                    [
-                        r["repo"],
-                        ";".join(sorted(set(r["scc_requests"]))),
-                        r["privileged_containers"],
-                        r["privileged_or_host_workloads"],
-                        r["runasnonroot_containers"],
-                        r["containers"],
-                        ";".join(r["namespaces"]),
-                        ";".join(r["install_modes"]),
-                        r.get("distinct_cluster_triples", r["cluster_scoped_rules"]),
-                        r.get("distinct_rule_triples", r["rbac_rules"]),
-                        r["wildcard_rules"],
-                        ";".join(f"{k}={v}" for k, v in sorted(r["rbac_risk_flags"].items())),
-                        r["surplus"] if r["surplus"] is not None else "n/a",
-                        r["markers"],
-                    ]
-                )
-
-        # compact self-contained HTML dashboard
-        n = len(rows)
-        n_scc = sum(1 for r in rows if r["scc_requests"])
-        n_priv = sum(
-            1 for r in rows if r["privileged_containers"] or r["privileged_or_host_workloads"]
-        )
-        n_surplus = sum(1 for r in rows if r["surplus"])
-        from html import escape
-
-        top = "".join(
-            f"<tr><td>{escape(r['repo'])}</td><td>{escape(_scc_cell(r))}</td>"
-            f"<td>{escape(_sc_cell(r))}</td>"
-            f"<td>{escape(', '.join(r['namespaces'][:2]) or '—')}</td>"
-            f"<td>{escape(_rbac_cell(r))}</td></tr>"
-            for r in rows[:60]
-        )
-        html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
-<title>Operator Least-Privilege Dashboard</title><style>
-body{{font-family:-apple-system,'Red Hat Text',sans-serif;background:#f5f5f5;color:#151515;margin:24px}}
-.card{{background:#fff;border-radius:6px;padding:16px 20px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.08)}}
-h1{{font-size:20px}}h2{{font-size:14px;color:#6a6e73;text-transform:uppercase}}
-table{{border-collapse:collapse;width:100%;font-size:12px}}td,th{{padding:4px 8px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}}
-.kpi{{display:inline-block;margin-right:32px}}.kpi b{{font-size:34px}}.kpi span{{color:#6a6e73;font-size:12px;display:block}}
-.banner{{background:#151515;color:#fff;padding:6px 12px;font-size:12px;border-radius:4px;margin-bottom:16px}}
-.note{{font-size:12px;color:#6a6e73}}</style></head><body>
-<div class="banner">RED HAT INTERNAL — EMBARGOED</div>
-<h1>Operator Least-Privilege Dashboard <span class="note">· static tiers 1–2 · SCC column = REQUESTED (assigned SCC needs tier-3 runtime capture)</span></h1>
-<div class="card"><span class="kpi"><b>{n}</b><span>operators profiled</span></span>
-<span class="kpi"><b>{n_scc}</b><span>request explicit SCCs</span></span>
-<span class="kpi"><b>{n - n_scc}</b><span>restricted-v2 default expected</span></span>
-<span class="kpi"><b style="color:#ec7a08">{n_priv}</b><span>privileged / host-touching</span></span>
-<span class="kpi"><b style="color:#cc0000">{n_surplus}</b><span>with RBAC surplus (tier-2)</span></span></div>
-<div class="card"><h2>Assessment (top 60 by surplus / wildcards / privilege — full set in priv-profile-rollup.json)</h2>
-<table><thead><tr><th>Operator</th><th>SCCs requested</th><th>Security context</th><th>Namespaces</th><th>Required roles (RBAC)</th></tr></thead>
-<tbody>{top}</tbody></table></div>
-<div class="card note">Per-operator detail: analysis-results/findings/&lt;product&gt;/&lt;repo&gt;/&lt;repo&gt;-priv-profile.md · Semantics: no SCC request ⇒ OpenShift assigns restricted-v2 by default · surplus = shipped RBAC with no +kubebuilder:rbac marker backing (verify non-kubebuilder call sites before filing) · generated by operator-priv-profile.</div>
-</body></html>"""
-        (out / "priv-profile-dashboard.html").write_text(html)
-        print(
-            f"rollup: {len(rows)} profiles -> {out}/priv-profile-rollup.{{md,json}} + priv-profile-dashboard.html"
-        )
-        return 0
 
     if not args.name or not args.out_dir:
         ap.error("--name and --out-dir required for profiling")

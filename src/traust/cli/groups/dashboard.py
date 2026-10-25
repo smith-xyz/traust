@@ -15,4 +15,8 @@ TEAM_REPORT = passthrough_op(
 
 VIEW = passthrough_op("dashboard_view", "Write one insight view for a scope.", "main")
 
-DASHBOARD: dict[str, object] = {"refresh": REFRESH, "team-report": TEAM_REPORT, "view": VIEW}
+DASHBOARD: dict[str, object] = {
+    "refresh": REFRESH,
+    "team-report": TEAM_REPORT,
+    "view": VIEW,
+}
