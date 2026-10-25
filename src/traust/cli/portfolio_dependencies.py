@@ -14,6 +14,7 @@ from traust_core.v1.errors import NotFoundError
 from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import Ecosystem
 
+from traust.cli._doors import package_id as find_package_id
 from traust.cli._doors import parser, run
 from traust.context import load_core
 
@@ -59,12 +60,7 @@ def dependents(argv: list[str] | None = None) -> int:
 
     def call() -> Any:
         services = load_core(args.config_home).services()
-        package_id = args.package_id
-        if package_id is None:
-            found = services.exposure.find_package(Ecosystem(args.ecosystem), args.name)
-            if found is None:
-                raise NotFoundError(f"no {args.ecosystem} package named {args.name}")
-            package_id = found.id
+        package_id = args.package_id or find_package_id(services, args.ecosystem, args.name)
         narrowed = () if args.version is None else (args.version,)
         out = []
         for ref_id in services.exposure.dependents(package_id, *narrowed):

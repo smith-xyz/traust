@@ -54,6 +54,7 @@ from traust_core.v1.models.remediation import (
 from traust_core.v1.models.values import GitSha, ProductSlug
 from traust_core.v1.models.vocabulary import Ecosystem, RemediationStatus, SourceType
 
+from traust.cli._doors import package_id as find_package_id
 from traust.cli._doors import parser, products, run
 from traust.cli.findings import _repository
 from traust.cli.impact import harness_version
@@ -335,10 +336,7 @@ def fleet_targets(argv: list[str] | None = None) -> int:
         services = core.services()
         package_id = args.package_id
         if args.module is not None:
-            package = services.exposure.find_package(Ecosystem(args.ecosystem), args.module)
-            if package is None:
-                raise NotFoundError(f"package {args.ecosystem}/{args.module} is not recorded")
-            package_id = package.id
+            package_id = find_package_id(services, args.ecosystem, args.module)
         named = tuple(_repository(core, u).id for u in args.repo_url or ())
         wanted = FleetScope(cwe=args.cwe, package_id=package_id, repository_ids=named)  # type: ignore[arg-type]
         owners = services.portfolio.list_owners

@@ -147,7 +147,7 @@ def test_targets_refusals_are_exit_2(doors: SimpleNamespace, home: Path) -> None
     rc, err = run(remediation.fleet_targets, home, "--package-id", str(PACKAGE_ID))
     assert rc == 2 and "package not found" in err
     rc, err = run(remediation.fleet_targets, home, "--module", "left-pad", "--ecosystem", "npm")
-    assert rc == 2 and "npm/left-pad is not recorded" in err
+    assert rc == 2 and "no npm package named left-pad" in err
 
 
 def test_record_parses_a_yaml_spec(doors: SimpleNamespace, home: Path) -> None:
