@@ -60,19 +60,18 @@ python3 -m traust.cli reporting record \
     --kind priv-profile --repo-url <url> --sha <commit>
 ```
 
-Fleet rollup (after profiling a set):
+Fleet rollup (after recording a set; each repository's latest recorded
+profile, `--as-of <ISO time>` for an earlier point):
 
 ```bash
-python harnessing/3-audit/operator-priv-profile/scripts/build_priv_profile.py \
-    --rollup 'analysis-results/findings/*/*/*-priv-profile.json' \
-    --rollup-out progress-tracker/metrics/dashboards/operator-least-priv/
+python3 -m traust.cli dashboard view privileges \
+    --out progress-tracker/metrics/dashboards/operator-least-priv/
 ```
 
-Emits four artifacts, one row per operator with one column per assessment
+Emits four artifacts, one row per repository with one column per assessment
 question (SCCs requested / securityContext posture / namespaces + install
-modes / RBAC): `priv-profile-rollup.md` (paste-into-doc table),
-`priv-profile-rollup.json` (full rows), `priv-profile-rollup.csv`
-(spreadsheet export), and `priv-profile-dashboard.html` (KPI tiles + top-60
+modes / RBAC): `operator-least-privilege-rollup.md` (paste-into-doc table),
+`.json` (full rows), `.csv` (spreadsheet export), and `.html` (KPI summary +
 table). Exclude catalog aggregation trees (certified-operators,
 community-operators, marketplace) from profiling — a catalog's thousands of
 third-party bundles would read as one giant "operator" and distort the
