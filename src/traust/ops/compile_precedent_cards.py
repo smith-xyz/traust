@@ -15,18 +15,18 @@ time**, never shipped as a hint.
 
 Shipped enumerators (schemas hardcoded from the emitting scripts):
 
-config-matrix     harnessing/3-audit/secure-code-audit/scripts/expand_config_matrix.py —
+config-matrix     traust adapters config-matrix (traust-core code facts) —
 rows = `triples[]`
                 (key, effective_default, source.*, sink.*, class,
                 judgement_required, weak_default)
-route-guards      harnessing/3-audit/secure-code-audit/scripts/enumerate_route_guards.py —
+route-guards      traust adapters route-guards (traust-core code facts) —
 rows = `routes[]`
                 (family, method, pattern, handler.*, guards,
                 scope_guards, registration.*, judgement_required,
                 unguard_markers, asymmetry)
-sanitizer-probes  harnessing/3-audit/secure-code-audit/scripts/probe_sanitizers.py —
+sanitizer-probes  traust adapters sanitizers, then (run) probe_sanitizers.py —
 rows = `candidates[]`
-                (--list, default) or `probes[]` (--run; EXECUTES repo
+                (discovery, default) or `probes[]` (--run; EXECUTES repo
                 code — a card must declare
                 `enumerator_options.run: true` to use run-only
                 fields, audit-sandbox doctrine)
@@ -139,19 +139,19 @@ SYMBOL_INDEX_FIELDS = {
 
 ENUMERATORS = {
     "config-matrix": {
-        "script": "expand_config_matrix.py",
+        "op": "config-matrix",
         "artifact": "config-matrix",
         "rows_key": "triples",
         "fields": CONFIG_MATRIX_FIELDS,
     },
     "route-guards": {
-        "script": "enumerate_route_guards.py",
+        "op": "route-guards",
         "artifact": "route-guard-matrix",
         "rows_key": "routes",
         "fields": ROUTE_GUARDS_FIELDS,
     },
     "sanitizer-probes": {
-        "script": "probe_sanitizers.py",
+        "op": "sanitizers",
         "artifact": "sanitizer-probes",
         # rows_key depends on mode — resolved in rows_of()
         "rows_key": None,
@@ -405,7 +405,7 @@ def apply_predicate(node: dict, row: dict) -> bool:
 
 def run_enumerator(name: str, options: dict, repo: Path, work: Path) -> dict:
     """Run one enumerator on a checkout, return its parsed artifact.
-    All enumerators are the shipped deterministic scripts; nothing here
+    All enumerators are the shipped deterministic doors; nothing here
     interprets code."""
     spec = ENUMERATORS[name]
     if name == "symbol-index":
@@ -429,15 +429,24 @@ def run_enumerator(name: str, options: dict, repo: Path, work: Path) -> dict:
         if proc.returncode != 0:
             raise RuntimeError(f"{name}: {proc.stderr[-400:]}")
         return json.loads(proc.stdout)
-    script = SCRIPTS / spec["script"]
     out = work / f"{name}-{abs(hash(json.dumps(options, sort_keys=True)))}.json"
-    cmd = [sys.executable, str(script), str(repo), "--out", str(out)]
-    if name == "sanitizer-probes":
-        cmd.append("--run" if options.get("run") is True else "--list")
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1200)
-    if proc.returncode != 0 or not out.is_file():
-        raise RuntimeError(f"{name}: {proc.stderr[-400:]}")
+    _run(
+        name,
+        [sys.executable, "-m", "traust.cli", "adapters", spec["op"], str(repo), "--out", str(out)],
+    )
+    if name == "sanitizer-probes" and options.get("run") is True:
+        candidates = out.with_suffix(".candidates.json")
+        out.rename(candidates)
+        probe = SCRIPTS / "probe_sanitizers.py"
+        _run(name, [sys.executable, str(probe), str(repo), "--run", "--candidates",
+                    str(candidates), "--out", str(out)])  # fmt: skip
     return json.loads(out.read_text(encoding="utf-8"))
+
+
+def _run(name: str, cmd: list[str]) -> None:
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1200)
+    if proc.returncode != 0:
+        raise RuntimeError(f"{name}: {proc.stderr[-400:]}")
 
 
 def rows_of(name: str, options: dict, artifact: dict) -> list[dict]:
