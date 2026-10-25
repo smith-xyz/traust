@@ -11,7 +11,7 @@ and `portfolio-graph-summary.json` report yours after a build.
 |---|---|---|---|
 | **repo-graph** | `repo-graph.{json,dot,gexf,html}` + `repo-graph-stats.md` | which repos exist, who owns them, what has been audited | *retired*: traust-core's portfolio (`repository`, `product`, `release`, `component`, `ownership`) and assessment coverage answer it; nothing builds the file |
 | **portfolio-graph** | `portfolio-graph.db` (SQLite) + `portfolio-graph-summary.json` | what the code depends on, and what a change reaches | [`/portfolio-graph`](../harnessing/portfolio-graph/SKILL.md) |
-| **ATT&CK coverage layer** | `attack-navigator-layer.json` (Navigator format 4.5) | which adversary techniques the portfolio's findings and validated chains cover | [`/attack-coverage`](../harnessing/attack-coverage/SKILL.md) |
+| **ATT&CK coverage layer** | `attack-coverage.json` `navigator_layer` (Navigator format 4.5) | which adversary techniques the portfolio's findings and validated chains cover | [`/attack-coverage`](../harnessing/attack-coverage/SKILL.md) |
 | **attack chains** | `attack_chains[]` inside validation reports | how a confirmed finding chains from entry point to terminal asset | [`/validate-findings`](../harnessing/5-validate/validate-findings/SKILL.md) |
 | **Joern Code Property Graph** | transient (temp dir, discarded with the run) | does an advisory's vulnerable symbol actually get called in this repo — the evidence that promotes a finding to `affected` | `adapters joern` (Java, C/C++) |
 | **govulncheck call graph** | transient, internal to the tool | the same question for Go, and the most precise reachability tier the harness has | `adapters govulncheck` |
@@ -101,11 +101,11 @@ table inside it, `graph_edges`, *is* imported from repo-graph so findings can
 be joined to what ships them — but a single borrowed edge table does not make
 the database a graph, and nothing treats it as one.
 
-## attack-navigator-layer.json — ATT&CK coverage
+## attack-coverage navigator_layer — ATT&CK coverage
 
 Joins three sources into one Navigator layer, scored by evidence strength:
 **observed** (3) from confirmed `attack_chains[].mitre_attack_refs` in
-validation reports, **modeled** (2) from threat-model `attack_refs`, and
+validation reports (not yet recorded in traust-core), **modeled** (2) from threat-model `attack_refs`, and
 **derived** (1) from finding categories.
 
 The scoring is the point: a technique covered only by category inference is

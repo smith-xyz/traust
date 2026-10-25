@@ -24,6 +24,7 @@ def test_all_planned_groups_registered():
         "adapters",
         "admin",
         "assessments",
+        "attack",
         "auth",
         "build",
         "check",

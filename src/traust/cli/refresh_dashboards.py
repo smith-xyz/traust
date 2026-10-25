@@ -91,16 +91,6 @@ def build_stages(
                 *path_args,
             ],
         ),
-        # no door: AttackCoverageView; its modeled leg reads AssessmentService.threats
-        (
-            "attack-coverage",
-            "consumer",
-            [
-                PYTHON,
-                str(h / "harnessing/attack-coverage/scripts/build_attack_coverage.py"),
-                *path_args,
-            ],
-        ),
     ]
     if spend_actuals:
         stages.append(

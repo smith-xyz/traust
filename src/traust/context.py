@@ -24,8 +24,13 @@ from traust_engine.adapters.fleet_fix import register_fleet_fix
 from traust_engine.adapters.opengrep import load_supplemental_packs
 from traust_engine.adapters.tools import register_tools
 
+from traust.paths import HARNESSING_DIR
+
 CORE_CONFIG = "core.yaml"
 SLA_POLICY = "sla-policy.yaml"
+# Security-pack content (home: traust-pack-security): the pinned ATT&CK release and its mapping.
+_ATTACK = HARNESSING_DIR / "attack-coverage" / "tables"
+ATTACK_TABLES = (_ATTACK / "attack-techniques.json", _ATTACK / "attack-mapping.json")
 
 # ---------------------------------------------------------------------------
 # Sanctioned environment overrides — read ONLY in this module, never in consumers.
@@ -98,10 +103,15 @@ def load_core(config_home: Path | None = None) -> Context:
 
 
 def load_insight_core(config_home: Path | None = None, sla_policy: Path | None = None) -> Context:
-    """``load_core`` with the SLA view built on ``sla_policy``, else on ``<config home>/
-    sla-policy.yaml`` when there is one (template: config/sla-policy.example.yaml); exit 2 when
-    the policy is unreadable or invalid."""
+    """``load_core`` with the ATT&CK coverage view on the pack's pinned ATT&CK tables, and the SLA
+    view built on ``sla_policy``, else on ``<config home>/sla-policy.yaml`` when there is one
+    (template: config/sla-policy.example.yaml); exit 2 when either is unreadable or invalid."""
     core = load_core(config_home)
+    try:
+        core.register_attack_catalog(*ATTACK_TABLES)
+    except ConfigError as e:
+        print(f"ATT&CK catalog not resolvable: {e}", file=sys.stderr)
+        raise SystemExit(2) from e
     home = config_home or deployment_config_dir()
     path = sla_policy or (home / SLA_POLICY if home is not None else None)
     if path is not None and (sla_policy is not None or path.is_file()):

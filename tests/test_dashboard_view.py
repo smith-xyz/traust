@@ -338,3 +338,35 @@ def test_freshness_reads_the_engines_tools_and_the_feeds_registry(
     assert feeds == [tmp_path / "feeds.yaml"]
     assert publish.calls == [(ViewName.FRESHNESS, ViewFilter())]
     assert (tmp_path / "fresh" / "freshness.md").is_file()
+
+
+@pytest.mark.parametrize("database", ["sqlite", "postgres"])
+def test_attack_coverage_on_core_renders_on_the_pinned_catalog(
+    tmp_path: Path, database: str
+) -> None:
+    config = tmp_path / "config"
+    config.mkdir()
+    core: dict[str, Any] = {"home": str(tmp_path / "store")}
+    with contextlib.ExitStack() as stack:
+        if database == "postgres":
+            core["database"] = {"url": stack.enter_context(_postgres())}
+        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        out = tmp_path / "out"
+        rc, answer = run(config, "attack-coverage", "--out", str(out))
+    assert rc == 0, answer
+    assert answer["model"]["attack_version"] == "19.1" and answer["model"]["techniques"] == []
+    layer = json.loads((out / "attack-coverage.json").read_text())["navigator_layer"]
+    assert layer["versions"]["layer"] == "4.5" and "MITRE" in layer["description"]
+    assert "not yet recorded in core" in (out / "attack-coverage.md").read_text()
+
+
+def test_an_unresolvable_attack_catalog_is_exit_2(
+    publish: Door, home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from traust import context
+
+    monkeypatch.setattr(context, "ATTACK_TABLES", (tmp_path / "t.json", tmp_path / "m.json"))
+    with pytest.raises(SystemExit) as exit, contextlib.redirect_stderr(io.StringIO()) as err:
+        dashboard_view.main(["--config-home", str(home), "attack-coverage", "--out", str(tmp_path)])
+    assert exit.value.code == 2 and "ATT&CK catalog not resolvable" in err.getvalue()
+    assert publish.calls == []
