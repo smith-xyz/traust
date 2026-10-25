@@ -161,8 +161,8 @@ findings.db `repos` baselines (producer: python3 -m traust.cli corpus findings-d
 Produces: `analysis-results/impact/fleet-osv-worklist-<date>.json` —
 terminal beyond this skill (a staging inventory consumed by the same
 run's worklist execution and by operator review of deep-scan staging;
-read by `/refresh-dashboards`' `build_dependency_exposure.py`, which
-still expects the old row shape and moves with that skill's port;
+*retired:* read by `/refresh-dashboards`' `build_dependency_exposure.py`
+(the exposure views read recorded impact analyses instead);
 *retired:* the `refuted_findings` list of `--verify`); baseline appends +
 dependency findings filed in traust-core by
 python3 -m traust.cli impact analyze (consumers: `/track-findings`

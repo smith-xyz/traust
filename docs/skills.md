@@ -513,7 +513,7 @@ Use when the user asks to measure the auditor's detection recall, run the recall
 
 ## refresh-dashboards
 
-Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, dependency-exposure, spend); the leadership scoreboard is a core view. Deterministic, ~$0, no agents.
+Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, spend); the leadership scoreboard is a core view. Deterministic, ~$0, no agents.
 
 - **Stage:** —
 - **Tier:** `secondary`

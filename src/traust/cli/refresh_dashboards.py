@@ -101,17 +101,6 @@ def build_stages(
                 *path_args,
             ],
         ),
-        # no door: ExposureView (ExposureService.summary). Reads the portfolio graph's
-        # dependency layer + impact/fleet-OSV artifacts; degrades when they are absent.
-        (
-            "dependency-exposure",
-            "consumer",
-            [
-                PYTHON,
-                str(h / "harnessing/refresh-dashboards/scripts/build_dependency_exposure.py"),
-                *path_args,
-            ],
-        ),
     ]
     if spend_actuals:
         stages.append(
