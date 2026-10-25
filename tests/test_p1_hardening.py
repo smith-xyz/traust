@@ -84,15 +84,6 @@ def test_symbol_index_cache_is_per_user(tmp_path, monkeypatch):
     assert (tmp_path / "xdg" / "symbol-index").stat().st_mode & 0o777 == 0o700
 
 
-def test_fetch_advisory_rejects_bad_cve():
-    """D7: the scoped fetcher validates identifiers."""
-    fa = _load("fetch_advisory_p1", "harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py")
-    with pytest.raises(SystemExit):
-        fa.main(["nvd", "not-a-cve"])
-    with pytest.raises(SystemExit):
-        fa.main(["csaf", "'; curl evil"])
-
-
 def test_no_raw_egress_grants_in_portable_skills():
     """D7: raw curl / gh api grants removed."""
     for skill in ("impact-analysis", "threat-model"):

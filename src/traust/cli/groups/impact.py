@@ -16,6 +16,12 @@ IMPACT: dict[str, object] = {
     "analyze": passthrough_op(
         "impact", "Assess and record the commits an advisory reaches.", "analyze"
     ),
+    "document": passthrough_op(
+        "impact", "Print a feed source's document for one identifier.", "document"
+    ),
+    "enrich": passthrough_op(
+        "impact", "EPSS, KEV and product reach for an artifact's CVEs.", "enrich"
+    ),
     "sweep": passthrough_op(
         "impact", "Which known advisories touch the recorded SBOMs at all.", "sweep"
     ),
