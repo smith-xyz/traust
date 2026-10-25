@@ -109,6 +109,26 @@ def test_loc_writes_the_lines_of_code_view(publish: Door, home: Path, tmp_path: 
     assert answer["model"]["code"] == 120
 
 
+@pytest.mark.parametrize(
+    ("view", "stem", "model"),
+    [
+        (ViewName.PQC, "pqc-readiness", insight.PqcDashboard()),
+        (ViewName.PQC_PORTFOLIO, "pqc-portfolio-roll-up", insight.PqcPortfolio()),
+    ],
+)
+def test_the_pqc_views_replace_the_skills_report_scripts(
+    publish: Door, home: Path, tmp_path: Path, view: ViewName, stem: str, model: Any
+) -> None:
+    publish.result = RenderedView(
+        view=view, stem=stem, model=model, markdown="# PQC\n", html="<title>PQC</title>"
+    )
+    out = tmp_path / "pqc"
+    rc, _ = run(home, view.value, "--product", "alpha", "--out", str(out))
+    assert rc == 0
+    assert publish.calls == [(view, ViewFilter(product_ids=(ALPHA.id,)))]
+    assert sorted(p.name for p in out.iterdir()) == [f"{stem}.{x}" for x in ("html", "json", "md")]
+
+
 def test_scope_window_and_bucket_go_into_one_filter(
     publish: Door, home: Path, tmp_path: Path
 ) -> None:

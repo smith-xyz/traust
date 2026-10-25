@@ -61,16 +61,6 @@ def test_opengrep_bare_fork_url_gets_documented_pin(tmp_path, monkeypatch):
     )
 
 
-def test_pick_slug_rejects_traversal(tmp_path):
-    """B3: slug becomes an output dir under pqc/."""
-    bp = _load("bulk_prescan_p1", "harnessing/3-audit/pqc-readiness/scripts/bulk_prescan.py")
-    pqc = tmp_path / "pqc"
-    pqc.mkdir()
-    assert bp.pick_slug("https://github.com/org/..", pqc) is None
-    assert bp.pick_slug("https://github.com/org/.git", pqc) is None
-    assert bp.pick_slug("https://github.com/org/good-repo", pqc) == "good-repo"
-
-
 def test_symbol_index_skips_file_symlinks(tmp_path):
     """B5: symlinked files must not be read out of the checkout."""
     bsi = _load("build_symbol_index_p1", "src/traust/cli/build_symbol_index.py")

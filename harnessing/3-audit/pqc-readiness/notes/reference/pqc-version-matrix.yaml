@@ -2,7 +2,7 @@
 #
 # All version thresholds for PQC capability live here.
 # Consumers: pqc_facts.py, pqc-readiness-decision-tree.json (via loader),
-#            build_pqc_rollup.py (toolchain quick-wins), remediation docs (illustrative only).
+#            traust-core's pqc facts (toolchain quick-wins), remediation docs (illustrative only).
 #
 # Update ONE file when a runtime ships PQC support.
 # Format: each runtime lists the minimum version where PQC key exchange

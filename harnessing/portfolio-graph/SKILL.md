@@ -227,16 +227,15 @@ PQC/isolation facts are a separately-costed decision
 `progress-tracker` root).
 
 Enrichment keys survive rebuilds: repo-node attrs stamped **after** the
-spine by a later step — currently the pqc backfeed's `$.pqc`
-(`scan_pqc_dependencies.py`) — are preserved across a spine rebuild via
+spine by a later step — formerly the pqc backfeed's `$.pqc`
+(`scan_pqc_dependencies.py`, *retired*: traust-core derives PQC readiness
+on demand) — are preserved across a spine rebuild via
 the `ENRICHMENT_ATTR_KEYS` allowlist in `build_portfolio_graph.py`. The
 spine stays authoritative for everything it owns (a spine key's new value
 always wins) and no unknown/foreign key is retained (bounded allowlist, not
 a blind merge), so a rebuild can no longer silently drop `$.pqc` and zero
 the per-product PQC reports. Adding a key to `ENRICHMENT_ATTR_KEYS` is the
-only step needed to make a future post-spine repo-node enrichment durable;
-`/drift-watch`'s `pqc-backfeed` row is the backstop that flags the clobber
-if it ever recurs.
+only step needed to make a future post-spine repo-node enrichment durable.
 
 ## Refresh cadence
 

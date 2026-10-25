@@ -20,6 +20,9 @@ Optional: --push-sheet <spreadsheet-id> [--tab <title>] upserts the rows
 into a Google Sheets tab using a `gcloud auth print-access-token` bearer
 token (requires a Drive-scoped gcloud login; see the PQC campaign notes).
 
+Kept until `<slug>-xcrypto-usage.json` (scan_xcrypto_usage.py) has a contracts schema traust-core
+can record (NEED(Michele: xcrypto-usage artifact or code-facts section)).
+
 Usage:
     python3 build_xcrypto_tracker.py --results-root <analysis-results> \
         [--out-dir DIR] [--push-sheet ID] [--tab TITLE]
