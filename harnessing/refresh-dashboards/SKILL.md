@@ -1,7 +1,7 @@
 ---
 name: refresh-dashboards
 description: >-
-  Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, dependency-exposure, spend), then the leadership scoreboard last because it harvests the others. Deterministic, ~$0, no agents.
+  Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, dependency-exposure, spend); the leadership scoreboard is a core view. Deterministic, ~$0, no agents.
 argument-hint: "[--only <stage...>] [--skip <stage>] [--spend-actuals] [--view <name>] [--out <dir>]"
 metadata:
   harness.tier: "secondary"
@@ -37,8 +37,9 @@ Ordering is the whole point:
    ATT&CK coverage rollup,
    LoC dashboard (cache-only), dependency-exposure, spend dashboard.
    Each continues on error; failures are collected.
-3. **Scoreboard last** — `collect_harness_metrics.py` harvests headline
-   numbers *from* the dashboards above, so it runs after all of them
+3. **Scoreboard last** — *retired:* the scoreboard is traust-core's
+   `ScoreboardView`, rendered in step 1; it composes the other views in-process,
+   so it needs no place in the order
    (it writes no history row: a trend is the view built at an earlier `as_of`).
 
 ## Procedure
@@ -81,8 +82,7 @@ Ordering is the whole point:
   scan's job, not this one's.
 - **Agent-built views** — the threat register (`/threat-register`)
   involves judgment, not just aggregation, and is rebuilt by its owning
-  skill on its own cadence. The scoreboard reads whatever its latest
-  artifact says.
+  skill on its own cadence. The scoreboard composes the threat-register view.
 - **Campaign-lane artifacts** that live in the same dashboards folder —
   pqc views, operator-least-priv, rbac-openshift-platform, fuzz,
   benchmark — are outputs of their campaign runs (`/pqc-readiness`,
@@ -108,21 +108,20 @@ Ordering is the whole point:
 | `dependency-exposure` | consumer | `harnessing/refresh-dashboards/scripts/build_dependency_exposure.py` (portfolio-graph dependency layer + impact/fleet-OSV artifacts; degrades gracefully when absent) |
 | `spend-actuals` | consumer, opt-in | python3 -m traust.cli metrics collect-spend --append |
 | `spend` | consumer | python3 -m traust.cli metrics spend |
-| `scoreboard` | consumer | `harnessing/traust-metrics/scripts/collect_harness_metrics.py` |
+| `scoreboard` | — | *retired:* rendered by the `views` stage (`ScoreboardView`) |
 
 ## Integrations
 
 - **Emits no artifact of its own** — every output is owned by the
   builder that writes it (the core views and the dashboard files
   under `progress-tracker/metrics/dashboards/`, the
-  scoreboard). Consumers are documented in each
+  scoreboard among them). Consumers are documented in each
   owning skill.
 - **docs/continuous-operations.md** names this script as the "Dashboards
   rebuild" scheduled job (orchestrator target: weekly; spend ≤4d); the
   security pack's `dashboards` asset runs it.
 - **/drift-watch** routes attention here: when `dashboards:*` rows go
   stale, the refresh command is this script.
-- **/traust-metrics `--refresh-sources`** remains the
-  scoreboard-scoped partial refresh (a skill-level token interpreted by
-  the agent — the collector script itself has no such argparse flag);
+- **/traust-metrics `--refresh-sources`** — *retired:* the scoreboard
+  composes live views (`--only views --view scoreboard` renders it alone);
   this skill is the full chain.
