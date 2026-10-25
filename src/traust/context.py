@@ -158,6 +158,14 @@ def load_engine_core(config_home: Path | None = None, *, canaries: str = "canari
     return core
 
 
+def load_compliance_services(config_home: Path | None = None) -> Services:
+    """``load_services`` with traust-engine's ADR source, which the citation gate and ``adrs``
+    read the pinned registers through."""
+    core = load_core(config_home)
+    register_compliance_sources(core, {})
+    return core.services()
+
+
 def load_services(config_home: Path | None = None) -> Services:
     """traust-core's domain services: the one code path for domain state."""
     return load_core(config_home).services()
