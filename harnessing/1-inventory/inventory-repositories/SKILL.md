@@ -26,6 +26,7 @@ allowed-tools:
   - Bash(traust portfolio plan:*)
   - Bash(traust portfolio owner-hints:*)
   - Bash(traust portfolio import-owners:*)
+  - Bash(traust portfolio file:*)
   - Bash(python3 -m traust.cli registry:*)
 ---
 
