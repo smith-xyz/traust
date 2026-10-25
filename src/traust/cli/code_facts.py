@@ -1,4 +1,4 @@
-"""``traust adapters route-guards|config-matrix|sanitizers|fork-lag``: secure-code-audit's
+"""``traust adapters route-guards|config-matrix|sanitizers|fork-lag|priv-profile``: the
 deterministic pre-scans on traust-core's code facts. Each reads a checkout and records nothing;
 every result is a candidate worklist the audit judges, never a finding.
 
@@ -8,6 +8,7 @@ sanitizers      sanitizer-shaped Python functions (discovery only; probing execu
                 and is `probe_sanitizers.py --run`)
 fork-lag        fork / vendored-upstream signals, then the advisories whose range holds each
                 tracked upstream version (unless --offline)
+priv-profile    an operator's privilege profile (tiers 1-2): the operator-priv-profile document
 """
 
 from __future__ import annotations
@@ -94,5 +95,19 @@ def fork_lag(argv: list[str] | None = None) -> int:
             ToolRequest(workspace=args.checkout), offline=args.offline
         )
         return _emit(fork.model_dump(mode="json"), args.out)
+
+    return run(call)
+
+
+def priv_profile(argv: list[str] | None = None) -> int:
+    ap = _parser("priv-profile", "A checkout's operator privilege profile (tiers 1-2).")
+    ap.add_argument("--name", required=True, help="the repository name the profile carries")
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        doc = load_services(args.config_home).code_facts.priv_profile(
+            ToolRequest(workspace=args.checkout), args.name
+        )
+        return _emit(json.loads(doc.payload), args.out)
 
     return run(call)

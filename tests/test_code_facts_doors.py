@@ -1,4 +1,4 @@
-"""`traust adapters route-guards|config-matrix|sanitizers|fork-lag`: each is one traust-core
+"""`traust adapters route-guards|config-matrix|sanitizers|fork-lag|priv-profile`: each is one traust-core
 code-facts call; services are stubbed (the pre-scans' behaviour is traust-core's tests)."""
 
 from __future__ import annotations
@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 from traust_core.v1.errors import ValidationError
+from traust_core.v1.models.artifacts import PrivProfileArtifact
 from traust_core.v1.models.code_facts import (
     CodeFactKind,
     ConfigClass,
@@ -58,6 +59,11 @@ FORK = ForkLagFact(
     ),
 )  # fmt: skip
 
+PROFILE = PrivProfileArtifact.from_document(
+    {"repo": "widget", "workloads": [], "rbac_rules": [{"verbs": ["get"]}],
+     "summary": {"workloads": 0, "rbac_rules": 1, "no_scc_request_recorded": True}}
+)  # fmt: skip
+
 
 class CodeFacts:
     def __init__(self, fail: Exception | None = None) -> None:
@@ -81,6 +87,9 @@ class CodeFacts:
 
     def fork_lag(self, request, *, offline):
         return self._answer(("fork_lag", request.workspace, offline), FORK)
+
+    def priv_profile(self, request, repo):
+        return self._answer(("priv_profile", request.workspace, repo), PROFILE)
 
 
 @pytest.fixture
@@ -150,3 +159,26 @@ def test_a_refused_checkout_exits_2(facts, capsys, tmp_path):
 @pytest.mark.parametrize("op", ["route-guards", "config-matrix", "sanitizers", "fork-lag"])
 def test_ops_are_registered_under_adapters(op):
     assert op in GROUPS["adapters"]
+
+
+def test_priv_profile_is_one_call_and_prints_the_contract_document(facts, capsys, tmp_path):
+    assert code_facts.priv_profile([str(tmp_path), "--name", "widget"]) == 0
+    assert facts.calls == [("priv_profile", tmp_path, "widget")]
+    assert _json(capsys) == json.loads(PROFILE.payload)
+
+
+def test_priv_profile_out_writes_the_document_for_reporting_record(facts, capsys, tmp_path):
+    out = tmp_path / "widget-priv-profile.json"
+    assert code_facts.priv_profile([str(tmp_path), "--name", "widget", "--out", str(out)]) == 0
+    assert _json(capsys) == {"wrote": str(out), "workloads": 0, "rbac_rules": 1}
+    assert PrivProfileArtifact.parse(out.read_bytes()).repo == "widget"
+
+
+def test_priv_profile_needs_a_name(facts, tmp_path):
+    with pytest.raises(SystemExit):
+        code_facts.priv_profile([str(tmp_path)])
+    assert facts.calls == []
+
+
+def test_priv_profile_is_registered_under_adapters():
+    assert "priv-profile" in GROUPS["adapters"]

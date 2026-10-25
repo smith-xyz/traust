@@ -47,6 +47,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "config-matrix": adapters.CONFIG_MATRIX,
         "sanitizers": adapters.SANITIZERS,
         "fork-lag": adapters.FORK_LAG,
+        "priv-profile": adapters.PRIV_PROFILE,
         "image-sbom": adapters.IMAGE_SBOM,
         "image-packages": adapters.IMAGE_PACKAGES,
     },
