@@ -67,13 +67,13 @@ What it does (traust-core's `LocView`, one `InsightService.publish`):
 Always tell the user:
 
 - The output paths.
-- Headline numbers: code-LoC, total-LoC, repo counts, not-measured count. (No door yet for the calibrated first-party figure.)
+- Headline numbers: code-LoC, total-LoC, repo counts, not-measured count. (The calibrated first-party figure: NEED(decision, Shaun: keep the legacy `FIRST_PARTY_DIVISOR` heuristic as a `LocView` figure or drop it).)
 
 If `summary` was requested, also print the per-bucket and top-10-language tables to the conversation.
 
 ### Step 4 — Interpretation note (include once per session)
 
-> The measured lines are whole-repository counts and **may include** tests, fixtures, and tooling. Audit reports that hand-state LoC typically cite *first-party non-test* code only. Spot-checking against reports that record both gave a median ratio of ~2.5× (legacy `FIRST_PARTY_DIVISOR`) — no door yet for the first-party figure, so the dashboard shows the measured one.
+> The measured lines are whole-repository counts and **may include** tests, fixtures, and tooling. Audit reports that hand-state LoC typically cite *first-party non-test* code only. Spot-checking against reports that record both gave a median ratio of ~2.5× (legacy `FIRST_PARTY_DIVISOR`) — the first-party figure has no door (the NEED in Step 3), so the dashboard shows the measured one.
 
 ---
 
@@ -82,9 +82,9 @@ If `summary` was requested, also print the per-bucket and top-10-language tables
 | File | Purpose |
 |---|---|
 | `lines-of-code.json` | The view's model: per-language totals and per-repo measured lines. |
-| `lines-of-code.{md,html}` | Dashboard: summary, language breakdown, per-repo table, not-measured repositories. |
+| `lines-of-code.{md,html}` | Dashboard: summary, language breakdown, per-repo table, not-measured repositories, population block. |
 
-No door yet for the population block panel.
+The dashboard ends with the standard population block (in scope, with findings reported, with a decision recorded) for cross-dashboard reconciliation.
 
 ---
 
