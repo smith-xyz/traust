@@ -21,6 +21,7 @@ from traust_core.v1.models.artifacts import (
     IsolationReviewArtifact,
     PrivProfileArtifact,
     SecurityAuditArtifact,
+    ThreatModelArtifact,
     VulnFindingsArtifact,
 )
 from traust_core.v1.models.assessment import AssessmentFilter, AssessmentKind
@@ -355,3 +356,18 @@ def test_record_files_a_secure_code_audit_at_its_report_date(doors, home, tmp_pa
     assert isinstance(doc, SecurityAuditArtifact)
     assert (ref, kind, assessor) == (REF, AssessmentKind.SECURE_CODE, "skill:secure-code-audit")
     assert provenance.occurred_at == datetime(2026, 5, 21, tzinfo=UTC)
+
+
+def test_record_files_a_threat_model_at_its_provenance_date(doors, home, tmp_path):
+    model = {
+        "system": "widget-operator",
+        "provenance": {"mode": "bootstrap", "date": "2026-10-01", "target": URL},
+        "threats": [],
+    }
+    path = document(tmp_path, model)
+    rc, _ = run(home, str(path), "--kind", "threat-model", "--repo-url", URL, "--sha", SHA)
+    assert rc == 0
+    [(doc, ref, kind, assessor, _, provenance)] = doors.record.calls
+    assert isinstance(doc, ThreatModelArtifact)
+    assert (ref, kind, assessor) == (REF, AssessmentKind.THREAT_MODEL, "skill:threat-model")
+    assert provenance.occurred_at == datetime(2026, 10, 1, tzinfo=UTC)
