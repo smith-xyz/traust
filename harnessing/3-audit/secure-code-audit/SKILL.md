@@ -55,7 +55,7 @@ allowed-tools:
   - Bash(python *harnessing/3-audit/secure-code-audit/scripts/probe_sanitizers.py:*)
   - Bash(python3 *-m traust.cli.check_citations:*)
   - Bash(python3 *-m traust.cli corpus finding-identity:*)
-  - Bash(python3 *harnessing/3-audit/secure-code-audit/scripts/enrich_findings_cves.py:*)
+  - Bash(python3 *-m traust.cli impact enrich:*)
   - Bash(python3 *-m traust.cli.emit_triage_ledger_events:*)
   - Bash(python3 *-m traust.cli sweep mine:*)
   - Bash(python3 *-m traust.cli corpus:*)
@@ -893,8 +893,8 @@ Contract (identical in spirit to the govulncheck stage):
    `scanner_correlation` entries like the other pre-scans. The step's key
    is `osv-scanner` whichever path ran (the OSV API or, air-gapped, the
    binary): it is the key the report schema and earlier reports use. For
-   prioritization context, `harnessing/3-audit/secure-code-audit/scripts/enrich_findings_cves.py --in
-   <artifact>` joins EPSS scores and CISA-KEV membership onto every
+   prioritization context, `python3 -m traust.cli impact enrich --in
+   <artifact> --repo-url <url>` joins EPSS scores and CISA-KEV membership onto every
    CVE-bearing candidate (an enrichment tagger — routes attention, never
    changes a severity).
 3. **Read `metadata.status`.** Exit 3 and `status: degraded` mean some

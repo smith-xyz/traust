@@ -132,7 +132,7 @@ specific tracker project is an internal-extension skill, not part of the harness
 
 **Decides which external sources to pull, and when.** Reads
 `config/feeds.yaml` — the registry covering both the cached tier this
-snapshots and the live tier `fetch_advisory.py` queries — and snapshots
+snapshots and the live tier `traust impact document` queries — and snapshots
 every cached source through traust-core (`ExposureService.refresh_feeds`);
 the pack's `feeds_cache` cadence decides when.
 

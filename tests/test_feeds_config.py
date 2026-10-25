@@ -93,33 +93,6 @@ def test_unparseable_registry_raises(tmp_path):
         fc.load(p)
 
 
-@pytest.mark.parametrize(
-    "ident,expected_year",
-    [
-        ("CVE-2021-44228", "2021"),
-        ("cve-2019-14540", "2019"),
-        # RHSA ids are RHSA-2024:6493 -- a '-' split yields '2024:6493' and
-        # silently produces a URL with an empty year segment.
-        ("RHSA-2024:6493", "2024"),
-    ],
-)
-def test_year_is_extracted_for_year_partitioned_trees(ident, expected_year):
-    spec = {"url_template": "https://h/{year}/{ident_lower}.json"}
-    assert f"/{expected_year}/" in fc.resolve_url(spec, ident)
-
-
-def test_rhsa_colon_becomes_underscore_in_path():
-    spec = {"url_template": "https://h/{year}/{ident_lower_us}.json"}
-    assert fc.resolve_url(spec, "RHSA-2024:6493").endswith("/2024/rhsa-2024_6493.json")
-
-
-def test_resolve_url_does_not_evaluate_caller_input():
-    """A template is config-supplied; an identifier is not a format string."""
-    spec = {"url_template": "https://h/{ident}"}
-    out = fc.resolve_url(spec, "{ident_upper}")
-    assert out == "https://h/{ident_upper}"
-
-
 def test_max_age_prefers_explicit_then_cadence_then_default():
     assert fc.max_age_hours({"max_age_hours": 6}) == 6
     assert fc.max_age_hours({"cadence": "weekly"}) == 24 * 7
