@@ -128,8 +128,9 @@ narratives are written to the schema's bar — present tense, jargon-free,
 readable by a non-technical VP — and are the single most effective
 persuasion artifact in a team package; never paraphrase them into table
 rows. Older threat models without section 9 get no such section (do not
-synthesize one from the threat table). (No door yet: the rollup has no threat
-models, so add the section to both written files yourself, escaped per Step 5.)
+synthesize one from the threat table). (`traust dashboard team-report` does:
+each repository's latest threat model's `attack_scenarios`, verbatim and
+escaped, one "Attack scenarios" section per scenario.)
 
 ### Step 4 — Create Output Folder
 
