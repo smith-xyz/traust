@@ -8,7 +8,7 @@ description: >-
   ({REPO_SLUG}-{SHORTSHA}-{NNN}) and the shared severity enum, for /triage
   to consume. When a <repo>-security-audit.json baseline exists, the scan
   supplements it: known findings are deduped against the baseline and new
-  verified findings enter the disposition ledger directly (as findings-carrying events; the baseline is never written — gate A15) at
+  verified findings enter traust-core directly (as findings of the scan's assessment; the baseline is never written — gate A15) at
   not_verified (no triage precondition; triage adjudicates downstream) —
   /secure-code-audit remains the preferred baseline and
   /verify-remediation the way to update it after fixes. Read-only — no
@@ -94,13 +94,13 @@ ingests directly.
   `/secure-code-audit`: a fast sweep for **new** candidate findings (new
   code, new release, a focus area the audit under-covered). When a
   baseline exists this skill **reads** it to dedupe, and its verified new
-  findings enter the **disposition ledger** as findings-carrying events
+  findings enter **traust-core** as findings of the scan's assessment
   **directly at `not_verified` — no `/triage` precondition** (user
   directive 2026-07-27, the same convention as `/verify-remediation`
   regression routing). The baseline itself is off limits: only the three
   `secure*audit` skills may write one (alignment gate **A15**), and
-  `build_cumulative` unions event-carried findings back at replay so
-  nothing is less visible for it. `/triage` remains the downstream
+  traust-core's finding reads count the scan's findings beside the
+  audit's, so nothing is less visible for it. `/triage` remains the downstream
   adjudicator via the ledger, never a gate on entry (see Step 5).
 
 **This skill does not execute code.** It reads source and reasons about it.
@@ -891,7 +891,7 @@ Tell the user:
 2. Top 3 by confidence, one line each.
 3. Next steps — the update path for the **ledger**:
    - Verify: `> /triage <target-dir>/<repo>-vuln-findings.json --repo <target-dir>`
-   - Record new findings as **ledger events — direct entry, no triage
+   - Record new findings **in traust-core — direct entry, no triage
      precondition** (user directive 2026-07-27; parity with the other
      scanning skills, whose findings enter the ledger at birth).
      **NEVER write the baseline.** Only `/secure-code-audit`,
@@ -911,13 +911,12 @@ Tell the user:
      ```
 
      It records a vuln-scan assessment of that commit with the report as
-     its artifact (schema-checked; a retried run adds nothing), and
+     its artifact (schema-checked; a retried run adds nothing), enters
+     the report's `findings[]` as findings of that assessment
+     (`known_findings` are the baseline's and stay out), and
      `traust findings surfaces` merges its `review_surface_coverage`
      into the repository's record; re-recording the same report is the
-     same run (`scanned_at`).
-     (Legacy gap: traust-core doesn't yet enter the report's findings as
-     findings; the per-finding events this step wrote went with the
-     retired findings layer.)
+     same run (`scanned_at`) and adds no finding.
 
      `/triage` remains the **downstream adjudicator**: its verdicts, and
      any refutations, flow through the disposition ledger
@@ -985,9 +984,9 @@ Emitted artifacts:
 
 - `<repo>-vuln-findings.json` — consumed by `/triage` (downstream
   adjudication and ledger flow) and `/patch`; the scan's verified new
-  findings enter the ledger as event-carried findings — the baseline is never
-  written (gate A15) — at
-  `validation_status: not_verified` with `origin: "vuln-scan"` — no
+  findings enter traust-core as findings of its vuln-scan assessment — the
+  baseline is never written (gate A15) — at
+  `validation_status: not_verified` — no
   triage precondition (Step 5; user directive 2026-07-27).
 - `<repo>-vuln-findings.md` — human companion of the JSON.
 - `metadata.additional.coverage_diff` (diff mode) — consumed by the
