@@ -24,6 +24,7 @@ SPEC = Path(__file__).parents[1] / "harnessing/7-remediate/fleet-fix/specs"
 REPO = "https://github.com/example-org/example-service"
 REPO_ID, PACKAGE_ID = uuid.uuid4(), uuid.uuid4()
 TARGET = FleetTarget(repository_id=REPO_ID, url=REPO, product_reach=2, evidence="named")
+OWNERS = {REPO_ID: [SimpleNamespace(name="team-b"), SimpleNamespace(name="team-a")]}
 
 
 class Door:
@@ -47,7 +48,8 @@ def doors(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     services = SimpleNamespace(
         remediation=SimpleNamespace(fleet_targets=stub.fleet_targets, record=stub.record),
         portfolio=SimpleNamespace(
-            find_repository=lambda url: SimpleNamespace(id=REPO_ID) if str(url) == REPO else None
+            find_repository=lambda url: SimpleNamespace(id=REPO_ID) if str(url) == REPO else None,
+            list_owners=lambda repository_id: OWNERS[repository_id],
         ),
     )
     monkeypatch.setattr(Context, "services", lambda self: services)
@@ -82,8 +84,19 @@ def test_targets_is_one_door_call_with_the_scope(
     doors: SimpleNamespace, home: Path, argv: tuple[str, ...], scope: FleetScope
 ) -> None:
     rc, out = run(remediation.fleet_targets, home, *argv)
-    assert (rc, out) == (0, [TARGET.model_dump(mode="json")])
+    assert (rc, out) == (
+        0,
+        [TARGET.model_dump(mode="json") | {"owner_teams": ["team-a", "team-b"]}],
+    )
     assert doors.fleet_targets.calls == [(scope,)]
+
+
+def test_targets_without_an_owner_have_none(
+    doors: SimpleNamespace, home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setitem(OWNERS, REPO_ID, [])
+    rc, out = run(remediation.fleet_targets, home, "--cwe", "CWE-79")
+    assert (rc, out[0]["owner_teams"]) == (0, [])
 
 
 def test_targets_writes_out(doors: SimpleNamespace, home: Path, tmp_path: Path) -> None:

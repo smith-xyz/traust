@@ -81,8 +81,8 @@ library. (No door looks a package up by name yet: `--module` /
 `--ecosystem` are gone until one exists.)
 Every target is enriched
 with **product reach** (fix highest-blast-radius repos
-first — the output is already sorted by it); **owner team** (MR
-routing at stage 5) has no door yet. Every target is a registered
+first — the output is already sorted by it) and **owner team** (MR
+routing at stage 5; `owner_teams`). Every target is a registered
 repository; an unknown one is refused, never guessed. `fleet.json` is the
 campaign's target list of record.
 
