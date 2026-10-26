@@ -25,6 +25,7 @@ from traust.cli.groups import (
     registry,
     remediation,
     reporting,
+    session,
     sweep,
     tools,
     triage,
@@ -123,6 +124,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "sarif": reporting.SARIF,
         "record": reporting.RECORD,
     },
+    "session": dict(session.SESSION),
     "sweep": {
         "collect": sweep.COLLECT,
         "draft": sweep.DRAFT,

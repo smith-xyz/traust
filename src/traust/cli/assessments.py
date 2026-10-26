@@ -1,7 +1,7 @@
 """``traust assessments prepare|coverage|threats``: the audit skills' doors on traust-core.
 
 prepare  what an assessment of one commit starts from, as JSON: the repository's findings, its
-         latest threat model and, with ``--diff``, the changes since the baseline audit
+         baseline audit, its latest threat model and, with ``--diff``, the changes since that audit
          (clusters, hunks, callers, each cluster's baseline findings). A refused diff prints
          the verdict and exits 3: run the full audit, never a wider or narrower scan.
 coverage what the registered repositories' latest default-line audits say they could not

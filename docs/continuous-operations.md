@@ -14,6 +14,21 @@ consume its worklist. The deps lane is the exception: its worklist rows are
 coverage classification — the daily `/dependency-watch` run covers that class
 advisory-first without reading the worklist (see rule 3b).
 
+Core owns the new-order classifier gate: order states, registered routing lanes,
+rescan event sources and machine reason codes come from its pinned contracts.
+Asset names such as `feeds_cache` or `dashboards` do not become lanes; an unrouted
+order has no lane. Materializer receipts expose stable reason codes
+(`bad_request`, `not_found`, `snapshot_unavailable`, `source_unavailable`,
+`ledger_unconfigured`); detailed causes are retained in logs with the run id.
+Historical order text and the existing router lane spellings are not rewritten.
+
+New completion coverage keys are checked against the common `DegradedKey` causes
+or current registered feed/view identifiers. A failed feed such as `kev` and an
+unavailable view such as `loc` keep separate counts; they do not become anonymous
+failures. Counts must be positive integers. Unknown causes or invalid counts leave
+the lease and artifact history unchanged. Imported historical keys remain readable
+and are retained when progress updates write a successor manifest.
+
 The thresholds and tier ceilings in this document are the router's shipped
 defaults. A deployment re-derives them from its own router telemetry on a
 quarterly cadence and records the derivation in its own planning documents;
@@ -116,6 +131,7 @@ rows named in the last column are the backstop that makes a dead timer visible.
 | **Feed-source liveness** | *retired* with `check drift`; returns as traust-core provider readiness once the live sources are core providers | probe | — | Probes every source in `config/feeds.yaml` carrying a `probe` — both tiers — so a live-tier source that answers with an error is visible. A definitive HTTP error is `drift`; a transport failure is `unavailable`, never `drift`, so an offline workstation does not report every source as broken |
 | Release/dist-git event feeder | on demand | a recorded release (`traust portfolio import-release`) | `python3 -m traust.cli portfolio release-changes --product <slug> --version <v>` | derived from recorded releases, nothing stored (`PortfolioService.release_changes`); a dist-git head is the `repo_state` observation of a registered repository |
 | `/dependency-watch` (deps lane end to end) | daily | timer (advisory publication) | `traust feeds fetch`, `traust impact sweep` and `traust impact analyze` | Core exposure services record per-commit impact assessments and dependency finding intake for `affected` commits without changing baselines. Advisory/classification provenance and evidence admission remain core-owned; never invent severity or promote an OSV match directly to a verdict. |
+| Below-range verification (packets, then review) | weekly per repository | timer (`below_range_packets`, then `below_range_review` once its packets are fresh) | `traust impact below-range-scan --repo <url>` records the head's packets; the review session runs `traust impact below-range-review`, two blind reviews and a judge on a split, then `traust impact below-range-record` | only `applicable` becomes a dependency finding (D1); `undetermined` cases and coverage gaps stay in the recorded review, never clean; no human queue (D4) |
 | **Feed router** — security-data refresh (EPSS / KEV / vendor CVE and VEX feeds) | **daily** | timer | `python3 -m traust.cli feeds fetch --feed all` | Orchestrator-neutral ([routers.md](routers.md)), deliberately not bound to a CI pipeline in this repo. Snapshots every `tier: cached` source in `config/feeds.yaml` through traust-core (`ExposureService.refresh_feeds`: a `feed_snapshot` per source, the bytes in core's object store; `rh-cve` fetches only what published since its last snapshot). A dedicated job exists because consumer-triggered refresh only holds while something runs daily; without one the snapshots silently age. Every source in `config/feeds.yaml` is public. A source that fails keeps its last snapshot and the order is **degraded**, keyed by the source; one with no snapshot at all fails the order. **Backstop:** drift rows `feeds:*` at **48h** — one missed run plus slack; a threshold looser than the cadence it guards is how a dead job stays green |
 | Weekly diff-drain tranche | weekly | timer over the router's drain ordering | *retired*: `diff_scan_quarterly`'s pacing and approval in `packs/security/assets.yaml`, routed by `traust.ops.router`; until the cutover, dispatch from the worklist by lane (see *Standing weekly drain* below) | fail-closed selection (refuses a worklist >48h old or a second tranche per ISO week); dispatching is an operator decision informed by measured cost |
 | Threat-model re-model lanes | rides the router (daily) + the weekly tranche | change (`pr` stamp), major/minor release event, calendar backstop | python3 -m traust.cli build rescan-worklist routes; the pack router schedules (the tranche script is retired); `/threat-model pr\|review` dispatches | **report-only** — no lane auto-applies an `update`. Drift row `threat-model` (held in lockstep with the lane's calendar threshold) is the dead-timer if the quarterly pool stops draining |
@@ -471,7 +487,7 @@ with none unexplained. `traust-engine` is installed with traust; every command
 takes the same three paths:
 
 ```bash
-E="--core $TRAUST_CONFIG_HOME/core.yaml --pack packs/security/assets.yaml --pin config/external-tools.yaml"
+E="--core $TRAUST_CONFIG_HOME/core.yaml --pack packs/security/assets.yaml --pin config/external-tools.yaml --feeds config/feeds.yaml"
 
 # each cron job, wrapped: its run becomes an order the engine counts
 traust-engine record $E feeds_cache -- traust feeds fetch --feed all
@@ -488,6 +504,22 @@ traust-engine diff $E --shadow shadow.jsonl --routes rescan-worklist.json
 `record` takes over the subject's open order if there is one, so there is still
 one open order per asset and repository. `shadow` reaps, plans and admits
 nothing. `traust-engine run` is the loop itself, for after the cutover.
+
+### Running orders: `traust-engine claim`
+
+After the cutover, `traust-engine run` plans and admits, and a runner does the
+work. `traust-engine claim $E` leases one queued order of an asset with a `run`
+command, fills its `{run_id}` and `{repo_url}` tokens from the order, renews the
+lease while the command runs, completes the order with the command's JobResult
+and exits (0 succeeded, 1 failed, 4 degraded, 5 refused; nothing queued is 0).
+It is claim-once, started by an operator or a scheduler, never a daemon.
+A skill session is a command too: its `run` is `traust session run --skill
+<skill> --role {role}`, which resolves the role's model from the registry and
+starts the skill headless in the harness (a repository it reviews is passed by
+URL, or as a temporary checkout outside the harness with `--checkout`). Its
+outcome is the session's exit. Pass `--feeds config/feeds.yaml` to every
+`traust-engine` command so core knows the pack's feeds when a run reports one
+degraded.
 
 ## Standing weekly drain — orchestrator contract
 

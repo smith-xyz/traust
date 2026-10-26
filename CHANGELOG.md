@@ -86,7 +86,7 @@ All notable changes to Traust are documented here.
   a traust-core import during the build. `requirements.txt` drops ldap3 and
   PyJWT (the ledger's auth) and adds sqlalchemy (core).
 
-## [0.35.0]
+## [0.37.0]
 
 - **LLM, agent and MCP application review on `development`.** This brings
   the deepsec comparison gap plan's steps 1 and 2 over from `main`, on
@@ -100,8 +100,31 @@ All notable changes to Traust are documented here.
     branch's report schema has no `owasp_llm_references` field, so findings
     name the OWASP category and check number in their description. Where
     the category lives in the data model is an open decision.
-  - **Pins:** traust-core at traust-core#184's head and traust-engine at
-    engine#92's head (the LLM-application rule pack, 0.39.0).
+  - **Pins:** traust-core development (with traust-core#184) and traust-engine
+    development (with engine#92, the LLM-application rule pack).
+
+## [0.36.0]
+
+- **Per-technology review checks for Kubernetes operators and gRPC**
+  (deepsec comparison gap plan, step 3, workstream C).
+  `harnessing/3-audit/secure-code-audit/framework-checks.md` is shared by
+  `/secure-code-audit` and `/vuln-scan`. Each check is a question answered
+  from code, with:
+  - the CWE a finding files under;
+  - its ASVS 5.0 section (from the harness's CWE-to-ASVS map) and, for
+    operator checks, the OWASP Kubernetes Top 10 ID from the audit's K01–K10
+    table;
+  - the evidence that settles it.
+
+  There are 13 operator checks (CR input reaching sinks and workloads,
+  cross-namespace reach, secret leakage, webhook fail-open and opt-out,
+  metrics and pprof exposure, image pinning, cache scope, minted
+  credentials). There are 11 gRPC checks (authentication on every service
+  and stream, per-method authorization, exemption matching, diagnostic
+  services, TLS and client certificates, metadata-based identity, the
+  in-process gateway that skips interceptors, resource limits, error
+  detail). The gRPC checks read traust-core's service x interceptor matrix
+  (traust-core#183). Audits record `"framework-checks": "ran: <sections>"`.
 
 ## [0.34.2]
 

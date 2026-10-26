@@ -15,7 +15,7 @@ from traust_core.v1.errors import NotFoundError
 from traust_core.v1.models.assessment import Assessment, AssessmentKind
 from traust_core.v1.models.inventory import RepositoryRef
 from traust_core.v1.models.observation import ComparisonStatus
-from traust_core.v1.models.operations import AssetRequest, JobResult
+from traust_core.v1.models.operations import AssetRequest, JobResult, OrderReason
 from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.providers.process import ProcessResult, ProcessRunner
 from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
@@ -147,4 +147,4 @@ def test_a_repository_core_doesnt_know_is_refused_with_its_reason() -> None:
     result = RepoStateMaterializer(Services(portfolio), HOSTS).materialize(  # type: ignore[arg-type]
         AssetRequest(asset="repo_state", run_id="t", partition=REPO)
     )
-    assert result == JobResult.refused("repository not in inventory: x")
+    assert result == JobResult.refused(OrderReason.NOT_FOUND)

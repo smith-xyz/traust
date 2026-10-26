@@ -32,7 +32,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `dashboard` | Dashboard rebuilds, the team report and one insight view | `refresh`, `team-report`, `view` |
 | `feeds` | Security feed snapshots (traust-core) and the product-definitions cache | `fetch`, `fetch-products` |
 | `findings` | track-findings' and findings-db's doors on traust-core | `apply`, `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `record`, `refuted`, `reject`, `request`, `review-cases`, `sarif`, `status`, `summary`, `surfaces`, `tickets`, `timeline` |
-| `impact` | Impact analysis | `analyze`, `below-range`, `calibrate-rule-pack`, `cluster-state-diff`, `document`, `enrich`, `find`, `package`, `sbom`, `sweep`, `symbols` |
+| `impact` | Impact analysis; `below-range-scan` is the `below_range_packets` materializer, `below-range-review` / `below-range-record` the review lane's doors | `analyze`, `below-range`, `below-range-record`, `below-range-review`, `below-range-scan`, `calibrate-rule-pack`, `cluster-state-diff`, `document`, `enrich`, `find`, `package`, `sbom`, `sweep`, `symbols` |
 | `isolation` | Tenant-isolation review | `repos` |
 | `ledger` | Ledger audit (traust-core) and the doc-variance register | `audit`, `doc-variance` |
 | `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `spend` |
@@ -42,6 +42,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `registry` | Model/product registry | `models`, `products` |
 | `remediation` | The remediation loop's doors on traust-core (remediate-finding, patch, property-test, fleet-fix, verify-remediation) | `assemble`, `candidates`, `fleet-apply`, `fleet-record`, `fleet-targets`, `fork`, `mutation-evidence`, `next`, `open`, `prepare`, `progress`, `property-evidence`, `record`, `verifications`, `verify-differential`, `verify-prepare`, `verify-record`, `verify-sweep`, `work-items` |
 | `reporting` | Report validation, rendering & recording | `lint`, `rate-threats`, `record`, `render`, `sarif`, `validate` |
+| `session` | A skill session started headless for a continuous-ops order (the pack's skill-session `run`) | `run` |
 | `tools` | One door over traust-core's tool registry: each registered tool's readiness, version and database; one tool over a checkout, SBOM, image or symbols, its typed result as JSON | `list`, `run` |
 | `triage` | The triage skill's doors on traust-core | `check`, `intake`, `prepare`, `record`, `render` |
 | `sweep` | Class-generalization sweep; recall-benchmark answer key | `benchmark`, `benchmark-targets`, `build-canaries`, `cards`, `collect`, `draft`, `emit`, `mine`, `rule-lane`, `screen-injection`, `sweep` |
