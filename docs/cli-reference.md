@@ -32,7 +32,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `dashboard` | Dashboard rebuilds, the team report and one insight view | `refresh`, `team-report`, `view` |
 | `feeds` | Security feed snapshots (traust-core) and the product-definitions cache | `fetch`, `fetch-products` |
 | `findings` | track-findings' and findings-db's doors on traust-core | `apply`, `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `record`, `refuted`, `reject`, `request`, `review-cases`, `sarif`, `status`, `summary`, `surfaces`, `tickets`, `timeline` |
-| `impact` | Impact analysis | `analyze`, `below-range`, `calibrate-rule-pack`, `cluster-state-diff`, `document`, `enrich`, `find`, `package`, `sbom`, `sweep`, `symbols` |
+| `impact` | Impact analysis; `below-range-scan` is the `below_range_packets` materializer, `below-range-review` / `below-range-record` the review lane's doors | `analyze`, `below-range`, `below-range-record`, `below-range-review`, `below-range-scan`, `calibrate-rule-pack`, `cluster-state-diff`, `document`, `enrich`, `find`, `package`, `sbom`, `sweep`, `symbols` |
 | `isolation` | Tenant-isolation review | `repos` |
 | `ledger` | Ledger audit (traust-core) and the doc-variance register | `audit`, `doc-variance` |
 | `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `spend` |

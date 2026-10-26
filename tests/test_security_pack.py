@@ -22,6 +22,7 @@ STANDING_JOBS = Path(__file__).resolve().parents[1] / "docs" / "continuous-opera
 ASSETS = {
     # the refresh half; its rescan router is the pack router (route_on: repo_state)
     "Fleet refresh + rescan router": "repo_state",
+    "Below-range verification (packets, then review)": "below_range_packets",
     "Weekly diff-drain tranche": "diff_scan_quarterly",
     "/dependency-watch (deps lane end to end)": "dependency_watch",
     "Feed router — security-data refresh (EPSS / KEV / vendor CVE and VEX feeds)": "feeds_cache",
@@ -39,6 +40,9 @@ ASSETS = {
 
 # The rescan router's routed lanes: assets planned from traust.ops.router's lane, not a row.
 ROUTED = {"Fleet refresh + rescan router": ("full_audit", "diff_scan")}
+
+# Assets a row's asset feeds: they run once its output is fresh, as the same standing job.
+FOLLOWS = {"below_range_review": "below_range_packets"}
 
 # Rows that stay outside the pack, and why.
 EXCLUDED = {
@@ -71,7 +75,9 @@ def test_every_standing_job_is_an_asset_or_an_explicit_exclusion() -> None:
     assert sorted(jobs) == sorted([*ASSETS, *EXCLUDED])
     pack = Pack.load(PACK)
     assert set(ASSETS.values()) <= set(pack.assets)
-    assert set(pack.assets) <= {*ASSETS.values(), *(a for row in ROUTED.values() for a in row)}
+    routed = {a for row in ROUTED.values() for a in row}
+    assert set(pack.assets) <= {*ASSETS.values(), *routed, *FOLLOWS}
+    assert all(pack.assets[a].deps == (FOLLOWS[a],) for a in FOLLOWS)
 
 
 def test_every_asset_has_a_trigger_freshness_and_runner_labels() -> None:

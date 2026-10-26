@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import tempfile
+from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 from uuid import UUID
 
 from traust_core.v1.context import Services
 from traust_core.v1.errors import ConfigError, NotFoundError, ValidationError
+from traust_core.v1.models.below_range import BelowRangeStatus
 from traust_core.v1.models.dependencies import FeedName
 from traust_core.v1.models.insight import RenderedView, ViewFilter, ViewName
 from traust_core.v1.models.observation import ComparisonStatus
@@ -134,3 +137,36 @@ class DashboardsMaterializer:
         return JobResult.partly(degraded, tuple(map(str, written))).model_copy(
             update={"reason": reason}
         )
+
+
+class BelowRangePacketsMaterializer:
+    """`below_range_packets`: below-range packets for one inventory repository's default-branch
+    head, recorded for review (source trees live only for the run). A commit with no head or
+    no manifest SBOM is refused; a degraded scan is degraded by gap reason."""
+
+    asset = "below_range_packets"
+
+    def __init__(self, services: Services, hosts: Iterable[str]) -> None:
+        self._portfolio = services.portfolio
+        self._below_range = services.below_range
+        self._hosts = tuple(hosts)
+
+    def materialize(self, request: AssetRequest) -> JobResult:
+        try:
+            url = HttpsRepoUrl.parse(request.partition or "", self._hosts)
+            order = _order_id(request.run_id)
+        except (ValidationError, ValueError) as e:
+            return JobResult.failed(f"bad request: {e}")
+        repo = self._portfolio.find_repository(url)
+        if repo is None or repo.id is None:
+            return JobResult.refused(f"{url} is not in the inventory")
+        with tempfile.TemporaryDirectory(prefix="below-range-") as workdir:
+            try:
+                scan = self._below_range.scan(repo.id, Path(workdir), run_order_id=order)
+            except NotFoundError as e:
+                return JobResult.refused(str(e))
+            except ConfigError as e:
+                return JobResult.failed(f"bad request: {e}")
+        if scan.packets.status == BelowRangeStatus.COMPLETE:
+            return JobResult.succeeded()
+        return JobResult.partly(Counter(g.reason.value for g in scan.packets.coverage_gaps))
