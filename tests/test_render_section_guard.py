@@ -8,9 +8,7 @@ went wrong. The guard makes that a refusal unless the caller says the
 removal is intended.
 """
 
-import importlib.util
 import json
-import sys
 from argparse import Namespace
 from pathlib import Path
 
@@ -104,18 +102,3 @@ def test_intended_removal_needs_the_flag(tmp_path: Path) -> None:
     assert _render(tmp_path, fewer, full_md)[0] == 1
     rc, md = _render(tmp_path, fewer, full_md, allow=True)
     assert rc == 0 and "physical access" not in md
-
-
-def test_scheduled_check_up_applies_ratings() -> None:
-    """The quarterly and release-review lanes write OWASP ratings and leave
-    everything else report-only (decided 2026-10-01)."""
-    path = (
-        Path(__file__).resolve().parents[1]
-        / "harnessing/2-threat-model/threat-model/scripts/emit_drain_tranche.py"
-    )
-    spec = importlib.util.spec_from_file_location("emit_drain_tranche", path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules.setdefault("emit_drain_tranche", module)
-    spec.loader.exec_module(module)
-    for lane in ("threat-model-quarterly", "threat-model-review"):
-        assert module._DISPATCH[lane] == "/threat-model review <clone> --auto --apply-ratings"

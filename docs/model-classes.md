@@ -213,11 +213,11 @@ Audits, threat models, triage, validation, remediation, verification — the rol
 
 `compliance-check` · `crypto-analysis` · `insecure-patterns` · `isolation-review` · `patch` · `pqc-readiness` · `recall-benchmark` · `remediate-finding` · `secure-code-audit` · `secure-rpm-audit` · `security-audit-phased` · `threat-model` · `triage` · `validate-browser-finding` · `validate-findings` · `verify-remediation`
 
-### `opus-class` — 26 skill(s)
+### `opus-class` — 25 skill(s)
 
 Orchestration, inventory, graphs, dashboards and rollups: work whose failure mode is a rerun, not a bad security decision.
 
-`add-inputs` · `attack-coverage` · `census` · `cloud-config-audit` · `corpus-intake` · `dependency-watch` · `financial-tracking` · `findings-db` · `fleet-fix` · `generate-team-report` · `impact-analysis` · `inventory-repositories` · `mine-ledger` · `operator-priv-profile` · `portfolio-graph` · `property-test` · `rbac-tenancy-rollup` · `repo-graph` · `secure-container-audit` · `sla-view` · `threat-register` · `track-findings` · `traust-metrics` · `validation-fuzz-dashboard` · `vuln-scan`
+`add-inputs` · `attack-coverage` · `census` · `cloud-config-audit` · `corpus-intake` · `dependency-watch` · `financial-tracking` · `findings-db` · `fleet-fix` · `generate-team-report` · `impact-analysis` · `inventory-repositories` · `mine-ledger` · `operator-priv-profile` · `portfolio-graph` · `property-test` · `rbac-tenancy-rollup` · `secure-container-audit` · `sla-view` · `threat-register` · `track-findings` · `traust-metrics` · `validation-fuzz-dashboard` · `vuln-scan`
 
 ### `sonnet-class` — 6 skill(s)
 
@@ -235,7 +235,7 @@ answer for them anyway, since that is what actually decides the floor:
 | `create-fuzzing` | `fuzz-author` | `opus-class` |
 | `executive-summary-findings` | `render-narrate` over deterministic aggregates | `opus-class` in practice; the narration step may drop to `haiku-class` |
 | `findings-trends` | deterministic replay + narration | `opus-class` |
-| `loc-dashboard` | deterministic, cache-only | `opus-class` |
+| `loc-dashboard` | deterministic, reads stored code facts | `opus-class` |
 
 ### Making this mechanical
 

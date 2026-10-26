@@ -3,8 +3,8 @@
 This procedure extracts every container image shipped in an OpenShift/OKD-style
 release payload image, maps each image back to its source repository,
 categorises by functional area, produces a Markdown report and a CSV inventory
-in a segment of kind `release-payload`, and registers the repositories and
-their owner teams in traust-core.
+in a segment of kind `release-payload`, and registers the repositories, their
+owner teams and the release (its version and commits) in traust-core.
 
 `<segment>` below is the descriptor segment resolved by the parent skill;
 `<inputs>` is `locations.inputs`.
@@ -169,6 +169,18 @@ Structure:
 `traust portfolio onboard --product <segment> --label <label> --repo <URL>…`
 (every repository in the CSV), then follow the ownership resolution procedure
 in the [parent skill](../SKILL.md#ownership-resolution).
+
+Then record the release, the payload's commits as they are (before removing
+`$AUTHDIR`):
+
+```bash
+traust portfolio import-release --product <segment> --version <version> \
+  --branch <source branch> --commits "$AUTHDIR/payload-image-repo-map.txt"
+```
+
+Re-running it for the same payload changes nothing; a different commit set
+for a version already recorded is refused (a release doesn't change), and so
+is a commit whose repository isn't registered (nothing is written).
 
 *Retired*: `<inputs>/<segment>/owners.csv` (see the parent skill's owners.csv
 schema).

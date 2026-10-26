@@ -23,7 +23,8 @@ allowed-tools:
   - Read
   - Glob
   - Bash(python3 *-m traust.cli.checkpoint:*)
-  - Bash(python3 *-m traust_engine.reporting.lint:*)
+  - Bash(python3 *-m traust.cli reporting lint:*)
+  - Bash(python3 *-m traust.cli reporting record:*)
   - Grep
   - Write
   - Bash(git log:*)
@@ -317,7 +318,15 @@ python3 -m traust.cli reporting rate-threats <repo>-threat-model.json
 python3 -m traust.cli reporting validate <repo>-threat-model.json
 python3 -m traust.cli reporting render   <repo>-threat-model.json \
     -o <repo>-threat-model.md
+python3 -m traust.cli reporting record <repo>-threat-model.json --kind threat_model \
+    --repo-url <https URL of the origin remote> --sha <the modelled commit>
 ```
+
+`reporting record` records the validated model in traust-core as a
+threat-model assessment of that commit (the JSON published as its
+artifact; the same model again is the same run, by `provenance.date`);
+the audits' `traust assessments prepare` hands it to them. `pr` mode
+writes no model and records nothing.
 
 `rate-threats` fills each `risk_rating`'s scores, levels and severity
 from the factors you scored. Author only the factors, the basis and the
@@ -370,8 +379,7 @@ from never tagging the surface.
 
 **Findings-tree placement (wiring contract, 2026-07-31).** The checkout
 copy alone is invisible to every downstream consumer — `/secure-code-audit`
-(coverage diff), `/vuln-scan`, `/triage`, `/threat-register`, and
-`traust_engine.corpus.resolver` all resolve threat models from the campaign findings
+(coverage diff), `/vuln-scan`, `/triage`, and `/threat-register` all resolve threat models from the campaign findings
 tree, and target checkouts are disposable. Whenever the target has a
 findings directory (`analysis-results/findings/<product>/<repo>/`), copy
 the emitted `<model-file>` there in the same step that writes it. If no
@@ -467,14 +475,13 @@ The **Markdown** is consumed by `/secure-code-audit` (coverage diff),
 the JSON, the source; the rendering repeats them as a trailing column in
 sections 3, 4 and 5.
 
-The **JSON** is the contract artifact, and its consumer is the storage
-layer rather than another skill: `traust_engine.corpus.store_ingest`
-routes it as the `threat-model` family, and
-`traust_contracts.v1.storage` projects it into the `threat` table
-behind the `threat_current` and `threat_exposure` views. That is the
+The **JSON** is the contract artifact, and its consumer is traust-core
+rather than another skill: `traust reporting record` records it as a
+threat-model assessment, and `AssessmentService.threats` reads its
+threats back (the latest completed model per repository). That is the
 adopter-neutral read surface — a deployment on Postgres gets the same
-rows without any skill in the path, which is the point of emitting it.
-The skills above still read the Markdown; migrating them onto the views
+threats without any skill in the path, which is the point of emitting it.
+The skills above still read the Markdown; migrating them onto those reads
 is dashboard work, not threat-model work.
 
 Context passes may also emit doc-variance records via
@@ -484,17 +491,17 @@ python3 -m traust.cli ledger doc-variance.
 shipped 2026-08-05 — `docs/continuous-operations.md`, plan
 `progress-tracker/plans/threat-model-cadence-plan.md`). Models are no
 longer written once at bootstrap and left to age; three router lanes
-re-model them, and `harnessing/2-threat-model/threat-model/scripts/emit_drain_tranche.py` puts each row in a
-weekly tranche the orchestrator dispatches headless:
+re-model them, and the pack router paces each row into the runs
+the orchestrator dispatches headless:
 
 | Trigger | Router output | Mode dispatched |
 |---|---|---|
 | diff-lane change touching a sensitive path or an interface-bearing path | `threat_model_pr` stamp on the existing diff row | `pr <clone> --base <anchor>` — **report-only**, on the clone the diff scan already made; writes no model |
-| major/minor release (`release_change` from `harnessing/2-threat-model/threat-model/scripts/build_release_events.py`) | `threat-model-review` lane row | `review <clone> --auto` |
+| major/minor release (`bump` from `traust portfolio release-changes`) | `threat-model-review` lane row | `review <clone> --auto` |
 | model older than 92d with no change-triggered re-model | `threat-model-quarterly` lane row (trickle-drained over a quarter) | `review <clone> --auto` |
 
 The provenance `date:` this skill stamps in section 7 is what the
-router and `check_drift.py`'s `threat-model` row both measure — that
+router and traust-core's freshness view (`assessments:threat-model`) both measure — that
 row is the dead-timer that fires if the quarterly lane stops draining.
 Auto-applying `update` is deliberately NOT wired: Phase 1 is
 report-only pending a calibration window.

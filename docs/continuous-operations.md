@@ -90,8 +90,8 @@ dropped.
 
 | Cadence | What runs |
 |---|---|
-| Daily (automated, deterministic) | fleet refresh + router → fresh worklist; `harnessing/2-threat-model/threat-model/scripts/build_release_events.py` — the release/dist-git event feeders (see *Event feeders*); `/dependency-watch` supplies advisory/impact evidence, but its former direct-entry finding router is retired and the core finding-intake skill port has no executable fallback |
-| Weekly session | dispatch the worklist's full-audit rows as a batch; `/verify-remediation` treadmill sweep (`harnessing/8-verify/verify-remediation/scripts/build_verify_sweep.py`); triage new findings |
+| Daily (automated, deterministic) | fleet refresh + router → fresh worklist (a recorded release's change is derived on demand: see *Event feeders*); `/dependency-watch` — the advisory-driven deps lane end to end (feeds → `/impact-analysis` → python3 -m traust.cli route impact-findings direct-entry filing) |
+| Weekly session | dispatch the worklist's full-audit rows as a batch; `/verify-remediation` treadmill sweep (`traust remediation verify-sweep`); triage new findings |
 | Monthly | sensitive-change P2 diff scans; validation session (criticals validated-or-blocked inside the SLA window); spend reconcile against the budget policy |
 | Weekly (trickle) | the `diff-scan-quarterly` pool drains as a risk-ordered weekly trickle: dispatch rows with `drain_order < weekly rate` (default ceil(pool/13) — the same quarterly volume as a 90-day batch, but a short stable queue instead of a long tail; external-band rows first, target ≤14 days in-pool). Dispatching the drain is an operator decision informed by the deployment's measured per-run cost (see *The diff lane*); the drain ordering accumulates until scheduled |
 | Weekly (rule mining) + post-wave | python3 -m traust.cli sweep rule-lane — the /mine-ledger lane: ledger miner → sweep-engine collect/draft → bounded regression-draft staging → delta report vs the previous `rule-mining.json`. Inputs: the disposition ledgers (`*-findings-current.json`) + audits' `scanner_correlation` judge decisions. Outputs: `lane-delta.{json,md}` under the metrics tree + staged rule drafts, then calibrated pack rules via the scheduled `/mine-ledger` session (the mechanical test-and-calibrate gate is the promotion criterion; sweep hits and mined candidates still route to `/triage` — the lane never auto-files findings). Post-wave trigger: `/drift-watch`'s `rule-mining` row goes stale when ledger changes are >7d newer than the artifact |
@@ -112,27 +112,27 @@ rows named in the last column are the backstop that makes a dead timer visible.
 
 | Job | Cadence | Trigger | Runner | Output gate / staleness backstop |
 |---|---|---|---|---|
-| Fleet refresh + rescan router | daily | timer | python3 -m traust.cli build rescan-worklist | routes only, never authors findings; drift row `rescan-worklist` flags a worklist >3 days old |
-| **Feed-source liveness** | rides the drift run | probe | `python3 -m traust.cli check drift` (`feed-source:*` rows) | Probes every source in `config/feeds.yaml` carrying a `probe` — both tiers — so a live-tier source that answers with an error is visible. A definitive HTTP error is `drift`; a transport failure is `unavailable`, never `drift`, so an offline workstation does not report every source as broken |
-| Release/dist-git event feeder | daily, beside the router | timer (inventory-CSV diff + dist-git `ls-remote` movement vs the committed seen-set) | `python3 harnessing/2-threat-model/threat-model/scripts/build_release_events.py` | emits events only; the router routes them; dispatch marks `consumed` |
+| Fleet refresh + rescan router | daily | timer | python3 -m traust.cli build rescan-worklist | routes only, never authors findings; the engine tick is the cadence |
+| **Feed-source liveness** | *retired* with `check drift`; returns as traust-core provider readiness once the live sources are core providers | probe | — | Probes every source in `config/feeds.yaml` carrying a `probe` — both tiers — so a live-tier source that answers with an error is visible. A definitive HTTP error is `drift`; a transport failure is `unavailable`, never `drift`, so an offline workstation does not report every source as broken |
+| Release/dist-git event feeder | on demand | a recorded release (`traust portfolio import-release`) | `python3 -m traust.cli portfolio release-changes --product <slug> --version <v>` | derived from recorded releases, nothing stored (`PortfolioService.release_changes`); a dist-git head is the `repo_state` observation of a registered repository |
 | `/dependency-watch` (deps lane end to end) | daily | timer (advisory publication) | `traust feeds fetch`, `traust impact sweep` and `traust impact analyze` | Core exposure services record per-commit impact assessments and dependency finding intake for `affected` commits without changing baselines. Advisory/classification provenance and evidence admission remain core-owned; never invent severity or promote an OSV match directly to a verdict. |
 | **Feed router** — security-data refresh (EPSS / KEV / vendor CVE and VEX feeds) | **daily** | timer | `python3 -m traust.cli feeds fetch --feed all` | Orchestrator-neutral ([routers.md](routers.md)), deliberately not bound to a CI pipeline in this repo. Snapshots every `tier: cached` source in `config/feeds.yaml` through traust-core (`ExposureService.refresh_feeds`: a `feed_snapshot` per source, the bytes in core's object store; `rh-cve` fetches only what published since its last snapshot). A dedicated job exists because consumer-triggered refresh only holds while something runs daily; without one the snapshots silently age. Every source in `config/feeds.yaml` is public. A source that fails keeps its last snapshot and the order is **degraded**, keyed by the source; one with no snapshot at all fails the order. **Backstop:** drift rows `feeds:*` at **48h** — one missed run plus slack; a threshold looser than the cadence it guards is how a dead job stays green |
-| Weekly diff-drain tranche | weekly | timer over the router's drain ordering | `python3 harnessing/2-threat-model/threat-model/scripts/emit_drain_tranche.py`, then one run per tranche row **by lane** (`dispatch_by_lane` in the manifest — see *Standing weekly drain* below) | fail-closed selection (refuses a worklist >48h old or a second tranche per ISO week); dispatching is an operator decision informed by measured cost |
-| Threat-model re-model lanes | rides the router (daily) + the weekly tranche | change (`pr` stamp), major/minor release event, calendar backstop | python3 -m traust.cli build rescan-worklist routes; `harnessing/2-threat-model/threat-model/scripts/emit_drain_tranche.py` schedules; `/threat-model pr\|review` dispatches | **report-only** — no lane auto-applies an `update`. Drift row `threat-model` (held in lockstep with the lane's calendar threshold) is the dead-timer if the quarterly pool stops draining |
-| Verify-remediation treadmill | weekly (worklist rebuilt per sweep) | timer | `harnessing/8-verify/verify-remediation/scripts/build_verify_sweep.py` → `/verify-remediation full-sweep` | verification artifacts remain evidence; the former verification emitter and regression router are retired, and core remediation/finding-intake skill ports remain unfinished with no executable ledger-write fallback |
+| Weekly diff-drain tranche | weekly | timer over the router's drain ordering | *retired*: the pack router's lane pacing and approval (*The security pack's router and its routed lanes*); until then dispatch from the worklist by lane (see *Standing weekly drain* below) | fail-closed selection (refuses a worklist >48h old or a second tranche per ISO week); dispatching is an operator decision informed by measured cost |
+| Threat-model re-model lanes | rides the router (daily) + the weekly tranche | change (`pr` stamp), major/minor release event, calendar backstop | python3 -m traust.cli build rescan-worklist routes; the pack router schedules (the tranche script is retired); `/threat-model pr\|review` dispatches | **report-only** — no lane auto-applies an `update`. Drift row `threat-model` (held in lockstep with the lane's calendar threshold) is the dead-timer if the quarterly pool stops draining |
+| Verify-remediation treadmill | weekly (worklist rebuilt per sweep) | timer | `traust remediation verify-sweep` → `/verify-remediation full-sweep` | verdicts gated by the verification schema + soundness lint; `traust remediation verify-record` records verdicts as decisions and regressions as findings |
 | Rule-mining lane | weekly + post-wave | timer + drift row `rule-mining` (ledger changes >7d newer than the artifact) | python3 -m traust.cli sweep rule-lane, then the scheduled `/mine-ledger` session | never auto-files findings; rule promotion sits behind the mechanical test-and-calibrate gate; sweep hits route to `/triage` |
 | Ledger audit | weekly | timer | python3 -m traust.cli ledger audit (`LedgerService.audit`) | verifies every ledger layer against its stored events and signature, so an edit to stored decision events is found within a week (appends no longer re-verify the layer); a layer that fails or can't be verified degrades the order, never green |
 | CVE-replay FN monitor | daily (cron-able, stdlib-only) | timer; per-ecosystem OSV watermark advances only on success | *retired with the traust-core hub*; rebuilt on `DetectionQualityService.critical_misses` (*Detection quality*), not in the pack until then | routes, never concludes (`detected`/`unclear`/`missed`); benchmark ground-truth candidates stay a human-gated queue |
-| `/drift-watch` | on demand; recommended alongside every `/census`; scheduled by the orchestrator | operator / timer | python3 -m traust.cli check drift | routes attention only — never auto-rebuilds, auto-advances a pin, or files a finding |
-| Census + repo-liveness refresh | formerly at intake and before denominator consumption | operator / intake flow | no executable projection fallback; core assessment/population and finding services own the unfinished census skill port | Existing population and repo-liveness artifacts may be stale; a drift row is not evidence that the retired refresh completed |
+| `/drift-watch` | on demand; recommended alongside every `/census`; scheduled by the orchestrator | operator / timer | python3 -m traust.cli dashboard view freshness | routes attention only — never auto-rebuilds, auto-advances a pin, or files a finding |
+| Census + repo-liveness refresh | no fixed timer — run at intake (`/corpus-intake` triggers it), and before denominators are consumed | operator / intake flow | `/census` (runs `traust portfolio liveness` as its Step 2b) | liveness derives on read; the engine tick is the cadence |
 | FP-precedent cache rebuild | formerly drift-triggered, no timer | former `fp-precedent-cache` drift row | no executable runner; core finding precedents own the unfinished skill port | Formerly indexed human-countersigned and sound machine refutations to inform review, never to dismiss automatically. Existing cache artifacts are not a current rebuild. |
 | Validation benchmark | release-cut + monthly hybrid | `run_validation_benchmark.py check-trigger` (exit 10 = benchmark required) + drift row `validation-benchmark` (35d) | python3 -m traust.cli sweep benchmark | below-floor runs exit non-zero; results land in the harness-QA tree, never campaign metrics |
 | Recall benchmark | quarterly, plus release scoring | timer / release cut (`--release` scores held-out targets) | `/recall-benchmark run` | manifest never enters an audited tree; held-out split scored only at release |
 | Class-sweep rotation | quarterly | timer (measured FN classes) | targeted class-sweep sessions (see *Lane weights*) | sweeps produce candidates for `/triage`, never filed findings |
 | Threshold re-derivation | quarterly | timer over router telemetry | re-derivation per the deployment's cadence plan | a human reviews and edits the decision table; the router never self-tunes |
-| Dashboards rebuild (all deterministic dashboards: census + exec summary, trends, insecure-patterns, validation-fuzz, rbac-tenancy, sla, compliance, attack-coverage, loc, spend, scoreboard) | **weekly** (inside the scoreboard's 7d drift threshold), spend rebuild every ≤4d | timer | `python3 -m traust.cli dashboard refresh` (skill wrapper: `/refresh-dashboards`) — the security pack's packaged sequential deterministic `dashboards` asset: core's `InsightService.refresh` through `DashboardsMaterializer` first, then validation-fuzz, SLA, compliance, attack-coverage, LoC (`--no-fetch`), dependency-exposure and spend consumers; scoreboard last. Stages continue on error and report failures, including degraded core views in the JobResult. | Old CVE-provenance reconciliation, `findings.db`/census projection, executive summary, trends, insecure-patterns and rbac-tenancy builders remain retired. Configure `analysis_results`, `workspace`, `progress_tracker` and persistent write-back paths through `locations.yaml`; ephemeral output is not a completed refresh. Drift rows `dashboards:*` guard age, not completion of retired stages (scoreboard >7d, spend >4d). Optional spend-actuals collection (`python3 -m traust.cli metrics collect-spend --append`) reads operator-workstation transcripts, stays operator-side until transcripts are centralized, and retains its un-appended-actuals >4d backstop. |
+| Dashboards rebuild (all deterministic dashboards: census + exec summary, trends, insecure-patterns, validation-fuzz, rbac-tenancy, sla, compliance, attack-coverage, loc, spend, scoreboard) | **weekly** (inside the scoreboard's 7d drift threshold), spend rebuild every ≤4d | timer | one command: python3 -m traust.cli dashboard refresh (skill wrapper: `/refresh-dashboards`) — the packaged sequential deterministic job, the security pack's `dashboards` asset: traust-core's insight views first (`InsightService.refresh` through `DashboardsMaterializer`); then the per-dashboard builders (`build_trends.py`, `build_insecure_patterns.py`, `build_validation_fuzz_dashboard.py`, `build_rbac_tenancy_rollup.py`, python3 -m traust.cli metrics spend); the scoreboard is a core view (`ScoreboardView`, composing the others) — all deterministic, no agent involved; every stage continues on error, failures are collected and reported (a degraded core view is named in the JobResult) | drift rows `dashboards:*` remain the dead-timer backstop (scoreboard >7d, spend >4d). **Orchestrator prerequisites for this job:** `$TRAUST_CONFIG_HOME/locations.yaml` must set `analysis_results` (and usually `workspace`, `progress_tracker`, the default `--out` for core views); and a **write-back path** for `analysis-results` (stamped layers) and `progress-tracker` (the metrics file) — on an ephemeral runner without one, the stamps are computed and then discarded. **Exception that stays operator-side:** the spend-*actuals* leg (python3 -m traust.cli metrics collect-spend --append) reads agent session transcripts on operator workstations — it cannot move to the orchestrator until transcripts are centralized, and its un-appended-actuals >4d drift row exists precisely to keep guarding that leg |
 | IaC quarterly re-baseline | quarterly — **human-decision, drift-flagged** | rides `checkov-pin` advances (drift row) | `/cloud-config-audit` re-runs against the IaC-bearing targets | pin advances are deliberate toolchain changes — re-verify one known-good target before the sweep |
-| Portfolio-graph heavyweight rebuild | **human-decision, drift-flagged** — after `/repo-graph` refreshes, or when `/impact-analysis` freshness demands it | drift row `portfolio-graph` (build stamp vs inputs HEAD) | `/portfolio-graph` (python3 -m traust.cli portfolio build) | build refuses a stale spine; rebuild timing stays with the operator (clone-sweep cost) |
+| Portfolio-graph heavyweight rebuild | **human-decision, drift-flagged** — after the inputs inventory moves, or when `/impact-analysis` freshness demands it | drift row `portfolio-graph` (build stamp vs inputs HEAD) | `/portfolio-graph` (python3 -m traust.cli portfolio build) | build refuses a stale spine; rebuild timing stays with the operator (clone-sweep cost) |
 | ADR / pin / external-tool advances | **human-decision, drift-flagged** — never automated | drift rows `adr-registry:*`, `checkov-pin`, `external-tools:*` | reviewed commits advancing the pins | no check may auto-advance a pin (drift-watch constraint) |
 | Spend capture (`/financial-tracking capture`) | **weekly** | timer; drift rows `dashboards:spend*` (>4d) | `/financial-tracking capture` — see *Spend capture cadence* below | capture is LOSSY if you are late: transcripts are retained for a rolling window only and there is no backfill. The reconcile step is a hard gate — a non-zero exit means tokens were lost between the collector and the attribution split |
 | Docs semantic sweep | quarterly | drift row `docs-semantic-sweep` (92d) | reviewer sweep per the check-harness-docs SKILL procedure | report lands in the deployment's gap-assessments tree |
@@ -174,13 +174,13 @@ run headless. Resolve every row for your deployment before scheduling it.
 
 | Requirement | Consumers | Notes |
 |---|---|---|
-| **Service identity for each `github`-kind host** (dedicated — not a human's PAT) with read access to the audited orgs, exposed as `GITHUB_TOKEN` | router stages 1–2 (`gh api`), `/dependency-watch`, python3 -m traust.cli check drift (private ADR-registry repos + `external-tools:*` release lookups), audit API lookups | A full fleet run consumes most of a core API quota hour and the router's preflight assumes it has the whole window — sharing a human's quota starves both. Anti-scraping **secondary bans are invisible to the `rate_limit` endpoint**: keep fleet sweeps single-pass with bounded parallelism and error-streak gating. Token via env/header only, never argv (rule S5). |
+| **Service identity for each `github`-kind host** (dedicated — not a human's PAT) with read access to the audited orgs, exposed as `GITHUB_TOKEN` | router stages 1–2 (`gh api`), `/dependency-watch`, python3 -m traust.cli check drift (private ADR-registry repos), audit API lookups | A full fleet run consumes most of a core API quota hour and the router's preflight assumes it has the whole window — sharing a human's quota starves both. Anti-scraping **secondary bans are invisible to the `rate_limit` endpoint**: keep fleet sweeps single-pass with bounded parallelism and error-streak gating. Token via env/header only, never argv (rule S5). |
 | **Service identity for each `gitlab`-kind host**, as `GITLAB_TOKEN` or the `glab` auth store | router stages 1–2, ledger/MR flows, secure-rpm-audit | Never in argv or clone URLs — a token-in-URL remote leaks into artifacts. A network-gated host needs a path from the orchestrator, and a run that cannot reach it must surface as `unreachable`, never falsely green (the router's behavior). |
 | **Clone credentials via ambient helper** | every lane that checks out code | No credentials in clone URLs; the runner image carries a credential helper wired to the service identities above. |
 | **Model-platform credentials + spend recording** | all agentic lanes (full audits, diff scans, triage, verify sweeps) | Per the model-routing contract (docs/model-routing.md); batch spend recorded with `model_registry.py spend` so the budget guard and dashboards stay truthful. |
 | **`execution-boundaries.yaml` in `$TRAUST_CONFIG_HOME`** | remediate-finding Phase 4 checks and Phase 4b mutation, property-test differential | Sets how target build/test code runs: `sandbox: none` (default — direct, scrubbed env, disposable copy) or `sandbox: podman` (nested rootless container). Leave `none` on a runner that is itself a locked-down job and cannot nest containers; that is the expected orchestrator shape. A configured `podman` mode is never downgraded — without a working runtime the lane reports `not_attempted` and produces no evidence, so do not set it on a runner that lacks one. Detection is `podman info`, so a job image shipping the CLI without a runtime is correctly treated as unusable rather than failing with exit 125. |
-| **Scanner binaries in the job image** | deterministic pre-scans; drift `external-tools:*` rows | Install the `expected` versions from `config/external-tools.yaml` — the manifest is the shared source of truth, so the image and `check_drift.py` can never disagree about what should be present. govulncheck must be a *tagged* build (unstamped `go install` builds defeat freshness tracking). Absent tools degrade loudly (`pending`), an install below the manifest floor reports `drift`, but an image without the scanners isn't doing continuous scanning. |
-| Unauthenticated feeds: OSV, EPSS, KEV, Go module proxy, PyPI | deps lane, feeds refresh, drift checks | No service account needed. NVD is keyless but rate-limited — an NVD API key is an optional quality-of-service upgrade for `fetch_advisory.py`. |
+| **Scanner binaries in the job image** | deterministic pre-scans; the freshness view's `tool:*` rows | Install the `expected` versions from `config/external-tools.yaml` — the manifest is the shared source of truth, so the image and traust-core's tool floors can never disagree about what should be present. govulncheck must be a *tagged* build (unstamped `go install` builds defeat freshness tracking). Absent tools degrade loudly (`pending`), an install below the manifest floor is not ready, but an image without the scanners isn't doing continuous scanning. |
+| Unauthenticated feeds: OSV, EPSS, KEV, Go module proxy, PyPI | deps lane, feeds refresh, drift checks | No service account needed. NVD is keyless but rate-limited — an NVD API key is an optional quality-of-service upgrade for `traust impact document nvd`. |
 | **Directory service** reachability | owner assignment, countersign identity verification | Needed only by the routing/accountability lanes, not the scan lanes. Decide which identity the orchestrator binds as. |
 | **Issue-tracker service account** | `/file-security-defect` (and the internal extension's backlog sync) | Must be able to set the restricted security level used for embargoed issues. Decide whether filing runs under a service identity or a human — countersign/override events remain human-signed by design. |
 | **Collaboration-suite identity** | ownership-tracker updates, document permissions | Human-delegated by default; decide whether these stay operator-session-only. |
@@ -305,12 +305,11 @@ this.
 
 `diff-scan` / `diff-scan-quarterly` rows are dispatched as
 `/vuln-scan <checkout> --diff` (`harnessing/3-audit/vuln-scan/SKILL.md`, "Diff
-mode"). The mode auto-resolves its own baseline — the skill's deterministic
-`harnessing/3-audit/vuln-scan/scripts/resolve_baseline.py` looks up the newest
-valid HEAD code-audit report for the checkout's repo URL in `findings.db` and
-anchors the diff at that report's pinned SHA, using the router's own
-first-party filter and sensitive matcher (imported from
-python3 -m traust.cli build rescan-worklist, so the two can never
+mode"). The mode auto-resolves its own baseline — `traust assessments prepare
+--diff` (traust-core's `AssessmentService.prepare`) looks up the newest
+completed `secure-code` audit of the repository's default branch and
+anchors the diff at that audit's commit, using the router's first-party
+filter and sensitive matcher (one owner in traust-core, so the two can never
 disagree). `--since`/`--baseline` exist as overrides only. When the diff
 invalidates the baseline (>30% of first-party files changed, C ≥ 8,000
 first-party lines, no baseline resolvable, or anchor unreachable) the resolver
@@ -409,57 +408,32 @@ honored in `events_honored` and marks nothing consumed — flip `consumed` to
 
 ### Event feeders
 
-`rescan-events.jsonl` is fed two ways: operators append
-`external-report`/`methodology`/`cve` rows by hand (or via feed importers), and
-**`release` rows originate from a feeder** —
-`harnessing/2-threat-model/threat-model/scripts/build_release_events.py`, run
-daily alongside the router. Two legs, one committed state file
-(`findings/_manifest/release-events-state.json` — the seen-set, so re-runs are
-idempotent and a movement-free run emits nothing):
+`rescan-events.jsonl` is fed by operators: `external-report`/`methodology`/`cve`
+rows by hand (or via feed importers), and `release` rows when a release should
+reach the router before the pack router reads releases itself.
 
-- **Container leg** — diffs the image inventories in the inputs repository
-  (the `*-payload-repos.csv` payload and operator-catalog files' image columns)
-  against the seen-set; a never-seen digest/tag appends one release event
-  carrying the image ref and the CSV-mapped source repo. **CSV diff only** — no
-  registry polling (no skopeo/network); a new digest becomes visible when the
-  inventory refresh lands. Quota-aware registry tag polling against the same
-  state file is the natural extension.
-- **Dist-git leg** — reads the operator-curated
-  `$TRAUST_CONFIG_HOME/rpm-distgit-watch.yaml` (the template ships with an
-  empty `active` list) and runs `git ls-remote` per active https URL (rule S3
-  discipline: https-only gate, `GIT_ALLOW_PROTOCOL=https`, `--` separator); a
-  moved HEAD appends a release event noting "dist-git commit — route
-  secure-rpm-audit". Failures degrade to per-repo skip counts, never a crash.
+**Releases are recorded, not fed.** A product version is recorded with
+`traust portfolio import-release` (the commits it ships); its change is derived
+on demand, never stored:
 
-**Release identity.** Because the router re-models on major/minor releases
-only, every event carries a structured version — never free text parsed back
-out of `note`. The identity is the **inventory path**, not the image tag: image
-tokens are almost always bare keys or digest-pinned and carry no parseable
-version, while inventory CSV paths do (for example
-`<product>/<product>-<version>-payload-repos.csv`,
-`operator-catalog/<operator>/<version>/…`). Each path normalizes to a `family`
-(the path with its version replaced by `{V}`) plus a version tuple; the
-committed state file remembers the highest version seen per family, and a new
-inventory file classifies as `major` / `minor` / `patch` / `backfill` (a version
-*below* the high-water mark — an old release inventoried late) / `initial` /
-`none`. Events stamp `release_family`, `release_version`, `release_previous`,
-`release_change`.
+```bash
+python3 -m traust.cli portfolio release-changes --product <slug> --version <v> [--previous <v0>]
+```
 
-Two coverage limits, stated rather than papered over: the **dist-git leg has no
-version at all** — a moved HEAD is a commit sha, not a release — so it
-classifies `unknown` and never reaches the threat-model lane; and a state file
-that predates version tracking seeds its high-water marks on the first run
-(emitting nothing new, since those inventories are already in the seen-set), so
-the *next* new inventory version is the first one that classifies against a
-real predecessor. The router counts every skipped kind in
-`summary.threat_model.release_changes` so "no reviews fired" is always
-distinguishable from "nothing qualified".
+returns the bump (`major` / `minor` / `patch` / `backfill` — a version *below*
+the high-water mark, an old release recorded late — / `none` / `unknown`, a
+label that is no version) against the highest version recorded before it,
+`remodels` (major or minor: the only bumps the threat-model-review lane acts
+on), and the commits it ships that the previous didn't (`added`) and the other
+way round (`removed`). A product's first recorded release has nothing to
+compare against and is refused. The committed seen-set
+(`release-events-state.json`) and the inventory-CSV diff are retired with
+`build_release_events.py`.
 
-The first run (no state file) seeds the state and emits nothing — the existing
-inventory is baseline, not news. `--dry-run` prints would-be events without
-writing. The feeder produces events only; the router routes them (release →
-`release-passthrough`), and dispatch marks `consumed` — three components, one
-verdict-free chain.
+**Dist-git heads** are not releases: register the dist-git repository in the
+inventory and the `repo_state` asset observes its head (`portfolio observe`);
+the pack router routes on that observation. The `rpm-distgit-watch.yaml` watch
+list is retired.
 
 ## Running the router
 
@@ -499,12 +473,9 @@ dispatch per row:
 # 1. DAILY — refresh the routed worklist (deterministic; quota-aware)
 python3 -m traust.cli build rescan-worklist
 
-# 2. WEEKLY — emit this week's tranche manifest (deterministic;
-#    selection only, no spend). Fail-closed: refuses a worklist older
-#    than 48h, one predating the refusal pre-route, or a second
-#    tranche in the same ISO week.
-python3 harnessing/2-threat-model/threat-model/scripts/emit_drain_tranche.py [--include-immediate]
-#    → analysis-results/findings/_manifest/drain-tranche-<YYYY-Www>.json
+# 2. WEEKLY — select this week's rows from the worklist (the tranche
+#    script is retired: the pack router's lane pacing and approval
+#    replace it, *The security pack's router and its routed lanes*)
 
 # 3. PER ROW — one headless run (agentic; this is the spend). A tranche
 #    carries more than one dispatchable lane, so BRANCH ON row.lane
@@ -513,7 +484,7 @@ python3 harnessing/2-threat-model/threat-model/scripts/emit_drain_tranche.py [--
 #
 #    lane diff-scan | diff-scan-quarterly:
 #      scan:     /vuln-scan <scratch>/clone --diff
-#                (packet path: resolver → build_diff_packet.py →
+#                (packet path: traust assessments prepare --diff →
 #                 packet-first review; a resolver refusal is a valid
 #                 terminal outcome — the row routes to full-audit on
 #                 the next router run, never widen the scan)

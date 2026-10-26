@@ -42,7 +42,6 @@ ships a template for each such file:
 | `campaign.example.yaml` | `campaign.yaml` | dashboards that cite a tracking reference (`/validation-fuzz-dashboard`, `/generate-team-report`) |
 | `product-definitions-map.example.yaml` | `product-definitions-map.yaml` | `traust_engine.registry.products`, `/assign-findings-owners`, `/sla-view` |
 | `budget-policy.example.yaml` | `budget-policy.yaml` | `traust_engine.metrics.spend`, rescan worklist, drain tranche |
-| `rpm-distgit-watch.example.yaml` | `rpm-distgit-watch.yaml` | `build_release_events.py` (threat-model event feeder) |
 | `rule-pack-allowlist.example.yaml` | `rule-pack-allowlist.yaml` | `traust_engine.adapters.opengrep`, `/mine-ledger` |
 | `safe-exec-profiles.example.yaml` | `safe-exec-profiles.yaml` | `traust_engine._util.safe_exec` |
 | `hardening-risk-weights.example.json` | `hardening-risk-weights.json` | none (its consumer retired with the traust-core hub; the triage skill port decides) |
@@ -50,9 +49,8 @@ ships a template for each such file:
 | `internal-vocabulary.example.yaml` | `internal-vocabulary.yaml` | `scan_internal_refs` |
 | `ledger-signing-key.example.pub` | `ledger-signing-key.pub` | `traust_engine.reporting.validate`, `/drift-watch` signature check |
 | `sla-policy.example.yaml` | `sla-policy.yaml` | `traust_engine.metrics` (`/sla-view` default policy), `/drift-watch` provenance |
-| `org-parameters.example.yaml` | `org-parameters.yaml` | `/compliance-check` (organization-defined parameter values), `/drift-watch` provenance |
-| `adr-registry.example.yaml` | `adr-registry.yaml` | `traust ops index-adrs`, `/drift-watch` pin check |
-| `reachability-watch.example.yaml` | `reachability-watch.yaml` | `/drift-watch` (`reachability-watch:review`) |
+| `org-parameters.example.yaml` | `org-parameters.yaml` | `/compliance-check` (organization-defined parameter values, recorded with `traust compliance policy org-parameters`), `/drift-watch` provenance |
+| `adr-registry.example.yaml` | `adr-registry.yaml` | `traust compliance policy adr-registry`, `/drift-watch` pin check |
 | `benchmark-targets.example.yaml` | `benchmark-targets.yaml` | `/recall-benchmark` (the answer key; canary and seeded sources sit beside it in `recall-benchmark/`) |
 
 Compliance boundaries are not config files: the scope intake (`/compliance-check`

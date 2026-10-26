@@ -9,20 +9,28 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from traust_contracts import DeploymentConfigMissing
 from traust_contracts.config import deployment_config_dir
-from traust_core.v1.context import Config, Context, Services
+from traust_core.v1.context import Config, Context, Locations, Services
 from traust_core.v1.errors import AuthenticationError, ConfigError
 from traust_core.v1.models.identity import Credential, Principal
-from traust_engine import HarnessEngine, locations
+from traust_engine import HarnessEngine
 from traust_engine.adapters.compliance_sources import register_compliance_sources
 from traust_engine.adapters.detection_quality import register_detection_quality
 from traust_engine.adapters.fleet_fix import register_fleet_fix
 from traust_engine.adapters.opengrep import load_supplemental_packs
+from traust_engine.adapters.tools import register_tools
+
+from traust.paths import HARNESSING_DIR
 
 CORE_CONFIG = "core.yaml"
+SLA_POLICY = "sla-policy.yaml"
+# Security-pack content (home: traust-pack-security): the pinned ATT&CK release and its mapping.
+_ATTACK = HARNESSING_DIR / "attack-coverage" / "tables"
+ATTACK_TABLES = (_ATTACK / "attack-techniques.json", _ATTACK / "attack-mapping.json")
 
 # ---------------------------------------------------------------------------
 # Sanctioned environment overrides — read ONLY in this module, never in consumers.
@@ -81,21 +89,45 @@ def load_core(config_home: Path | None = None) -> Context:
     """traust-core's context from ``<config home>/core.yaml``, or exit 2 when it is invalid.
 
     No ``core.yaml``: core's defaults (SQLite and artifacts under ``~/.traust``),
-    the zero-setup laptop install.
+    the zero-setup laptop install, with the home's ``locations.yaml``.
     """
     home = config_home or deployment_config_dir()
     path = home / CORE_CONFIG if home is not None else None
     try:
-        return Context.from_file(path) if path is not None and path.is_file() else Context(Config())
+        if path is not None and path.is_file():
+            return Context.from_file(path)
+        return Context(Config(locations=Locations.from_home(home) if home else Locations()))
     except ConfigError as e:
         print(f"core config not resolvable: {e}", file=sys.stderr)
         raise SystemExit(2) from e
 
 
+def load_insight_core(config_home: Path | None = None, sla_policy: Path | None = None) -> Context:
+    """``load_core`` with the ATT&CK coverage view on the pack's pinned ATT&CK tables, and the SLA
+    view built on ``sla_policy``, else on ``<config home>/sla-policy.yaml`` when there is one
+    (template: config/sla-policy.example.yaml); exit 2 when either is unreadable or invalid."""
+    core = load_core(config_home)
+    try:
+        core.register_attack_catalog(*ATTACK_TABLES)
+    except ConfigError as e:
+        print(f"ATT&CK catalog not resolvable: {e}", file=sys.stderr)
+        raise SystemExit(2) from e
+    home = config_home or deployment_config_dir()
+    path = sla_policy or (home / SLA_POLICY if home is not None else None)
+    if path is not None and (sla_policy is not None or path.is_file()):
+        try:
+            core.register_sla_policy(path)
+        except ConfigError as e:
+            print(f"SLA policy not resolvable: {e}", file=sys.stderr)
+            raise SystemExit(2) from e
+    return core
+
+
 def load_engine_core(config_home: Path | None = None, *, canaries: str = "canaries") -> Context:
     """traust-core with traust-engine's providers for its protocols: ADR and docs sources, the
     rule-pack source and canary materialiser (``canaries``: the ``recall-benchmark/<canaries>``
-    source dir), the fleet-fix applier and golden runner."""
+    source dir), the fleet-fix applier and golden runner, and the scanner tool providers with the
+    toolchain inspector (``ProviderCatalog`` stamps and database freshness)."""
     core, engine = load_core(config_home), load_engine(config_home)
     home = config_home or deployment_config_dir()
     assert home is not None  # load_engine exits when there is no config home
@@ -115,7 +147,23 @@ def load_engine_core(config_home: Path | None = None, *, canaries: str = "canari
         canary_repos=cache / canaries,
     )
     register_fleet_fix(core)
+    register_tools(
+        core,
+        loc=engine.ctx.locations,
+        profile_map=engine.adapters.safe_exec_profile_map(),
+        pins=engine.toolchain.pins(),
+        rule_pack=pack,
+        allowlist=engine.adapters.allowlist_for_opengrep(),
+    )
     return core
+
+
+def load_compliance_services(config_home: Path | None = None) -> Services:
+    """``load_services`` with traust-engine's ADR source, which the citation gate and ``adrs``
+    read the pinned registers through."""
+    core = load_core(config_home)
+    register_compliance_sources(core, {})
+    return core.services()
 
 
 def load_services(config_home: Path | None = None) -> Services:
@@ -151,36 +199,37 @@ def add_config_home_arg(parser) -> None:
     )
 
 
-def analysis_results_dir(engine: HarnessEngine) -> Path:
-    """Configured local analysis-results root (fail-loud when unset)."""
-    return locations.require(
-        locations.analysis_results_dir(engine.ctx.locations), "analysis_results"
+def locations(src: Context | HarnessEngine) -> Locations:
+    """core's ``Config.locations``. An engine (callers still on ``load_engine``) gets the same
+    ``locations.yaml`` read by core, so both resolve every path the same way."""
+    return (
+        src.config.locations
+        if isinstance(src, Context)
+        else Locations.from_home(src.ctx.config_home)
     )
 
 
-def workspace_dir(engine: HarnessEngine) -> Path:
+def _required(value: Callable[[], Path | None], name: str) -> Path:
+    """A location from core, or :class:`DeploymentConfigMissing` naming it (what callers catch)."""
+    try:
+        return Locations.require(value(), name)
+    except ConfigError as e:
+        raise DeploymentConfigMissing(str(e)) from e
+
+
+def analysis_results_dir(src: Context | HarnessEngine) -> Path:
+    """Configured local analysis-results root (fail-loud when unset)."""
+    return _required(locations(src).analysis_results_dir, "analysis_results")
+
+
+def workspace_dir(src: Context | HarnessEngine) -> Path:
     """Configured workspace root (fail-loud when unset)."""
-    return locations.workspace_dir(engine.ctx.locations)
+    return _required(locations(src).workspace_dir, "workspace")
 
 
-def inputs_dir(engine: HarnessEngine) -> Path:
-    """The repository-inventory tree, from ``locations.inputs``.
-
-    Falls back to ``<workspace>/inputs``. The inventory's directory name is
-    deployment config, not a harness constant — until 2026-09-07 this returned
-    a hardcoded sibling directory named after one organisation's repository.
-    Relative values resolve against the config home like every other location.
-    """
-    loc = engine.ctx.locations
-    val = getattr(loc, "inputs", None) if loc is not None else None
-    if val:
-        p = locations.local_path(val)
-        if p is not None:
-            if not p.is_absolute():
-                home = deployment_config_dir()
-                p = (home / p).resolve() if home else p.resolve()
-            return p
-    return workspace_dir(engine) / "inputs"
+def inputs_dir(src: Context | HarnessEngine) -> Path:
+    """The repository-inventory tree: ``locations.inputs``, else ``<workspace>/inputs``."""
+    return _required(locations(src).inputs_dir, "inputs")
 
 
 def _optional_config(name: str) -> dict:
@@ -280,37 +329,32 @@ def campaign_settings() -> dict:
     }
 
 
-def findings_db(engine: HarnessEngine) -> Path:
+def findings_db(src: Context | HarnessEngine) -> Path:
     """``<analysis-results>/graph/findings.db`` (fail-loud when unset)."""
-    return locations.require(locations.findings_db(engine.ctx.locations), "analysis_results")
+    return _required(locations(src).findings_db, "analysis_results")
 
 
-def progress_tracker_dir(engine: HarnessEngine) -> Path:
+def progress_tracker_dir(src: Context | HarnessEngine) -> Path:
     """Configured progress-tracker root (fail-loud when unset)."""
-    return locations.require(
-        locations.progress_tracker_dir(engine.ctx.locations), "progress_tracker"
-    )
+    return _required(locations(src).progress_tracker_dir, "progress_tracker")
 
 
-def rule_drafts_dir(engine: HarnessEngine) -> Path:
+def rule_drafts_dir(src: Context | HarnessEngine) -> Path:
     """Configured rule-drafts root (fail-loud when unset)."""
-    return locations.require(locations.rule_drafts_dir(engine.ctx.locations), "rule_drafts")
+    return _required(locations(src).rule_drafts_dir, "rule_drafts")
 
 
-def feeds_cache_dir(engine: HarnessEngine) -> Path:
+def feeds_cache_dir(src: Context | HarnessEngine) -> Path:
     """Feeds pull-through cache: ``FEEDS_CACHE_DIR`` > config > ``progress_tracker/feeds``."""
     override = _feeds_cache_dir_from_env()
     if override is not None:
         return override
-    cache = locations.feeds_cache_dir(engine.ctx.locations)
-    if cache is not None:
-        return cache
-    return progress_tracker_dir(engine) / "feeds"
+    return locations(src).feeds_cache_dir() or progress_tracker_dir(src) / "feeds"
 
 
-def findings_tree_dir(engine: HarnessEngine) -> Path:
+def findings_tree_dir(src: Context | HarnessEngine) -> Path:
     """``<analysis-results>/findings`` (fail-loud when analysis_results unset)."""
-    return analysis_results_dir(engine) / "findings"
+    return analysis_results_dir(src) / "findings"
 
 
 def resolve_results_root(args=None, *, config_home: Path | None = None) -> Path:

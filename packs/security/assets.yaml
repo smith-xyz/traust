@@ -22,13 +22,6 @@ assets:
     freshness: {fail: 72h}
     runner: {labels: [deterministic]}
 
-  release_events:
-    run: [python3, harnessing/2-threat-model/threat-model/scripts/build_release_events.py]
-    trigger: {every: 24h}
-    priority: 30
-    freshness: {fail: 48h}
-    runner: {labels: [deterministic]}
-
   # A skill session is `model: {role: <model-registry role>}`, not a `run` (traust-engine counts
   # either as runnable). Each gets its role when a runner can start a session (*Shadow run and
   # cutover*); until then the engine reports them unrunnable. dependency-watch is also broken
@@ -47,7 +40,7 @@ assets:
     freshness: {fail: 14d}
     runner: {labels: [deterministic]}
 
-  verify_remediation:  # skill session: build_verify_sweep.py → /verify-remediation full-sweep
+  verify_remediation:  # skill session: traust remediation verify-sweep → /verify-remediation full-sweep
     trigger: {every: 7d}
     priority: 50
     freshness: {fail: 14d}

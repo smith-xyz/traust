@@ -129,11 +129,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
         "harnessing/rbac-tenancy-rollup/SKILL.md",
     ): "reviewed — deterministic rollup; keyword in scope prose",
     # --- S3 git-transport: the P0 fix list; MUST empty when P0 lands ---
-    (
-        "S3",
-        "harnessing/3-audit/pqc-readiness/scripts/bulk_prescan.py",
-    ): "reviewed — https-scheme gate at call site (startswith check) prevents non-https;"
-    " url originates from the harness corpus registry",
     # --- S4: pod-side shells — the sh -c runs INSIDE the scoped target
     # pod/container via runtime exec, never on the harness host; the
     # outer argv is kubeargv-classified and scope-checked (P0-2) ---
@@ -194,14 +189,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
         "harnessing/validation-fuzz-dashboard/scripts/build_validation_fuzz_dashboard.py",
     ): "reviewed — dashboard builder; 'go test -fuzz' appears in "
     "rendered method strings, no execution",
-    (
-        "S10",
-        "harnessing/remediate-finding/scripts/mutation_evidence.py",
-    ): "reviewed — pure JSON builder for a patch_evidence item; imports only "
-    "argparse/json/sys/pathlib and runs nothing. 'go test ./...' appears as "
-    "the descriptive `command` field recorded in the evidence so a reader can "
-    "re-run it. Execution lives in run_mutation.sh, under the container "
-    "boundary (ToB plan item 3)",
     (
         "S10",
         "harnessing/remediate-finding/run_checks.sh",

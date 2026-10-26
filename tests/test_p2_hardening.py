@@ -64,10 +64,7 @@ def _src(rel):
 
 
 def test_e2_no_authorization_header_in_curl_argv():
-    for rel in (
-        "harnessing/7-remediate/remediate-finding/ensure_fork.sh",
-        "harnessing/7-remediate/remediate-finding/finish_batch.sh",
-    ):
+    for rel in ("harnessing/7-remediate/remediate-finding/ensure_fork.sh",):
         s = _src(rel)
         assert '-H "Authorization' not in s, rel
         assert "--config -" in s, rel
@@ -143,15 +140,6 @@ def test_p3_sweep_engine_dir_prefix():
     assert 'url.startswith("dir:")' in s
     assert "unsupported url" in s
     assert "GIT_ALLOW_PROTOCOL" in s
-
-
-def test_p3_gh_api_path_constraints():
-    assert "_GH_NAME_RE" in _src("harnessing/census/scripts/check_repo_liveness.py")
-    assert "unsafe slug" in _src("harnessing/loc-dashboard/scripts/build_loc_dashboard.py")
-
-
-def test_p3_canaries_off_shared_tmp():
-    assert '"/tmp/recall-bench' not in _src("harnessing/recall-benchmark/scripts/build_canaries.py")
 
 
 def test_p3_agents_md_curl_rule():

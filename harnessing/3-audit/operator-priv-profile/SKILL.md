@@ -20,19 +20,19 @@ records privilege *violations*, not inventories; this skill builds the
 
 | Tier | Question | Source | Tool |
 |---|---|---|---|
-| 1 | What does the operator **ask for**? | manifests + CSV in the repo | `build_priv_profile.py` |
+| 1 | What does the operator **ask for**? | manifests + CSV in the repo | `traust adapters priv-profile` |
 | 2 | What does it **declare it needs**? | `+kubebuilder:rbac:` markers vs shipped roles | same (diff section) |
 | 3 | What does it **actually run with**? | live cluster (pod `openshift.io/scc`, `oc auth can-i --list`) | `capture_runtime_privileges.py` |
 
 ## Tier 1+2 — static profile
 
 ```bash
-python harnessing/3-audit/operator-priv-profile/scripts/build_priv_profile.py \
-    --repo-url <url> [--ref <ref>] --name <repo-name> \
-    --out-dir analysis-results/findings/<product>/<repo>/
+GIT_ALLOW_PROTOCOL=https git clone --depth 1 [--branch <ref>] -- <url> <local-path>
+python3 -m traust.cli adapters priv-profile <local-path> --name <repo-name> \
+    --out analysis-results/findings/<product>/<repo>/<repo-name>-priv-profile.json
 ```
 
-Emits `<repo>-priv-profile.{json,md}` next to the repo's audit report:
+Emits `<repo>-priv-profile.json` next to the repo's audit report:
 
 - **SCC requests** — RBAC `use` verbs on `securitycontextconstraints`
   (with `resourceNames`) plus any shipped SCC objects. *No request
@@ -52,27 +52,26 @@ Emits `<repo>-priv-profile.{json,md}` next to the repo's audit report:
   statically" note — do NOT infer need from silence.
 
 Record each profile as a priv-profile assessment of the profiled commit
-(with `--repo-url`, the script prints it as `commit=`):
+(`git -C <local-path> rev-parse HEAD`):
 
 ```bash
 python3 -m traust.cli reporting record \
     analysis-results/findings/<product>/<repo>/<repo>-priv-profile.json \
-    --kind priv_profile --repo-url <url> --sha <commit>
+    --kind priv_profile --repo-url <url> --sha <commit> --branch <branch>
 ```
 
-Fleet rollup (after profiling a set):
+Fleet rollup (after recording a set; each repository's latest recorded
+profile, `--as-of <ISO time>` for an earlier point):
 
 ```bash
-python harnessing/3-audit/operator-priv-profile/scripts/build_priv_profile.py \
-    --rollup 'analysis-results/findings/*/*/*-priv-profile.json' \
-    --rollup-out progress-tracker/metrics/dashboards/operator-least-priv/
+python3 -m traust.cli dashboard view privileges \
+    --out progress-tracker/metrics/dashboards/operator-least-priv/
 ```
 
-Emits four artifacts, one row per operator with one column per assessment
+Emits four artifacts, one row per repository with one column per assessment
 question (SCCs requested / securityContext posture / namespaces + install
-modes / RBAC): `priv-profile-rollup.md` (paste-into-doc table),
-`priv-profile-rollup.json` (full rows), `priv-profile-rollup.csv`
-(spreadsheet export), and `priv-profile-dashboard.html` (KPI tiles + top-60
+modes / RBAC): `operator-least-privilege-rollup.md` (paste-into-doc table),
+`.json` (full rows), `.csv` (spreadsheet export), and `.html` (KPI summary +
 table). Exclude catalog aggregation trees (certified-operators,
 community-operators, marketplace) from profiling — a catalog's thousands of
 third-party bundles would read as one giant "operator" and distort the

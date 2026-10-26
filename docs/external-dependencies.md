@@ -88,7 +88,7 @@ tools). Pinned versions for the scanner binaries live in
 | `kustomize`, `golangci-lint`, `cargo-clippy` | remediate-finding `run_checks.sh` — opportunistic, only if the *target repo* uses them | Apache-2.0 / **GPL-3.0-only** (golangci-lint) / Apache-2.0 (clippy) | [golangci-lint LICENSE](https://github.com/golangci/golangci-lint/blob/main/LICENSE) |
 | `tokei` / `scc` / `cloc` | secure-code-audit LoC step (tokei preferred; scc, then cloc as fallbacks) | MIT OR Apache-2.0 / MIT / **GPL-2.0-or-later** (cloc) | [tokei](https://github.com/XAMPPRocky/tokei) · [scc](https://github.com/boyter/scc) · [cloc header](https://github.com/AlDanial/cloc/blob/master/cloc) |
 | `universal-ctags` | `build_symbol_index.py` ctags engine (optional; built-in extractors otherwise) | **GPL-2.0-or-later** | [source headers](https://github.com/universal-ctags/ctags/blob/master/main/entry.c) |
-| `ast-grep` | fleet-fix structural transforms (`apply_fleet_fix.py`, matcher kind `ast_grep`) | MIT | [LICENSE](https://github.com/ast-grep/ast-grep/blob/main/LICENSE) |
+| `ast-grep` | fleet-fix structural transforms (`apply_fleet_fix.py`, `traust remediation fleet-record` golden tests, `fleet-apply`; matcher kind `ast_grep`) | MIT | [LICENSE](https://github.com/ast-grep/ast-grep/blob/main/LICENSE) |
 | `gh` | remediate-finding, secure-code-audit (API lookups), the rescan router (`github`-kind hosts) | MIT | [LICENSE](https://github.com/cli/cli/blob/trunk/LICENSE) |
 | `glab` | fleet-fix and remediate-finding MR automation (human-gated); the rescan router (`gitlab`-kind hosts) | MIT | [LICENSE](https://gitlab.com/gitlab-org/cli/-/blob/main/LICENSE) |
 | `jq` | shell snippets across several skills | MIT (code) + CC-BY-3.0 (docs) | [COPYING](https://github.com/jqlang/jq/blob/master/COPYING) |
@@ -196,10 +196,9 @@ as a pin.
 
 **Freshness.** Plugins have no binary and no `--version`, so
 `config/external-tools.yaml` cannot describe them. The roster at
-`$TRAUST_CONFIG_HOME/agent-plugins.yaml` drives `check drift`'s
-`agent-plugins:*` rows instead: declared-but-absent reports `pending`,
-installed-behind-the-marketplace reports `stale`. Neither auto-advances a
-version — upstream can change a skill's behaviour *and* its licence terms
+`$TRAUST_CONFIG_HOME/agent-plugins.yaml` drove `check drift`'s
+`agent-plugins:*` rows; *retired* with it (workstation hygiene, not a product
+report). Never auto-advance a version — upstream can change a skill's behaviour *and* its licence terms
 between releases, so a `stale` row means re-read this table, not just
 `/plugin update`.
 
@@ -232,9 +231,9 @@ Code and data license differently — all these feeds permit free
 
 **The machine-readable registry is [`config/feeds.yaml`](../config/feeds.yaml)** —
 every source, cached or live, with its endpoint, cadence, licence block, and
-consumers. The feed fetcher, the advisory fetcher, and `check_drift.py`
-(`feeds:*` freshness + `feed-source:*` liveness) all read it, so adding a
-source is a config change and a dead source is a failing row. The table below
+consumers. The feed fetcher, the advisory fetcher, and traust-core's freshness
+view (`feeds:*` freshness) all read it, so adding a source is a config
+change. The table below
 is the licensing companion, not a second source of truth. HTTP endpoints are
 not covered by the docs gate's subprocess scan — a new feed adds a row here at
 intake.
@@ -242,17 +241,17 @@ intake.
 | Feed / API | Used by | Terms | Evidence | Notes |
 |---|---|---|---|---|
 | Vendor CSAF VEX (Red Hat: `access.redhat.com/security/data/csaf/v2/vex/`) | `traust feeds fetch --feed vex` (index) + lazy per-CVE load → `/impact-analysis`, `/triage` | CC-BY-4.0 | [Red Hat security data](https://access.redhat.com/security/data) | Per-CVE product impact status (`known_affected`, `fixed`, `known_not_affected` with justification flags). CVE-keyed; the `advisories/` endpoint is advisory-id-keyed (next row). Index synced; documents fetched on demand and cached |
-| Vendor CSAF advisories (Red Hat: `access.redhat.com/security/data/csaf/v2/advisories/`) | secure-rpm-audit, container CVE context, `fetch_advisory.py redhat-csaf` | CC-BY-4.0 | [security data page](https://access.redhat.com/security/data) | Attribute the vendor when distributing. Advisory-id-keyed and year-partitioned |
+| Vendor CSAF advisories (Red Hat: `access.redhat.com/security/data/csaf/v2/advisories/`) | secure-rpm-audit, container CVE context, `traust impact document redhat-csaf` | CC-BY-4.0 | [security data page](https://access.redhat.com/security/data) | Attribute the vendor when distributing. Advisory-id-keyed and year-partitioned |
 | Vendor CVE data (Red Hat: `access.redhat.com/hydra/rest/securitydata/cve.json`) | `traust feeds fetch --feed rh-cve` → first-discovery reconciliation | CC-BY-4.0 | [Red Hat security data](https://access.redhat.com/security/data) | Attribute when redistributing. Public endpoint, paginated and incremental from the newest record in the last snapshot |
 | grype vulnerability DB (grype.anchore.io) | secure-container-audit, secure-code-audit SBOM step | **No published license/ToS** — provided "at no cost to users" | [Anchore docs](https://oss.anchore.com/docs/guides/vulnerability/database/) | The one undocumented feed; obtain written terms before redistributing a product that depends on it |
 | Go vulnerability DB (vuln.go.dev) | govulncheck runs | CC-BY-4.0 | [copyright](https://vuln.go.dev/copyright) | Attribute if republishing records |
 | OSV.dev | the dependency pre-scan (`traust adapters osv`, API by default), the fleet sweep, secure-rpm-audit, the CVE-replay monitor, fork-advisory lag, `resolve-advisory-symbols`; offline database via osv-scanner when air-gapped | Pass-through: each record keeps its home DB's license (mostly CC-BY-4.0; some CC0/MIT/BSD) | [data docs](https://google.github.io/osv.dev/data/) | Free unauthenticated API; attribute the source DB when reproducing advisory text |
 | deps.dev API (`api.deps.dev/v3`, Google) | the dependency pre-scan (`traust adapters osv`, via `traust_engine.adapters.osv.resolve_transitive`): resolves the transitive tree of manifests without a lockfile, and the default version of declarations without one. **On by default**; opt out with `access: disabled` on the `deps_dev` source in `feeds.yaml` | **Data deps.dev generates** (resolved dependency graphs, which is all traust stores, as package/version pairs) is **CC BY 4.0**. Aggregated upstream data keeps its source's terms. **API use is subject to the [Google APIs Terms of Service](https://developers.google.com/terms)**, which bind the operator who runs it | [API docs: data and terms](https://docs.deps.dev/api/v3/) (verified 2026-10-21) | **Attribution** (CC BY 4.0), carried in every scan's `metadata.resolution.attribution`: "Resolved dependency data: deps.dev (Google LLC), https://deps.dev, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); used unmodified as package/version pairs." deps.dev expressly permits caching (24 h on-disk cache). **Operator obligations under the Google APIs ToS:** usage limits set by Google (2.d); the API may be discontinued at any time (8.a), and an outage leaves manifests unresolved, a recorded coverage gap; no sublicensing or re-serving the API (4.a); a business operator indemnifies Google for misuse (9.c); California law and Santa Clara venue (10.c). No API key, so nothing to keep out of the open-source tree (4.b). Not used air-gapped. Owner decision 2026-10-21: on by default, no legal sign-off required at this time |
-| NVD CVE API | `fetch_advisory.py` → impact-analysis advisory ingestion | Free public API; attribution requested ("This product uses the NVD API but is not endorsed or certified by the NVD"); rate limits apply without an API key | [NVD terms](https://nvd.nist.gov/developers/terms-of-use) | US-Gov data, no content license on records; consumed at runtime, not republished |
+| NVD CVE API | `traust impact document nvd` → impact-analysis advisory ingestion | Free public API; attribution requested ("This product uses the NVD API but is not endorsed or certified by the NVD"); rate limits apply without an API key | [NVD terms](https://nvd.nist.gov/developers/terms-of-use) | US-Gov data, no content license on records; consumed at runtime, not republished |
 | OpenSSF Scorecard API | secure-code-audit, secure-rpm-audit | CDLA-Permissive-2.0 (data); Apache-2.0 (code) | [repo](https://github.com/ossf/scorecard) | Essentially no downstream obligations |
 | FIRST EPSS scores | `traust feeds fetch` snapshot → CVE-finding enrichment | Free to the public incl. commercial products; "appropriate attribution" requested | [EPSS FAQ](https://www.first.org/epss/faq) | Cite "EPSS at https://www.first.org/epss" wherever scores are rendered |
 | CISA KEV catalog | `traust feeds fetch` snapshot → CVE-finding enrichment | **CC0-1.0** (no CISA/DHS logo use or endorsement implication) | [license.txt](https://www.cisa.gov/sites/default/files/licenses/kev/license.txt) | Third-party links inside KEV records carry their own terms |
-| GitHub REST API (`/languages`, commits, compare) | secure-code-audit, loc-dashboard, the rescan router | GitHub ToS | [docs](https://docs.github.com/en/rest) | Service terms, not a content license |
+| GitHub REST API (`/languages`, commits, compare) | secure-code-audit, the rescan router | GitHub ToS | [docs](https://docs.github.com/en/rest) | Service terms, not a content license |
 | Credential-liveness probe endpoints (GitHub `/user`, GitLab `/api/v4/user`, Slack `auth.test`, OpenShift `users/~`, AWS `sts:GetCallerIdentity`) | validate-findings `credential_liveness.py` | Each service's ToS / API terms | [GitHub](https://docs.github.com/en/rest) · [GitLab](https://docs.gitlab.com/ee/api/) · [Slack](https://api.slack.com/methods/auth.test) | **No harness-owned tokens** — each probe authenticates with the discovered candidate credential itself, one read-only introspection call, explicit-only scope unlock. Keep probing inside the engagement's authorization, which the scope guard enforces |
 | Deployment-internal registries and services (product registry, directory service, dist-git lookaside cache) | owner skills, SLA view, defect filing, secure-rpm-audit | Internal to the deployment — no third-party licence surface | — | Network-gated; excluded from `--feed all`; cache-only, never vendored. Configured per deployment |
 

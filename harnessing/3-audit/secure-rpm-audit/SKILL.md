@@ -473,7 +473,7 @@ tree's SBOM from *SBOM & Dependency Scan* below on the dist-git commit first):
 
 ```bash
 python3 -m traust.cli adapters crypto-source <prepared-tree> \
-    --repo-url <dist-git url> --sha <dist-git commit> [--public] \
+    --repo-url <dist-git url> --sha <dist-git commit> [--branch <stream>] [--public] \
     --sbom /tmp/<component>-sbom.cdx.json --out /tmp/<component>-crypto-audit.json
 ```
 
@@ -645,7 +645,7 @@ Key profile obligations for this skill:
 - `metadata.repository` = dist-git URL; upstream Source0/Version/Release/patches under `metadata.additional`.
 - `category` uses the `RPM01`–`RPM10` packaging taxonomy; digit-leading slugs take the `RPM_` prefix.
 - Emit `review_surface_coverage`, one entry per review surface (see *Review surfaces* above). Required from traust 0.21.0; the validator checks every entry against the rest of the report.
-- After validation, run python3 -m traust.cli corpus finding-identity fingerprint <report.json> --write.
+- After validation, `reporting record` (Step 5) takes the report's findings in as findings of the assessment, each by its fingerprint; a finding located only at `.`, `./` or `/` refuses the whole record.
 
 ### Report Validation
 
@@ -694,7 +694,7 @@ This Markdown file is for human consumption only — the JSON file remains the a
 
 ```bash
 python3 -m traust.cli reporting record <path-to-report.json> --kind rpm \
-  --repo-url <dist-git url> --sha <dist-git commit>
+  --repo-url <dist-git url> --sha <dist-git commit> [--branch <stream>]
 ```
 
 **A report is not complete until python3 -m traust.cli reporting validate exits with 0 errors. Do not begin analysis of the next component until the current report passes validation.**

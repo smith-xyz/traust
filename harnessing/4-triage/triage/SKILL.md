@@ -269,7 +269,7 @@ source format.
 
   ```bash
   python3 -m traust.cli triage intake <file> --format sarif|dependabot|govulncheck \
-      --repo-url <https URL> --sha <scanned commit> [--public]
+      --repo-url <https URL> --sha <scanned commit> [--public] [--branch <scanned branch>]
   ```
 
   Never hand-parse these formats. Suppressed SARIF results are skipped.

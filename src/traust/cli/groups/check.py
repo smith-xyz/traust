@@ -28,7 +28,7 @@ _ENTRIES: tuple[tuple[str, str, str], ...] = (
     (
         "drift",
         "check_drift",
-        "Staleness & drift checker across derived artifacts and paired reports.",
+        "Security-pack config pins and review dates against their source (interim).",
     ),
     (
         "fix-propagation",

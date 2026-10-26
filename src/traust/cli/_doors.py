@@ -5,15 +5,17 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import uuid
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
 from pydantic import ValidationError as ModelValidationError
 from traust_core.v1.errors import NotFoundError, TraustError, ValidationError
-from traust_core.v1.models.inventory import Product
+from traust_core.v1.models.inventory import Product, RefName, RepositoryRef
 from traust_core.v1.models.operations import JobResult, Outcome
-from traust_core.v1.models.values import ProductSlug
+from traust_core.v1.models.values import GitSha, ProductSlug
+from traust_core.v1.models.vocabulary import Ecosystem, RefKind
 
 from traust.context import add_config_home_arg
 
@@ -22,6 +24,24 @@ def parser(group: str, op: str, about: str) -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog=f"traust {group} {op}", description=about)
     add_config_home_arg(ap)
     return ap
+
+
+def add_branch_arg(ap: argparse.ArgumentParser) -> None:
+    ap.add_argument(
+        "--branch",
+        help="the branch the commit was scanned on; named like the forge-observed default "
+        "branch, the record is on the default line. Without it the commit is recorded bare "
+        "(never guessed from the sha), on the default line only at the observed default head",
+    )
+
+
+def register_commit(
+    services: Any, repository_id: uuid.UUID, sha: str, branch: str | None
+) -> RepositoryRef:
+    """The scanned commit's ref: on its branch when the caller names one, else bare. Core
+    decides the default line from the forge-observed default branch name."""
+    name, kind = (RefName(branch), RefKind.BRANCH) if branch else (None, None)
+    return services.portfolio.register_ref(repository_id, GitSha.parse(sha), name, kind)
 
 
 def when(raw: str | None) -> datetime | None:
@@ -65,3 +85,11 @@ def answer(result: JobResult) -> int:
     """A materializer's door: print the JobResult; the exit code is its outcome."""
     print(result.model_dump_json())
     return EXIT_CODES[result.outcome]
+
+
+def package_id(services: Any, ecosystem: str, name: str) -> uuid.UUID:
+    """The recorded package's id by ecosystem and name (Exposure's ``find_package``)."""
+    found = services.exposure.find_package(Ecosystem(ecosystem), name)
+    if found is None:
+        raise NotFoundError(f"no {ecosystem} package named {name} is recorded")
+    return found.id

@@ -138,9 +138,10 @@ report. Common generic cases:
 If the bundle is not available in any accessible registry, fetch the CSV from
 the operator's source repository instead:
 ```bash
-python3 harnessing/1-inventory/inventory-repositories/scripts/fetch_forge_owners.py --repo-url https://github.com/<org>/<repo> \
-  --file bundle/manifests/<name>.clusterserviceversion.yaml   # .file in the JSON output
+python3 -m traust.cli portfolio file --repo https://github.com/<org>/<repo> --sha <commit> \
+  bundle/manifests/<name>.clusterserviceversion.yaml   # .file in the JSON output
 ```
+(`<commit>` is a full sha, e.g. the default branch's from `git ls-remote <url> HEAD`.)
 
 ## Step 6 — Categorise
 

@@ -2,7 +2,7 @@
 
 The schemas, packaged CLIs and key scripts that make up the harness's deterministic tooling.
 
-The schemas below (from the installed `traust-contracts` package) are the complete set; the scripts listed are the key entry points — packaged CLIs live under `src/traust/`, and skill-specific tooling lives alongside each skill in its own `scripts/` — under a stage directory for workflow skills (`harnessing/3-audit/vuln-scan/scripts/`), at the `harnessing/` root for the rest.
+The schemas below (from the installed `traust-contracts` package) are the complete set; the scripts listed are the key entry points — packaged CLIs live under `src/traust/`, and skill-specific tooling lives alongside each skill in its own `scripts/` — under a stage directory for workflow skills (`harnessing/3-audit/secure-code-audit/scripts/`), at the `harnessing/` root for the rest.
 
 | Component | Purpose |
 |---|---|
@@ -34,7 +34,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | `schemas/v1/compliance-scope.schema.json` | JSON Schema for a compliance boundary declaration (recorded by `python3 -m traust.cli compliance declare`; repo membership resolved from the inventory by `python3 -m traust.cli compliance resolve`) |
 | `schemas/v1/pqc-facts.schema.json` | JSON Schema for the deterministic Layer 1 crypto census (`*-pqc-facts.json`) — the contract `/patch`'s pqc ingest and the Layer 2 prepass consume |
 | `schemas/v1/pqc-readiness.schema.json` | JSON Schema for PQC readiness reports |
-| `schemas/v1/pqc-blockers.schema.json` | JSON Schema for the findings-shaped projection of readiness remediations (`*-pqc-blockers.json`, emitted by `build_pqc_blockers.py`) — mirrors the security-audit findings vocabulary without claiming `report.schema.json` conformance |
+| `schemas/v1/pqc-blockers.schema.json` | JSON Schema for the findings-shaped projection of readiness remediations (no longer emitted: `traust pqc blockers` derives the items from the recorded report) — mirrors the security-audit findings vocabulary without claiming `report.schema.json` conformance |
 | `schemas/v1/pqc-decision-tree.schema.json` | JSON Schema for the PQC provenance decision tree |
 | `schemas/v1/fleet-fix.schema.json` | JSON Schema for fleet-fix transform specs |
 | `schemas/v1/sla-policy.schema.json` | JSON Schema for SLA policy files (sla-view) — adopters configuring their own service levels start at [sla-policy.md](sla-policy.md) |
@@ -71,7 +71,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | python3 -m traust.cli sweep mine | The /mine-ledger miner on traust-core (`DetectionQualityService.mine_rules`) — confirmed-TP corpus, cluster coverage vs the opengrep pack, per-rule campaign precision |
 | harnessing/mine-ledger/scripts/emit_rule_drafts.py | Regression-rule draft staging from resolved-at-fix-commit findings (pre/post calibration pairs) |
 | python3 -m traust.cli sweep rule-lane | The weekly rule-mining lane runner — miner → sweep collect/draft → bounded draft staging → `lane-delta.{json,md}` vs the previous mine; exit 1 when the delta needs authoring attention |
-| harnessing/census/scripts/check_repo_liveness.py | Census-owned repo-liveness sweep (active/archived/moved/missing, status_since ratcheting) |
+| python3 -m traust.cli portfolio liveness | Census-owned repo liveness on traust-core (`PortfolioService.liveness`) — active/archived/unknown per registered repository from stored observations |
 | python3 -m traust.cli check skill-alignment | Pre-commit cross-skill contract gate (A-series rules) |
 | python3 -m traust.cli check skill-security | Pre-commit security-posture gate (S-series rules incl. S9 repo-config isolation) |
 | python3 -m traust.cli adapters crypto-audit | Unopinionated crypto data collector — source/image/cluster tiers emit `crypto-audit/v1` JSON |

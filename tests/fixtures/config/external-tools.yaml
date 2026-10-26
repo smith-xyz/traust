@@ -4,10 +4,9 @@
 # docs/requirements.md the per-skill install matrix).
 #
 # Consumers:
-#   - python3 -m traust.cli check drift — the `external-tools:*` rows read their
-#     roster and expected floors from this file (installed < expected
-#     reports `drift`; installed behind the latest upstream release past
-#     the grace window reports `stale`).
+#   - traust-engine's toolchain (`register_tools`) — the `expected` floors
+#     become traust-core's tool floors, so `traust dashboard view freshness`
+#     reports a tool installed below its floor as not ready.
 #   - the platform orchestrator's job-image build — install exactly the
 #     `expected` versions so the image and the checker can never
 #     disagree about what should be present (continuous-operations.md,
@@ -152,6 +151,6 @@ tools:
     # than a lag number; a tagged-release install compares normally.
     # Kept in the roster regardless: it is the job-image install target,
     # and `expected` governs that build whether or not the runtime probe
-    # can confirm it. The probe DEVNULLs stdin (check_drift) — without
-    # that, the fallthrough REPL reads the drift run's input.
+    # can confirm it. The probe must DEVNULL stdin — without
+    # that, the fallthrough REPL reads the caller's input.
     consumers: [impact-analysis, secure-rpm-audit]

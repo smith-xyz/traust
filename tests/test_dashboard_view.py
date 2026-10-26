@@ -20,6 +20,7 @@ from traust_core.v1.models import insight
 from traust_core.v1.models.common import TimeBucket, TimeWindow
 from traust_core.v1.models.insight import FindingsTrend, RenderedView, ViewFilter, ViewName
 
+from tests.test_products_doors import _postgres
 from traust.cli import dashboard_view
 
 ALPHA = SimpleNamespace(id=uuid.uuid4(), slug="alpha", name="Alpha")
@@ -86,6 +87,46 @@ def test_no_scope_is_one_publish_and_three_files(publish: Door, home: Path, tmp_
     assert (out / "findings-trend.md").read_text() == RENDERED.markdown
     assert json.loads((out / "findings-trend.json").read_text())["repositories"] == 2
     assert answer["model"]["repositories"] == 2
+
+
+def test_loc_writes_the_lines_of_code_view(publish: Door, home: Path, tmp_path: Path) -> None:
+    publish.result = RenderedView(
+        view=ViewName.LOC,
+        stem="lines-of-code",
+        model=insight.LocDashboard(code=120, total=150),
+        markdown="# Lines of code\n",
+        html="<!doctype html><title>Lines of code</title>",
+    )
+    out = tmp_path / "dashboards"
+    rc, answer = run(home, "loc", "--product", "alpha", "--out", str(out))
+    assert rc == 0
+    assert publish.calls == [(ViewName.LOC, ViewFilter(product_ids=(ALPHA.id,)))]
+    assert sorted(p.name for p in out.iterdir()) == [
+        "lines-of-code.html",
+        "lines-of-code.json",
+        "lines-of-code.md",
+    ]
+    assert answer["model"]["code"] == 120
+
+
+@pytest.mark.parametrize(
+    ("view", "stem", "model"),
+    [
+        (ViewName.PQC, "pqc-readiness", insight.PqcDashboard()),
+        (ViewName.PQC_PORTFOLIO, "pqc-portfolio-roll-up", insight.PqcPortfolio()),
+    ],
+)
+def test_the_pqc_views_replace_the_skills_report_scripts(
+    publish: Door, home: Path, tmp_path: Path, view: ViewName, stem: str, model: Any
+) -> None:
+    publish.result = RenderedView(
+        view=view, stem=stem, model=model, markdown="# PQC\n", html="<title>PQC</title>"
+    )
+    out = tmp_path / "pqc"
+    rc, _ = run(home, view.value, "--product", "alpha", "--out", str(out))
+    assert rc == 0
+    assert publish.calls == [(view, ViewFilter(product_ids=(ALPHA.id,)))]
+    assert sorted(p.name for p in out.iterdir()) == [f"{stem}.{x}" for x in ("html", "json", "md")]
 
 
 def test_scope_window_and_bucket_go_into_one_filter(
@@ -189,3 +230,163 @@ def test_an_unknown_view_is_a_usage_error(publish: Door, home: Path, tmp_path: P
     with pytest.raises(SystemExit) as exit, contextlib.redirect_stderr(io.StringIO()):
         dashboard_view.main(["--config-home", str(home), "nope", "--out", str(tmp_path)])
     assert exit.value.code == 2 and publish.calls == []
+
+
+@pytest.fixture
+def policies(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
+    """The SLA policy each `services()` call saw registered on its Context."""
+    seen: list[Any] = []
+    services = SimpleNamespace(insight=SimpleNamespace(publish=Door(RENDERED)))
+
+    def build(self: Context) -> SimpleNamespace:
+        seen.append(self.sla_policy)
+        return services
+
+    monkeypatch.setattr(Context, "services", build)
+    return seen
+
+
+SLA_TEMPLATE = Path(__file__).resolve().parents[1] / "config" / "sla-policy.example.yaml"
+
+
+def test_the_config_homes_sla_policy_is_registered(
+    policies: list[Any], home: Path, tmp_path: Path
+) -> None:
+    (home / "sla-policy.yaml").write_text(SLA_TEMPLATE.read_text())
+    rc, _ = run(home, "sla", "--out", str(tmp_path / "sla"))
+    assert rc == 0
+    assert [p.policy_name for p in policies] == ["example-sla-policy"]
+
+
+def test_sla_policy_flag_wins_and_no_policy_registers_none(
+    policies: list[Any], home: Path, tmp_path: Path
+) -> None:
+    other = tmp_path / "other.yaml"
+    other.write_text(SLA_TEMPLATE.read_text().replace("example-sla-policy", "fedramp"))
+    assert run(home, "sla", "--sla-policy", str(other), "--out", str(tmp_path))[0] == 0
+    assert run(home, "findings-trend", "--out", str(tmp_path))[0] == 0
+    assert [p and p.policy_name for p in policies] == ["fedramp", None]
+
+
+@pytest.mark.parametrize("policy", ["missing.yaml", "invalid.yaml"])
+def test_an_unresolvable_sla_policy_is_exit_2_and_writes_nothing(
+    policies: list[Any], home: Path, tmp_path: Path, policy: str
+) -> None:
+    (tmp_path / "invalid.yaml").write_text("policy_name: x\n")
+    out = tmp_path / "out"
+    with pytest.raises(SystemExit) as exit, contextlib.redirect_stderr(io.StringIO()) as err:
+        argv = ["sla", "--sla-policy", str(tmp_path / policy), "--out", str(out)]
+        dashboard_view.main(["--config-home", str(home), *argv])
+    assert exit.value.code == 2 and "SLA policy not resolvable" in err.getvalue()
+    assert policies == [] and not out.exists()
+
+
+def test_threat_register_writes_its_files(publish: Door, home: Path, tmp_path: Path) -> None:
+    publish.result = RenderedView(
+        view=ViewName.THREAT_REGISTER,
+        stem="threat-register",
+        model=insight.ThreatRegister(as_of=AS_OF, repository_urls={}, models=0),
+        markdown="# Threat register\n",
+        html="<!doctype html><title>Threat register</title>",
+    )
+    out = tmp_path / "threat-register"
+    argv = ("--product", "alpha", "--as-of", AS_OF.isoformat(), "--out", str(out))
+    rc, answer = run(home, "threat-register", *argv)
+    assert rc == 0
+    assert publish.calls == [
+        (ViewName.THREAT_REGISTER, ViewFilter(product_ids=(ALPHA.id,), as_of=AS_OF))
+    ]
+    assert sorted(p.name for p in out.iterdir()) == [
+        "threat-register.html",
+        "threat-register.json",
+        "threat-register.md",
+    ]
+    assert (answer["model"]["models"], answer["model"]["threats"]) == (0, [])
+
+
+@pytest.mark.parametrize("database", ["sqlite", "postgres"])
+def test_threat_register_on_core_renders_an_empty_fleet(tmp_path: Path, database: str) -> None:
+    config = tmp_path / "config"
+    config.mkdir()
+    core: dict[str, Any] = {"home": str(tmp_path / "store")}
+    with contextlib.ExitStack() as stack:
+        if database == "postgres":
+            core["database"] = {"url": stack.enter_context(_postgres())}
+        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        out = tmp_path / "out"
+        rc, answer = run(config, "threat-register", "--out", str(out))
+    assert rc == 0, answer
+    assert answer["model"]["threats"] == [] and answer["model"]["quick_wins"] == []
+    assert "_No threat models recorded._" in (out / "threat-register.md").read_text()
+
+
+def test_freshness_reads_the_engines_tools_and_the_feeds_registry(
+    publish: Door, home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    feeds: list[Path] = []
+
+    def engine_core(config_home: Path | None) -> Context:
+        core = Context.from_file(config_home / "core.yaml")  # type: ignore[operator]
+        monkeypatch.setattr(core, "register_feeds", feeds.append)
+        return core
+
+    monkeypatch.setattr(dashboard_view, "load_engine_core", engine_core)
+    monkeypatch.setattr(dashboard_view, "registry_path", lambda: tmp_path / "feeds.yaml")
+    publish.result = RENDERED.model_copy(update={"view": ViewName.FRESHNESS, "stem": "freshness"})
+    rc, answer = run(home, "freshness", "--out", str(tmp_path / "fresh"))
+    assert rc == 0, answer
+    assert feeds == [tmp_path / "feeds.yaml"]
+    assert publish.calls == [(ViewName.FRESHNESS, ViewFilter())]
+    assert (tmp_path / "fresh" / "freshness.md").is_file()
+
+
+@pytest.mark.parametrize("database", ["sqlite", "postgres"])
+def test_attack_coverage_on_core_renders_on_the_pinned_catalog(
+    tmp_path: Path, database: str
+) -> None:
+    config = tmp_path / "config"
+    config.mkdir()
+    core: dict[str, Any] = {"home": str(tmp_path / "store")}
+    with contextlib.ExitStack() as stack:
+        if database == "postgres":
+            core["database"] = {"url": stack.enter_context(_postgres())}
+        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        out = tmp_path / "out"
+        rc, answer = run(config, "attack-coverage", "--out", str(out))
+    assert rc == 0, answer
+    assert answer["model"]["attack_version"] == "19.1" and answer["model"]["techniques"] == []
+    layer = json.loads((out / "attack-coverage.json").read_text())["navigator_layer"]
+    assert layer["versions"]["layer"] == "4.5" and "MITRE" in layer["description"]
+    assert "not yet recorded in core" in (out / "attack-coverage.md").read_text()
+
+
+def test_an_unresolvable_attack_catalog_is_exit_2(
+    publish: Door, home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from traust import context
+
+    monkeypatch.setattr(context, "ATTACK_TABLES", (tmp_path / "t.json", tmp_path / "m.json"))
+    with pytest.raises(SystemExit) as exit, contextlib.redirect_stderr(io.StringIO()) as err:
+        dashboard_view.main(["--config-home", str(home), "attack-coverage", "--out", str(tmp_path)])
+    assert exit.value.code == 2 and "ATT&CK catalog not resolvable" in err.getvalue()
+    assert publish.calls == []
+
+
+def test_artifact_id_names_the_document_a_single_item_view_renders(
+    publish: Door, home: Path, tmp_path: Path
+) -> None:
+    assessment = uuid.uuid4()
+    document = {"assessment-results": {"uuid": str(uuid.uuid4()), "results": []}}
+    publish.result = RenderedView(
+        view=ViewName.OSCAL,
+        stem="acme-compliance-assessment",
+        model=insight.OscalAssessmentResults.model_validate(document),
+        markdown="# acme compliance assessment\n",
+        html="<title>acme compliance assessment</title>",
+    )
+    out = tmp_path / "oscal"
+    rc, answer = run(home, "oscal", "--artifact-id", str(assessment), "--out", str(out))
+    assert rc == 0
+    assert publish.calls == [(ViewName.OSCAL, ViewFilter(artifact_id=assessment))]
+    assert json.loads((out / "acme-compliance-assessment.json").read_text()) == document
+    assert answer["model"] == document

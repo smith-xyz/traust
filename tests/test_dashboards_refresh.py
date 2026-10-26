@@ -6,6 +6,8 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -141,7 +143,28 @@ def test_a_degraded_refresh_exits_with_its_outcome(insight: Insight, tmp_path: P
     assert rc == 4
 
 
-def test_views_run_first_and_the_scoreboard_writes_no_history() -> None:
+def test_views_run_first_and_render_the_scoreboard() -> None:
     stages = refresh_dashboards.build_stages(Path("/w"), Path("/r"), False)
-    assert stages[0][0] == "views" and stages[-1][0] == "scoreboard"
-    assert "--no-history" in stages[-1][2]
+    assert stages[0][0] == "views" and "scoreboard" not in [name for name, _, _ in stages]
+
+
+def test_the_views_stage_builds_the_sla_view_on_the_config_homes_policy(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    home = tmp_path / "config"
+    shutil.copytree(os.environ["TRAUST_CONFIG_HOME"], home)
+    template = Path(__file__).resolve().parents[1] / "config" / "sla-policy.example.yaml"
+    (home / "sla-policy.yaml").write_text(template.read_text())
+    seen: list[Any] = []
+    stub = Insight(RefreshResult())
+
+    def services(self: Context) -> SimpleNamespace:
+        seen.append(self.sla_policy.policy_name)
+        return SimpleNamespace(insight=stub)
+
+    monkeypatch.setattr(Context, "services", services)
+    monkeypatch.setenv("TRAUST_CONFIG_HOME", str(home))
+    rc, _ = run("--only", "views", "--results-root", str(tmp_path), "--out", str(tmp_path / "d"))
+    assert rc == 0 and seen == ["example-sla-policy"]
+    names = [name for name, _, _ in refresh_dashboards.build_stages(tmp_path, tmp_path, False)]
+    assert "sla" not in names

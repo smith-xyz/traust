@@ -91,8 +91,7 @@ def add_build_args(ap) -> None:
         "--stats-out",
         help="Override the path build_deps_multi's stats dict is "
         "persisted to (default: deps-multi-stats.json next to "
-        "--db). The smoke checker reads it for the honest "
-        "manifest-based coverage denominator.",
+        "--db).",
     )
     ap.add_argument(
         "--sleep-ms",
@@ -171,7 +170,7 @@ def call_build(engine, args) -> int:
                 "WARNING: L1 multi-ecosystem sweep stopped INCOMPLETE on "
                 "a GitHub secondary rate-limit ban — "
                 f"{sm.get('repos_ratelimited_skipped', 0)} repo(s) left "
-                "unvisited; re-run `deps-multi` to resume via the cache",
+                "unvisited; re-run `build` to resume via the cache",
                 file=sys.stderr,
             )
         if sm.get("loud_fail"):
@@ -189,78 +188,6 @@ BUILD = OpSpec(
     add_args=add_build_args,
     call=call_build,
     help="Build portfolio code graph (L0+L1)",
-)
-
-
-def add_deps_multi_args(ap) -> None:
-    ap.add_argument("--db", required=True)
-    ap.add_argument(
-        "--jobs",
-        type=int,
-        default=4,
-        help="Concurrent gh fetches. Default 4 (capped low on "
-        "purpose: a wide tree-driven sweep trips GitHub's "
-        "secondary anti-scraping rate limit at higher "
-        "concurrency — keep this <=4).",
-    )
-    ap.add_argument("--limit", type=int)
-    ap.add_argument("--ecosystems", default="all")
-    ap.add_argument(
-        "--no-universal",
-        action="store_true",
-        help="Skip the universal surfaces (docker/actions/helm).",
-    )
-    ap.add_argument("--lang-cache", default=DEFAULT_LANG_CACHE)
-    ap.add_argument(
-        "--stats-out",
-        help="Override the path the stats dict is persisted to "
-        "(default: deps-multi-stats.json next to --db).",
-    )
-    ap.add_argument(
-        "--sleep-ms",
-        type=int,
-        default=0,
-        help="Inter-call pacing (ms) for each live gh fetch. 0 "
-        "(default) = no pacing; a small value gentles huge "
-        "sweeps against the GitHub secondary rate limit.",
-    )
-
-
-def call_deps_multi(engine, args) -> int:
-    con = graph.db_connect(Path(args.db))
-    requested = graph._parse_ecosystems(args.ecosystems)
-    if args.no_universal:
-        requested -= set(UNIVERSAL_ECOSYSTEMS)
-    non_go = {e for e in requested if e not in ("go", "Go")}
-    sm = graph.build_deps_multi(
-        con, args.limit, min(args.jobs, 4), non_go, args.lang_cache, sleep_ms=args.sleep_ms
-    )
-    graph._print_deps_multi_report(sm, non_go)
-    sp = graph._write_deps_multi_stats(sm, args.db, args.stats_out)
-    print(f"L1 stats persisted -> {sp}")
-    if sm.get("rate_limited_incomplete"):
-        print(
-            "WARNING: deps-multi stopped INCOMPLETE on a GitHub "
-            "secondary rate-limit ban — "
-            f"{sm.get('repos_ratelimited_skipped', 0)} repo(s) left "
-            "unvisited; re-run to resume via the cache",
-            file=sys.stderr,
-        )
-    if sm.get("loud_fail"):
-        print(
-            "ERROR: L1 ecosystem(s) with manifests discovered but ZERO "
-            f"dependency edges extracted: {', '.join(sm['loud_fail'])} "
-            "— manifest coverage is silently broken",
-            file=sys.stderr,
-        )
-        return 1
-    return 0
-
-
-DEPS_MULTI = OpSpec(
-    add_args=add_deps_multi_args,
-    call=call_deps_multi,
-    help="L1 for non-Go package ecosystems against an existing db (resumable)",
 )
 
 
@@ -409,7 +336,6 @@ def add_query_args(ap) -> None:
     ap.add_argument(
         "name",
         choices=[
-            "blast-radius",
             "top-shared",
             "internal-coupling",
             "crd-consumers",
@@ -420,13 +346,6 @@ def add_query_args(ap) -> None:
     )
     ap.add_argument("arg", nargs="?")
     ap.add_argument("--limit", type=int, default=20)
-    ap.add_argument(
-        "--ecosystem",
-        default="go",
-        help="Ecosystem for blast-radius: the positional arg is "
-        "resolved to a node id via dep_node_id (default "
-        "'go' -> module:<path>; e.g. 'npm' -> pkg:npm/<name>).",
-    )
 
 
 def call_query(engine, args) -> int:
@@ -434,13 +353,7 @@ def call_query(engine, args) -> int:
     if db is None:
         return 2
     try:
-        out = graph.query(
-            db,
-            args.name,
-            args.arg,
-            limit=args.limit,
-            ecosystem=args.ecosystem,
-        )
+        out = graph.query(db, args.name, args.arg, limit=args.limit)
     except ValueError as e:
         print(str(e), file=sys.stderr)
         return 2
@@ -451,51 +364,9 @@ def call_query(engine, args) -> int:
 QUERY = OpSpec(
     add_args=add_query_args,
     call=call_query,
-    help="Run a portfolio graph query (blast-radius, top-shared, …)",
+    help="Run a portfolio graph query (top-shared, internal-coupling, …)",
 )
 
-
-def add_parsers_args(ap) -> None:
-    ap.add_argument(
-        "manifests",
-        nargs="+",
-        type=Path,
-        help="Manifest file path(s) to parse",
-    )
-
-
-def call_parsers(_engine, args) -> int:
-    from traust_engine.portfolio import parsers
-
-    for path in args.manifests:
-        hit = parsers.parser_for_path(str(path))
-        if hit is None:
-            print(f"unknown manifest: {path}", file=sys.stderr)
-            return 2
-        ecosystem, fn = hit
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError as e:
-            print(f"cannot read {path}: {e}", file=sys.stderr)
-            return 1
-        declared, deps = fn(text)
-        out = {
-            "path": str(path),
-            "ecosystem": ecosystem,
-            "declared": declared,
-            "dependencies": [
-                {"name": name, "version": ver, "indirect": indirect} for name, ver, indirect in deps
-            ],
-        }
-        print(json.dumps(out, indent=2))
-    return 0
-
-
-PARSERS = OpSpec(
-    add_args=add_parsers_args,
-    call=call_parsers,
-    help="Parse dependency manifests (portfolio L1 parsers)",
-)
 
 OBSERVE = passthrough_op(
     "portfolio_observe", "Observe one repository at its forge; keep what it answered.", "main"
@@ -504,9 +375,25 @@ OBSERVE = passthrough_op(
 PLAN = passthrough_op("portfolio_onboard", "What onboard would register, writing nothing.", "plan")
 ONBOARD = passthrough_op("portfolio_onboard", "Register a product's repositories.", "onboard")
 OWNER_HINTS = passthrough_op("portfolio_onboard", "Who may own a repository.", "owner_hints")
+FILE = passthrough_op("portfolio_onboard", "One file's text at a pinned commit.", "file")
 IMPORT_OWNERS = passthrough_op(
     "portfolio_onboard", "Mirror the declared ownership source.", "import_owners"
 )
+IMPORT_RELEASE = passthrough_op(
+    "portfolio_onboard", "Record a product version and its commits.", "import_release"
+)
+RELEASE_CHANGES = passthrough_op(
+    "portfolio_onboard", "What a recorded product version changed.", "release_changes"
+)
 POPULATION = passthrough_op(
     "portfolio_population", "What the registered repositories had assessed.", "main"
+)
+DEPENDENCIES = passthrough_op(
+    "portfolio_dependencies", "The packages in a commit's manifest SBOM.", "dependencies"
+)
+DEPENDENTS = passthrough_op(
+    "portfolio_dependencies", "The commits a package reaches.", "dependents"
+)
+LIVENESS = passthrough_op(
+    "portfolio_liveness", "Each registered repository's archived flag and push.", "main"
 )

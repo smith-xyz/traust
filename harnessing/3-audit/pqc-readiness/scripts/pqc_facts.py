@@ -18,11 +18,13 @@ Runs the pinned pqc-scan binary with the merged rules dir (vendored defaults
 
 Facts never contain verdicts. Same repo SHA -> byte-identical facts.
 
+Kept until traust-engine registers core's PqcScanner (NEED(engine: pqc-scan provider)), when
+`PqcService.prescan` replaces it; record its output with `traust pqc record --facts`.
+
 Usage:
   pqc_facts.py --repo-dir DIR --repo-url URL --out FACTS.json \
       [--scanner BIN] [--rules-dir DIR] [--cbom-out CBOM.json]
   pqc_facts.py --from-sbom SBOM.json --repo-url URL --out FACTS.json
-  pqc_facts.py --validate-readiness REPORT.json   # schema gate helper
 """
 
 from __future__ import annotations
@@ -40,8 +42,6 @@ from typing import Any
 
 import yaml  # PyYAML — already in harness deps
 from traust_contracts.paths import schema_path
-from traust_core.v1.errors import TraustError
-from traust_core.v1.models.artifacts import PqcReadinessArtifact
 
 from traust.context import add_config_home_arg, load_engine
 
@@ -649,133 +649,6 @@ def validate_facts(doc: dict, source: str = "<in-memory>") -> int:
 
 
 # ---------------------------------------------------------------------------
-# Readiness report validator
-# ---------------------------------------------------------------------------
-
-REQUIRED_READINESS = [
-    "metadata",
-    "summary",
-    "status",
-    "who_sets_tls",
-    "quantum_ready",
-    "why_not",
-    "do_next",
-    "capabilities",
-    "scores",
-    "flags",
-    "provenance_summary",
-    "readiness_bucket",
-]
-REQUIRED_META = ["repository", "assessment_basis", "tool"]
-
-
-def validate_readiness(path: Path) -> int:
-    try:
-        artifact = PqcReadinessArtifact.parse(path.read_bytes())
-    except (OSError, TraustError) as error:
-        print(f"INVALID: {error}", file=sys.stderr)
-        return 1
-    doc = json.loads(artifact.payload)
-    errs: list[str] = []
-
-    for k in REQUIRED_READINESS:
-        if k not in doc:
-            errs.append(f"missing top-level key: {k}")
-
-    meta = doc.get("metadata") or {}
-    for k in REQUIRED_META:
-        if k not in meta:
-            errs.append(f"missing metadata.{k}")
-
-    scores = doc.get("scores") or {}
-    for dom in ("VULN", "AGIL", "PQCA", "HNDL"):
-        d = scores.get(dom)
-        if not d:
-            errs.append(f"missing scores.{dom}")
-            continue
-        for i, c in enumerate(d.get("checks") or []):
-            if c.get("result") in ("partial", "no") and not c.get("fact_ids"):
-                errs.append(
-                    f"{dom}.checks[{i}] ({c.get('id')}): non-yes result requires fact_ids citations"
-                )
-
-    basis = meta.get("assessment_basis")
-    if basis == "source+runtime":
-        re_ = doc.get("runtime_evidence")
-        if not re_ or not re_.get("pqc_caps"):
-            errs.append(
-                "assessment_basis=source+runtime requires non-empty runtime_evidence.pqc_caps"
-            )
-
-    flags = doc.get("flags") or {}
-    for k in ("has_2030_clock_items", "hndl_priority", "runtime_verification_required"):
-        if k not in flags:
-            errs.append(f"missing flags.{k}")
-    # remediations — optional section (harness >= 0.153.0), validated when present
-    rem_ids: set[str] = set()
-    for i, r in enumerate(doc.get("remediations") or []):
-        rid = r.get("id") or ""
-        if rid in rem_ids:
-            errs.append(f"remediations[{i}]: duplicate id {rid!r}")
-        rem_ids.add(rid)
-        if not (r.get("action") or "").strip():
-            errs.append(f"remediations[{i}]: empty action")
-        if r.get("category") == "waiting-on-upstream" and not r.get("blocked_on"):
-            errs.append(f"remediations[{i}]: waiting-on-upstream requires blocked_on")
-        if r.get("category") == "deadline" and r.get("deadline") not in (2030, 2035):
-            errs.append(
-                f"remediations[{i}]: category=deadline requires "
-                f"deadline 2030 or 2035, got {r.get('deadline')!r}"
-            )
-        if r.get("fact_ids"):
-            errs.append(
-                f"remediations[{i}]: fact_ids belong on scores/clock_items, "
-                f"not remediations — use locations[] for owner anchors"
-            )
-
-    # do_next — owner-facing; ban harness paths; prefer locations for app work
-    _HARNESS_PATH_RE = re.compile(
-        r"(?:^|[\s`])(?:harnessing/|remediation/|notes/(?:capabilities|reference|schemas)/)"
-    )
-    _FACT_ID_RE = re.compile(r"\bF\d{4}\b")
-    for i, step in enumerate(doc.get("do_next") or []):
-        if not isinstance(step, dict):
-            errs.append(f"do_next[{i}]: must be an object")
-            continue
-        if not (step.get("do") or "").strip():
-            errs.append(f"do_next[{i}]: empty do")
-        how = step.get("how") or ""
-        if how and _HARNESS_PATH_RE.search(how):
-            errs.append(
-                f"do_next[{i}].how: cites harness-local path — distill the "
-                f"playbook into prose; /patch loads recipes via index.yaml"
-            )
-        for fld in ("do", "how"):
-            text = step.get(fld) or ""
-            if _FACT_ID_RE.search(text):
-                errs.append(
-                    f"do_next[{i}].{fld}: contains fact id — owners use "
-                    f"locations[]; fact ids stay on scores/clock_items"
-                )
-        if step.get("fact_ids"):
-            errs.append(f"do_next[{i}]: fact_ids not allowed — use locations[]")
-        who = step.get("who")
-        locs = step.get("locations")
-        if who == "app" and not locs:
-            errs.append(
-                f"do_next[{i}]: who=app requires locations[] (repo file:line anchors for the owner)"
-            )
-
-    if errs:
-        print("INVALID:", file=sys.stderr)
-        for e in errs:
-            print("  -", e, file=sys.stderr)
-        return 1
-    print("readiness report valid: 0 errors")
-    return 0
-
-
-# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -790,13 +663,10 @@ def main():
     ap.add_argument("--rules-dir")
     ap.add_argument("--cbom-out")
     ap.add_argument("--from-sbom")
-    ap.add_argument("--validate-readiness")
     ap.add_argument("--validate-facts")
     args = ap.parse_args()
     # Pure report validation needs the installed contract, not engine config.
 
-    if args.validate_readiness:
-        raise SystemExit(validate_readiness(Path(args.validate_readiness)))
     if args.validate_facts:
         p = Path(args.validate_facts)
         raise SystemExit(min(validate_facts(json.loads(p.read_text()), str(p)), 1))

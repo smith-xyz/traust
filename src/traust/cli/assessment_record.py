@@ -16,13 +16,15 @@ from traust_core.v1.models.artifacts import (
     IsolationReviewArtifact,
     PrivProfileArtifact,
     SecurityAuditArtifact,
+    ThreatModelArtifact,
+    VulnFindingsArtifact,
 )
 from traust_core.v1.models.assessment import AssessmentKind
 from traust_core.v1.models.common import Provenance
-from traust_core.v1.models.values import GitSha, HttpsRepoUrl
+from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import SourceType
 
-from traust.cli._doors import parser, run, when
+from traust.cli._doors import add_branch_arg, parser, register_commit, run, when
 from traust.context import load_core
 
 # The kind of assessment each audit skill records, and its document's contract type.
@@ -31,6 +33,9 @@ RECORDS: dict[AssessmentKind, tuple[str, type[ArtifactDocument]]] = {
     AssessmentKind.RPM: ("secure-rpm-audit", SecurityAuditArtifact),
     AssessmentKind.ISOLATION_REVIEW_CANONICAL: ("isolation-review", IsolationReviewArtifact),
     AssessmentKind.PRIV_PROFILE_CANONICAL: ("operator-priv-profile", PrivProfileArtifact),
+    AssessmentKind.VULN_SCAN_CANONICAL: ("vuln-scan", VulnFindingsArtifact),
+    AssessmentKind.SECURE_CODE_CANONICAL: ("secure-code-audit", SecurityAuditArtifact),
+    AssessmentKind.THREAT_MODEL_CANONICAL: ("threat-model", ThreatModelArtifact),
 }
 
 
@@ -42,6 +47,10 @@ def ran_at(kind: AssessmentKind, doc: ArtifactDocument) -> datetime:
         reviewed := when(doc.metadata.reviewed_at)
     ):
         return reviewed
+    if kind is AssessmentKind.THREAT_MODEL_CANONICAL:  # schema: provenance.date, a date
+        return datetime.combine(date.fromisoformat(doc.provenance.date), time(), UTC)
+    if kind is AssessmentKind.VULN_SCAN_CANONICAL:
+        return when(doc.scanned_at)  # schema: required, a time with a zone
     return datetime.combine(date.fromisoformat(doc.metadata.date), time(), UTC)  # schema: a date
 
 
@@ -52,6 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--repo-url", required=True, help="https URL of the audited repository")
     ap.add_argument("--sha", required=True, help="the audited commit")
     ap.add_argument("--public", action="store_true", help="the repository is public")
+    add_branch_arg(ap)
     args = ap.parse_args(argv)
     kind = AssessmentKind(args.kind)
     skill, artifact = RECORDS[kind]
@@ -62,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, args.public)
-        ref = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None)
+        ref = register_commit(services, repo.id, args.sha, args.branch)
         assessment = services.assessment.record(
             doc,
             ref.id,

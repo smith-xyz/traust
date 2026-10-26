@@ -18,7 +18,7 @@ from pathlib import Path
 
 from traust.context import (
     add_config_home_arg,
-    load_engine,
+    load_core,
     progress_tracker_dir,
     resolve_results_root,
 )
@@ -404,7 +404,7 @@ def _processed_results_root(
 ) -> Path:
     if processed_root is not None:
         return processed_root
-    return progress_tracker_dir(load_engine(config_home)) / "processed-results"
+    return progress_tracker_dir(load_core(config_home)) / "processed-results"
 
 
 # ---------------------------------------------------------------------------

@@ -102,14 +102,11 @@ or substitute for the ledger):
 
 | Skill | Touchpoint |
 |---|---|
-| `/vuln-scan` | diff-mode baseline resolution (`resolve_baseline.py --db`) |
 | `/verify-remediation` | sweep scoping / accelerator queries |
 | `/dependency-watch` | `impact` table + `repos` baselines |
 | `/compliance-check` | `findings_db` collector — pre-shaped views over ledger conclusions |
-| `/sla-view` | python3 -m traust.cli metrics sla clock inputs |
 | `/fleet-fix` | optional candidate listing (`v_open` + `graph_edges`) |
 | `/mine-ledger` | optional cluster-shape pre-queries (DB for scoping; the miner stays file-based) |
-| `/traust-metrics` | cloud-config lane (`collect_harness_metrics.py`) |
 | `/refresh-dashboards` | downstream dashboard builders read the fresh projection |
 | `/drift-watch` | staleness sentinel (`built_at` vs newest ledger/report mtime) — watches the DB, never queries findings from it |
 

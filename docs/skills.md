@@ -75,7 +75,6 @@ field on every skill.
 | [rbac-tenancy-rollup](#rbac-tenancy-rollup) | — | `secondary` | `/rbac-tenancy-rollup` |
 | [recall-benchmark](#recall-benchmark) | — | `secondary` | `/recall-benchmark` |
 | [refresh-dashboards](#refresh-dashboards) | — | `secondary` | `/refresh-dashboards` |
-| [repo-graph](#repo-graph) | — | `secondary` | `/repo-graph` |
 | [sla-view](#sla-view) | — | `secondary` | `/sla-view` |
 | [threat-register](#threat-register) | — | `secondary` | `/threat-register` |
 | [traust-metrics](#traust-metrics) | — | `secondary` | `/traust-metrics` |
@@ -101,7 +100,7 @@ Use when the user wants to register, update, or review a corpus tree or scan eng
 
 ## inventory-repositories
 
-Use when the user asks to list, discover, inventory, or extract the source repositories that ship in a release payload image or an OLM operator bundle/catalog — e.g. "inventory release 4.21", "which repos ship in the foo operator 2.3", "refresh the payload inventory". Writes the per-segment CSV inventory that repo-graph and the dashboards read, and registers the repositories and their owner teams in traust-core.
+Use when the user asks to list, discover, inventory, or extract the source repositories that ship in a release payload image or an OLM operator bundle/catalog — e.g. "inventory release 4.21", "which repos ship in the foo operator 2.3", "refresh the payload inventory". Writes the per-segment CSV inventory that the dashboards read, and registers the repositories and their owner teams in traust-core.
 
 - **Stage:** ① Inventory
 - **Tier:** `secondary`
@@ -235,11 +234,11 @@ Use when a reviewer wants to steer a security code audit between phases — Phas
 
 ## vuln-scan
 
-Static source-code vulnerability scan. Reads a target directory (and its threat model — <repo>-threat-model.md, or legacy THREAT_MODEL.md — if present), spawns parallel review subagents per focus area, and writes <repo>-vuln-findings.{json,md} with campaign finding IDs ({REPO_SLUG}-{SHORTSHA}-{NNN}) and the shared severity enum, for /triage to consume. When a <repo>-security-audit.json baseline exists, the scan supplements it: known findings are deduped against the baseline and new verified findings enter the disposition ledger directly (as findings-carrying events; the baseline is never written — gate A15) at not_verified (no triage precondition; triage adjudicates downstream) — /secure-code-audit remains the preferred baseline and /verify-remediation the way to update it after fixes. Read-only — no building, running, or network. Use when asked to "scan for vulns", "review this code for security issues", "find bugs in <dir>", "re-sweep an audited repo", or as the step between /threat-model and /triage.
+Static source-code vulnerability scan. Reads a target directory (and its threat model — <repo>-threat-model.md, or legacy THREAT_MODEL.md — if present), spawns parallel review subagents per focus area, and writes <repo>-vuln-findings.{json,md} with campaign finding IDs ({REPO_SLUG}-{SHORTSHA}-{NNN}) and the shared severity enum, for /triage to consume. When a <repo>-security-audit.json baseline exists, the scan supplements it: known findings are deduped against the baseline and new verified findings enter traust-core directly (as findings of the scan's assessment; the baseline is never written — gate A15) at not_verified (no triage precondition; triage adjudicates downstream) — /secure-code-audit remains the preferred baseline and /verify-remediation the way to update it after fixes. Read-only — no building, running, or network. Use when asked to "scan for vulns", "review this code for security issues", "find bugs in <dir>", "re-sweep an audited repo", or as the step between /threat-model and /triage.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
-- **Invoke:** `/vuln-scan` — arguments: `<target-dir> [--diff [--since <commit>]] [--baseline <audit.json>] [--focus <area>] [--single] [--extra <file>] [--no-score]`
+- **Invoke:** `/vuln-scan` — arguments: `<target-dir> [--diff [--since <commit>] [--baseline-assessment <id>]] [--baseline <audit.json>] [--focus <area>] [--single] [--extra <file>] [--no-score]`
 - **Skill:** [harnessing/3-audit/vuln-scan/SKILL.md](../harnessing/3-audit/vuln-scan/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/3-audit/vuln-scan/SKILL.md#integrations)
 
@@ -308,7 +307,7 @@ Generate candidate fixes for verified security findings. Consumes <repo>-triage.
 
 - **Stage:** ⑦ Remediation
 - **Tier:** `primary`
-- **Invoke:** `/patch` — arguments: `<findings-path> [--repo PATH] [--top N] [--id fNNN] [--model M] [--fresh]`
+- **Invoke:** `/patch` — arguments: `<findings-path | work-item-id> [--repo PATH] [--top N] [--id fNNN] [--model M] [--fresh]`
 - **Skill:** [harnessing/7-remediate/patch/SKILL.md](../harnessing/7-remediate/patch/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/7-remediate/patch/SKILL.md#integrations)
 
@@ -354,7 +353,7 @@ Use when the user asks to generate a shareable findings folder, executive summar
 
 ## attack-coverage
 
-Use when the user asks for MITRE ATT&CK coverage of the portfolio — "which ATT&CK techniques/tactics do our threats or validated chains cover", "build the ATT&CK Navigator layer", "ATT&CK heat map", or after updating threat models/validations to refresh the coverage roll-up. Deterministically joins validated attack chains, threat-model attack_refs, and finding-category-derived candidates against the pinned vendored ATT&CK table and emits a Navigator layer JSON plus a tactic/technique coverage one-pager.
+Use when the user asks for MITRE ATT&CK coverage of the portfolio — "which ATT&CK techniques/tactics do our threats or validated chains cover", "build the ATT&CK Navigator layer", "ATT&CK heat map", or after updating threat models/validations to refresh the coverage roll-up. Deterministically joins threat-model attack_refs and finding-category-derived candidates (validated attack chains once traust-core records them) against the pinned vendored ATT&CK table and emits a Navigator layer JSON plus a tactic/technique coverage one-pager.
 
 - **Stage:** —
 - **Tier:** `secondary`
@@ -409,7 +408,7 @@ Use before committing any new or edited skill or script to the traust repo, or w
 
 ## drift-watch
 
-Use when the user asks whether derived artifacts or paired sources are stale or drifting — "is anything stale", "check for drift", "are the feeds/graphs/findings-db current", "did inputs change since the graph was built", "run the drift report" — or on a regular cadence. Runs the deterministic staleness/drift checker over feeds, findings.db, repo-/portfolio-graph vs the inputs inventory, repo-liveness, corpus registration, finding-identity stamping across every audit report, ADR-registry pins, external-tool freshness (installed scanners vs latest upstream releases), docs-product-map version enumeration (declared doc versions vs the live docs.redhat.com landing pages — catches FUTURE product-doc versions the variance lane isn't covering), pqc-facts stamps/schema provenance, and dated policy provenance; writes drift-report.{json,md} to progress-tracker/metrics/drift/.
+Use when the user asks whether derived artifacts or paired sources are stale or drifting — "is anything stale", "check for drift", "are the feeds/graphs/findings-db current", "did inputs change since the graph was built", "run the drift report" — or on a regular cadence. Shows traust-core's freshness view over feeds, scanner readiness and tool databases, the toolchain's versions, threat-model and audit cadence, and audit coverage gaps, plus ADR-registry pins, rule-pack pins, docs-product-map version enumeration (declared doc versions vs the live docs.redhat.com landing pages — catches FUTURE product-doc versions the variance lane isn't covering), framework-spine upstream and dated policy provenance; writes freshness.{md,html,json} where asked.
 
 - **Stage:** —
 - **Tier:** `secondary`
@@ -467,7 +466,7 @@ Use when the user asks which insecure coding patterns recur across the portfolio
 
 ## loc-dashboard
 
-Use when the user asks how many lines of code have been scanned/audited, wants a LoC breakdown by language or repo across the security-audit campaign, or asks to (re)build the LoC dashboard. Produces gh-languages-cache.jsonl and a self-contained loc-dashboard.html from the campaign manifests.
+Use when the user asks how many lines of code have been scanned/audited, wants a LoC breakdown by language or repo across the security-audit campaign, or asks to (re)build the LoC dashboard. Produces the lines-of-code view {json,md,html} from the code facts traust-core has measured.
 
 - **Stage:** —
 - **Tier:** `tertiary`
@@ -486,7 +485,7 @@ Use when the user asks to mine the disposition ledger for confirmed true positiv
 
 ## portfolio-graph
 
-Use when the user asks code-level portfolio questions or to build/refresh/query the portfolio source-code graph — "which products depend on module X" / CVE blast radius, "top shared libraries", "internal library coupling", "rebuild the portfolio graph", "query the code graph". Distinct from /repo-graph (the organizational coverage graph): this one holds the code-level layers — module dependencies (L1), Kubernetes interfaces (L2), artifacts/SBOM (L3), and symbols (L4), all implemented — in a queryable SQLite database built by python3 -m traust.cli portfolio.
+Use when the user asks code-level portfolio questions or to build/refresh/query the portfolio source-code graph — "which products depend on module X" / CVE blast radius, "top shared libraries", "internal library coupling", "rebuild the portfolio graph", "query the code graph". Distinct from the retired /repo-graph (the organizational coverage graph): this one holds the code-level layers — module dependencies (L1), Kubernetes interfaces (L2), artifacts/SBOM (L3), and symbols (L4), all implemented — in a queryable SQLite database built by python3 -m traust.cli portfolio.
 
 - **Stage:** —
 - **Tier:** `secondary`
@@ -514,7 +513,7 @@ Use when the user asks to measure the auditor's detection recall, run the recall
 
 ## refresh-dashboards
 
-Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, dependency-exposure, spend), then the leadership scoreboard last because it harvests the others. Deterministic, ~$0, no agents.
+Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, spend); the leadership scoreboard is a core view. Deterministic, ~$0, no agents.
 
 - **Stage:** —
 - **Tier:** `secondary`
@@ -522,19 +521,9 @@ Use when the user asks to refresh, rebuild, or update all the dashboards — "re
 - **Skill:** [harnessing/refresh-dashboards/SKILL.md](../harnessing/refresh-dashboards/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/refresh-dashboards/SKILL.md#integrations)
 
-## repo-graph
-
-Build or refresh the portfolio repository graph. Reads every segment of the inputs inventory (`locations.inputs`) by the kind declared in `<inputs>/inventory.yaml` (groups / release-payload / catalog / services; ansible/ excluded by default), cross-references every repo against analysis-results/findings/ coverage (audit/triage/threat-model + severity), and emits repo-graph.{json,dot,gexf,html} + repo-graph-stats.md into analysis-results/graph/. Use when asked to "build the repo graph", "update the portfolio graph", "map repos to findings", "which repos have no coverage", or "what ships kube-rbac-proxy".
-
-- **Stage:** —
-- **Tier:** `secondary`
-- **Invoke:** `/repo-graph` — arguments: `[--inputs DIR] [--findings DIR] [--out DIR] [--exclude SEGMENT]... [--date YYYY-MM-DD]`
-- **Skill:** [harnessing/repo-graph/SKILL.md](../harnessing/repo-graph/SKILL.md)
-- **Produces / consumes:** [Integrations](../harnessing/repo-graph/SKILL.md#integrations)
-
 ## sla-view
 
-Use when the user asks about SLA compliance, overdue findings, response/remediation deadlines, breach counts, or escalation lists — e.g. "what's past SLA", "criticals overdue", "are we meeting the 30-day clock", "SLA view for FedRAMP", "who's most overdue". Replays disposition-ledger clocks against a schema-validated SLA policy (default: the deployment's sla-policy.yaml in the config home) and emits sla-view.{json,md} with per-team overdue tables and a human-gated escalation digest.
+Use when the user asks about SLA compliance, overdue findings, response/remediation deadlines, breach counts, or escalation lists — e.g. "what's past SLA", "criticals overdue", "are we meeting the 30-day clock", "SLA view for FedRAMP", "who's most overdue". Replays the clocks of the findings recorded in traust-core against a schema-validated SLA policy (default: the deployment's sla-policy.yaml in the config home) and emits sla-view-<policy>.{md,html,json} with per-team overdue tables and a human-gated escalation digest.
 
 - **Stage:** —
 - **Tier:** `secondary`
@@ -544,16 +533,16 @@ Use when the user asks about SLA compliance, overdue findings, response/remediat
 
 ## threat-register
 
-Use when the user asks for a fleet-wide or portfolio-wide view of threats (not findings) — "how many unmitigated critical threats do we have", "threat register", "which products carry the most open threat exposure", "what class-closing mitigations would pay off fleet-wide" — or asks to (re)build the threat register. Deterministically aggregates every *-threat-model.md (and legacy THREAT_MODEL.md) under analysis-results into progress-tracker/metrics/dashboards/threat-register/threat-register.{json,md,html}, keyed by the stable compound key <model-slug>:<Tn>.
+Use when the user asks for a fleet-wide or portfolio-wide view of threats (not findings) — "how many unmitigated critical threats do we have", "threat register", "which products carry the most open threat exposure", "what class-closing mitigations would pay off fleet-wide" — or asks to (re)build the threat register. Deterministically lists every threat the registered repositories' latest recorded threat models state (traust assessments threats), each keyed by a stable id per model and <Tn>.
 
 - **Stage:** —
 - **Tier:** `secondary`
-- **Invoke:** `/threat-register` — arguments: `[--root <analysis-results>] [--out <dir>]`
+- **Invoke:** `/threat-register` — arguments: `[--status <status>] [--technique <attack-id>]`
 - **Skill:** [harnessing/threat-register/SKILL.md](../harnessing/threat-register/SKILL.md)
 
 ## traust-metrics
 
-Use when the user asks for campaign metrics, a leadership scoreboard, or to (re)build/refresh progress-tracker/metrics/traust-metrics.md. Deterministically harvests headline numbers from the campaign's derived artifacts (executive summary, validation/fuzz dashboard, threat register, progress-tracker control files) and the harness's own tree/git metadata into one consistently-updatable Markdown scoreboard.
+Use when the user asks for campaign metrics, a leadership scoreboard, or to (re)build/refresh progress-tracker/metrics/dashboards/scoreboard/traust-metrics.md. Deterministically harvests headline numbers from traust-core's executive summary, findings trend and threat register views into one consistently-updatable Markdown scoreboard.
 
 - **Stage:** —
 - **Tier:** `secondary`

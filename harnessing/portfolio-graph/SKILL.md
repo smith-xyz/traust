@@ -5,7 +5,7 @@ description: >-
   build/refresh/query the portfolio source-code graph — "which products
   depend on module X" / CVE blast radius, "top shared libraries",
   "internal library coupling", "rebuild the portfolio graph", "query
-  the code graph". Distinct from /repo-graph (the organizational
+  the code graph". Distinct from the retired /repo-graph (the organizational
   coverage graph): this one holds the code-level layers — module
   dependencies (L1), Kubernetes interfaces (L2), artifacts/SBOM (L3),
   and symbols (L4), all implemented — in a queryable SQLite database
@@ -18,6 +18,7 @@ allowed-tools:
   - Grep
   - Write
   - Bash(python3 *traust* -m traust.cli portfolio:*)
+  - Bash(python3 *-m traust.cli impact sbom:*)
   - Bash(sqlite3:*)
   - Bash(ls:*)
   - Bash(jq:*)
@@ -36,7 +37,7 @@ allowed-tools:
 
 
 The queryable **source-code** graph of the Hybrid Platforms portfolio.
-Where `/repo-graph` maps organization and audit coverage (segments →
+Where the retired `/repo-graph` mapped organization and audit coverage (segments →
 products → repos → findings dirs), this skill maps **how code connects**:
 which repos declare and depend on which Go modules (with versions,
 direct/indirect, and internal-library marking), joined to the product
@@ -46,11 +47,11 @@ Design, layer roadmap, and per-layer dependencies are recorded in
 `plans/portfolio-graph-plan.md` under the configured `progress-tracker` root
 (an external workspace artifact, not bundled with this skill).
 **L1 is multi-ecosystem**: Go (`go.mod`) plus npm, PyPI, Maven, Cargo,
-RubyGems, and NuGet manifests (python3 -m traust.cli portfolio parsers), language-gated
+RubyGems, and NuGet manifests, language-gated
 per repo against a `gh-languages` cache. Non-Go package nodes are namespaced
 `pkg:<eco>/<name>` (a distinct id space from Go's `module:<path>`) and their
-`depends_on` edges carry an `ecosystem` attr — `blast-radius` and the other
-canned queries take an explicit ecosystem so a same-named package in two
+`depends_on` edges carry an `ecosystem` attr — the blast radius
+(`portfolio dependents`) takes an explicit ecosystem so a same-named package in two
 ecosystems never cross-contaminates a result. Manifest discovery walks the
 git tree recursively (a repo's manifests can live in any subdirectory —
 nested `.csproj`, submodule `pom.xml`, monorepo layouts — not just root).
@@ -59,17 +60,20 @@ filename rather than language-gated: Docker base images (`Dockerfile*`
 `FROM`, `pkg:docker/<img>`), GitHub Actions (`uses:` in
 `.github/workflows/*.y{,a}ml`, `pkg:actions/<owner/repo>`), and Helm chart
 dependencies (`Chart.yaml`, `pkg:helm/<name>`) — `--no-universal` on
-`build`/`deps-multi` skips them. Of the three, only GitHub Actions has an
+`build` skips them. Of the three, only GitHub Actions has an
 OSV CVE lane; Docker and Helm are graph/blast-radius surfaces only (their
 vuln lane is the container-SBOM/grype path, never OSV — see
-`/dependency-watch` and `/impact-analysis`). `harnessing/portfolio-graph/scripts/smoke_deps_multi.py`
-is the offline completeness checker for this layer (presence, per-ecosystem
-coverage ratio, Go no-regression snapshot, id-space collision check;
-universal surfaces are checked presence-only, no coverage floor) — run
-it after any backfill or ecosystem-scope change. The builder persists
+`/dependency-watch` and `/impact-analysis`). traust-core records each
+commit's dependencies from its manifest SBOM
+(`python3 -m traust.cli impact sbom --repo-url <url> --sha <commit>`: syft over
+the checkout, every ecosystem syft reads); `traust portfolio dependencies` and
+`dependents` read them. The offline completeness checker
+(`smoke_deps_multi.py`) is *retired*: it checked the manifest parsers, which
+syft replaces, and packages are keyed by ecosystem and name, so ids cannot
+collide. The builder persists
 `analysis-results/graph/deps-multi-stats.json` (per-ecosystem
 `repos_with_manifest`) as the authoritative coverage denominator —
-`smoke_deps_multi.py` and other consumers prefer it over the
+consumers prefer it over the
 language-cache count, which overcounts repos that declare a language but
 carry no manifest.
 **Implemented: L0 spine + L1 dependencies + L2 Kubernetes interfaces**
@@ -102,7 +106,8 @@ layers are now implemented.
 
   `STALE` means the the inputs inventory inventories changed after the
   spine was generated, or the spine exceeds the 30-day age backstop —
-  **run `/repo-graph` to regenerate the spine, then come back here**.
+  **`/repo-graph` is retired, so nothing regenerates the spine: build from
+  the existing one with `--allow-stale`, or stop**.
   `build` enforces the same check and refuses a stale spine
   (`--allow-stale` overrides, e.g. offline). `FRESH` means skip the
   `/repo-graph` run entirely; rebuilding a fresh spine is wasted work.
@@ -125,16 +130,7 @@ python3 -m traust.cli portfolio build \
   # Gemfile.lock. The three universal surfaces (docker/actions/helm) run
   # alongside it by default; --no-universal skips them. `build` stays
   # exit 0 even if one ecosystem comes back silently broken (prints a
-  # WARNING) — run smoke_deps_multi.py to catch that case loudly.
-
-# Non-Go L1 only, against an existing db (resumable via the disk cache;
-# e.g. after adding an ecosystem or re-running a partial backfill without
-# re-touching the Go layer):
-python3 -m traust.cli portfolio deps-multi \
-  --db analysis-results/graph/portfolio-graph.db --jobs 4 \
-  --ecosystems npm,pypi
-  # --no-universal here too, if you want the language-gated ecosystems
-  # only (e.g. re-running just a language-manifest backfill).
+  # WARNING).
   #
   # RATE LIMITS & RESUMABILITY (a full backfill is a wide fleet sweep —
   # one git-tree call + N manifest fetches per repo — so it WILL hit
@@ -148,12 +144,11 @@ python3 -m traust.cli portfolio deps-multi \
   # the same command: ok/absent results are disk-cached, so it picks up
   # exactly where it stopped. A full portfolio backfill can therefore take
   # several passes / a couple hours; each pass is cheap over the cache.
+  # (The non-Go-only backfill, `portfolio deps-multi`, is retired: re-run
+  # `build`.)
 
-# Completeness check after any multi-ecosystem build/backfill (presence,
-# per-ecosystem coverage ratio, Go no-regression snapshot, id-space
-# collision check between module:<path> and pkg:<eco>/<name>; reads
-# deps-multi-stats.json when present for the authoritative denominator):
-python harnessing/portfolio-graph/scripts/smoke_deps_multi.py --db analysis-results/graph/portfolio-graph.db
+# One commit's dependencies into traust-core (syft over the checkout):
+python3 -m traust.cli impact sbom --repo-url <url> --sha <commit>
 
 # Layer 2 — clone sweep (long on a cold cache; resume-safe, re-run freely)
 python3 -m traust.cli portfolio interfaces \
@@ -187,13 +182,13 @@ absence of dependencies.
 Canned queries (JSON to stdout):
 
 ```bash
-# CVE lands in a module — who requires it, at what version, in which products?
-python3 -m traust.cli portfolio query --db <db> blast-radius golang.org/x/net
+# CVE lands in a module — which commits hold it (traust-core; --version
+# starts only from SBOMs holding that version)?
+python3 -m traust.cli portfolio dependents --name golang.org/x/net [--version <v>]
 
-# Same query on a non-Go package: --ecosystem resolves the positional arg
-# to the right node id (default 'go' -> module:<path>; e.g. 'npm' ->
-# pkg:npm/<name>).
-python3 -m traust.cli portfolio query --db <db> blast-radius left-pad --ecosystem npm
+# Same query on a non-Go package: --ecosystem (default 'go'), the name as
+# that ecosystem normalises it.
+python3 -m traust.cli portfolio dependents --name left-pad --ecosystem npm
 
 # Highest-fan-in libraries across the portfolio
 python3 -m traust.cli portfolio query --db <db> top-shared --limit 20
@@ -204,6 +199,11 @@ python3 -m traust.cli portfolio query --db <db> internal-coupling
 # Everything coupled to one API group: CRD owners, requirers, code
 # consumers, RBAC granters, webhook interceptors
 python3 -m traust.cli portfolio query --db <db> crd-consumers route.openshift.io
+
+# traust-core: one commit's packages, then the commits a package reaches
+# (directly, through a base image or an internal library)
+python3 -m traust.cli portfolio dependencies --repo-url <url> --sha <commit>
+python3 -m traust.cli portfolio dependents --package-id <package_id>  # or --ecosystem + --name
 ```
 
 Anything beyond the canned set: query the SQLite schema directly —
@@ -227,27 +227,26 @@ PQC/isolation facts are a separately-costed decision
 `progress-tracker` root).
 
 Enrichment keys survive rebuilds: repo-node attrs stamped **after** the
-spine by a later step — currently the pqc backfeed's `$.pqc`
-(`scan_pqc_dependencies.py`) — are preserved across a spine rebuild via
+spine by a later step — formerly the pqc backfeed's `$.pqc`
+(`scan_pqc_dependencies.py`, *retired*: traust-core derives PQC readiness
+on demand) — are preserved across a spine rebuild via
 the `ENRICHMENT_ATTR_KEYS` allowlist in `build_portfolio_graph.py`. The
 spine stays authoritative for everything it owns (a spine key's new value
 always wins) and no unknown/foreign key is retained (bounded allowlist, not
 a blind merge), so a rebuild can no longer silently drop `$.pqc` and zero
 the per-product PQC reports. Adding a key to `ENRICHMENT_ATTR_KEYS` is the
-only step needed to make a future post-spine repo-node enrichment durable;
-`/drift-watch`'s `pqc-backfeed` row is the backstop that flags the clobber
-if it ever recurs.
+only step needed to make a future post-spine repo-node enrichment durable.
 
 ## Refresh cadence
 
 Human-decision, drift-flagged (see docs/continuous-operations.md,
-"Standing jobs — the complete inventory"): rebuild after `/repo-graph`
-refreshes (inventory changes), or when a consumer needs freshness —
+"Standing jobs — the complete inventory"): rebuild after the inputs
+inventory changes, or when a consumer needs freshness —
 `/impact-analysis` states graph freshness as a precondition, and
 `/drift-watch`'s `portfolio-graph` row flags a build stamp older than
 the inputs HEAD. The fetch cache makes off-cadence rebuilds cheap.
 
-The multi-ecosystem L1 layer (`deps-multi`) is **tree-driven and part of
+The multi-ecosystem L1 layer is **tree-driven and part of
 the standard `build`** — manifests are discovered by walking each repo's
 git tree (subdir-aware) and re-parsed on every rebuild, so a rebuild is
 the refresh. Three `/drift-watch` rows are the coverage backstops between
@@ -264,8 +263,8 @@ portfolio, so that row guards the guard.
 ## Integrations
 
 **Consumes:** `repo-graph.json` as its L0 spine — a stale repo-graph yields a
-portfolio-graph with the wrong repo set, so `/repo-graph` is a prerequisite
-rather than an alternative. Then the repos' own manifests and source for
+portfolio-graph with the wrong repo set, so `/repo-graph` was a prerequisite
+rather than an alternative (it is retired: the existing spine is the last one). Then the repos' own manifests and source for
 L1–L4.
 
 **Emits:** `analysis-results/graph/portfolio-graph.db` (SQLite `nodes` +

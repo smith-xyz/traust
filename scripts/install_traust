@@ -46,13 +46,13 @@ DEFAULT_HOME="${TRAUST_CONFIG_HOME:-$HOME/.traust/config}"
 REQUIRED_FILES="corpus-config.yaml safe-exec-profiles.yaml"
 # Optional files (feature-gated in the MANIFEST): a template is seeded as a
 # starting point, but absence is fine. The declared-policy files (sla-policy,
-# org-parameters, adr-registry, reachability-watch, benchmark-targets) are
+# org-parameters, adr-registry, benchmark-targets) are
 # never copied: their placeholder values would be reported as if declared. ledger-signing-key.pub is optional too
 # (no key ⇒ the ledger records unsigned; signature verification is skipped) and
 # is NOT copied because its template is instructions, not a key.
-OPTIONAL_FILES="storage.yaml ledger.yaml execution-boundaries.yaml product-definitions-map.yaml budget-policy.yaml rule-pack-allowlist.yaml hardening-risk-weights.json rpm-distgit-watch.yaml internal-vocabulary.yaml locations.yaml remediation.yaml campaign.yaml export.yaml sla-policy.yaml org-parameters.yaml adr-registry.yaml reachability-watch.yaml benchmark-targets.yaml"
+OPTIONAL_FILES="storage.yaml ledger.yaml execution-boundaries.yaml product-definitions-map.yaml budget-policy.yaml rule-pack-allowlist.yaml hardening-risk-weights.json internal-vocabulary.yaml locations.yaml remediation.yaml campaign.yaml export.yaml sla-policy.yaml org-parameters.yaml adr-registry.yaml benchmark-targets.yaml"
 # Files whose template is a real, usable starting point (copied as-is).
-COPYABLE="execution-boundaries.yaml agent-plugins.yaml corpus-config.yaml safe-exec-profiles.yaml product-definitions-map.yaml budget-policy.yaml rule-pack-allowlist.yaml hardening-risk-weights.json rpm-distgit-watch.yaml internal-vocabulary.yaml remediation.yaml campaign.yaml locations.yaml remediation.yaml campaign.yaml export.yaml"
+COPYABLE="execution-boundaries.yaml corpus-config.yaml safe-exec-profiles.yaml product-definitions-map.yaml budget-policy.yaml rule-pack-allowlist.yaml hardening-risk-weights.json internal-vocabulary.yaml remediation.yaml campaign.yaml locations.yaml remediation.yaml campaign.yaml export.yaml"
 # Shipped as-is with the harness and ALSO copied into TRAUST_CONFIG_HOME, so a
 # deployment is complete in one directory even where only traust-engine is
 # installed. These are the MANIFEST-required shipped defaults (model router +
@@ -298,7 +298,7 @@ except ImportError:
     sys.exit(1)
 names = ["corpus-config.yaml", "product-definitions-map.yaml", "budget-policy.yaml",
          "safe-exec-profiles.yaml", "rule-pack-allowlist.yaml", "hardening-risk-weights.json",
-         "rpm-distgit-watch.yaml", "internal-vocabulary.yaml", "ledger-signing-key.pub"]
+         "internal-vocabulary.yaml", "ledger-signing-key.pub"]
 bad = 0
 for n in names:
     p = optional_config_path(n)

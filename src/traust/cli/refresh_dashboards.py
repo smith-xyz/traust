@@ -3,9 +3,8 @@
 
 Packages the "Dashboards rebuild" job from docs/continuous-operations.md
 as one command: first traust-core's insight views (`DashboardsMaterializer`,
-one `InsightService.refresh`), then the builders of the dashboards core has
-no view for yet, then the leadership scoreboard last because it
-harvests from the other dashboards' output.
+one `InsightService.refresh`, the leadership scoreboard among them), then the
+builders of the dashboards core has no view for yet.
 
 All stages are deterministic (~$0, no agent). A failure is recorded and
 the remaining stages still run; the exit code is non-zero if anything failed.
@@ -20,7 +19,7 @@ Usage:
   python3 -m traust.cli.refresh_dashboards --list        # show stages
   python3 -m traust.cli.refresh_dashboards --only views spend
   python3 -m traust.cli.refresh_dashboards --view findings-rollup --out /tmp/dashboards
-  python3 -m traust.cli.refresh_dashboards --skip scoreboard
+  python3 -m traust.cli.refresh_dashboards --skip spend
   python3 -m traust.cli.refresh_dashboards --dry-run
   python3 -m traust.cli.refresh_dashboards --spend-actuals
 """
@@ -37,8 +36,8 @@ from traust_core.v1.models.operations import AssetRequest
 from traust.cli._doors import EXIT_CODES
 from traust.context import (
     add_config_home_arg,
-    load_core,
     load_engine,
+    load_insight_core,
     progress_tracker_dir,
     resolve_results_root,
     workspace_dir,
@@ -92,48 +91,6 @@ def build_stages(
                 *path_args,
             ],
         ),
-        # no door: an SLA view (profiles, clock ladder, digest); reads the retired findings.db
-        ("sla", "consumer", [PYTHON, "-m", "traust.cli", "metrics", "sla", *cfg]),
-        # no door: ComplianceDashboardView
-        (
-            "compliance",
-            "consumer",
-            [PYTHON, "-m", "traust.cli", "compliance", "dashboard", *path_args],
-        ),
-        # no door: AttackCoverageView; its modeled leg reads AssessmentService.threats
-        (
-            "attack-coverage",
-            "consumer",
-            [
-                PYTHON,
-                str(h / "harnessing/attack-coverage/scripts/build_attack_coverage.py"),
-                *path_args,
-            ],
-        ),
-        # no door: LocView. --no-fetch: rebuild from the committed gh-languages cache only;
-        # refreshing the cache hits the GitHub API and stays with the
-        # owning skill (see gh-api fleet-sweep constraints).
-        (
-            "loc",
-            "consumer",
-            [
-                PYTHON,
-                str(h / "harnessing/loc-dashboard/scripts/build_loc_dashboard.py"),
-                *path_args,
-                "--no-fetch",
-            ],
-        ),
-        # no door: ExposureView (ExposureService.summary). Reads the portfolio graph's
-        # dependency layer + impact/fleet-OSV artifacts; degrades when they are absent.
-        (
-            "dependency-exposure",
-            "consumer",
-            [
-                PYTHON,
-                str(h / "harnessing/refresh-dashboards/scripts/build_dependency_exposure.py"),
-                *path_args,
-            ],
-        ),
     ]
     if spend_actuals:
         stages.append(
@@ -160,23 +117,12 @@ def build_stages(
             [PYTHON, "-m", "traust.cli", "metrics", "spend", *cfg, "--workspace", str(workspace)],
         )
     )
-    # Last on purpose: the scoreboard harvests from the dashboards above. no door: ProgramView
-    # (OpsService.timeline). No history row: a trend is the view built at an earlier as_of.
-    scoreboard = [
-        PYTHON,
-        str(h / "harnessing/traust-metrics/scripts/collect_harness_metrics.py"),
-        *path_args,
-        "--workspace-root",
-        str(workspace),
-        "--no-history",
-    ]
-    stages.append(("scoreboard", "consumer", scoreboard))
     return stages
 
 
 def run_views(args, out: Path) -> int:
     """The `dashboards` asset's materializer: one InsightService.refresh; prints its JobResult."""
-    materializer = DashboardsMaterializer(load_core(args.config_home).services(), out)
+    materializer = DashboardsMaterializer(load_insight_core(args.config_home).services(), out)
     result = materializer.materialize(
         AssetRequest(asset=materializer.asset, run_id=args.run_id, partition=args.view)
     )
@@ -187,7 +133,7 @@ def run_views(args, out: Path) -> int:
 def main(argv=None):
     ap = argparse.ArgumentParser(
         description="Rebuild all deterministic dashboards: traust-core's views, "
-        "then the remaining builders, the scoreboard last."
+        "then the remaining builders."
     )
     add_config_home_arg(ap)
     ap.add_argument(

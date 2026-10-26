@@ -48,16 +48,17 @@ finding's disposition.)
 
 - A findings tree to mine — *retired*: `sweep mine` reads traust-core's
   recorded findings.
-- `--pack <dir>` — rule pack to check coverage against (default: the
-  pack bundled in traust-engine, `traust_engine/data/secure-code-audit/opengrep-rules/`).
+- `--pack <name>` — rule pack to check coverage against (default `traust`: the
+  pack bundled in traust-engine, `traust_engine/data/secure-code-audit/opengrep-rules/`,
+  or `locations.opengrep_rules`; an enabled allowlist supplement by its name).
 - `--out <file>` — also write the whole mining (with the TP corpus) as
   JSON; the command prints it without the corpus.
 
 ## Bundled precedent cards
 
 [precedent-cards/pilot.yaml](precedent-cards/pilot.yaml) supplies the pilot
-cards used by `tests/test_compile_precedent_cards.py` to check card
-validation and compiler behavior. Consult it when maintaining precedent-card
+cards traust-core's tests use to check card validation and sweep behavior
+(`python3 -m traust.cli sweep cards <cards.yaml> [--checkout <dir>]`). Consult it when maintaining precedent-card
 compilation; these fixtures are not findings or production sweep inputs.
 
 ## Procedure
@@ -65,7 +66,7 @@ compilation; these fixtures are not findings or production sweep inputs.
 **Step 1 — run the deterministic miner** (all analysis is script-side):
 
 ```bash
-python3 -m traust.cli sweep mine [--pack <dir>] [--out <file>]
+python3 -m traust.cli sweep mine [--pack <name>] [--out <file>]
 ```
 
 Output: `corpus` (one confirmed TP per finding — the rule

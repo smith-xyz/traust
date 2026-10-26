@@ -40,23 +40,23 @@ python3 -m traust.cli dashboard view findings-trend $ARGUMENTS
     --out DIR                   # e.g. progress-tracker/metrics/dashboards/trends
 ```
 
-Outputs `<stem>.{json,md,html}` into `--out` (core renders them, stores nothing). No door yet for the population block or the "Ownership cuts (latest bucket)" section (owned vs upstream); the view sums the scope's repositories.
+Outputs `<stem>.{json,md,html}` into `--out` (core renders them, stores nothing). The view renders the population block. *Retired:* the "Ownership cuts (latest bucket)" section (owned vs upstream): scope is `--product` / `--team-id`; the view sums the scope's repositories.
 
 ## Semantics (fixed by design decisions, 2026-07-10)
 
 - **Option A open counting.** Every finding from every audited repo counts
   as *open* until a decision closes it. Findings without decisions therefore
   contribute permanent open exposure — that is the point: total exposure is
-  what leadership needs. (No door yet for the coverage figure; the view
-  doesn't print it.)
+  what leadership needs. (The view prints the coverage figure: the
+  repositories with a decision recorded, of those reported, per bucket.)
 - **Accepted risk is not remediation.** `risk_accepted` findings leave
   "open" but land on a standing **Accepted Risk Register** — unfixed and
   unmitigated, reported with severity, CVSS, who accepted, when, and the
   recorded rationale. The register never decays; it shrinks only through
   remediation or re-triage. The accepted-risk CVSS sum is its own trend
-  series, distinct from the open risk index. (The view counts accepted
-  findings per bucket; no door yet for the register's entries or the
-  accepted CVSS sum.)
+  series, distinct from the open risk index. (The view lists the
+  register's entries and the accepted CVSS sum, `accepted risk index`,
+  per bucket.)
 - **Risk index = CVSS sum.** Sum of `cvss.score` over open findings;
   findings without CVSS use their severity band midpoint (critical 9.5,
   high 8.0, medium 5.5, low 2.0, informational 0). Custom weighting is
@@ -78,8 +78,7 @@ Outputs `<stem>.{json,md,html}` into `--out` (core renders them, stores nothing)
 
 Direction = last bucket vs the mean of up to three prior buckets, with a
 ±10% dead band rendered as → flat. Worsening metrics carry a ⚠ flag.
-(No door yet: the view renders the series without arrows, FP rate or
-velocity.)
+(The view computes the directions, FP rate and velocity.)
 
 ## Procedure
 
@@ -97,13 +96,12 @@ velocity.)
    **exploitation-evidence likelihood factor** (KEV membership / EPSS
    band — `threat_intel_factor` in `risk-rating-methodology.json`); the
    dashboard's methodology note records feed versions and staleness.
-3. Read `findings-trends.md` back to the user. Lead with the direction
+3. Read `findings-trend.md` back to the user. Lead with the direction
    table, then call out:
    - any **worsening ⚠** metric, with the driving repos where identifiable
    - the **Accepted Risk Register** headcount and its highest-CVSS entries
    - the **ledger coverage** figure and its trend — if coverage is low,
      say explicitly that the open count is dominated by untracked repos
-     (no door yet: the view has no coverage figure)
 4. Offer the HTML dashboard path for sharing.
 
 ## Gotchas

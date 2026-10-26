@@ -12,6 +12,9 @@ Output: progress-tracker/metrics/dashboards/pqc/pqc-vendor-roadmap.{md,json}
 Re-run whenever the registry is reviewed or reports change; counts are
 deterministic, status text is curated (each row carries last_reviewed).
 
+Kept until the curated vendor registry has a home in the data model (NEED(Michele, Shaun:
+dated vendor PQC status claims)); the blocked-external repos come from the pqc-portfolio view.
+
 Usage: build_pqc_vendor_tracker.py [--results-root PATH] [--config-home PATH]
 """
 
@@ -26,7 +29,7 @@ from pathlib import Path
 
 from traust.context import (
     add_config_home_arg,
-    load_engine,
+    load_core,
     progress_tracker_dir,
     resolve_results_root,
 )
@@ -50,11 +53,11 @@ def main() -> int:
     ap.add_argument("--out-dir", type=Path, default=None)
     args = ap.parse_args()
     results = resolve_results_root(args)
-    engine = load_engine(args.config_home)
+    core = load_core(args.config_home)
     out = (
         args.out_dir.resolve()
         if args.out_dir
-        else progress_tracker_dir(engine) / "metrics" / "dashboards" / "pqc"
+        else progress_tracker_dir(core) / "metrics" / "dashboards" / "pqc"
     )
     out.mkdir(parents=True, exist_ok=True)
     # The vendor registry is CURATED ORG DATA, not a skill asset: its 16

@@ -1,7 +1,7 @@
 ---
 name: refresh-dashboards
 description: >-
-  Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, dependency-exposure, spend), then the leadership scoreboard last because it harvests the others. Deterministic, ~$0, no agents.
+  Use when the user asks to refresh, rebuild, or update all the dashboards — "refresh the dashboards", "rebuild every dashboard", "update the derived views", "run the weekly dashboards job" — or on the weekly orchestration cadence. Runs python3 -m traust.cli dashboard refresh, the packaged "Dashboards rebuild" job from docs/continuous-operations.md: traust-core's insight views first (InsightService.refresh), then the per-dashboard builders (executive summary, trends, insecure-patterns, validation-fuzz, RBAC/tenancy rollup, SLA view, compliance, ATT&CK coverage, LoC cache-only, spend); the leadership scoreboard is a core view. Deterministic, ~$0, no agents.
 argument-hint: "[--only <stage...>] [--skip <stage>] [--spend-actuals] [--view <name>] [--out <dir>]"
 metadata:
   harness.tier: "secondary"
@@ -28,18 +28,20 @@ as a single command.
 Ordering is the whole point:
 
 1. **Core views** — `DashboardsMaterializer`: one `InsightService.refresh`
-   renders every view traust-core has built (today `findings-rollup`, `findings-trend`)
+   renders every view traust-core has built (`traust dashboard view --help` lists them)
    to `<out>/<view>/<stem>.{md,html,json}`. Reads are live, so there is
    no projection to go stale; a view that fails is reported degraded and
    the others still render.
 2. **Consumers** — executive summary,
    insecure-patterns, validation-fuzz dashboard, RBAC/tenancy rollup,
-   SLA view, compliance dashboard, ATT&CK coverage rollup,
-   LoC dashboard (cache-only), dependency-exposure, spend dashboard.
+   LoC dashboard (cache-only), spend dashboard. (*Retired* here:
+   dependency-exposure, now the `exposure` and `dependency-reach` core views;
+   ATT&CK coverage rollup, now the `attack-coverage` core view.)
    Each continues on error; failures are collected.
-3. **Scoreboard last** — `collect_harness_metrics.py` harvests headline
-   numbers *from* the dashboards above, so it runs after all of them
-   (`--no-history`: a trend is the view built at an earlier `as_of`).
+3. **Scoreboard last** — *retired:* the scoreboard is traust-core's
+   `ScoreboardView`, rendered in step 1; it composes the other views in-process,
+   so it needs no place in the order
+   (it writes no history row: a trend is the view built at an earlier `as_of`).
 
 ## Procedure
 
@@ -76,14 +78,12 @@ Ordering is the whole point:
   default job skips it to stay orchestrator-portable. Pass
   `--spend-actuals` when running on a workstation that has transcripts;
   the `dashboards:spend-actuals` drift row guards this leg either way.
-- **LoC language-cache refresh** — the `loc` stage rebuilds the
-  dashboard from the committed `gh-languages-cache.jsonl` only
-  (`--no-fetch`); refreshing the cache sweeps the GitHub API and stays
-  with `/loc-dashboard` under the gh-api fleet-sweep constraints.
+- **LoC measurement** — the `views` stage renders `loc` from the
+  lines the code-facts scan already stored; measuring them is the
+  scan's job, not this one's.
 - **Agent-built views** — the threat register (`/threat-register`)
   involves judgment, not just aggregation, and is rebuilt by its owning
-  skill on its own cadence. The scoreboard reads whatever its latest
-  artifact says.
+  skill on its own cadence. The scoreboard composes the threat-register view.
 - **Campaign-lane artifacts** that live in the same dashboards folder —
   pqc views, operator-least-priv, rbac-openshift-platform, fuzz,
   benchmark — are outputs of their campaign runs (`/pqc-readiness`,
@@ -102,28 +102,27 @@ Ordering is the whole point:
 | `insecure-patterns` | consumer | `RETIRED:build_insecure_patterns.py` |
 | `validation-fuzz` | consumer | `harnessing/validation-fuzz-dashboard/scripts/build_validation_fuzz_dashboard.py` |
 | `rbac-tenancy` | consumer | `RETIRED:build_rbac_tenancy_rollup.py` |
-| `sla` | consumer | python3 -m traust.cli metrics sla |
-| `compliance` | consumer | python3 -m traust.cli compliance dashboard |
-| `attack-coverage` | consumer | `harnessing/attack-coverage/scripts/build_attack_coverage.py` |
-| `loc` | consumer | `harnessing/loc-dashboard/scripts/build_loc_dashboard.py --no-fetch` (committed gh-languages cache only) |
-| `dependency-exposure` | consumer | `harnessing/refresh-dashboards/scripts/build_dependency_exposure.py` (portfolio-graph dependency layer + impact/fleet-OSV artifacts; degrades gracefully when absent) |
+| `sla` | — | *retired:* rendered by the `views` stage (`SlaView`, once `sla-policy.yaml` is in the config home) |
+| `compliance` | — | *retired:* rendered by the `views` stage (`ComplianceDashboardView`) |
+| `attack-coverage` | — | *retired:* rendered by the `views` stage (`AttackCoverageView`) |
+| `loc` | — | *retired:* rendered by the `views` stage (`LocView`) |
+| `dependency-exposure` | — | *retired:* rendered by the `views` stage (`ExposureView` for advisory, MAL- and product exposure; `DependencyReachView` for per-ecosystem coverage and shared-package blast radius) |
 | `spend-actuals` | consumer, opt-in | python3 -m traust.cli metrics collect-spend --append |
 | `spend` | consumer | python3 -m traust.cli metrics spend |
-| `scoreboard` | consumer | `harnessing/traust-metrics/scripts/collect_harness_metrics.py` |
+| `scoreboard` | — | *retired:* rendered by the `views` stage (`ScoreboardView`) |
 
 ## Integrations
 
 - **Emits no artifact of its own** — every output is owned by the
   builder that writes it (the core views and the dashboard files
   under `progress-tracker/metrics/dashboards/`, the
-  scoreboard). Consumers are documented in each
+  scoreboard among them). Consumers are documented in each
   owning skill.
 - **docs/continuous-operations.md** names this script as the "Dashboards
   rebuild" scheduled job (orchestrator target: weekly; spend ≤4d); the
   security pack's `dashboards` asset runs it.
 - **/drift-watch** routes attention here: when `dashboards:*` rows go
   stale, the refresh command is this script.
-- **/traust-metrics `--refresh-sources`** remains the
-  scoreboard-scoped partial refresh (a skill-level token interpreted by
-  the agent — the collector script itself has no such argparse flag);
+- **/traust-metrics `--refresh-sources`** — *retired:* the scoreboard
+  composes live views (`--only views --view scoreboard` renders it alone);
   this skill is the full chain.

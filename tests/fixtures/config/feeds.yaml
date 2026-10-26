@@ -18,12 +18,13 @@
 #   - traust.registry.feeds_config — the loader; every other
 #     consumer goes through it rather than parsing this file directly.
 #   - traust feeds fetch (traust-core's ExposureService.refresh_feeds) — snapshots `tier: cached`.
-#   - harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py — resolves
-#     `tier: live` sources; its `source` argument is generated from the
-#     ids here, so a new live source needs no code change.
-#   - traust.cli.check_drift — `feeds:*` rows from the cached
-#     tier, `feed-source:*` liveness rows from every source carrying a
-#     `probe`.
+#   - `traust impact document` (traust-core's ExposureService.source_document)
+#     — resolves `tier: live` sources and the cached tier's per-identifier
+#     documents (`doc_url_template`); its `source` argument is an id here,
+#     so a new live source needs no code change.
+#   - `traust dashboard view freshness` — `feeds:*` rows from the cached
+#     tier (traust-core's FreshnessQuery.stale), `feed-source:*` liveness
+#     rows from every source carrying a `probe` (ProviderCatalog readiness).
 #
 # NOT HERE, deliberately:
 #   - Tool-managed vulnerability DBs (grype, govulncheck, osv-scanner):
@@ -57,7 +58,7 @@ sources:
     max_age_hours: 24
     cadence: daily
     consumers:
-      - harnessing/3-audit/secure-code-audit/scripts/enrich_findings_cves.py
+      - traust impact enrich (traust-core ExposureService.exploit_context)
     license:
       id: free-commercial-with-attribution
       terms: Free to the public including commercial products; "appropriate attribution" requested.
@@ -77,7 +78,7 @@ sources:
     max_age_hours: 24
     cadence: daily
     consumers:
-      - harnessing/3-audit/secure-code-audit/scripts/enrich_findings_cves.py
+      - traust impact enrich (traust-core ExposureService.exploit_context)
     license:
       id: CC0-1.0
       terms: >-
@@ -147,7 +148,7 @@ sources:
       ident: CVE-2021-44228
       expect_status: 200
     consumers:
-      - harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py
+      - traust impact document (traust-core ExposureService.source_document)
       - harnessing/4-triage/triage
     license:
       id: CC-BY-4.0
@@ -170,8 +171,8 @@ sources:
       ecosystem: npm
       expect_status: 200
     consumers:
-      - harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py
-      - harnessing/3-audit/secure-code-audit/scripts/run_fork_advisory_lag.py
+      - traust impact document (traust-core ExposureService.source_document)
+      - traust.cli adapters fork-lag (traust-core CodeFactsService.fork_lag)
       - traust.cli.impact
       - traust.ops.cve_replay_monitor
     license:
@@ -194,7 +195,7 @@ sources:
     # upgrade, never a correctness requirement.
     api_key_env: NVD_API_KEY
     consumers:
-      - harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py
+      - traust impact document (traust-core ExposureService.source_document)
     license:
       id: public-domain-with-attribution-request
       terms: >-

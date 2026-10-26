@@ -150,6 +150,11 @@ import tempfile
 import urllib.parse
 from pathlib import Path
 
+from traust_core.v1.models.observation import (
+    SENSITIVE_RX,
+    is_deps_manifest,
+    is_first_party,
+)
 from traust_engine.corpus.resolver import normalize_repo_url
 
 from traust.context import add_config_home_arg, analysis_results_dir, load_engine
@@ -193,29 +198,8 @@ def _git_hosts() -> dict[str, str]:
 
 GIT_HOSTS = _git_hosts()
 
-# NARROW sensitive matcher (rescan-cadence plan §2.2 — measured to
-# discriminate at 43% of changed repos vs 90% for a broad matcher).
-SENSITIVE_RX = re.compile(
-    r"auth|login|token|secret|cred|crypt|tls|ssl|cert|session|passw|"
-    r"rbac|scc|privile|sanitiz|escap|deserial|unmarshal|jwt|oauth|"
-    r"saml|acl",
-    re.I,
-)
-
-DEPS_MANIFESTS = {
-    "go.mod",
-    "go.sum",
-    "package.json",
-    "package-lock.json",
-    "yarn.lock",
-    "poetry.lock",
-    "pom.xml",
-    "Cargo.toml",
-    "Cargo.lock",
-    "Gemfile",
-    "Gemfile.lock",
-}
-_EXCLUDE_DIR_PARTS = {"vendor", "node_modules", "third_party", "dist"}
+# The first-party filter, NARROW sensitive matcher (rescan-cadence plan §2.2) and deps
+# manifests are traust-core's, shared with /vuln-scan --diff's scoping.
 
 GH_COMPARE_FILE_CAP = 300  # GitHub compare API hard cap on files[]
 GITLAB_DIFF_CAP = 1000  # GitLab compare caps diffs[] server-side
@@ -223,9 +207,7 @@ GITLAB_DIFF_CAP = 1000  # GitLab compare caps diffs[] server-side
 CHURN_FULL_LINES = 8000  # rule-2 C threshold (plan §2.3)
 CHURN_FULL_RATIO = 0.10  # rule-2 R threshold
 SENSITIVE_MIN_LINES = 200  # rule-3
-# Diff-resolver refusal threshold — small shared copy of
-# harnessing/3-audit/vuln-scan/scripts/resolve_baseline.py MAX_CHANGED_FILE_RATIO
-# (same convention as parse_pinned_sha above).
+# Diff-refusal file ratio: the same threshold traust-core's diff scoping refuses at.
 MAX_CHANGED_FILE_RATIO = 0.30
 PREROUTE_MIN_FILES = 3  # ratio pre-check only when >= this many
 # first-party files changed (tranche-1
@@ -282,15 +264,14 @@ TM_SURFACE_RX = re.compile(
     r"|\.proto$",
     re.I,
 )
-# Phase 2: only these release-bump kinds re-model. The feeder classifies
-# (harnessing/2-threat-model/threat-model/scripts/build_release_events.py
-#  REMODEL_CHANGES) — kept as a literal
-# here so the router never depends on the feeder being importable.
+# Phase 2: only these release-bump kinds re-model (traust-core's ReleaseChange.remodels;
+# `traust portfolio release-changes` stamps the bump).
 RELEASE_REMODEL_CHANGES = ("major", "minor")
 # Phase 3: calendar backstop for repos whose code is quiet but whose
-# threat landscape isn't. Held in LOCKSTEP with check_drift.py's
-# THREAT_MODEL_STALE_DAYS — the drift row is the dead-timer that fires
-# only if this lane stops draining, so the two must not diverge.
+# threat landscape isn't. Held in LOCKSTEP with traust-core's
+# THREAT_MODEL_MAX_AGE — the freshness view's threat-model row is the
+# dead-timer that fires only if this lane stops draining, so the two
+# must not diverge.
 THREAT_MODEL_QUARTERLY_DAYS = 92
 THREAT_MODEL_DRAIN_WEEKS = 13  # spread the pool over one quarter
 _TM_TAIL_BYTES = 8192  # provenance is section 7, near EOF
@@ -1009,23 +990,6 @@ def run_preroute(
 # ---------------------------------------------------------------------------
 # change metrics (pure — the unit-testable core of stage 2)
 # ---------------------------------------------------------------------------
-
-
-def is_first_party(path: str) -> bool:
-    parts = path.split("/")
-    if any(p in _EXCLUDE_DIR_PARTS for p in parts):
-        return False
-    if any("_generated" in p for p in parts):
-        return False
-    name = parts[-1]
-    return not (name.endswith(".pb.go") or name.lower().endswith(".md"))
-
-
-def is_deps_manifest(path: str) -> bool:
-    name = path.rsplit("/", 1)[-1]
-    if name in DEPS_MANIFESTS:
-        return True
-    return name.startswith("requirements") and name.endswith(".txt")
 
 
 # iac-lane detection (router-lane-coverage-plan §3, lever 6): the
@@ -2244,8 +2208,8 @@ def main(argv=None) -> int:
         default=THREAT_MODEL_QUARTERLY_DAYS,
         help="calendar backstop threshold for the "
         "threat-model-quarterly lane (default 92; keep "
-        "in lockstep with check_drift.py's "
-        "THREAT_MODEL_STALE_DAYS)",
+        "in lockstep with traust-core's freshness view "
+        "THREAT_MODEL_MAX_AGE)",
     )
     ap.add_argument(
         "--threat-model-drain-rate",

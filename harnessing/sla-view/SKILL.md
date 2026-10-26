@@ -1,7 +1,7 @@
 ---
 name: sla-view
 description: >-
-  Use when the user asks about SLA compliance, overdue findings, response/remediation deadlines, breach counts, or escalation lists — e.g. "what's past SLA", "criticals overdue", "are we meeting the 30-day clock", "SLA view for FedRAMP", "who's most overdue". Replays disposition-ledger clocks against a schema-validated SLA policy (default: the deployment's sla-policy.yaml in the config home) and emits sla-view.{json,md} with per-team overdue tables and a human-gated escalation digest.
+  Use when the user asks about SLA compliance, overdue findings, response/remediation deadlines, breach counts, or escalation lists — e.g. "what's past SLA", "criticals overdue", "are we meeting the 30-day clock", "SLA view for FedRAMP", "who's most overdue". Replays the clocks of the findings recorded in traust-core against a schema-validated SLA policy (default: the deployment's sla-policy.yaml in the config home) and emits sla-view-<policy>.{md,html,json} with per-team overdue tables and a human-gated escalation digest.
 metadata:
   harness.tier: "secondary"
 ---
@@ -15,7 +15,8 @@ metadata:
 
 
 Per-severity resolve clocks over every clocked finding, scored against a
-policy file. This is the adoption metric that replaced the retired
+policy file: traust-core's `SlaView`, through `traust dashboard view sla`.
+This is the adoption metric that replaced the retired
 "team packages delivered" count: it measures whether owners respond,
 not whether we shipped them lists.
 
@@ -25,35 +26,32 @@ not whether we shipped them lists.
 deployment's `sla-policy.yaml` in the config home (template:
 `config/sla-policy.example.yaml`; gated by
 `contracts/schemas/sla-policy.schema.json`, provenance + retrieval date
-inside). With no policy there and no `--policy`, the view fails and names
-the template; it never falls back to placeholder SLAs.
+inside). With no policy there and no `--sla-policy`, the view is not built
+(`view 'sla' is not built`, exit 2); it never falls back to placeholder SLAs.
 Different SLAs — customer contracts, per-BU policies — are a different
-file passed with `--policy`, never an edit to the script. The
+file passed with `--sla-policy`, never an edit to the script. The
 severity mapping (PSIRT Important→high, Moderate→medium, Low→low) is
 part of that data, because external severity vocabularies and the
 harness enum are different languages and the join must stay auditable.
 
 ## Procedure
 
-1. **Freshness first** — the view reads the C9 findings DB; rebuild it
-   if the ledgers moved since its `built_at`.
-   (No door yet: traust-core has no SLA view, and the hub retired the
-   findings DB builder (`corpus findings-db`), so step 2 runs only where a
-   findings DB is still on disk. Each finding's deadline is recorded state
-   now: `traust findings baseline --repo-url <url> [--as-of <ISO>]` gives its
-   `sla_due` — core's `rating.sla`, one profile, clock from the first report.)
+1. **Freshness first** — *retired:* the view reads recorded state, so
+   there is no projection to rebuild.
 
-2. **Build the view** (repeat per profile when asked for a compliance
-   cut):
+2. **Build the view** (every profile of the policy, the default first):
 
    ```bash
-   python3 -m traust.cli metrics sla \
-       [--profile internal-cve|fedramp-rosa-gc|fedramp-aro] \
-       [--policy <other-policy.yaml>] [--as-of YYYY-MM-DD] \
-       [--pd-cache-dir <feeds-dir>]
+   python3 -m traust.cli dashboard view sla \
+       [--sla-policy <other-policy.yaml>] [--as-of <ISO time>] \
+       [--product <slug>…] [--team-id <uuid>…] \
+       --out progress-tracker/metrics/dashboards/sla
    ```
 
-   Output: `progress-tracker/metrics/dashboards/sla/sla-view.{json,md}`.
+   Output: `progress-tracker/metrics/dashboards/sla/sla-view-<policy>.{md,html,json}`.
+   *Retired:* `--profile` (every profile is in the one view; read the one
+   asked for) and `--pd-cache-dir` (no product-definitions door yet; the
+   report says "Accountable contacts: unavailable").
 
 3. **Report back**: overdue count (lead with criticals), resolved-SLA
    compliance %, the per-team overdue table, and the unclocked /
@@ -69,11 +67,9 @@ harness enum are different languages and the join must stay auditable.
 
 ## Clock semantics (deterministic, stated in the artifact)
 
-- Clock start ladder (`clock_start: first_routed_or_filed`): routing/
-  filing ledger event → earliest ledger event → report audit date. No
-  ladder rung ⇒ `unclocked`, counted and shown, never guessed. (No
-  filing events exist in today's corpus; that rung activates when
-  Jira-filing events reach the ledger.)
+- Clock start ladder (`clock_start: first_routed_or_filed`): first Jira
+  link → earliest report or decision → first report. No
+  ladder rung ⇒ `unclocked`, counted and shown, never guessed.
 - `resolve_days: null` = tracked, never overdue (PSIRT Low).
 - `cvss_floor_days` (FedRAMP ARO): CVSS ≥ threshold overrides the
   severity clock.
@@ -92,23 +88,26 @@ harness enum are different languages and the join must stay auditable.
   never a failed run. Escalation contacts confer no disposition
   authority, and only tier 1 is embargo-cleared (see
   `assign-findings-owners` Step 6 for the rules — not restated here).
-- Branch re-audits are excluded (HEAD findings carry the clock);
-  hardening/FP/refuted classes are excluded like every dashboard.
+- Branch re-audits are *retired* (one finding per repository fingerprint,
+  one clock); hardening/FP classes are excluded like every dashboard.
+  Risk-accepted findings are counted under `accepted`, never overdue.
 - The census remains the denominator authority; when an SLA headline
   will be quoted upward, state the profile, the policy retrieval date,
-  and the DB build time (all embedded in the artifact metadata).
+  and the `as_of` (all embedded in the artifact metadata).
 - When touching the shipped policy file, re-verify the values at the
   source URL and update `source.retrieved`.
 
 ## Integrations
 
-**Consumes:** the C9 findings DB (producer:
-python3 -m traust.cli corpus findings-db); `$TRAUST_CONFIG_HOME/sla-policy.yaml`
+**Consumes:** traust-core's findings, decisions, Jira links and repository
+owners (`SlaView`); `$TRAUST_CONFIG_HOME/sla-policy.yaml`
 (human-curated policy data); `analysis-results/feeds/product_definitions.json`
 (producer: python3 -m traust.cli feeds fetch-products, read via
 python3 -m traust.cli registry products) plus `$TRAUST_CONFIG_HOME/product-definitions-map.yaml`
-for the accountable-contact join.
+for the accountable-contact join (NEED(core: a product-definitions provider
+giving `SlaView` each product's accountable contacts; until then the view
+reports contacts unavailable)).
 
-**Emits:** `progress-tracker/metrics/dashboards/sla/sla-view.{json,md}` —
+**Emits:** `progress-tracker/metrics/dashboards/sla/sla-view-<policy>.{md,html,json}` —
 read by humans and quoted by the executive dashboards; the escalation
 digest inside it is generated, never auto-sent.

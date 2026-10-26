@@ -9,6 +9,9 @@ symbols  the functions the advisory's fix touched: published, or mined from its 
 analyze  every commit the advisory reaches (or one): evidence, classification, an `impact`
          assessment each, and a dependency finding for each `affected` commit
 sweep    which known advisories touch the recorded SBOMs at all, each with its `analyze` argv
+document a registered feed source's document for one identifier (NVD, Red Hat CSAF or VEX, ...)
+enrich   EPSS and KEV on the CVE-bearing items of findings/candidates artifacts, with the
+         repository's product reach (an enrichment tagger: routes attention, never a severity)
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from traust_core.v1.context import Context, Services
-from traust_core.v1.errors import NotFoundError, ServiceError
+from traust_core.v1.errors import NotFoundError, ServiceError, ValidationError
 from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.dependencies import (
     AdvisoryRecord,
@@ -32,7 +35,7 @@ from traust_core.v1.models.dependencies import (
     Version,
     parse_advisory_identifier,
 )
-from traust_core.v1.models.values import GitSha, HttpsRepoUrl
+from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import (
     Ecosystem,
     ImpactClassification,
@@ -40,7 +43,7 @@ from traust_core.v1.models.vocabulary import (
     SourceType,
 )
 
-from traust.cli._doors import parser, run
+from traust.cli._doors import add_branch_arg, parser, register_commit, run
 from traust.context import load_core
 from traust.paths import HARNESS_ROOT
 from traust.registry.feeds_config import registry_path
@@ -108,6 +111,7 @@ def sbom(argv: list[str] | None = None) -> int:
     ap.add_argument("--repo-url", required=True, help="https URL of the repository")
     ap.add_argument("--sha", required=True, help="the commit the SBOM was read from")
     ap.add_argument("--public", action="store_true", help="the repository is public")
+    add_branch_arg(ap)
     args = ap.parse_args(argv)
 
     def call() -> dict:
@@ -115,7 +119,7 @@ def sbom(argv: list[str] | None = None) -> int:
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, args.public)
-        ref = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None)
+        ref = register_commit(services, repo.id, args.sha, args.branch)
         if args.sbom is not None:
             kept = services.exposure.ingest_sbom(args.sbom.read_bytes(), ref.id)
             return {"repository_ref_id": ref.id, "sbom_id": kept.id}
@@ -150,6 +154,7 @@ def analyze(argv: list[str] | None = None) -> int:
     ap.add_argument("advisory")
     ap.add_argument("--repo-url", help="assess only this repository's commit (with --sha)")
     ap.add_argument("--sha", help="the commit to assess (with --repo-url)")
+    add_branch_arg(ap)
     ap.add_argument(
         "--scan",
         action="store_true",
@@ -164,6 +169,8 @@ def analyze(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if bool(args.repo_url) != bool(args.sha):
         ap.error("--repo-url and --sha go together")
+    if args.branch and not args.sha:
+        ap.error("--branch names the assessed commit's branch: give --repo-url and --sha")
 
     def call() -> dict:
         core = _core(args.config_home)
@@ -175,9 +182,7 @@ def analyze(argv: list[str] | None = None) -> int:
         if args.repo_url:
             url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
             repo = services.portfolio.register_repository(url, False)
-            commits = [
-                services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None).id
-            ]
+            commits = [register_commit(services, repo.id, args.sha, args.branch).id]
         else:
             commits = list(
                 dict.fromkeys(
@@ -269,6 +274,58 @@ def sweep(argv: list[str] | None = None) -> int:
 
     code = run(call)
     return code or SWEEP_EXIT[status[0]]
+
+
+def document(argv: list[str] | None = None) -> int:
+    ap = _parser("document", "Print a feed source's document for one identifier, as served.")
+    ap.add_argument("source", help="a feed source in feeds.yaml (nvd, redhat-csaf, vex, ...)")
+    ap.add_argument("ident", help="the identifier the source is keyed by (CVE, RHSA, repo)")
+    args = ap.parse_args(argv)
+
+    def call() -> str:
+        services = _core(args.config_home).services()
+        raw = services.exposure.source_document(args.source, args.ident)
+        return raw.decode("utf-8", errors="replace")
+
+    return run(call)
+
+
+def enrich(argv: list[str] | None = None) -> int:
+    ap = _parser("enrich", "EPSS, KEV and product reach for an artifact's CVEs, as JSON.")
+    ap.add_argument(
+        "--in", dest="inputs", action="append", required=True, type=Path,
+        help="a findings or candidates artifact (repeatable)",
+    )  # fmt: skip
+    ap.add_argument("--repo-url", help="https URL of the repository the artifacts are about")
+    ap.add_argument(
+        "--workloads", type=Path,
+        help="JSON list of repository URLs running in an authorized lab cluster",
+    )  # fmt: skip
+    ap.add_argument("--out", type=Path, help="also write the result here")
+    args = ap.parse_args(argv)
+
+    def call() -> str:
+        core = _core(args.config_home)
+        hosts = core.config.forge_hosts
+        url = HttpsRepoUrl.parse(args.repo_url, hosts) if args.repo_url else None
+        deployed = None
+        if args.workloads is not None:
+            try:
+                listed = json.loads(args.workloads.read_text())
+            except ValueError as e:
+                raise ValidationError(f"{args.workloads}: not JSON: {e}") from e
+            if not isinstance(listed, list) or not all(isinstance(u, str) for u in listed):
+                raise ValidationError(f"{args.workloads}: expected a JSON list of repository URLs")
+            deployed = [HttpsRepoUrl.parse(u, hosts) for u in listed]
+        found = core.services().exposure.exploit_context(
+            {str(p): p.read_bytes() for p in args.inputs}, url, deployed
+        )
+        text = found.model_dump_json(indent=2)
+        if args.out:
+            args.out.write_text(text + "\n")
+        return text
+
+    return run(call)
 
 
 def clone(url: str, sha: str, dest: Path) -> Path:

@@ -63,7 +63,7 @@ do PQ TLS (consult capability notes). Say who should change what next.
 | --------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `<slug>-pqc-facts.json`     | L1 scanner (`pqc_facts.py`) | `pqc-facts.schema.json` in traust-contracts — gated at write time; `--validate-facts` re-checks |
 | `<slug>-cbom.json`          | L1 scanner                  | CycloneDX                                                                                                              |
-| `<slug>-pqc-readiness.json` | **you**                     | `pqc-readiness.schema.json` in traust-contracts                                                                                         |
+| `<slug>-pqc-readiness.json` | **you**                     | `pqc-readiness.schema.json` in traust-contracts; recorded on the commit with `traust pqc record --report`                              |
 | `<slug>-pqc-readiness.md`   | **you**                     | human companion                                                                                                        |
 
 This is a **posture assessment**, not a vulnerability report. The output
@@ -88,10 +88,17 @@ deterministic scanner:
 python3 <skill-base>/scripts/pqc_facts.py \
   --repo-dir <checkout> --repo-url <URL> \
   --out <slug>-pqc-facts.json --cbom-out <slug>-cbom.json
+traust pqc record --repo-url <URL> --sha <commit> --facts <slug>-pqc-facts.json
+traust pqc prepare --repo-url <URL> --sha <commit>
 ```
+
+(`prepare` returns the commit's recorded facts, its Layer-2 route and its
+prior report.)
 
 **Zero-hit gate:** empty facts without `coverage.no_crypto_detected_assertion`
 means the scan failed — stop. Do not call a broken scan "ready."
+(`record` returns the not-applicable verdict, `readiness`, only for a verified
+zero-hit.)
 
 Facts give you: provider versions, rule IDs, `pqc_capable` hints,
 `fips_mode`, IR 8547 clocks, provenance hints. They do **not** contain the
@@ -241,15 +248,13 @@ Thresholds: [notes/scoring.yaml](notes/scoring.yaml).
 ### 5. Validate
 
 ```bash
-python3 <skill-base>/scripts/pqc_facts.py \
-  --validate-readiness <slug>-pqc-readiness.json
+traust pqc check <slug>-pqc-readiness.json
+traust pqc record --repo-url <URL> --sha <commit> --report <slug>-pqc-readiness.json
 ```
 
-This command evaluates core's installed `PqcReadinessArtifact` schema, then
-retains citation and owner-facing semantic checks. It rejects invalid dominant
-provenance, out-of-range overall scores and incomplete tool provenance; no
-engine configuration is required for validation-only use. The facts-scan
-write gate is unchanged.
+`check` validates the report against core's `PqcReadinessArtifact` schema (it rejects an
+invalid dominant provenance, an out-of-range overall score and incomplete tool provenance);
+(`record` refuses a report that fails `check`, or one for another repository or commit.)
 
 One-line recap: status, who sets TLS, quantum_ready, top do_next.
 
@@ -281,10 +286,9 @@ arrays are owner-facing. Fact ids (`F0008`) stay only on
 `scores.*.checks[]` / `clock_items[]` (and the sibling facts file) as
 machine citations; owners navigate via `locations`.
 `waiting-on-upstream` entries must name `blocked_on`. The validator
-checks the section whenever present. Reports written before 0.153.0 are
-backfilled deterministically with
-`python3 harnessing/3-audit/pqc-readiness/scripts/backfill_remediations.py` (derives
-entries from the existing MD sections + clock_items; idempotent).
+checks the section whenever present. Reports written before 0.153.0 were
+backfilled by a script, now *retired*: it migrated Markdown-era files
+that traust-core never recorded.
 
 **Markdown companion format (`<slug>-pqc-readiness.md`)** — this file is
 read by developers and engineering leads who are NOT PQC experts. Write it
@@ -358,7 +362,7 @@ distilled `how` under Action — never a harness Playbook path.
 
 ### What the domains mean
 <the standard domain legend, verbatim from
- backfill_remediations.py LEGEND — question each domain answers, its
+ [notes/domain-legend.md](notes/domain-legend.md) — question each domain answers, its
  0–100 scale, the Overall weighting (VULN 40% / AGIL 25% / PQCA 20% /
  HNDL 15%), and the bucket thresholds. Mandatory on every report that
  shows scores; omit only on minimal ready/not-applicable pages with no
@@ -386,8 +390,7 @@ Rules for the `.md`:
   Machine citations live only in `<slug>-pqc-readiness.json`
   (`scores.*.checks[].fact_ids`, `clock_items[].fact_ids`) and
   `<slug>-pqc-facts.json` — never on `remediations[]` / `do_next[]`.
-  (Existing MD was scrubbed of Facts columns by
-  `backfill_remediations.py --refresh-md`; re-scrub prose leaks the
+  (Existing MD was scrubbed of Facts columns; re-scrub prose leaks the
   same way.)
 - The `## Remediations` section mirrors the JSON `remediations` array
   one-for-one (ids included, so a developer can reference REM-002 in a
@@ -446,43 +449,42 @@ Capability / ownership notes (`notes/capabilities/`, [`notes/who-sets-tls.yaml`]
 
 ### Worklist (sweep mode)
 
-`bulk_prescan.py --refresh` (v0.132.3+) re-runs Layer 1 across the corpus
-after a rules/adapter change: stamp-aware (re-scans only facts whose
-adapter_version/rules_sha256 differ from the current pack), idempotent
-and resumable. `l2_prepass.py` (v0.132.4) then routes the Layer-2
-re-score deterministically — tiers `full` (governance/DB/FIPS facts
+Re-running Layer 1 across the corpus after a rules/adapter change is a
+continuous-ops lane of the security pack (`bulk_prescan.py`, *retired*): per
+commit, `PqcService.prescan` is stamp-aware (re-scans only facts whose
+adapter_version/rules_sha256 differ from the current pack) and idempotent. `traust pqc prepare` (per commit, once its facts are
+recorded) then routes the Layer-2
+re-score deterministically — `route` `full` (governance/DB/FIPS facts
 fired, or 2030-clock/HNDL/not-ready stakes), `light` (governance labels +
 PQCA-3 ceiling check only), `skip` (zero-hit n/a or vendor/test-only
-facts: re-derive bucket, no agent) — into
-`pqc/_manifest/l2-worklist-adapter-<ver>.json` so migration agent fleets
+facts: re-derive bucket, no agent), `unscored` (no report yet) — so
+migration agent fleets
 visit the affected population instead of every scored repo. Routes only;
 never authors a verdict.
 
-`build_pqc_dashboard.py --results-root <dir>` regenerates the live
-campaign dashboard after every batch —
-`progress-tracker/metrics/dashboards/pqc/pqc-dashboard.{md,json}`
-(executive summary, org-grouped repos worst-first, bucket distribution,
-2030-clock burndown, HNDL harvest-risk list, effort mix, provenance
-breakdown, "What the scores mean" guide, human-readable FIPS/provenance
-labels) plus `pqc-readiness` metrics in the shared hash-chained ledger
-(charted on Executive-Trends).
+`traust pqc summary [--product <slug>] [--by bucket|provenance]` gives the
+live campaign status after every batch from the recorded readiness: per
+bucket (or dominant provenance) the repositories, mean overall score,
+2030-clock and HNDL counts, blocked count and remediation mix;
+`traust pqc blockers --category deadline` lists the 2030/2035 clock items
+with their locations; `traust dashboard view pqc [--product <slug>] --out <dir>`
+writes the rendered `pqc-readiness.{md,html,json}`. (The ranked lists stay in
+the roll-up below.)
 
-`build_pqc_worklist.py --analysis-results <dir>` writes
-`findings/_manifest/pqc-worklist.{json,md}`: one entry per unique repository
-URL (normalized), priority-tiered chokepoint → crypto-CWE ground truth →
-tail, with the unreachable-triage residual routed `sbom-only` /
-`access-request`.
+Building the sweep worklist (`build_pqc_worklist.py`, *retired*: one entry
+per unique repository URL, priority-tiered chokepoint → crypto-CWE ground
+truth → tail, with the unreachable-triage residual routed `sbom-only` /
+`access-request`) is the security pack's continuous-ops lane selection.
 
-`build_pqc_rollup.py --results-root <dir>` synthesizes the completed sweep
+`traust dashboard view pqc-portfolio --out <dir>` synthesizes the completed sweep
 into the portfolio migration plan:
-`progress-tracker/metrics/dashboards/pqc/pqc-portfolio-rollup.{md,json}` +
-5 CSV exports (2030-clock burndown, HNDL ranking, hybrid-TLS blockers
-with file:line, go-directive quick wins, per-product roll-up via the
-graph's `ships` edges). Uses plain-English section headings and
-human-readable FIPS/provenance labels; the Go PQC threshold is consumed
-at runtime from the [`notes/reference/pqc-version-matrix.yaml`](notes/reference/pqc-version-matrix.yaml) input
-table. Read-only full
-rebuild; re-run after mop-up or probe passes change the reports.
+`pqc-portfolio-roll-up.{md,html,json}` (2030-clock burndown, HNDL ranking,
+hybrid-TLS blockers with file:line, go-directive quick wins, per-product
+roll-up via the products' shipped commits). Uses plain-English section headings and
+human-readable FIPS/provenance labels; the Go PQC threshold is
+traust-core's copy of the [`notes/reference/pqc-version-matrix.yaml`](notes/reference/pqc-version-matrix.yaml) input
+table. Derived on demand from the recorded readiness and facts; re-run after
+mop-up or probe passes change the reports.
 
 `build_pqc_vendor_tracker.py --results-root <dir>` (Phase 3 handoff) merges
 the curated vendor registry (`<results-root>/pqc/inputs/vendor-registry.json`
@@ -503,36 +505,23 @@ IR 8547 table — teams own the final call. `--push-sheet <spreadsheet-id>
 `gcloud auth print-access-token` bearer (run
 `gcloud auth login --enable-gdrive-access` once per host).
 
-`build_pqc_product_reports.py --results-root <dir>` writes one per-product
-report + worst-first index under
-`progress-tracker/metrics/dashboards/pqc/products/` (graph ships edges ×
-pqc repo attrs × clock detail); re-run with the dashboard/roll-up. Each
-per-product report also carries an additive **Cross-language crypto
-dependencies** section — the product's repos' graph-discovered crypto-library
-hits (package / version / ecosystem / manifest / PQC posture) with a
-per-product posture rollup whose `classical-only` count is the
-migration-relevant total. It reuses `scan_crypto_deps_graph.discover()` and
-the `ships` repo→product mapping so it stays consistent with the roll-up's
-portfolio-level section, routes repo/package/manifest cell text through
-traust_engine.escaping (`md_cell`), and degrades to a "no data" line (never a
-crash) when the graph or its multi-ecosystem `depends_on` layer is absent.
+`traust dashboard view pqc-portfolio --product <slug> --out <dir>` writes one per-product
+report (the roll-up's worst-first index lists every product) (shipped commits ×
+recorded readiness × clock detail); re-run with the dashboard/roll-up. Each
+per-product report also carries an additive **Crypto packages** section — the
+product's repos' crypto packages from their manifest SBOMs, with how many
+repositories pull each in, and a count of repositories without a manifest
+SBOM rather than a crash.
 
-`scan_pqc_dependencies.py --results-root <dir>` backfeeds the portfolio
-graph from the already-emitted facts: L1 `crypto-dep` nodes (library ×
-version) + `uses_crypto_dep` edges, L3 `crypto-usage` nodes (ir8547
-usage × qclass) + `uses_crypto` edges, and a `pqc` attrs block on each
-repo node (bucket/overall/HNDL/2030 flags). Deterministic full rebuild —
-re-run after each sweep batch alongside the dashboard; "show all repos
-using RSA key exchange" becomes a SQL lookup over
-`analysis-results/graph/portfolio-graph.db`.
+`scan_pqc_dependencies.py` (*retired*) backfed the portfolio graph from the
+already-emitted facts; traust-core stores the facts and readiness and derives
+those views on demand, so there is no graph projection to rebuild.
 
-`scan_crypto_deps_graph.py --results-root <dir>` goes the OTHER direction:
-it **reads** the portfolio graph's multi-ecosystem `depends_on` edges
-(`repo -[depends_on {version, ecosystem, manifest}]-> pkg:<eco>/<name>`,
-built by `python3 -m traust.cli portfolio deps-multi` for npm / pypi / maven /
-cargo / ruby / nuget) to discover crypto-relevant dependencies **across
-languages**, not just the Go/TLS surface `pqc_facts.py` covers. The set
-of crypto packages it looks for is a **curated STARTER seed list**,
+`scan_crypto_deps_graph.py` (*retired*: the pqc-portfolio view reads the
+crypto packages of each commit's manifest SBOM) discovered crypto-relevant
+dependencies **across languages** from the portfolio graph, not just the
+Go/TLS surface `pqc_facts.py` covers. A package's PQC posture is in a
+**curated STARTER seed list**,
 [`notes/crypto-packages.yaml`](notes/crypto-packages.yaml) — keyed by ecosystem, each package carries a
 PQC `posture` (`classical-only` / `pqc-capable` / `inherits` +
 `capability_card` / `unknown`) and a one-line note. **Extend it there:**
@@ -540,14 +529,7 @@ add a package under its ecosystem key using the exact `pkg:<eco>/<name>`
 node name (npm scoped names keep `@scope/name`; maven uses
 `group:artifact`), give it a posture, and set `capability_card` when a
 `notes/capabilities/<id>.yaml` card governs its real crypto backend; mark
-anything uncertain `posture: unknown`. The scan emits, per ecosystem, the
-repo + crypto package + version + `manifest` provenance path(s) from the
-edge + mapped posture into
-`analysis-results/pqc/_manifest/crypto-deps.{json,md}`, and
-`build_pqc_rollup.py` imports its `discover()` to render a cross-language
-crypto-dependency section in the portfolio roll-up. READ-ONLY against the
-graph (opened `mode=ro`), NO network; a missing or legacy graph db is a
-clean logged skip (`graph_present: false`), never a crash.
+anything uncertain `posture: unknown`.
 
 ## Two-layer probe model
 
@@ -568,7 +550,7 @@ Chain reasoning:    crypto-analysis SKILL.md    → governance chains (who owns 
 | `crypto_audit.py`       | python3 -m traust.cli adapters crypto-audit                        | Unopinionated data collector — `cluster` tier with `--groups` provides raw TLS negotiation facts for PQC probing                                                                 |
 | `pqc_facts.py`          | `harnessing/3-audit/pqc-readiness/scripts/pqc_facts.py`          | Imports crypto*probe, maps `CRYPTO*_`→`HP*CHAIN*_`, adds PQC capability assessment via `\_pqc_capable_version()`(reads thresholds from[`notes/reference/pqc-version-matrix.yaml`](notes/reference/pqc-version-matrix.yaml)) |
 | `scan_xcrypto_usage.py` | `harnessing/3-audit/pqc-readiness/scripts/scan_xcrypto_usage.py` | golang.org/x/crypto evidence: first-party import sites, go.mod versions, optional callgraph reachability (somepath witness)                                                      |
-| `build_pqc_blockers.py` | `harnessing/3-audit/pqc-readiness/scripts/build_pqc_blockers.py` | Projects readiness `remediations[]` into the findings-shaped `<slug>-pqc-blockers.json` (contracts/schemas/pqc-blockers.schema.json) for `/patch` and other findings consumers              |
+| `traust pqc blockers`   | traust-core `PqcService.blockers`                                | Derives each recorded report's `remediations[]` in the findings vocabulary (severity, classification, `patchable`) for `/patch` and other findings consumers                        |
 | `novel.py`              | `harnessing/5-validate/validate-findings/novel.py`          | Runtime probes: `pqc-tls-negotiation`, `pqc-cert-algorithm`, `pqc-crypto-policy`, `pqc-backend-tls`                                                                              |
 | `crypto-analysis`       | `harnessing/3-audit/crypto-analysis/SKILL.md`            | Governance chain reasoning — traces who decides crypto config from OS through platform to app code                                                                               |
 
@@ -583,35 +565,29 @@ is confirmed by probing — never by static data alone.
 - `<slug>-pqc-facts.json` (contract: `pqc-facts.schema.json` in
   traust-contracts, gated at write time by `pqc_facts.py`;
   `--validate-facts` re-checks an
-  existing file) — consumed by this skill's Layer 2 scoring
-  (`l2_prepass.py`, `bulk_prescan.py`), by `/patch`'s pqc ingest
+  existing file; recorded with `traust pqc record --facts`) — consumed by
+  this skill's Layer 2 scoring
+  (`traust pqc prepare`), by `/patch`'s pqc ingest
   (actionable first-party blockers → candidate diffs), and by
-  `build_pqc_rollup.py` + `build_xcrypto_tracker.py`.
-- `<slug>-pqc-readiness.json` (schema-gated, `--validate-readiness`) —
-  consumed by `build_pqc_dashboard.py`, `build_pqc_rollup.py`,
-  `build_pqc_product_reports.py`, and `build_pqc_blockers.py`.
-- `<slug>-pqc-blockers.json` (contract: `pqc-blockers.schema.json` in
-  traust-contracts, gated at write time) — **Emits:**
-  `build_pqc_blockers.py --readiness
-<slug>-pqc-readiness.json` (or `--results-root` for batch backfill), a
-  deterministic projection of the readiness report's `remediations[]`
-  into the security-audit findings _vocabulary_ (same field names and
-  semantics; deliberately parallel to `report.schema.json`, not
+  the pqc-portfolio view + `build_xcrypto_tracker.py`.
+- `<slug>-pqc-readiness.json` (gated by `traust pqc check`, recorded with
+  `traust pqc record --report`) —
+  consumed by `traust pqc summary`, the pqc-portfolio view
+  (roll-up and per-product), and `traust pqc blockers`.
+- PQC blockers — **Emits:** nothing to write; `traust pqc blockers
+  [--repo <URL> <sha>] --patchable` derives them from the recorded report:
+  a deterministic projection of the readiness report's `remediations[]`
+  into the security-audit findings _vocabulary_ (severity, classification;
+  deliberately parallel to `report.schema.json`, not
   conformant — shape convergence is a planned separate feature).
-  Remediations without `locations[]` are excluded and recorded in
-  `metadata.additional.excluded_remediations`. Consumed by `/patch` as a
+  Remediations without `locations[]` are not patchable and are listed by
+  `--not-patchable`. Consumed by `/patch` as a
   findings-shaped input (preferred over raw `*-pqc-facts.json` filtering
-  when both exist). Emit it whenever the readiness report carries
-  remediations.
+  when both exist).
 - `<slug>-xcrypto-usage.json` — consumed by `build_xcrypto_tracker.py`.
-- `pqc/_manifest/crypto-deps.{json,md}` — **Emits:** written by
-  `scan_crypto_deps_graph.py` from the portfolio graph's multi-ecosystem
-  `depends_on` edges (input: `analysis-results/graph/portfolio-graph.db`
-  produced by `/portfolio-graph`; seed list [`notes/crypto-packages.yaml`](notes/crypto-packages.yaml)).
-  **Consumes:** none authored here beyond the graph. Consumed by
-  `build_pqc_rollup.py` and `build_pqc_product_reports.py` (both import
-  `discover()`) for the roll-up's portfolio-level and the per-product
-  cross-language crypto-dependency sections.
+- `pqc/_manifest/crypto-deps.{json,md}` — *retired* with
+  `scan_crypto_deps_graph.py`; the pqc-portfolio view's crypto-package
+  sections read the manifest SBOMs.
 - `<slug>-cbom.json` (CycloneDX) and `<slug>-pqc-readiness.md` are
   terminal: interchange/compliance evidence and the human companion.
 

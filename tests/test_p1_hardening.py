@@ -61,16 +61,6 @@ def test_opengrep_bare_fork_url_gets_documented_pin(tmp_path, monkeypatch):
     )
 
 
-def test_pick_slug_rejects_traversal(tmp_path):
-    """B3: slug becomes an output dir under pqc/."""
-    bp = _load("bulk_prescan_p1", "harnessing/3-audit/pqc-readiness/scripts/bulk_prescan.py")
-    pqc = tmp_path / "pqc"
-    pqc.mkdir()
-    assert bp.pick_slug("https://github.com/org/..", pqc) is None
-    assert bp.pick_slug("https://github.com/org/.git", pqc) is None
-    assert bp.pick_slug("https://github.com/org/good-repo", pqc) == "good-repo"
-
-
 def test_symbol_index_skips_file_symlinks(tmp_path):
     """B5: symlinked files must not be read out of the checkout."""
     bsi = _load("build_symbol_index_p1", "src/traust/cli/build_symbol_index.py")
@@ -92,15 +82,6 @@ def test_symbol_index_cache_is_per_user(tmp_path, monkeypatch):
     out = bsi.default_index_path(tmp_path, "abc1234")
     assert str(out).startswith(str(tmp_path / "xdg"))
     assert (tmp_path / "xdg" / "symbol-index").stat().st_mode & 0o777 == 0o700
-
-
-def test_fetch_advisory_rejects_bad_cve():
-    """D7: the scoped fetcher validates identifiers."""
-    fa = _load("fetch_advisory_p1", "harnessing/3-audit/impact-analysis/scripts/fetch_advisory.py")
-    with pytest.raises(SystemExit):
-        fa.main(["nvd", "not-a-cve"])
-    with pytest.raises(SystemExit):
-        fa.main(["csaf", "'; curl evil"])
 
 
 def test_no_raw_egress_grants_in_portable_skills():

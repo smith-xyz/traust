@@ -5,7 +5,7 @@ description: >-
   repositories that ship in a release payload image or an OLM operator
   bundle/catalog — e.g. "inventory release 4.21", "which repos ship in the
   foo operator 2.3", "refresh the payload inventory". Writes the per-segment
-  CSV inventory that repo-graph and the dashboards read, and registers the
+  CSV inventory that the dashboards read, and registers the
   repositories and their owner teams in traust-core.
 argument-hint: "<segment> <version|bundle-tag> [--image <ref>]"
 metadata:
@@ -26,8 +26,7 @@ allowed-tools:
   - Bash(traust portfolio plan:*)
   - Bash(traust portfolio owner-hints:*)
   - Bash(traust portfolio import-owners:*)
-  # fetch_forge_owners.py stays for --file only (no forge file-read door yet)
-  - Bash(python3 *traust/harnessing/1-inventory/inventory-repositories/scripts/fetch_forge_owners.py:*)
+  - Bash(traust portfolio file:*)
   - Bash(python3 -m traust.cli registry:*)
 ---
 
@@ -97,12 +96,14 @@ All output goes under the target segment of `locations.inputs`:
             └── <product>-<version>-payload-analysis.md
 ```
 
-These are the layouts `repo-graph` reads for the two kinds; the CSV column
-schemas are in each procedure. The CSVs keep the release version, payload
-images and categories (traust-core has no release-import door yet); the
+These are the layouts `traust.inventory` describes for the two kinds; the CSV column
+schemas are in each procedure. The CSVs keep the payload images and
+categories (traust-core has no column for them yet); the
 repositories themselves are registered with
 `traust portfolio onboard --product <segment or product> --repo <URL>…`
-(needs `traust auth local`; base images have no repository).
+(needs `traust auth local`; base images have no repository), and a release
+payload's version with the commits it ships with
+`traust portfolio import-release` (release-payload Step 7).
 
 ---
 
@@ -193,18 +194,18 @@ When the same repository appears across multiple versions:
    repository names.
 6. A repository with no owner team is a valid state — never fabricate one.
 7. Commit the inventory changes with a descriptive message and push to the
-   inventory's remote, then rebuild the graph with `/repo-graph`.
+   inventory's remote.
 
 ## Integrations
 
 - **Consumes**: `<inputs>/inventory.yaml` (segment kinds, `payload_image`,
   `registries`, `org_teams`); registry data via `oc`/`skopeo`/`podman`; forge
   data only via `traust portfolio owner-hints` (and
-  `harnessing/1-inventory/inventory-repositories/scripts/fetch_forge_owners.py --file`).
+  `traust portfolio file`).
 - **Emits**: `<segment>-<version>-payload-repos.csv` and `*-payload-analysis.md`
-  under `locations.inputs`, read by `repo-graph` (graph nodes,
-  release/product-version layers), `executive-summary-findings --by-segment`
+  under `locations.inputs`, read by `executive-summary-findings --by-segment`
   and the coverage dashboards; `repository` and `ownership` rows in
-  traust-core (`traust portfolio onboard`, `import-owners`).
+  traust-core (`traust portfolio onboard`, `import-owners`); a release
+  payload's `release` and `component` rows (`traust portfolio import-release`).
 - **Counterpart**: `/add-inputs` for hand-registered repos in `groups`
   segments; `/corpus-intake` registers the *output* tree audits will write to.

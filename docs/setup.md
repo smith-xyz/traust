@@ -88,9 +88,9 @@ Core's platform configuration is documented in its
 [development README](https://github.com/traust-security/traust-core/blob/development/README.md).
 
 What each component owns, which repo to change, and how source conflicts and
-commit updates work: [components.md](components.md). `/check-drift` reports an
-installed package that does not match its selected dependency; `uv sync`
-restores the manifest/lockfile selection.
+commit updates work: [components.md](components.md). `uv sync --locked`
+refuses an installed package that does not match its selected dependency;
+`uv sync` restores the manifest/lockfile selection.
 
 ## 4. Scanner toolchain
 
@@ -115,7 +115,7 @@ manager or index sits in between. Binaries land in `~/.local/bin` (override
 with `HARNESS_BIN_DIR`); `--dry-run` previews. macOS and Linux. `doctor` exits
 0 when every tool for the profile is installed at the pinned version with its
 databases populated, 1 with a per-tool diagnostic otherwise; `/drift-watch`
-runs the same comparison continuously.
+(`traust dashboard view freshness`) shows the same readiness on demand.
 
 Step by step, if you need to install by hand:
 
@@ -211,8 +211,8 @@ does not install them, and continuous operations do not keep them current.
 
 1. Install osv-scanner on the scanning host (or into your extension of the
    toolchain image) at the version pinned in `config/external-tools.yaml`:
-   the tested version, kept current by the `external-tools:osv-scanner`
-   drift row. `install-toolchain.sh` and the image do not install it.
+   the tested version, the floor the freshness view's `tool:osv-scanner`
+   row checks. `install-toolchain.sh` and the image do not install it.
 2. On a connected host, download the database:
    `osv-scanner scan source --offline-vulnerabilities --download-offline-databases <any dir>`.
 3. Copy the cache directory to the scanning host and point
@@ -227,7 +227,7 @@ osv-scanner reports no Go standard-library advisories (measured on etcd,
 run govulncheck, which carries its own database, for Go. The other OSV
 consumers query the API and do not run air-gapped: the fleet sweep
 (`dependency-watch`) writes a `failed` worklist and exits 2, and advisory
-fetches (`traust impact find` / `symbols`, `fetch_advisory.py`, the CVE-replay
+fetches (`traust impact find` / `symbols` / `document`, the CVE-replay
 monitor) report their lookups as failed.
 
 ### Container image (CI, platform worker, air gap)
@@ -336,11 +336,10 @@ Three ways to populate it:
 - **Export from your own source of truth** into the CSV shape above; a
   spreadsheet export is enough.
 - **Keep the inventory in its own repository**, as this project does, so that
-  ownership changes are reviewed and the graphs can detect when it moves
-  (`/drift-watch` compares the inventory's HEAD with each graph's build stamp).
+  ownership changes are reviewed and portfolio sync can tell when it moves.
 
-Then register the *output* tree the audits write to with `/corpus-intake`,
-and build the graph with `/repo-graph`. Unset, `locations.inputs` defaults to
+Then register the *output* tree the audits write to with `/corpus-intake`.
+Unset, `locations.inputs` defaults to
 `<workspace>/inputs`.
 
 ### Remote results and graph

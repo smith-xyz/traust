@@ -25,10 +25,10 @@ allowed-tools:
   - Bash(python3 *traust* -m traust.cli adapters osv:*)
   - Bash(python3 *traust* -m traust.cli adapters image-sbom:*)
   - Bash(python3 *traust* -m traust.cli adapters image-packages:*)
+  - Bash(python3 *traust* -m traust.cli adapters priv-profile:*)
   - Bash(python3 *traust* -m traust.cli reporting validate:*)
   - Bash(python3 *traust* -m traust.cli reporting record:*)
   - Bash(python3 *traust* -m traust_engine.reporting.render:*)
-  - Bash(python3 *traust* -m traust.cli corpus finding-identity:*)
   # Confinement added 2026-07-31 (P1 gate rework — the
   # widened S1 privilege tokens made this skill's missing
   # allowlist visible; assessment root-cause 3). Never
@@ -159,8 +159,8 @@ The `KHS-*` facts (exact `file:line` inside the extracted tree — record the la
 **Bundle privilege profile.** For operator **bundle images** specifically, additionally run the least-privilege profiler over the extracted `/manifests` tree so the bundle's SCC requests, securityContexts, and complete RBAC enumeration are persisted (the CSV is the authoritative statement of what the operator ships to clusters — sometimes ahead of or divergent from the source repo):
 
 ```bash
-python harnessing/3-audit/operator-priv-profile/scripts/build_priv_profile.py \
-    --repo <extracted-bundle-root> --name <repo> --out-dir <report-output-dir>/
+python3 -m traust.cli adapters priv-profile <extracted-bundle-root> --name <repo> \
+    --out <report-output-dir>/<repo>-priv-profile.json
 ```
 
 Judge its flags per `/operator-priv-profile`'s interpretation rules (any-SCC `use`, wildcard grants, privileged workloads without SCC requests); the tier-2 kubebuilder diff is n/a for bundles (no Go source in the image) — say so rather than reporting zero surplus. Record `"priv-profile": "ran"`/`"skipped: <reason>"` in `deterministic_steps`.
@@ -575,7 +575,7 @@ Key profile obligations for this skill:
 - `dependency_audit` populated from Phase 3; findings only for reachable/shipping vulnerabilities.
 - `peach_isolation_review` always emitted — normally `{"applicable": false, "rationale": …}` pointing at the source repo's code-profile report.
 - No `loc_breakdown`; record `metadata.additional.sbom_packages` instead.
-- After validation: python3 -m traust.cli corpus finding-identity fingerprint <report.json> --write.
+- After validation, `reporting record` (below) takes the report's findings in as findings of the assessment, each by its fingerprint; a finding located only at `.`, `./` or `/` refuses the whole record.
 
 ### Report Validation
 
@@ -611,12 +611,14 @@ Historical container-specific output requirements:
   `<image>-container-audit-findings-current.{json,md}` — never the
   short `<image>-findings-*` names, which belong to the code audit.
   The port must preserve this naming; retired tooling is not a current writer.
-- **Identity across rebuilds.** Digest-keyed report labels describe their
-  particular image; they are not the core UUID used by the findings doors.
-  Re-audit the new digest instead of editing the old report. Core finding
-  identity/intake owns matching and provenance across observations; the
-  removed corpus identity CLI is not an executable fallback. Never claim
-  automatic resolution merely because a CVE is absent from a new report.
+- **Identity across rebuilds.** Finding IDs are digest-keyed; a fixed
+  image rebuild is a **new digest → new report → new finding IDs**.
+  Dispositions do not carry forward by editing the old report: re-audit
+  the new digest (the container analog of `/verify-remediation`) and
+  record it: core finding intake matches the same finding in the new report
+  (fingerprint) and joins its old dispositions — the same mechanism branch
+  re-audits use. Never claim automatic resolution merely because a CVE is
+  absent from a new report.
 - **Census cut.** Container reports are their own census block
   (`container_audit`, like `cloud_config`) and are **never blended
   into the distinct-vulnerability headline** — an image finding is

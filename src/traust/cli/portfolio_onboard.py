@@ -1,28 +1,42 @@
-"""``traust portfolio plan|onboard|owner-hints|import-owners``: add-inputs' and
+"""``traust portfolio plan|onboard|owner-hints|file|import-owners|import-release``: add-inputs' and
 inventory-repositories' doors on traust-core (onboarding and portfolio sync).
 
 plan           what onboard would register and order, writing nothing (the dry run)
 onboard        register the product (when --label names a new one), the repositories and an
                organisation's non-archived, non-fork repositories; re-runs are no-ops
 owner-hints    OWNERS / CODEOWNERS approvers, then top contributors: hints, never stored
+file           one file's text at a pinned commit, read at the forge: untrusted, never stored
 import-owners  mirror the declared ownership source onto every registered repository
+import-release a product version and the commits it ships (a payload's commit URLs)
+release-changes a recorded version against the highest one recorded before it (or --previous):
+               its bump, whether it re-models the threat surface (major/minor), the commits moved
 """
 
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 from typing import Any
 
 import pydantic
 import yaml
 from traust_core.v1.context import Context
-from traust_core.v1.errors import ValidationError
+from traust_core.v1.errors import NotFoundError, ValidationError
 from traust_core.v1.models.base import Dto, Model
-from traust_core.v1.models.inventory import OrgName, OwnerAssignment, OwnershipSource, TeamName
+from traust_core.v1.models.inventory import (
+    OrgName,
+    OwnerAssignment,
+    OwnershipSource,
+    RefName,
+    ReleaseCommit,
+    TeamName,
+    VersionLabel,
+)
 from traust_core.v1.models.onboarding import OnboardingRequest, RepositorySpec
-from traust_core.v1.models.values import HttpsRepoUrl, ProductSlug
+from traust_core.v1.models.values import GitSha, HttpsRepoUrl, ProductSlug, RepoPath
 
+from traust.cli import _doors
 from traust.cli._doors import parser, run
 from traust.context import load_caller, load_core
 
@@ -101,6 +115,22 @@ def owner_hints(argv: list[str] | None = None) -> int:
     return run(call)
 
 
+def file(argv: list[str] | None = None) -> int:
+    ap = parser("portfolio", "file", "One file's text at a pinned commit, from its forge.")
+    ap.add_argument("--repo", required=True, help="an https repository URL")
+    ap.add_argument("--sha", required=True, help="the full commit sha to read at")
+    ap.add_argument("path", help="the file's path inside the repository")
+    args = ap.parse_args(argv)
+
+    def call() -> Any:
+        core = load_core(args.config_home)
+        url, sha, path = _url(core, args.repo), GitSha.parse(args.sha), RepoPath.parse(args.path)
+        text = core.services().sync.find_file(url, path, sha)
+        return {"repo": str(url), "sha": str(sha), "path": str(path), "file": text}
+
+    return run(call)
+
+
 class _Assignment(Model):
     repo: str
     teams: tuple[str, ...]
@@ -140,5 +170,71 @@ def import_owners(argv: list[str] | None = None) -> int:
     def call() -> Any:
         core = load_core(args.config_home)
         return _json(core.services().sync.import_owners(_source(core, args.source)))
+
+    return run(call)
+
+
+_COMMIT_URL = re.compile(r"(?P<repo>https://\S+?)(?:/-)?/commit/(?P<sha>[0-9a-f]{40})/?")
+
+
+def _commits(core: Context, path: Path, branch: str | None) -> list[ReleaseCommit]:
+    """One commit per non-blank line whose last field is a commit URL (`oc adm release info
+    --commit-urls`: `<image> <commit URL>`)."""
+    commits = []
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        found = _COMMIT_URL.fullmatch(line.split()[-1])
+        if found is None:
+            raise ValidationError(f"{path}:{n}: not a commit URL: {line.strip()!r}")
+        commits.append(
+            ReleaseCommit(
+                url=_url(core, found["repo"]),
+                sha=GitSha.parse(found["sha"]),
+                branch=None if branch is None else RefName(branch),
+            )
+        )
+    return commits
+
+
+def import_release(argv: list[str] | None = None) -> int:
+    ap = parser("portfolio", "import-release", "Record a product version and its commits.")
+    ap.add_argument("--product", required=True, help="the product slug")
+    ap.add_argument("--version", required=True, help="the release version, e.g. 4.21.3")
+    ap.add_argument("--commits", type=Path, required=True, help="lines of `<image> <commit URL>`")
+    ap.add_argument("--branch", help="the branch every commit was built from (release-4.21)")
+    args = ap.parse_args(argv)
+
+    def call() -> Any:
+        core = load_core(args.config_home)
+        services = core.services()
+        commits = _commits(core, args.commits, args.branch)
+        [product] = _doors.products(services, [args.product])
+        release = services.portfolio.import_release(product.id, VersionLabel(args.version), commits)
+        return release.model_dump(mode="json")
+
+    return run(call)
+
+
+def release_changes(argv: list[str] | None = None) -> int:
+    ap = parser("portfolio", "release-changes", "What a recorded product version changed.")
+    ap.add_argument("--product", required=True, help="the product slug")
+    ap.add_argument("--version", required=True, help="the recorded release version, e.g. 4.21.0")
+    ap.add_argument("--previous", help="compare with this version (default: the high-water mark)")
+    args = ap.parse_args(argv)
+
+    def call() -> Any:
+        services = load_core(args.config_home).services()
+        [product] = _doors.products(services, [args.product])
+
+        def release(version: str) -> Any:
+            found = services.portfolio.find_release(product.id, VersionLabel(version))
+            if found is None:
+                raise NotFoundError(f"{args.product} {version} is not a recorded release")
+            return found.id
+
+        previous = None if args.previous is None else release(args.previous)
+        change = services.portfolio.release_changes(release(args.version), previous)
+        return {**change.model_dump(mode="json"), "remodels": change.remodels()}
 
     return run(call)

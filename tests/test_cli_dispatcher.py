@@ -17,6 +17,52 @@ def test_traust_cli_top_level_help():
     assert "impact analyze" in proc.stdout
 
 
+def test_all_planned_groups_registered():
+    from traust.cli.groups import GROUPS
+
+    assert set(GROUPS) == {
+        "adapters",
+        "admin",
+        "assessments",
+        "attack",
+        "auth",
+        "build",
+        "check",
+        "cloud-config",
+        "compliance",
+        "dashboard",
+        "feeds",
+        "findings",
+        "impact",
+        "isolation",
+        "ledger",
+        "metrics",
+        "portfolio",
+        "pqc",
+        "products",
+        "registry",
+        "remediation",
+        "reporting",
+        "sweep",
+        "triage",
+        "util",
+        "validation",
+    }
+    assert sum(len(ops) for ops in GROUPS.values()) >= 81
+
+
+def test_traust_impact_analyze_help():
+    proc = subprocess.run(
+        [sys.executable, "-m", "traust.cli", "impact", "analyze", "--help"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0
+    assert "Assess every commit an advisory reaches" in proc.stdout
+    assert "--config-home" in proc.stdout
+
+
 def test_traust_portfolio_and_sweep_help():
     for group, op, flag in (
         ("portfolio", "build", "--spine"),
@@ -35,18 +81,6 @@ def test_traust_portfolio_and_sweep_help():
 def test_traust_feeds_fetch_help():
     proc = subprocess.run(
         [sys.executable, "-m", "traust.cli", "feeds", "fetch", "--help"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert proc.returncode == 0, proc.stderr
-    assert "--config-home" in proc.stdout
-    assert "Snapshot the security feeds" in proc.stdout
-
-
-def test_traust_tools_fetch_feeds_help():
-    proc = subprocess.run(
-        [sys.executable, "-m", "traust.cli", "tools", "fetch-feeds", "--help"],
         capture_output=True,
         text=True,
         check=False,

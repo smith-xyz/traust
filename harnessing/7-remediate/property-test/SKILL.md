@@ -23,7 +23,7 @@ allowed-tools:
   # finding prose and target source; an unscoped interpreter under injection
   # is code execution. Scope every script individually.
   - Bash(bash *run_property.sh:*)
-  - Bash(python3 *traust/harnessing/7-remediate/property-test/scripts/property_evidence.py:*)
+  - Bash(python3 -m traust.cli remediation property-evidence:*)
 ---
 
 # Property test authoring
@@ -172,7 +172,7 @@ never the evidence); the finding's sink location from
 `<repo>-triage.json` or `<repo>-security-audit.json`.
 
 **Emits:** one `patch_evidence` item (`kind: property`) on stdout, consumed by
-`/remediate-finding` Phase 5 via `emit_remediation_report.py --evidence`. No
+`/remediate-finding` Phase 5 via `traust remediation assemble --evidence`. No
 new artifact family and no terminal output — the item lands in the existing
 remediation report, satisfying A9/A10.
 
