@@ -462,6 +462,33 @@ the MD summary) and the next daily run classifies them — convergence within a
 day, never silent loss. `--ignore-rate-limit` overrides the preflight; >5% error
 rate adds an MD warning and each row carries its API `error` message.
 
+## The shadow run — the engine beside cron, until the cutover
+
+Before traust-engine takes over a standing job, it runs next to cron without
+dispatching, and a daily diff shows where the two disagree. Every difference is
+fixed or written down; a group of jobs moves to the engine only after two weeks
+with none unexplained. `traust-engine` is installed with traust; every command
+takes the same three paths:
+
+```bash
+E="--core $TRAUST_CONFIG_HOME/core.yaml --pack packs/security/assets.yaml --pin config/external-tools.yaml"
+
+# each cron job, wrapped: its run becomes an order the engine counts
+traust-engine record $E feeds_cache -- traust feeds fetch --feed all
+traust-engine record $E repo_state --repo <url> -- traust portfolio observe --repo <url>
+
+# every 15 minutes: what the engine would plan, one JSON line per pass
+traust-engine shadow $E --router traust.ops.router:SecurityRouter --once >> shadow.jsonl
+
+# daily: missed (the engine wanted it, nobody ran it), early (run before its cadence fell
+# due) and lanes that differ from the legacy worklist; exit 1 if anything differs
+traust-engine diff $E --shadow shadow.jsonl --routes rescan-worklist.json
+```
+
+`record` takes over the subject's open order if there is one, so there is still
+one open order per asset and repository. `shadow` reaps, plans and admits
+nothing. `traust-engine run` is the loop itself, for after the cutover.
+
 ## Standing weekly drain — orchestrator contract
 
 The weekly trickle-drain is designed to run under an external orchestrator
