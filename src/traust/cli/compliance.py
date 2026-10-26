@@ -4,7 +4,7 @@ declare   record one boundary declaration (a compliance-scope document); signed 
           verified caller, are its declarant, otherwise DRAFT; an existing boundary needs --replace
 scopes    the current declaration of each boundary, newest first
 resolve   a boundary's repositories now, under its current declaration
-policy    record the next version of the control mapping or the ADR registers
+policy    record the next version of the control mapping, the ADR registers or the org parameters
 evaluate  the deterministic runner over a boundary: writes the draft assessment, lists the
           evidence_review controls awaiting artifacts; exit 1 when the citation gate fails
 evidence  hash one JSON artifact the agent pass judged into the evidence bundle; cite the result
@@ -36,6 +36,7 @@ from traust_core.v1.models.artifacts import (
     ComplianceAssessmentArtifact,
     ComplianceMappingArtifact,
     ComplianceScopeArtifact,
+    OrgParametersArtifact,
 )
 from traust_core.v1.models.code_facts import CryptoFact
 from traust_core.v1.models.common import PageRequest, Provenance
@@ -67,7 +68,11 @@ BUILT = {  # collectors traust-core builds itself
     CRYPTO_AUDIT: "pass the crypto census as --crypto",
     CLOUD_INVENTORY: "pass the snapshot as --inventory",
 }
-POLICY = {"mapping": ComplianceMappingArtifact, "adr-registry": AdrRegistryArtifact}
+POLICY = {
+    "mapping": ComplianceMappingArtifact,
+    "adr-registry": AdrRegistryArtifact,
+    "org-parameters": OrgParametersArtifact,
+}
 
 
 def declare(argv: list[str] | None = None) -> int:
@@ -155,9 +160,11 @@ def _csv(raw: str | None) -> tuple[str, ...]:
 
 
 def policy(argv: list[str] | None = None) -> int:
-    ap = parser("compliance", "policy", "Record the control mapping or the ADR registers.")
+    ap = parser(
+        "compliance", "policy", "Record the control mapping, the ADR registers or org parameters."
+    )
     ap.add_argument("kind", choices=sorted(POLICY))
-    ap.add_argument("document", type=Path, help="compliance-mapping.yaml or adr-registry.yaml")
+    ap.add_argument("document", type=Path, help="the policy document (YAML)")
     args = ap.parse_args(argv)
 
     def call() -> dict:

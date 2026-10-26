@@ -33,7 +33,8 @@ is **policy data**, not prompt text
 schema-gated; changing a mapping is a reviewed change, recorded in
 traust-core with `traust compliance policy mapping <file>`; runs use the
 newest recorded version). Org parameters
-(`org-parameters.yaml`) are deployment config in the config home; boundary
+(`org-parameters.yaml`) are deployment config, recorded with
+`traust compliance policy org-parameters <file>`; boundary
 declarations are recorded in traust-core (`traust compliance declare`). The
 chain for every deterministic verdict:
 
@@ -136,7 +137,7 @@ ledger, SLA clocks, and dashboards as every other finding.
    `not_assessed` — the run proceeds and says so.
 4. **Run the deterministic runner** (code-computed verdicts, evidence
    bundle, coverage, gate; the mapping and ADR registers are the versions
-   recorded with `traust compliance policy mapping|adr-registry <file>`):
+   recorded with `traust compliance policy mapping|adr-registry|org-parameters <file>`):
 
    ```bash
    python3 -m traust.cli compliance evaluate <boundary> \
@@ -148,7 +149,8 @@ ledger, SLA clocks, and dashboards as every other finding.
    ```
 
    It lists the evidence_review controls awaiting artifacts. OSCAL
-   export is not available (traust-core has no home for it yet).
+   export (800-53 spine) is `traust dashboard view oscal --artifact-id <id>
+   --out <out>`, `<id>` being the `artifact.id` step 9's `record` prints.
 
 5. **Agent pass — evidence_review controls ONLY.** For each
    `not_assessed (evidence_review — awaiting artifact …)` result where

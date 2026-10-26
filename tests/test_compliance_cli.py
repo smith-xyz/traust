@@ -20,6 +20,7 @@ from traust_core.v1.models.artifacts import (
     ComplianceAssessmentArtifact,
     ComplianceMappingArtifact,
     ComplianceScopeArtifact,
+    OrgParametersArtifact,
 )
 from traust_core.v1.models.common import Page, PageRequest
 from traust_core.v1.models.compliance import (
@@ -284,6 +285,33 @@ def test_policy_records_the_mapping_or_the_adr_registers(
         )
         assert (rc, out) == (0, {"artifact_id": str(published.artifact_id)})
         assert isinstance(doors.record.calls[-1][0], artifact)
+
+
+def test_policy_records_the_org_parameters(
+    doors: SimpleNamespace, home: Path, tmp_path: Path
+) -> None:
+    published = SimpleNamespace(artifact_id=uuid.uuid4())
+    doors.record = Door(published)
+    body = {
+        "version": 1,
+        "declared_by": "platform-security",
+        "parameters": {
+            "allowed_data_regions": {"value": ["us-east-1"], "controls": ["gdpr:art-44"]}
+        },
+    }
+    document = write(tmp_path, "org-parameters.yaml", yaml.safe_dump(body))
+    rc, out = call("policy", home, "org-parameters", str(document))
+    assert (rc, out) == (0, {"artifact_id": str(published.artifact_id)})
+    assert isinstance(doors.record.calls[-1][0], OrgParametersArtifact)
+
+
+def test_policy_refuses_org_parameters_off_their_schema(
+    doors: SimpleNamespace, home: Path, tmp_path: Path
+) -> None:
+    doors.record = Door(SimpleNamespace(artifact_id=uuid.uuid4()))
+    document = write(tmp_path, "org-parameters.yaml", yaml.safe_dump({"version": 1}))
+    rc, _ = call("policy", home, "org-parameters", str(document))
+    assert rc == 2 and doors.record.calls == []
 
 
 def test_evaluate_writes_the_draft_and_lists_what_awaits_the_agent_pass(

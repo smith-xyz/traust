@@ -370,3 +370,23 @@ def test_an_unresolvable_attack_catalog_is_exit_2(
         dashboard_view.main(["--config-home", str(home), "attack-coverage", "--out", str(tmp_path)])
     assert exit.value.code == 2 and "ATT&CK catalog not resolvable" in err.getvalue()
     assert publish.calls == []
+
+
+def test_artifact_id_names_the_document_a_single_item_view_renders(
+    publish: Door, home: Path, tmp_path: Path
+) -> None:
+    assessment = uuid.uuid4()
+    document = {"assessment-results": {"uuid": str(uuid.uuid4()), "results": []}}
+    publish.result = RenderedView(
+        view=ViewName.OSCAL,
+        stem="acme-compliance-assessment",
+        model=insight.OscalAssessmentResults.model_validate(document),
+        markdown="# acme compliance assessment\n",
+        html="<title>acme compliance assessment</title>",
+    )
+    out = tmp_path / "oscal"
+    rc, answer = run(home, "oscal", "--artifact-id", str(assessment), "--out", str(out))
+    assert rc == 0
+    assert publish.calls == [(ViewName.OSCAL, ViewFilter(artifact_id=assessment))]
+    assert json.loads((out / "acme-compliance-assessment.json").read_text()) == document
+    assert answer["model"] == document
