@@ -174,6 +174,28 @@ def test_a_repo_state_completion_routes_the_repository_once(
     assert len(_orders(context.services(), "diff_scan_quarterly")) == 1  # re-routes are idempotent
 
 
+def test_an_iac_change_routes_the_cloud_config_lane_beside_the_tables(
+    loop: tuple[Context, Clock, EngineLoop], forge: dict[str, Any]
+) -> None:
+    context, clock, engine = loop
+    files = forge[f"repos/org/app/compare/{PINNED}...HEAD"]["files"]
+    files.append({"filename": "infra/main.tf", "changes": 3})
+    repository_id = _audited(context, "app")
+    _materialize_repo_state(context, repository_id)
+    clock.at += timedelta(minutes=1)
+
+    assert engine.run_once().tick.routed == 1
+    routed = [
+        (o.asset, o.lane, o.rule)
+        for asset in ("diff_scan_quarterly", "cloud_config_audit")
+        for o in _orders(context.services(), asset)
+    ]
+    assert routed == [
+        ("diff_scan_quarterly", "diff-scan-quarterly", "rule-5"),
+        ("cloud_config_audit", "iac-baseline", "lever-6"),  # no cloud-config baseline yet
+    ]
+
+
 def test_a_lane_over_its_budget_is_withheld(tmp_path: Path, forge: dict[str, Any]) -> None:
     clock = Clock()
     budget = Budget(

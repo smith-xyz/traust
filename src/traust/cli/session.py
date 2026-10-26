@@ -76,6 +76,9 @@ def run(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--checkout", action="store_true", help="pass a checkout of --repo's head, not its URL"
     )
+    ap.add_argument(
+        "--mode", help="the skill's mode token, before the repository (e.g. threat-model review)"
+    )
     ap.add_argument("--run-id", default="manual", help="the run order this session is for")
     argv = sys.argv[1:] if argv is None else argv
     split = argv.index("--") if "--" in argv else len(argv)
@@ -88,6 +91,7 @@ def run(argv: list[str] | None = None) -> int:
     except (ValidationError, FileNotFoundError, KeyError) as e:
         print(f"run {args.run_id}: {OrderReason.BAD_REQUEST}: {e}", file=sys.stderr)
         return answer(JobResult.failed(OrderReason.BAD_REQUEST))
+    mode = [args.mode] if args.mode else []
     with tempfile.TemporaryDirectory(prefix="traust-session-") as tmp:
         target: list[str] = []
         if args.repo:
@@ -100,7 +104,7 @@ def run(argv: list[str] | None = None) -> int:
             except (ValidationError, ServiceError) as e:
                 print(f"run {args.run_id}: {OrderReason.NOT_FOUND}: {e}", file=sys.stderr)
                 return answer(JobResult.refused(OrderReason.NOT_FOUND))
-        command = [*AGENT, "--model", model, prompt(args.skill, [*target, *extra])]
+        command = [*AGENT, "--model", model, prompt(args.skill, [*mode, *target, *extra])]
         try:
             done = subprocess.run(command, cwd=HARNESS_ROOT, check=False)
         except OSError as e:
