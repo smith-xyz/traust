@@ -8,7 +8,7 @@ metadata:
 
 # Compliance Check — Evidence-Gated Control Assessment
 
-> **Being ported to traust-core** (progress-tracker skill port 32, compliance-check): boundaries are declared and resolved in traust-core (`traust compliance declare|scopes|resolve`). The runner, gate and dashboard still run from files until traust-core can publish the control mapping.
+> **On traust-core:** boundaries, the runner, the citation gate and the recorded assessments are traust-core doors (`traust compliance …`); posture is `traust dashboard view compliance`.
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in
@@ -30,9 +30,11 @@ You will not find control IDs in this file — the control↔check binding
 is **policy data**, not prompt text
 (`compliance-mapping.yaml`, shipped with traust-engine in
 `data/compliance/` beside the NIST spine, profiles and framework catalogs;
-schema-gated; changing a mapping is a reviewed change, and a deployment
-that needs a different one passes `--registry`). Org parameters
-(`org-parameters.yaml`) are deployment config in the config home; boundary
+schema-gated; changing a mapping is a reviewed change, recorded in
+traust-core with `traust compliance policy mapping <file>`; runs use the
+newest recorded version). Org parameters
+(`org-parameters.yaml`) are deployment config, recorded with
+`traust compliance policy org-parameters <file>`; boundary
 declarations are recorded in traust-core (`traust compliance declare`). The
 chain for every deterministic verdict:
 
@@ -41,7 +43,7 @@ framework control (catalogs/spine)          e.g. nist-800-53-rev5:si-2
   → registry entry (classification + checks[] + crosswalks)
     → check = declarative assertion ({collector, path, operator, expected})
       → collector snapshot                  (see below)
-        → compliance_assert.py computes the verdict (code, never the LLM)
+        → traust-core computes the verdict (code, never the LLM)
           → runner aggregates per framework; evidence bundle; citation gate
 ```
 
@@ -50,10 +52,10 @@ existing bodies of work**:
 
 | Collector | What it is | Doctrine |
 |---|---|---|
-| `findings_db` | pre-shaped views over the C9 findings DB, scoped to the target's repos (e.g. `open_critical_dependency_findings`, `open_confirmed_hardcoded_credential_findings`) | reads **disposition-ledger conclusions** — triage-confirmed, still-open findings — never raw scanner candidates; the campaign's triage verdicts ARE the compliance evidence, and a ledger resolution flips the control on the next run |
+| `findings_db` | pre-shaped views over traust-core's findings, scoped to the target's repos (e.g. `open_critical_dependency_findings`, `open_confirmed_hardcoded_credential_findings`) | reads **disposition-ledger conclusions** — triage-confirmed, still-open findings — never raw scanner candidates; the campaign's triage verdicts ARE the compliance evidence, and a ledger resolution flips the control on the next run |
 | `scan_k8s_hardening` | the existing KHS fact scanner's output verbatim | existing deterministic facts (privileged containers, RBAC wildcards, secrets-in-env) drive AC/CM-family and crosswalked PCI/TSC controls |
 | `cloud_inventory` | declared (IaC) or observed (live) environment snapshot | new for this skill; declared-vs-observed labeling below |
-| `crypto_audit` | crypto-audit/v1 provider census from python3 -m traust.cli adapters crypto-audit (source/image/runtime tiers, shared with `/crypto-analysis` and `/pqc-readiness`) | one crypto facts layer, many judgment consumers — SC-13/TSC CC6.7 assert over it; when it fires, delegate to `/crypto-analysis` for the governance chain that resolves remediation ownership |
+| `crypto_audit` | crypto census from python3 -m traust.cli adapters crypto-source / crypto-image / crypto-cluster (source/image/runtime tiers, shared with `/crypto-analysis` and `/pqc-readiness`) | one crypto facts layer, many judgment consumers — SC-13/TSC CC6.7 assert over it; when it fires, delegate to `/crypto-analysis` for the governance chain that resolves remediation ownership |
 
 Crosswalks make one fact serve many frameworks: the same
 `chk-no-open-critical-dependency-vulns` result satisfies-or-fails
@@ -67,7 +69,8 @@ ledger, SLA clocks, and dashboards as every other finding.
 `$ARGUMENTS`: `<target> --framework <id>[,<id>…]|all` plus flags.
 
 - **Target**: a product name (resolved to repos via its boundary,
-  `traust compliance resolve <boundary>`), a `--repos org/a org/b` list, and/or an environment (needs a
+  `traust compliance resolve <boundary>`) or an explicit repo list, declared
+  as a boundary (`traust compliance declare`), and/or an environment (needs a
   mode-1 `targets.yaml` for the collectors). FedRAMP and GDPR verdicts
   **require an environment target** — the runner skips them on
   product-only runs, with the reason named.
@@ -96,8 +99,8 @@ ledger, SLA clocks, and dashboards as every other finding.
      frameworks have no machine feed, so the review window IS the
      staleness mechanism; PCI SSC revisions, TSC updates, and EUR-Lex
      consolidations only enter through a dated human review).
-   - **ADR evidence** (when in play): adr-index build time + each
-     register pin vs upstream HEAD.
+   - **ADR evidence** (when in play): each register pin vs upstream
+     HEAD (decisions are read at the pin: `traust compliance adrs <product>`).
    Stale framework data does not block the run — it goes in the
    artifact metadata as a loud caveat, and the report must carry it.
    Pins and reviewed-dates advance only as deliberate config changes —
@@ -116,9 +119,8 @@ ledger, SLA clocks, and dashboards as every other finding.
        --out /tmp/cc/<t>/cloud-inventory.json
    python3 -m traust.cli adapters checkov <checkout> \
        -o /tmp/cc/<t>/khs.json                          # per repo
-   python3 -m traust.cli adapters crypto-audit source <checkout> \
-       --component <t> --output /tmp/cc/<t>/crypto-audit.json
-   python3 -m traust.cli corpus findings-db                 # if stale
+   python3 -m traust.cli adapters crypto-source <checkout> \
+       --repo-url <url> --sha <sha> --out /tmp/cc/<t>/crypto.json
    ```
 
    **Declared vs observed — always label which ran.** The IaC snapshot
@@ -134,23 +136,28 @@ ledger, SLA clocks, and dashboards as every other finding.
    An unavailable layer means the affected controls verdict
    `not_assessed` — the run proceeds and says so.
 4. **Run the deterministic runner** (code-computed verdicts, evidence
-   bundle, coverage, gate):
+   bundle, coverage, gate; the mapping and ADR registers are the versions
+   recorded with `traust compliance policy mapping|adr-registry|org-parameters <file>`):
 
    ```bash
-   python3 harnessing/3-audit/compliance-check/scripts/run_compliance_check.py \
-       --frameworks <sel> --target-kind <kind> [--repos …] \
-       --collector cloud_inventory=/tmp/cc/<t>/cloud-inventory.json \
+   python3 -m traust.cli compliance evaluate <boundary> \
+       [--frameworks <sel>] --target-kind <kind> \
+       --inventory /tmp/cc/<t>/cloud-inventory.json \
        --collector scan_k8s_hardening=/tmp/cc/<t>/khs.json \
-       --collector crypto_audit=/tmp/cc/<t>/crypto-audit.json \
-       --adr-index progress-tracker/metrics/adr/adr-index.json \
-       --out-dir <out> [--oscal] [declared-input flags]
+       --crypto /tmp/cc/<t>/crypto.json \
+       --out <out>/compliance-assessment.json [declared-input flags]
    ```
+
+   It lists the evidence_review controls awaiting artifacts. OSCAL
+   export (800-53 spine) is `traust dashboard view oscal --artifact-id <id>
+   --out <out>`, `<id>` being the `artifact.id` step 9's `record` prints.
 
 5. **Agent pass — evidence_review controls ONLY.** For each
    `not_assessed (evidence_review — awaiting artifact …)` result where
    the user supplied an artifact: judge the artifact against the
    control intent, set the verdict with `verdict_source: agent`,
-   attach the evidence (hash the artifact into the bundle;
+   attach the evidence (`traust compliance evidence <artifact.json>
+   --locator <…>` hashes it into the bundle and prints the entry to cite;
    `kind: human_artifact`; ADR citations as `adr:<register>/<id>` —
    the gate refuses superseded/unknown decisions). You may add
    `narrative` annotations to ANY result; you may NEVER change a
@@ -162,9 +169,7 @@ ledger, SLA clocks, and dashboards as every other finding.
 6. **Re-run the gate** after any agent edits:
 
    ```bash
-   python3 harnessing/3-audit/compliance-check/scripts/validate_compliance_assessment.py <out>/compliance-assessment.json \
-       --evidence-dir <out>/evidence \
-       --adr-index progress-tracker/metrics/adr/adr-index.json
+   python3 -m traust.cli compliance check <out>/compliance-assessment.json
    ```
 
    A gate failure is a defect in the assessment, not a formality — fix
@@ -181,11 +186,10 @@ ledger, SLA clocks, and dashboards as every other finding.
    `control_refs` entry (`<framework>:<control_id>`) so the disposition
    ledger, SLA clocks, and findings DB track remediation — compliance
    gaps never get a parallel tracking system.
-9. **Refresh the posture dashboard.** Copy/emit the assessment into
-   `analysis-results/compliance/<target>/` (the assessment-output
-   tree of record, beside findings/ and validations/; the
-   evidence bundle stays local — gitignored, rebuildable from the
-   pinned snapshot) and rebuild:
+9. **Refresh the posture dashboard.** Record the gated assessment in
+   traust-core (`python3 -m traust.cli compliance record
+   <out>/compliance-assessment.json`; the evidence bundle is in
+   traust-core's object store) and rebuild:
 
    ```bash
    python3 -m traust.cli dashboard view compliance --out <metrics-root>/dashboards
@@ -236,8 +240,8 @@ validated artifacts, and NOTHING else:
    self-service compliance historically rots, so it is the one place
    the interview slows down on purpose.
 3. **Intake and assessment stay separable.** The interview always ends
-   with the choice: run the assessment now (`run_compliance_check.py
-   --boundary <id>`), or record the intake and hand off. Never make
+   with the choice: run the assessment now (`traust compliance evaluate
+   <boundary>`), or record the intake and hand off. Never make
    the run a condition of completing the intake.
 
 ### Question sequence (bounded — one pass, no fishing)

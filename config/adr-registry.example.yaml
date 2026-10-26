@@ -2,10 +2,11 @@
 # The harness never reads this example at run time.
 #
 # Architecture-decision-record registers, schema-gated by traust-contracts
-# adr-registry.schema.json. `traust ops index-adrs` reads each register AT
-# ITS PIN; /drift-watch reports pin-vs-upstream drift. Advancing a pin is a
-# reviewed config change: read the upstream diff (especially decisions that
-# became superseded), then move the SHA.
+# adr-registry.schema.json. Record it with `traust compliance policy
+# adr-registry`; traust-core reads each register AT ITS PIN; /drift-watch
+# reports pin-vs-upstream drift. Advancing a pin is a reviewed config
+# change: read the upstream diff (especially decisions that became
+# superseded), then move the SHA, then record it again.
 
 version: 1
 registers:
