@@ -44,6 +44,7 @@ def test_all_planned_groups_registered():
         "remediation",
         "reporting",
         "sweep",
+        "tools",
         "triage",
         "util",
         "validation",

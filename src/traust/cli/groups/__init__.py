@@ -26,6 +26,7 @@ from traust.cli.groups import (
     remediation,
     reporting,
     sweep,
+    tools,
     triage,
     util,
     validation,
@@ -134,6 +135,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "mine": sweep.MINE,
         "cards": sweep.CARDS,
     },
+    "tools": dict(tools.TOOLS),
     "triage": dict(triage.TRIAGE),
     "util": {
         "redact": util.REDACT,
