@@ -318,7 +318,7 @@ python3 -m traust.cli reporting rate-threats <repo>-threat-model.json
 python3 -m traust.cli reporting validate <repo>-threat-model.json
 python3 -m traust.cli reporting render   <repo>-threat-model.json \
     -o <repo>-threat-model.md
-python3 -m traust.cli reporting record <repo>-threat-model.json --kind threat-model \
+python3 -m traust.cli reporting record <repo>-threat-model.json --kind threat_model \
     --repo-url <https URL of the origin remote> --sha <the modelled commit>
 ```
 

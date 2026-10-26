@@ -10,6 +10,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
+from pydantic import ValidationError as ModelValidationError
 from traust_core.v1.errors import NotFoundError, TraustError, ValidationError
 from traust_core.v1.models.inventory import Product, RefName, RepositoryRef
 from traust_core.v1.models.operations import JobResult, Outcome
@@ -64,12 +65,13 @@ def products(services: Any, slugs: list[str]) -> list[Product]:
     return found
 
 
-def run(call: Callable[[], object]) -> int:
-    """Print the result (JSON unless it's text); a refused input is exit 2 with its reason."""
+def run(call: Callable[[], object], *, redact: bool = False) -> int:
+    """Print the result; optionally keep submitted content out of refusal messages."""
     try:
         out = call()
-    except (OSError, TraustError) as e:
-        print(f"ERROR: {e}", file=sys.stderr)
+    except (OSError, TraustError, ModelValidationError) as e:
+        detail = type(e).__name__ if redact else str(e)
+        print(f"ERROR: {detail}", file=sys.stderr)
         return 2
     if out is not None:
         print(out if isinstance(out, str) else json.dumps(out, indent=2, default=str))

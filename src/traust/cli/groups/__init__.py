@@ -28,6 +28,7 @@ from traust.cli.groups import (
     sweep,
     triage,
     util,
+    validation,
 )
 
 GROUPS: dict[str, dict[str, object]] = {
@@ -139,4 +140,5 @@ GROUPS: dict[str, dict[str, object]] = {
         "elf": util.ELF,
         "safe-exec": util.SAFE_EXEC,
     },
+    "validation": dict(validation.VALIDATION),
 }

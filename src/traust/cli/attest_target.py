@@ -4,10 +4,9 @@
 Fail-closed environment gate for the validation lanes: BEFORE any probe
 runs, prove the target is actually testable and record the proof as
 machine-checkable `target-attestation.json` beside the validation run.
-If attestation fails, the run may emit only `environment_invalid` —
-verdict events are structurally unavailable (enforced by
-emit_validation_ledger_events for reports at/after the shipping
-harness version).
+Core's ValidationService.record consumes the full artifact and owns the
+run-level gate: explicit failed attestation voids every verdict at any age,
+and current-policy recording requires attestation independent of version.
 
 Checks (each recorded individually; `attested` is the AND of required
 checks):

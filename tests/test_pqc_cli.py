@@ -157,6 +157,27 @@ def test_check_refuses_a_report_that_fails_its_schema(
     assert not doors.check.calls
 
 
+@pytest.mark.parametrize(
+    ("change", "field"),
+    [
+        (lambda d: d["provenance_summary"].update(dominant="invented"), "dominant"),
+        (lambda d: d["scores"].update(overall=101), "overall"),
+        (lambda d: d["metadata"]["tool"].pop("rules_sha256"), "rules_sha256"),
+    ],
+    ids=["dominant", "overall", "tool"],
+)
+def test_check_refuses_the_authoritative_readiness_constraints(
+    doors: SimpleNamespace, home: Path, tmp_path: Path, change: Any, field: str
+) -> None:
+    doc = json.loads(REPORT.read_text())
+    change(doc)
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps(doc))
+    rc, err = call("check", home, str(bad))
+    assert rc == 2 and field in err
+    assert not doors.check.calls
+
+
 def test_prepare_reads_the_registered_commit(doors: SimpleNamespace, home: Path) -> None:
     rc, out = call("prepare", home, "--repo-url", URL, "--sha", SHA)
     assert (rc, out) == (0, {"route": "full"})

@@ -4,6 +4,64 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- Repair native scanner artifact admission through the adapter-specific
+  observation contract. The unchanged real scan-to-artifact regression passes
+  without invented CWE/remediation; authored report constraints remain strict.
+
+- Consume atomic scanner intake and finding DTO corrections: malformed scanner
+  batches leave no partial assessment, copied candidates/nested locations are
+  revalidated, and replay uses database-native timestamp precision. Scanner tool
+  names/native fingerprints are not emitted as finding origin/domain identity.
+  Declared classifier/dependency provenance and unknown effort remain intact;
+  sparse raw scanner claims are not padded into full audit artifacts.
+
+- Add the machine-validation recording producer: `traust validation record`
+  sends a typed report, explicit stored multi-source bindings and actual run
+  provenance through core's record door. Full target attestation, install-failure
+  text, controls, explicit/null grades and target context stay retained; core
+  gates canonical decisions versus review items. No actor/auto-accept flag,
+  legacy emitter, layer/corpus write or inferred execution proof is restored.
+- Wire the existing isolated-lab runner's report/record handoff; schema-gate
+  final serialized reports before writing, preserve original source labels and
+  move auxiliary surface/credential counters under metadata.additional. Keep
+  bounded chain context without duplicating transcripts. Reuse core soundness
+  observations instead of a second app policy implementation.
+- Evaluate the authoritative installed PQC-readiness schema at the real
+  `pqc_facts.py --validate-readiness` door, retaining citation/owner-facing
+  semantic checks and avoiding engine configuration for validation-only use.
+  This completes this step19 producer/readiness slice, not full plan24
+  preparation/authorization/live execution, novel intake, scanner adapters or
+  historical portfolio certification. OWASP risk rating is unchanged.
+
+- Consolidate the completed core-backed human review workflow under
+  `/track-findings` and `traust findings`, honoring the retirement of the
+  countersign skill/wrapper and admin command/module. Paged/filterable
+  `review-cases`, idempotent `request`, direct validity/severity/resolution
+  `record`, and single/bulk `apply` retain the reviewed-answer protocol.
+  Every write uses core identity and requires a verified human; both review outcomes append the
+  person's explicit judgement and rationale atomically with queue resolution.
+  Queue cards include finding state, attributed history and integrity-checked
+  evidence documents, including raw probe observations. Core owns proof
+  precedence, independent reviewers, actor, clock, replay and ledger integrity.
+  Receipts/errors omit credentials and submitted rationale. Legacy checkbox/
+  prose approval parsing, scan-ID alias mapping and layer/cumulative writes are
+  retired; no alternate state or authentication store is introduced.
+- Reuse the merged `traust auth` login for countersign by default; explicit
+  `--token-stdin` still authenticates only that token without fallback. Machine
+  sessions cannot countersign. Migrate `findings reject` to require the finding
+  UUID, an actual judged decision and the reviewer's own rationale, like confirm;
+  neither outcome can close a review without an atomically recorded decision.
+- Keep the app and engine's core pins aligned so the `postgres` extra installs
+  core's PostgreSQL driver; a bare dependency override discarded that extra.
+- Retain the async `countersign-queue.md` round trip: `findings review-cases --output` creates a
+  private 0600, non-overwriting Markdown workbench with real decision cards and
+  cursor metadata. `apply` accepts only its single bounded typed JSON answer
+  block; an empty answer list explicitly defers without writes after human
+  authentication. Escaped evidence cannot forge controls; malformed/duplicate
+  controls and invalid rows fail. Existing JSON single/bulk answers still work.
+  Full `findings review-cases` cards and the unchanged flat `findings queue`
+  summary list consume core `ReviewItemCase` values without rebuilding domain policy.
+
 - **Breaking: traust-core is the hub.** traust depends on traust-core and
   traust-engine only; traust-contracts and traust-ledger come through core's
   pins. Domain state goes through core's services:
@@ -12,7 +70,8 @@ All notable changes to Traust are documented here.
 - **Retired, to be rebuilt per skill on core's services** (progress-tracker
   skill ports): the code that ran on the old ledger and corpus.
   - Commands: `traust corpus …`, `traust route …`, `traust ledger emit-*` /
-    `pull`, `admin countersign`, `build cumulative`, `check report-digests`,
+    `pull`,
+    `build cumulative`, `check report-digests`,
     `feeds reconcile-cve-provenance`; `check drift` loses its findings.db,
     ledger, signature, identity and corpus-registration checks.
   - Skill scripts: census, compliance-check scope intake, secure-code-audit

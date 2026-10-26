@@ -595,27 +595,30 @@ Do not begin the next image until the current report passes.
 
 The report is an **immutable baseline**, and this skill never writes
 disposition state — the same invariant as every audit profile. Post-audit
-truth flows through the disposition ledger
-([`docs/disposition-ledger.md`](../../../docs/disposition-ledger.md)):
-`/triage` and `/validate-findings` verdicts reach the ledger via
-`traust triage record` /
-validate-findings' record door (retired `ledger emit-validation`; being ported to traust-core), and `/track-findings`
-regenerates the cumulative view. Container-specific rules:
+truth flows through core findings
+([`docs/disposition-ledger.md`](../../../docs/disposition-ledger.md)).
+`traust triage record` records triage verdicts and queues human review;
+`/track-findings` reads derived state and records explicit human judgements
+through `traust findings`. The former layer emitters and cumulative-file rebuild
+are **retired, not executable**. Bound machine validation uses `traust validation
+record`; container-specific cumulative output ports remain unfinished: retain reports and provenance,
+never hand-write events or claim a regenerated cumulative view.
+Historical container-specific output requirements:
 
 - **Naming.** The report shares its directory with the source repo's
   code audit, so ledger artifacts keep the full report stem:
   `<image>-container-audit-findings-layer.json` and
   `<image>-container-audit-findings-current.{json,md}` — never the
   short `<image>-findings-*` names, which belong to the code audit.
-  The ledger tooling derives this naming by default.
+  The port must preserve this naming; retired tooling is not a current writer.
 - **Identity across rebuilds.** Finding IDs are digest-keyed; a fixed
   image rebuild is a **new digest → new report → new finding IDs**.
   Dispositions do not carry forward by editing the old report: re-audit
   the new digest (the container analog of `/verify-remediation`) and
-  record it: the same finding in the new report is the same finding (fingerprint), which joins
-  old dispositions to the new baseline — the same mechanism branch
-  re-audits use. A CVE absent from the rebuilt image's report resolves
-  the old finding through that join, not through a hand edit.
+  record it: core finding intake matches the same finding in the new report
+  (fingerprint) and joins its old dispositions — the same mechanism branch
+  re-audits use. Never claim automatic resolution merely because a CVE is
+  absent from a new report.
 - **Census cut.** Container reports are their own census block
   (`container_audit`, like `cloud_config`) and are **never blended
   into the distinct-vulnerability headline** — an image finding is

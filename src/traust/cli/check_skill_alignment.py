@@ -387,11 +387,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
     "the internal extension repo (upstream plan Phase 4)",
     (
         "A9",
-        "validate-findings:target-attestation.json",
-    ): "track-findings read it until its port to traust-core (2026-10-23); validate-findings' "
-    "own record door reads it next (progress-tracker skill port 24, validate-findings)",
-    (
-        "A9",
         "validate-findings:install-failure.yaml",
     ): "cross-repo: consumed by deploy-operator, which moved to the internal "
     "extension repo 2026-09-07 (its only callers were already there)",

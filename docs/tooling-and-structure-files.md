@@ -7,26 +7,24 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | Component | Purpose |
 |---|---|
 | python3 -m traust.cli util safe-exec + `$TRAUST_CONFIG_HOME/safe-exec-profiles.yaml` | Enforced sandbox for target-derived commands (argv allowlists, env scrub, shell-free pipelines) — gate rule S10; [docs/safe-exec.md](safe-exec.md) |
-| python3 -m traust.cli dashboard refresh | The packaged dashboards rebuild (core views → builders → scoreboard) — `/refresh-dashboards` |
+| python3 -m traust.cli dashboard refresh | The packaged dashboards rebuild (core views → remaining registered builders → scoreboard); retired corpus projections/builders are not restored — see [continuous-operations.md](continuous-operations.md#standing-jobs--the-complete-inventory) |
 | `traust_engine.escaping` | Shared untrusted-text helpers every emitter uses (HTML, inline-script JSON, md cells, CSV, slugs) — library import, not a CLI |
 | `schemas/v1/report.schema.json` | JSON Schema (draft 2020-12) for security-audit reports |
 | `schemas/v1/triage.schema.json` | JSON Schema for TRIAGE.json validation |
 | `schemas/v1/vuln-findings.schema.json` | JSON Schema for vuln-scan candidate reports (`<repo>-vuln-findings.json`) |
 | `schemas/v1/adapter-result.schema.json` | JSON Schema for traust-engine scanner adapter `scan()` return values (distinct from skill-level vuln-findings output) |
+| `traust-contracts/artifacts_schema/v1/code-facts.schema.json` | Recorded symbols and measured language statistics on a `tool_scan` assessment; read through core's artifact and code-facts services |
 | `schemas/v1/validation.schema.json` | JSON Schema for live-validation reports |
 | `schemas/v1/remediation.schema.json` | JSON Schema for remediation patches |
 | `schemas/v1/verification.schema.json` | JSON Schema for remediation-verification reports |
 | `schemas/v1/impact-analysis.schema.json` | JSON Schema for CVE impact-analysis artifacts |
 | `schemas/v1/layer.schema.json` | JSON Schema for findings-disposition layers (track-findings ledger) |
 | `schemas/v1/refuted-register.schema.json` | JSON Schema for the refuted-finding register: triage or validation refutations kept, integrity-bound, for later execution evidence and countersign |
-| `schemas/v1/threat-model.schema.json` | JSON Schema for one subject's threat model. The authored artifact is Markdown (`<repo>-threat-model.md`); this is its contract form (`<repo>-threat-model.json`), emitted alongside it by `traust reporting threat-model-json` and projected into the `threat` table |
-| `schemas/v1/code-facts.schema.json` | JSON Schema for recorded code facts: deterministic symbols and measured language statistics, the artifact of a `tool_scan` assessment (traust-core `AssessmentService`) |
-| `schemas/v1/repo-state.schema.json` | JSON Schema for one forge observation of a repository (default-branch head, compared with its latest audit), the artifact of a `repo-state` assessment |
+| `schemas/v1/threat-model.schema.json` | JSON Schema for one subject's threat model contract (`<repo>-threat-model.json`), alongside the authored Markdown (`<repo>-threat-model.md`); the former JSON emitter is retired and the core assessment/artifact skill port is unfinished, with no executable fallback |
 | `schemas/v1/run-manifest.schema.json` | JSON Schema for an order's run manifest (`run_order.artifact_id`): config digests in force (the pack version), the budget verdict at admission, the approval, progress and degraded keys (traust-core `OpsService`) |
 | `schemas/v1/corpus-registry.schema.json` | JSON Schema for the corpus ownership registry — the subject→owner/business-unit mapping that every denominator divides by |
 | `schemas/v1/operator-priv-profile.schema.json` | JSON Schema for per-operator least-privilege profiles (`*-priv-profile.json`), parsed from shipped manifests — declared state, never a live cluster read |
-| `schemas/v1/adapter-result.schema.json` | JSON Schema for adapter results (contracts v0.2.0) |
-| `traust-ledger/tests/fixtures/identity-recipe-vectors.json` | Regression fixtures for the finding-fingerprint recipe (canon_repo/canon_path/primary_cwe/fingerprint, implemented in `traust-ledger/traust_ledger/identity.py`), replayed by `traust-ledger/tests/test_identity_recipe_vectors.py`. **Fixtures, not a contract**: under decision D7 (2026-08-18) only the harness computes identity, so the cross-implementation golden-vector suite that used to live at contracts `vectors/v1/` was retired in contracts 0.5.0 along with the SDK's `go/v1/identity` port. They exist so the one remaining implementation cannot change by accident across an `algo_version` bump — see [docs/components.md](components.md#5-what-crosses-the-boundary). |
+| `traust_core.v1.services.findings.identity.IdentityPolicy` | Core-owned finding fingerprint recipe and version attribution, moved from traust-ledger. Reuse core identity handling; never invent a second recipe or substitute a fingerprint for the finding UUID required by the severity writer. |
 | `schemas/v1/isolation-review.schema.json` | JSON Schema for tenant-isolation review reports |
 | `schemas/v1/cloud-config-audit.schema.json` | JSON Schema for declared-layer IaC audit reports |
 | `schemas/v1/cloud-config-findings-current.schema.json` | JSON Schema for cloud-config cumulative status reports (`*-findings-current.json` from track-findings) |
@@ -46,6 +44,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | `schemas/v1/adr-registry.schema.json` | JSON Schema for the architecture-decision-record registry |
 | `schemas/v1/org-parameters.schema.json` | JSON Schema for org-wide parameter files |
 | `schemas/v1/risk-rating-methodology.schema.json` | JSON Schema for the risk-rating methodology config |
+| `schemas/v1/repo-state.schema.json` | JSON Schema for a repository's forge observation: observed default-branch head compared with its latest audit, stored as a repo-state assessment artifact; unavailable/deferred run outcomes are not observation documents |
 | python3 -m traust.cli reporting validate | Validates report JSON against schema; supports `--strict` and batch validation |
 | python3 -m traust.cli reporting lint | Deterministic threat-model gate — sections/columns/enums, coverage invariant, ID stability, provenance, evidence hygiene |
 | python3 -m traust.cli reporting render | Renders validated JSON reports to Markdown |
@@ -53,17 +52,21 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | python3 -m traust.cli check citations | Citation verification gate for findings |
 | python3 -m traust.cli build symbol-index | Builds symbol index for triage acceleration |
 | python3 -m traust.cli admin query-index | Queries the symbol index |
-| `traust triage record` | Records a validated triage as decisions on traust-core (replaced `ledger emit-triage`) |
+| Retired baseline-claim workflow | Formerly pinned legacy baseline claim hashes; core finding intake/baseline services own the unfinished skill port, with no executable fallback |
+| python3 -m traust.cli triage record | Records validated triage decisions through core; human review items feed the countersign queue |
+| `traust auth` | Core-owned stored login, local/device-code/token-file authentication, machine service accounts, status, refresh and logout |
+| `traust findings` | Core finding reads, forge/Jira import, full review cards/evidence, review requests, direct human judgements, typed Markdown/JSON batch apply and confirm/reject, refuted findings, review surfaces, SARIF and ticket links; both review outcomes require a judged decision and own rationale |
 | python3 -m traust.cli check docs-consistency | Doc-drift detection for harness docs |
 | python3 -m traust.cli impact cluster-state-diff | P5 discovery sweep 1 — before/after security-state snapshots (RBAC, SCCs, webhooks, NetworkPolicies, Services/Routes) diffed into validation-discovery candidates for /triage |
 | python3 -m traust.cli sweep benchmark | P7 validation-lane benchmark — vulnerable/safe-twin fixtures, confirm-recall + refute-precision + severity-accuracy floors, hybrid release-cut/monthly cadence (check-trigger + drift-watch) |
 | python3 -m traust.cli admin attest-target | P2 pre-flight target attestation for validation lanes — fail-closed environment gate (cluster fingerprint, CSV/pod readiness, version-in-range, URL reachability) emitting target-attestation.json |
+| `traust validation record` | Typed machine-report recording via core `ValidationService.record`; explicit stored source bindings/provenance, full target-attestation/install observations, core-owned soundness and canonical decisions or review items |
 | python3 -m traust.cli registry models | Model-registry loader/resolver — role→model resolution with floor enforcement, routing stamps, spend recording (docs/model-routing.md) |
 | python3 -m traust.cli admin checkpoint | Agent checkpoint support |
 | python3 -m traust.cli check fix-propagation | Deterministic cross-repo fix-propagation check on traust-core (`ExposureService.consumes_fix`) — has the original commit consumed the fixed version, by its manifest SBOM and the images built from it? Feeds verify-remediation's two-legged rule |
-| python3 -m traust.cli impact find / sbom / symbols / analyze / sweep | The impact-analysis and dependency-watch doors on traust-core (`ExposureService`): the advisory from its source, a commit's SBOM in (a document, or syft over its checkout), the fix's symbols, per-commit analysis (blast radius over SBOMs, govulncheck and source-scan tiers with `--scan`) recorded as `impact` assessments with a dependency finding per `affected` commit, and the fleet OSV sweep over every recorded SBOM |
-| python3 -m traust.cli route regressions | Direct-ledger routing for follow-up-scan findings — transcribes verify-remediation regressions into the ledger as event-carried findings with campaign IDs (never the baseline — gate A15) (no triage precondition); idempotent |
-| python3 -m traust.cli corpus precedent | Tiered FP-precedent index (human-countersigned > machine-refuted-sound) keyed by finding fingerprint — kills shared-component re-refutation; consumed by /triage and the Precision Gate |
+| python3 -m traust.cli impact find / sbom / symbols / analyze / sweep | The impact-analysis and dependency-watch doors on traust-core (`ExposureService`): source advisories, recorded commit SBOMs, fix symbols, per-commit analysis (`--scan` for govulncheck/source tiers) saved as `impact` assessments, dependency finding intake for `affected` commits, and fleet OSV sweep over recorded SBOMs; no fabricated classifier or severity |
+| Retired regression router | Formerly converted remediation regressions into event-carried findings; core finding intake owns the replacement, but the skill port is unfinished and there is no executable fallback |
+| Retired FP-precedent corpus CLI | Formerly built a tiered refutation-precedent index for triage and the Precision Gate; core finding precedents own the replacement, but the skill port is unfinished and there is no executable fallback |
 | python3 -m traust.cli sweep | Class-generalization sweep loop: confirmed finding → candidate rule → corpus-wide sweep → triage-ready candidates |
 | python3 -m traust.cli sweep mine | The /mine-ledger miner on traust-core (`DetectionQualityService.mine_rules`) — confirmed-TP corpus, cluster coverage vs the opengrep pack, per-rule campaign precision |
 | harnessing/mine-ledger/scripts/emit_rule_drafts.py | Regression-rule draft staging from resolved-at-fix-commit findings (pre/post calibration pairs) |

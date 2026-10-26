@@ -23,19 +23,9 @@ def add_validate_args(ap) -> None:
         default=None,
         help="Schema file to validate against (default: filename-based auto-detection)",
     )
-    ap.add_argument(
-        "--signing-pubkey",
-        default=None,
-        help="cosign public key path for optional merkle_root_signature verification",
-    )
 
 
 def call_validate(engine, args) -> int:
-    signing_pubkey = args.signing_pubkey
-    if signing_pubkey is None:
-        key = engine.reporting.signing_pubkey()
-        signing_pubkey = str(key) if key is not None else None
-
     files = validate.collect_report_files(args.path)
     if not files:
         target = Path(args.path)
@@ -58,7 +48,6 @@ def call_validate(engine, args) -> int:
         args.path,
         strict=args.strict,
         schema=explicit_schema,
-        signing_pubkey=signing_pubkey,
     )
     total_errors = 0
     total_warnings = 0

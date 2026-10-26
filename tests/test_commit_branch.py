@@ -92,7 +92,7 @@ def test_on_core_the_named_branch_decides_the_default_line(
 ) -> None:
     observed_default(home, "main")
     path = str(document(tmp_path, PRIV_PROFILE))
-    argv = ("--kind", "priv-profile", "--repo-url", URL, "--sha", SHA, *branch)
+    argv = ("--kind", "priv_profile", "--repo-url", URL, "--sha", SHA, *branch)
     rc, out = run(assessment_record.main, home, path, *argv)
     assert rc == 0, out
     services = Context.from_file(home / "core.yaml").services()
@@ -136,7 +136,7 @@ def doors(tmp_path: Path) -> list[tuple[Any, list[str]]]:
     return [
         (
             assessment_record.main,
-            [str(document(tmp_path, PRIV_PROFILE)), "--kind", "priv-profile", *commit],
+            [str(document(tmp_path, PRIV_PROFILE)), "--kind", "priv_profile", *commit],
         ),
         (
             check_fix_propagation.main,
@@ -149,7 +149,7 @@ def doors(tmp_path: Path) -> list[tuple[Any, list[str]]]:
         (impact.analyze, ["GHSA-xxxx-xxxx-xxxx", *commit]),
         (
             triage.intake,
-            [str(tmp_path / "scan.sarif"), "--format", "sarif", "--origin", "vuln-scan", *commit],
+            [str(tmp_path / "scan.sarif"), "--format", "sarif", *commit],
         ),
     ]
 

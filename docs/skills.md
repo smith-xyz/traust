@@ -166,7 +166,7 @@ Use when determining which portfolio repositories are affected by an advisory (C
 
 ## isolation-review
 
-Use when the user asks to review, assess, or score the tenant isolation of a multi-tenant service — resolving the service's repo set via the portfolio graph, building a customer-facing interface inventory from graph data and existing audit/threat-model findings, rating per-interface complexity, scoring five isolation-hardening dimensions (privilege, encryption, authentication, connectivity, operational hygiene) with cited evidence, and emitting a schema-validated isolation report under analysis-results/isolation/<service-slug>/.
+Use when the user asks to review, assess, or score the tenant isolation of a multi-tenant service — resolving the service's repo set via the portfolio graph, building a customer-facing interface inventory from graph data and existing audit/threat-model findings, rating per-interface complexity, scoring five isolation-hardening dimensions (privilege, encryption, authentication, connectivity, operational hygiene) with cited evidence, emitting a schema-validated isolation report under analysis-results/isolation/<service-slug>/, and recording canonical isolation_review assessments on every covered commit through traust-core.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -176,7 +176,7 @@ Use when the user asks to review, assess, or score the tenant isolation of a mul
 
 ## operator-priv-profile
 
-Use when the user asks whether an operator runs with least privilege, what SCCs/securityContext/namespaces/roles an operator uses or requires, or for a fleet least-privilege inventory of OpenShift core and optional operators. Builds a deterministic per-operator privilege profile from manifests/CSVs (tier 1 — SCC requests, per-container securityContext, namespaces/install modes, complete RBAC enumeration), diffs shipped RBAC against the code's +kubebuilder:rbac markers (tier 2 — surplus grants = least-priv gap), and ships a gated runtime capture for the actually-assigned SCC and effective SA permissions (tier 3, executed only with explicit cluster authorization).
+Use when the user asks whether an operator runs with least privilege, what SCCs/securityContext/namespaces/roles an operator uses or requires, or for a fleet least-privilege inventory of OpenShift core and optional operators. Builds a deterministic per-operator privilege profile from manifests/CSVs (tier 1 — SCC requests, per-container securityContext, namespaces/install modes, complete RBAC enumeration), diffs shipped RBAC against the code's +kubebuilder:rbac markers (tier 2 — surplus grants = least-priv gap), and ships a gated runtime capture for the actually-assigned SCC and effective SA permissions (tier 3, executed only with explicit cluster authorization). Records canonical priv_profile assessments for each profiled commit through traust-core.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -244,7 +244,7 @@ Static source-code vulnerability scan. Reads a target directory (and its threat 
 
 ## track-findings
 
-Use when the user wants to record human triage feedback against the findings of an audit — merge-request or pull-request comments, commits, Jira tickets, or an interactive triage session — or asks for the current state of a repository's findings. Statements become decisions in traust-core (recorded when they need no interpretation, queued for a person otherwise); the skill reports each finding's validity, resolution, assurance, severity, SLA and review-surface coverage, and hands findings to code scanning as SARIF. Machine reports (triage, validation, verification) record through their own skills.
+Use when the user wants to record human feedback against audit findings, review core decision cards, countersign machine verdicts, or inspect current finding state. Imports forge/Jira statements and supports private asynchronous countersign-queue.md review, typed single/bulk answers and direct verified-human judgements through shared traust auth or explicit stdin tokens. Requires genuine judged fields and the reviewer's own rationale; core owns evidence admission. Reports validity, resolution, assurance, severity, SLA and review surfaces, and exports SARIF. Machine reports record through their own skills. Untrusted review blocks use the workbench's lossless JSON quotation.
 
 - **Stage:** ④ Triage
 - **Tier:** `primary`
@@ -254,7 +254,7 @@ Use when the user wants to record human triage feedback against the findings of 
 
 ## triage
 
-Triage a batch of raw security findings. Verify each is real, collapse duplicates, re-rank by derived exploitability, and tag with an owner. Takes a directory or file of scanner output and writes <repo>-triage.json + <repo>-triage.md sorted by what actually needs engineering attention. Use when asked to "triage findings", "validate scanner output", "prioritize vulns", or "review the backlog". Runs interactively by default; pass --auto to skip the interview.
+Triage a batch of raw security findings. Verify each is real, collapse duplicates, re-rank by derived exploitability, and tag with an owner. Takes a directory or file of scanner output and writes <repo>-triage.json + <repo>-triage.md sorted by what actually needs engineering attention. Use when asked to "triage findings", "validate scanner output", "prioritize vulns", or "review the backlog". Runs interactively by default; pass --auto to skip the interview. Scanner source attribution comes from the recorded Core assessment, not a caller-supplied origin flag.
 
 - **Stage:** ④ Triage
 - **Tier:** `primary`
@@ -274,7 +274,7 @@ Use when validating browser-exploitable findings such as CSRF, XSS, or clickjack
 
 ## validate-findings
 
-Use when the user asks to validate, reproduce, exploit, red-team, or live-test security findings against a Kubernetes/OpenShift cluster, operator, WASM module, container, pod, or cluster component. Ingests *-security-audit, *-threat-model, and *-triage reports, builds an attack plan (replay + chained + novel), executes it against an authorized live target under a hard scope guard, and emits a schema-validated *-validation.{json,md} report.
+Use when the user asks to validate, reproduce, exploit, red-team, or live-test security findings against a Kubernetes/OpenShift cluster, operator, WASM module, container, pod, or cluster component. Ingests *-security-audit, *-threat-model, and *-triage reports, builds an attack plan (replay + chained + novel), executes it against an authorized live target under a hard scope guard, and emits a schema-validated *-validation.{json,md} report. Records explicitly bound existing findings through core-owned soundness and evidence gates; novel-finding intake remains a separate port.
 
 - **Stage:** ⑤ Validation
 - **Tier:** `primary`

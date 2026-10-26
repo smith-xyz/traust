@@ -531,7 +531,7 @@ scanner checks mechanically.
    # the scanner run that backed the findings is already recorded on the
    # original commit; record the same scanner's run of the patched commit
    python3 -m traust.cli triage intake <patched-scan.sarif> --format sarif \
-     --repo-url <repository> --sha <patched_commit> --origin verify-remediation
+     --repo-url <repository> --sha <patched_commit>
    python3 -m traust.cli remediation verify-differential <work-item> \
      --repo-url <repository> --sha <patched_commit>
    ```
@@ -1001,8 +1001,8 @@ findings directly** — no `/triage` precondition (user directive
 2026-07-27; parity with the scanning skills, whose findings enter
 reports/ledger at birth as `not_verified` with triage adjudicating
 downstream). (`traust remediation verify-record`, 7b, takes every
-`regressions[]` entry in as a finding of the patched commit, `origin:
-verify-remediation`, not yet validated, with the verification as its
+`regressions[]` entry in as a finding of the patched commit (sourced from the
+verification), not yet validated, with the verification as its
 evidence; re-recording the same report changes nothing.) It records — it
 never authors a verdict; the routed findings await triage/validation
 adjudication like any other claimed finding
@@ -1034,8 +1034,13 @@ Present a summary table to the user:
 - REG-001: <title> (Medium)
 ```
 
-After delivering, emit resolution events into the findings ledger so
-the cumulative status reflects verification verdicts:
+**RETIRED — verdict ingestion and cumulative rebuild.** The former
+verification-ledger emitter is **not executable**. Core
+`VerificationService.record` owns the intended ingestion door, but that
+record service is unfinished; `FindingService` owns derived finding state
+and its cumulative output port is also unfinished. Deliver the validated
+verification report and evidence, explicitly report that disposition
+ingestion/rebuild did not run, and do not hand-write ledger events.
 
 ```bash
 python3 -m traust.cli remediation verify-record \
@@ -1187,9 +1192,10 @@ For each worklist entry, in order:
 
 After the run (or the `--limit` cap), report: repos verified this run,
 findings resolved / partially resolved / unresolved / regressions,
-tiers remaining, and suggest rebuilding the dashboards
-(`/executive-summary-findings`, `/findings-trends`) so the remediation
-sections reflect the new class-1 evidence.
+tiers remaining. These are **verification-report verdict counts**, not
+proof of persisted disposition updates. Dashboard remediation sections
+cannot reflect new ledger state through this retired ingestion/rebuild
+path until the core record/output ports land.
 
 ---
 

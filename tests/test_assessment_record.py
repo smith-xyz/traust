@@ -101,8 +101,8 @@ def run(home: Path, *argv: str) -> tuple[int, Any]:
     [
         ("container", security_audit(), SecurityAuditArtifact, "secure-container-audit"),
         ("rpm", security_audit(), SecurityAuditArtifact, "secure-rpm-audit"),
-        ("isolation-review", isolation_review(), IsolationReviewArtifact, "isolation-review"),
-        ("priv-profile", PRIV_PROFILE, PrivProfileArtifact, "operator-priv-profile"),
+        ("isolation_review", isolation_review(), IsolationReviewArtifact, "isolation-review"),
+        ("priv_profile", PRIV_PROFILE, PrivProfileArtifact, "operator-priv-profile"),
     ],
 )
 def test_record_files_the_document_on_the_commit(
@@ -127,7 +127,7 @@ def test_record_files_the_document_on_the_commit(
     ("kind", "body", "ran"),
     [
         ("container", security_audit(), datetime(2026, 5, 21, tzinfo=UTC)),
-        ("isolation-review", isolation_review(), datetime(2026, 7, 20, tzinfo=UTC)),
+        ("isolation_review", isolation_review(), datetime(2026, 7, 20, tzinfo=UTC)),
     ],
 )
 def test_record_stamps_when_the_audit_ran(doors, home, tmp_path, kind, body, ran):
@@ -140,7 +140,7 @@ def test_record_stamps_when_the_audit_ran(doors, home, tmp_path, kind, body, ran
 def test_record_stamps_a_profile_when_recorded(doors, home, tmp_path):
     before = datetime.now(UTC)
     path = document(tmp_path, PRIV_PROFILE)
-    assert run(home, str(path), "--kind", "priv-profile", "--repo-url", URL, "--sha", SHA)[0] == 0
+    assert run(home, str(path), "--kind", "priv_profile", "--repo-url", URL, "--sha", SHA)[0] == 0
     assert doors.record.calls[0][-1].occurred_at >= before
 
 
@@ -153,7 +153,7 @@ def test_record_stamps_a_profile_when_recorded(doors, home, tmp_path):
             "metadata/date",
         ),
         (
-            "isolation-review",
+            "isolation_review",
             {
                 **isolation_review(),
                 "metadata": {
@@ -176,7 +176,7 @@ def test_record_refuses_a_run_time_off_its_schema(doors, home, tmp_path, kind, b
 def test_record_marks_a_public_repository(doors, home, tmp_path):
     path = document(tmp_path, PRIV_PROFILE)
     rc, _ = run(
-        home, str(path), "--kind", "priv-profile", "--repo-url", URL, "--sha", SHA, "--public"
+        home, str(path), "--kind", "priv_profile", "--repo-url", URL, "--sha", SHA, "--public"
     )
     assert rc == 0
     assert doors.register_repository.calls[0][1] is True
@@ -200,7 +200,7 @@ def test_record_refuses_a_kind_it_does_not_record(doors, home, tmp_path):
 
 def test_record_refuses_a_short_sha(doors, home, tmp_path):
     path = document(tmp_path, PRIV_PROFILE)
-    rc, _ = run(home, str(path), "--kind", "priv-profile", "--repo-url", URL, "--sha", "abc")
+    rc, _ = run(home, str(path), "--kind", "priv_profile", "--repo-url", URL, "--sha", "abc")
     assert rc == 2
     assert doors.record.calls == []
 
@@ -216,14 +216,14 @@ def test_record_missing_document_is_exit_2(doors, home, tmp_path):
 def test_record_refusal_from_core_is_exit_2(doors, home, tmp_path):
     doors.record.result = NotFoundError(f"repository ref {REF} not found")
     path = document(tmp_path, PRIV_PROFILE)
-    rc, err = run(home, str(path), "--kind", "priv-profile", "--repo-url", URL, "--sha", SHA)
+    rc, err = run(home, str(path), "--kind", "priv_profile", "--repo-url", URL, "--sha", SHA)
     assert rc == 2
     assert "not found" in err
 
 
 def test_reporting_group_routes_record(doors, home, tmp_path, capsys):
     path = document(tmp_path, PRIV_PROFILE)
-    argv = ["reporting", "record", "--config-home", str(home), str(path), "--kind", "priv-profile"]
+    argv = ["reporting", "record", "--config-home", str(home), str(path), "--kind", "priv_profile"]
     rc = cli([*argv, "--repo-url", URL, "--sha", SHA])
     assert rc == 0
     assert json.loads(capsys.readouterr().out)["id"] == "a-1"
@@ -245,7 +245,7 @@ def core_home(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Path]:
 def test_record_on_core_files_one_assessment_on_the_bare_commit(core_home, tmp_path):
     home = core_home
     path = document(tmp_path, PRIV_PROFILE)
-    rc, out = run(home, str(path), "--kind", "priv-profile", "--repo-url", URL, "--sha", SHA)
+    rc, out = run(home, str(path), "--kind", "priv_profile", "--repo-url", URL, "--sha", SHA)
     assert rc == 0, out
     core = Context.from_file(home / "core.yaml")
     services = core.services()
@@ -330,11 +330,11 @@ VULN_FINDINGS = {
 def test_record_files_a_vuln_scan_at_its_scan_time(doors, home, tmp_path):
     path = document(tmp_path, VULN_FINDINGS)
     for _ in range(2):
-        rc, _ = run(home, str(path), "--kind", "vuln-scan", "--repo-url", URL, "--sha", SHA)
+        rc, _ = run(home, str(path), "--kind", "vuln_scan", "--repo-url", URL, "--sha", SHA)
         assert rc == 0
     (doc, ref, kind, assessor, _, _provenance) = doors.record.calls[0]
     assert isinstance(doc, VulnFindingsArtifact)
-    assert (ref, kind, assessor) == (REF, AssessmentKind.VULN_SCAN, "skill:vuln-scan")
+    assert (ref, kind, assessor) == (REF, AssessmentKind.VULN_SCAN_CANONICAL, "skill:vuln-scan")
     assert [c[-1].occurred_at for c in doors.record.calls] == [
         datetime(2026, 10, 24, 9, tzinfo=UTC)
     ] * 2
@@ -342,7 +342,7 @@ def test_record_files_a_vuln_scan_at_its_scan_time(doors, home, tmp_path):
 
 def test_record_refuses_a_vuln_scan_time_without_a_zone(doors, home, tmp_path):
     path = document(tmp_path, {**VULN_FINDINGS, "scanned_at": "2026-10-24T09:00:00"})
-    rc, err = run(home, str(path), "--kind", "vuln-scan", "--repo-url", URL, "--sha", SHA)
+    rc, err = run(home, str(path), "--kind", "vuln_scan", "--repo-url", URL, "--sha", SHA)
     assert rc == 2
     assert "time zone" in err
     assert doors.record.calls == []
@@ -350,11 +350,15 @@ def test_record_refuses_a_vuln_scan_time_without_a_zone(doors, home, tmp_path):
 
 def test_record_files_a_secure_code_audit_at_its_report_date(doors, home, tmp_path):
     path = document(tmp_path, security_audit())
-    rc, _ = run(home, str(path), "--kind", "secure-code", "--repo-url", URL, "--sha", SHA)
+    rc, _ = run(home, str(path), "--kind", "secure_code", "--repo-url", URL, "--sha", SHA)
     assert rc == 0
     [(doc, ref, kind, assessor, _, provenance)] = doors.record.calls
     assert isinstance(doc, SecurityAuditArtifact)
-    assert (ref, kind, assessor) == (REF, AssessmentKind.SECURE_CODE, "skill:secure-code-audit")
+    assert (ref, kind, assessor) == (
+        REF,
+        AssessmentKind.SECURE_CODE_CANONICAL,
+        "skill:secure-code-audit",
+    )
     assert provenance.occurred_at == datetime(2026, 5, 21, tzinfo=UTC)
 
 
@@ -365,9 +369,13 @@ def test_record_files_a_threat_model_at_its_provenance_date(doors, home, tmp_pat
         "threats": [],
     }
     path = document(tmp_path, model)
-    rc, _ = run(home, str(path), "--kind", "threat-model", "--repo-url", URL, "--sha", SHA)
+    rc, _ = run(home, str(path), "--kind", "threat_model", "--repo-url", URL, "--sha", SHA)
     assert rc == 0
     [(doc, ref, kind, assessor, _, provenance)] = doors.record.calls
     assert isinstance(doc, ThreatModelArtifact)
-    assert (ref, kind, assessor) == (REF, AssessmentKind.THREAT_MODEL, "skill:threat-model")
+    assert (ref, kind, assessor) == (
+        REF,
+        AssessmentKind.THREAT_MODEL_CANONICAL,
+        "skill:threat-model",
+    )
     assert provenance.occurred_at == datetime(2026, 10, 1, tzinfo=UTC)

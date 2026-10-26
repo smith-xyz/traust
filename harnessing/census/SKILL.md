@@ -59,7 +59,7 @@ If neither contains `analysis-results/`, ask the user for the path.
 
 ```bash
 python3 -m traust.cli portfolio population \
-    [--kind secure-code] [--as-of <ISO time>]
+    [--kind secure_code] [--as-of <ISO time>]
 python3 -m traust.cli dashboard view census \
     --out <workspace-root>/progress-tracker/metrics/dashboards/census \
     [--product <slug>] [--team-id <id>] [--as-of <ISO time>]

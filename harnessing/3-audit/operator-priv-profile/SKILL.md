@@ -1,6 +1,6 @@
 ---
 name: operator-priv-profile
-description: Use when the user asks whether an operator runs with least privilege, what SCCs/securityContext/namespaces/roles an operator uses or requires, or for a fleet least-privilege inventory of OpenShift core and optional operators. Builds a deterministic per-operator privilege profile from manifests/CSVs (tier 1 — SCC requests, per-container securityContext, namespaces/install modes, complete RBAC enumeration), diffs shipped RBAC against the code's +kubebuilder:rbac markers (tier 2 — surplus grants = least-priv gap), and ships a gated runtime capture for the actually-assigned SCC and effective SA permissions (tier 3, executed only with explicit cluster authorization).
+description: Use when the user asks whether an operator runs with least privilege, what SCCs/securityContext/namespaces/roles an operator uses or requires, or for a fleet least-privilege inventory of OpenShift core and optional operators. Builds a deterministic per-operator privilege profile from manifests/CSVs (tier 1 — SCC requests, per-container securityContext, namespaces/install modes, complete RBAC enumeration), diffs shipped RBAC against the code's +kubebuilder:rbac markers (tier 2 — surplus grants = least-priv gap), and ships a gated runtime capture for the actually-assigned SCC and effective SA permissions (tier 3, executed only with explicit cluster authorization). Records canonical priv_profile assessments for each profiled commit through traust-core.
 metadata:
   harness.tier: "primary"
 ---
@@ -57,7 +57,7 @@ Record each profile as a priv-profile assessment of the profiled commit
 ```bash
 python3 -m traust.cli reporting record \
     analysis-results/findings/<product>/<repo>/<repo>-priv-profile.json \
-    --kind priv-profile --repo-url <url> --sha <commit> --branch <branch>
+    --kind priv_profile --repo-url <url> --sha <commit> --branch <branch>
 ```
 
 Fleet rollup (after recording a set; each repository's latest recorded

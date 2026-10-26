@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import pytest
 import yaml
 
 from traust.cli import triage
+from traust.cli.__main__ import main
+from traust.context import load_services
 from traust.paths import skill_dir
 
 CANARY = skill_dir("triage") / "fixtures" / "canary-target"
@@ -82,8 +86,6 @@ def intake(home: Path, tmp_path: Path) -> str:
         "https://github.com/example/canary",
         "--sha",
         SHA,
-        "--origin",
-        "vuln-scan",
     )
     assert rc == 0, out
     got = json.loads(out)
@@ -140,7 +142,107 @@ def test_scanner_output_triaged_and_recorded(home: Path, tmp_path: Path) -> None
 
     rc, out = run(triage.record, home, assessment, str(path), "--repo", str(CANARY))
     assert rc == 0, out
-    assert json.loads(out) == {"decisions": 1, "awaiting_countersign": 0, "auto_accepted": 0}
+    receipt = json.loads(out)
+    assert {
+        key: receipt[key] for key in ("decisions", "awaiting_countersign", "auto_accepted")
+    } == {
+        "decisions": 1,
+        "awaiting_countersign": 0,
+        "auto_accepted": 0,
+    }
+    assert receipt["baseline_assessment_id"] == assessment
+    (native,) = receipt["records"]
+    (saved,) = load_services(home).findings.history(finding["id"])
+    assert native == {
+        "decision_id": str(saved.id),
+        "assessment_id": str(saved.assessment_id),
+        "artifact_id": str(saved.artifact_id),
+        "finding_id": finding["id"],
+    }
+
+    validation = {
+        "title": "Live validation report for the isolated CLI fixture",
+        "metadata": {
+            "date": "2026-10-23",
+            "harness_version": "0.34.3",
+            "scope_binding_mode": "explicit",
+            "target_fingerprint": [],
+            "target_environment": "isolated-fixture",
+            "target_attestation": {"attested": True},
+        },
+        "source_reports": [
+            {
+                "kind": "triage",
+                "path": "opaque:canary-triage",
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+        ],
+        "summary": {
+            "by_verdict": {
+                "confirmed": 1,
+                "refuted": 0,
+                "inconclusive": 0,
+                "blocked_by_scope": 0,
+                "not_attempted": 0,
+            },
+            "by_technique": {"replay": 1},
+        },
+        "validated_findings": [
+            {
+                "source_id": "f001",
+                "source_report": "opaque:canary-triage",
+                "verdict": "confirmed",
+                "technique": "replay",
+                "evidence_grade": "E1",
+                "observed_impact": "Authenticated fixture action succeeded.",
+            }
+        ],
+        "attack_chains": [],
+        "novel_findings": [],
+        "execution_log_ref": "opaque:audit",
+    }
+    validation_path = tmp_path / "canary-validation.json"
+    validation_path.write_text(json.dumps(validation))
+    bindings_path = tmp_path / "bindings.json"
+    bindings_path.write_text(
+        json.dumps(
+            {
+                "sources": [
+                    {
+                        "source_report": "opaque:canary-triage",
+                        "assessment_id": native["assessment_id"],
+                        "artifact_id": native["artifact_id"],
+                        "findings": [{"source_id": "f001", "finding_id": native["finding_id"]}],
+                    }
+                ]
+            }
+        )
+    )
+    provenance_path = tmp_path / "provenance.json"
+    provenance_path.write_text(
+        json.dumps(
+            {
+                "run_id": str(uuid4()),
+                "source": "validation_report",
+                "occurred_at": "2026-10-23T12:00:00Z",
+            }
+        )
+    )
+    rc, out = run(
+        lambda argv: main(["validation", "record", *argv]),
+        home,
+        "--report",
+        str(validation_path),
+        "--bindings",
+        str(bindings_path),
+        "--provenance",
+        str(provenance_path),
+    )
+    assert rc == 0, out
+    (recorded,) = json.loads(out)["findings"]
+    assert recorded["finding_id"] == native["finding_id"]
+    assert recorded["decision_id"]
+    assert recorded["assessment_id"] != native["assessment_id"]
 
     rc, out = run(triage.render, home, str(path))
     assert rc == 0 and "## Act on these" in out and "(f001)" in out

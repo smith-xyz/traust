@@ -46,6 +46,7 @@ def test_all_planned_groups_registered():
         "sweep",
         "triage",
         "util",
+        "validation",
     }
     assert sum(len(ops) for ops in GROUPS.values()) >= 81
 
@@ -58,7 +59,7 @@ def test_traust_impact_analyze_help():
         check=False,
     )
     assert proc.returncode == 0
-    assert "Assess and record the commits an advisory reaches" in proc.stdout
+    assert "Assess every commit an advisory reaches" in proc.stdout
     assert "--config-home" in proc.stdout
 
 
