@@ -1,5 +1,5 @@
-"""``traust pqc record|check|prepare|summary|blockers``: the pqc-readiness skill's doors
-on traust-core.
+"""``traust pqc record|check|prepare|summary|blockers|xcrypto``: the pqc-readiness skill's
+doors on traust-core.
 
 record    a commit's Layer-1 facts (`pqc_facts.py`; `PqcService.prescan` waits on the engine's
           pqc-scan provider) or its Layer-2 report; a verified zero-hit is not applicable
@@ -7,6 +7,7 @@ check     a readiness report against its gate past the schema (`record` applies 
 prepare   what Layer 2 scores from: the commit's facts, its route (full/light/skip) and prior report
 summary   the latest readiness per commit in scope, rolled up by bucket or dominant provenance
 blockers  the remediations of each commit's latest readiness, in the vocabulary /patch reads
+xcrypto   a commit's x/crypto usage tracker rows from its checkout (Status is a suggestion)
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from uuid import UUID
 from traust_core.v1.context import Context
 from traust_core.v1.errors import NotFoundError
 from traust_core.v1.models.artifacts import PqcFactsArtifact, PqcReadinessArtifact
-from traust_core.v1.models.common import Provenance
+from traust_core.v1.models.common import Provenance, ToolRequest
 from traust_core.v1.models.pqc import PqcDimension, PqcFilter
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import (
@@ -28,6 +29,7 @@ from traust_core.v1.models.vocabulary import (
     PqcRemediationCategory,
     SourceType,
 )
+from traust_engine.adapters.go_callgraph import register_go_callgraph
 
 from traust.cli import _doors
 from traust.cli._doors import parser, run
@@ -184,5 +186,31 @@ def blockers(argv: list[str] | None = None) -> int:
             )
         )
         return [{**b.model_dump(mode="json"), "patchable": b.patchable} for b in found]
+
+    return run(call)
+
+
+def xcrypto(argv: list[str] | None = None) -> int:
+    ap = _parser("xcrypto", "A commit's x/crypto usage tracker rows; Status is a suggestion.")
+    ap.add_argument("checkout", type=Path, help="the commit's checkout (read-only)")
+    ap.add_argument("--public", action="store_true", help="the repository is public")
+    ap.add_argument(
+        "--callgraph",
+        action="store_true",
+        help="also each main package's reachable x/crypto functions (go-callgraph: needs go and "
+        "callgraph; compiles the module, fetching dependencies unless vendored)",
+    )
+    ap.add_argument("--csv", action="store_true", help="the workbook CSV instead of JSON rows")
+    args = ap.parse_args(argv)
+
+    def call() -> str | list[dict]:
+        core = load_core(args.config_home)
+        if args.callgraph:
+            register_go_callgraph(core)
+        request = ToolRequest(workspace=args.checkout, params={"callgraph": args.callgraph})
+        found = core.services().pqc.xcrypto_tracker(_register(core, args), request)
+        return (
+            found.csv.rstrip("\n") if args.csv else [r.model_dump(mode="json") for r in found.rows]
+        )
 
     return run(call)

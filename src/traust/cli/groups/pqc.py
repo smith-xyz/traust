@@ -12,4 +12,5 @@ PQC: dict[str, object] = {
     "blockers": passthrough_op(
         "pqc", "Remediations of each commit's latest readiness.", "blockers"
     ),
+    "xcrypto": passthrough_op("pqc", "A commit's x/crypto usage tracker rows.", "xcrypto"),
 }

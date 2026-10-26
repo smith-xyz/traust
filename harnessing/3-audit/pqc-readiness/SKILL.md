@@ -493,17 +493,17 @@ the curated vendor registry (`<results-root>/pqc/inputs/vendor-registry.json`
 `progress-tracker/metrics/dashboards/pqc/pqc-vendor-roadmap.{md,json}`;
 review the registry, then re-run.
 
-`build_xcrypto_tracker.py --results-root <dir>` regenerates the OCP
-"x/crypto usage tracking" workbook rows from the corpus:
-`progress-tracker/metrics/dashboards/pqc/xcrypto-tracker.{csv,md}` in the
+`traust pqc xcrypto --repo-url <URL> --sha <sha> <checkout> [--callgraph] [--csv]`
+regenerates the OCP "x/crypto usage tracking" workbook rows for one commit
+(`PqcService.xcrypto_tracker`, derived from the checkout, never stored; the
+fleet tab is every swept commit's rows):
+`--csv` prints them in the
 tracker's column order (Product/Org, Repository, Entrypoint, Crypto module
 used, Status, Comment, Dependency Graph), best evidence tier first per
 repo×package (callgraph-reachable → first-party import → vendored
-presence from the facts). Status is a **suggestion** from the per-package
-IR 8547 table — teams own the final call. `--push-sheet <spreadsheet-id>
-[--tab <title>]` upserts the tab directly via a Drive-scoped
-`gcloud auth print-access-token` bearer (run
-`gcloud auth login --enable-gdrive-access` once per host).
+presence from the recorded facts). Status is a **suggestion** from the per-package
+IR 8547 table — teams own the final call. `--push-sheet` (upserting the
+Google Sheets tab) is *not yet ported*: paste or import the CSV.
 
 `traust dashboard view pqc-portfolio --product <slug> --out <dir>` writes one per-product
 report (the roll-up's worst-first index lists every product) (shipped commits ×
@@ -549,7 +549,7 @@ Chain reasoning:    crypto-analysis SKILL.md    → governance chains (who owns 
 | `crypto_probe.py`       | python3 -m traust.cli adapters crypto-probe                        | Provider census: Go, Node, JDK, Python, Rust, .NET, Ruby, C/C++ crypto stacks, base images, RPM locks, GODEBUG, crypto-policies                                                  |
 | `crypto_audit.py`       | python3 -m traust.cli adapters crypto-audit                        | Unopinionated data collector — `cluster` tier with `--groups` provides raw TLS negotiation facts for PQC probing                                                                 |
 | `pqc_facts.py`          | `harnessing/3-audit/pqc-readiness/scripts/pqc_facts.py`          | Imports crypto*probe, maps `CRYPTO*_`→`HP*CHAIN*_`, adds PQC capability assessment via `\_pqc_capable_version()`(reads thresholds from[`notes/reference/pqc-version-matrix.yaml`](notes/reference/pqc-version-matrix.yaml)) |
-| `scan_xcrypto_usage.py` | `harnessing/3-audit/pqc-readiness/scripts/scan_xcrypto_usage.py` | golang.org/x/crypto evidence: first-party import sites, go.mod versions, optional callgraph reachability (somepath witness)                                                      |
+| `traust pqc xcrypto`    | traust-core `CodeFactsService.xcrypto` (`go-callgraph` tool for `--callgraph`) | golang.org/x/crypto evidence: first-party import sites, go.mod versions, optional callgraph reachability (somepath witness)                                                      |
 | `traust pqc blockers`   | traust-core `PqcService.blockers`                                | Derives each recorded report's `remediations[]` in the findings vocabulary (severity, classification, `patchable`) for `/patch` and other findings consumers                        |
 | `novel.py`              | `harnessing/5-validate/validate-findings/novel.py`          | Runtime probes: `pqc-tls-negotiation`, `pqc-cert-algorithm`, `pqc-crypto-policy`, `pqc-backend-tls`                                                                              |
 | `crypto-analysis`       | `harnessing/3-audit/crypto-analysis/SKILL.md`            | Governance chain reasoning — traces who decides crypto config from OS through platform to app code                                                                               |
@@ -569,7 +569,7 @@ is confirmed by probing — never by static data alone.
   this skill's Layer 2 scoring
   (`traust pqc prepare`), by `/patch`'s pqc ingest
   (actionable first-party blockers → candidate diffs), and by
-  the pqc-portfolio view + `build_xcrypto_tracker.py`.
+  the pqc-portfolio view + `traust pqc xcrypto`.
 - `<slug>-pqc-readiness.json` (gated by `traust pqc check`, recorded with
   `traust pqc record --report`) —
   consumed by `traust pqc summary`, the pqc-portfolio view
@@ -584,7 +584,8 @@ is confirmed by probing — never by static data alone.
   `--not-patchable`. Consumed by `/patch` as a
   findings-shaped input (preferred over raw `*-pqc-facts.json` filtering
   when both exist).
-- `<slug>-xcrypto-usage.json` — consumed by `build_xcrypto_tracker.py`.
+- `<slug>-xcrypto-usage.json` — *retired*: x/crypto usage is a code fact
+  `traust pqc xcrypto` derives from the checkout on each call.
 - `pqc/_manifest/crypto-deps.{json,md}` — *retired* with
   `scan_crypto_deps_graph.py`; the pqc-portfolio view's crypto-package
   sections read the manifest SBOMs.
