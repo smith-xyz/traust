@@ -12,7 +12,6 @@ from uuid import uuid4
 
 import pytest
 from traust_core.v1.models.inventory import ExposureClass, RepoState, RiskTier
-from traust_core.v1.models.observation import Designation
 from traust_core.v1.models.vocabulary import ComparisonStatus
 from traust_core.v1.services.portfolio import PortfolioPolicy
 
@@ -73,9 +72,8 @@ def _primary_state(supplied: dict[str, Any]) -> RepoState:
         designation = (supplied["Inventory"] or {}).get("Designation")
         return _state(
             status=ComparisonStatus.NEVER_AUDITED,
-            exposure=POLICY.exposure_class(
-                Designation(designation) if designation else None, None, False
-            ),
+            # the legacy fixture's `external` designation is "ships in a product" (core#191)
+            exposure=POLICY.exposure_class(designation == "external", False, False),
         )
     risk, change = audit.get("Risk", {}), audit.get("Change") or {}
     live = risk.get("LiveCriticalHigh", 0)

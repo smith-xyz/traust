@@ -43,6 +43,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | `schemas/v1/below-range-packets.schema.json` | JSON Schema for a commit's below-range evidence packets (traust-core `BelowRangeService.scan`) |
 | `schemas/v1/below-range-verdicts.schema.json` | JSON Schema for a below-range review: two blind reviews, a judge on a split, the verdict per packet |
 | `schemas/v1/validation-plan.schema.json` | JSON Schema for the validate-findings plan `plan.py` emits |
+| `schemas/v1/validation-authorization.schema.json` | JSON Schema for the validate-findings authorization `ValidationService.authorize` records (operator approval of a plan + scope) |
 | `schemas/v1/attack-mapping.schema.json` | JSON Schema for the finding-category→ATT&CK mapping table |
 | `schemas/v1/adr-registry.schema.json` | JSON Schema for the architecture-decision-record registry |
 | `schemas/v1/org-parameters.schema.json` | JSON Schema for org-wide parameter files |
