@@ -125,9 +125,9 @@ is supplied, say plainly that nothing has been checked against billing.
 
 Do not imply spend is being controlled. As of 2026-08-06:
 
-- `$TRAUST_CONFIG_HOME/budget-policy.yaml` runs `enforcement: observe` — every weekly
-  tranche computes a budget verdict, records it, and **withholds
-  nothing** (traust.cli.budget_shadow).
+- `$TRAUST_CONFIG_HOME/budget-policy.yaml` runs `enforcement: observe` — every planned
+  order gets a budget verdict, recorded in its run manifest, and **withholds
+  nothing** (traust-engine's admission).
 - The only lane the router can ever drop is a full audit, and only when
   enforcement is `advisory`/`enforced`.
 - `--monthly-budget` on the router is the sole live gating knob.
@@ -139,7 +139,7 @@ total workstation spend overstates the overage by a multiple — the
 workstation figure carries every session on the machine, lane
 attribution does not.
 
-Recorded verdicts accumulate under `budget-shadow` in the ledger — count
+Recorded verdicts accumulate in the orders' run manifests (`budget`) — count
 them to answer "how often would the cap have bound".
 
 ## Unit economics — the denominator trap
@@ -160,8 +160,8 @@ re-running never double-counts and never freezes a partial day.
 
 **Consumes:** Claude Code session transcripts (via
 `collect_session_spend.py` / `attribute_session_spend.py`); the
-hash-chained metrics ledger (`spend-attribution:*`, `budget-shadow`,
-`model-spend:*`); `analysis-results/graph/findings.db` (`business_unit`,
+hash-chained metrics ledger (`spend-attribution:*`,
+`model-spend:*`); run manifests' budget verdicts; `analysis-results/graph/findings.db` (`business_unit`,
 finding and repo counts); `config/model-registry.yaml` (prices);
 `$TRAUST_CONFIG_HOME/budget-policy.yaml` (ceiling and enforcement posture);
 optionally an operator-supplied invoice CSV.
