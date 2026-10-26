@@ -178,17 +178,23 @@ class BelowRangePacketsMaterializer:
             url = HttpsRepoUrl.parse(request.partition or "", self._hosts)
             order = _order_id(request.run_id)
         except (ValidationError, ValueError) as e:
-            return JobResult.failed(f"bad request: {e}")
+            log.warning("run %s: %s: %s", request.run_id, OrderReason.BAD_REQUEST, e)
+            return JobResult.failed(OrderReason.BAD_REQUEST)
         repo = self._portfolio.find_repository(url)
         if repo is None or repo.id is None:
-            return JobResult.refused(f"{url} is not in the inventory")
+            log.warning(
+                "run %s: %s: %s is not in the inventory", request.run_id, OrderReason.NOT_FOUND, url
+            )
+            return JobResult.refused(OrderReason.NOT_FOUND)
         with tempfile.TemporaryDirectory(prefix="below-range-") as workdir:
             try:
                 scan = self._below_range.scan(repo.id, Path(workdir), run_order_id=order)
             except NotFoundError as e:
-                return JobResult.refused(str(e))
+                log.warning("run %s: %s: %s", request.run_id, OrderReason.NOT_FOUND, e)
+                return JobResult.refused(OrderReason.NOT_FOUND)
             except ConfigError as e:
-                return JobResult.failed(f"bad request: {e}")
+                log.warning("run %s: %s: %s", request.run_id, OrderReason.BAD_REQUEST, e)
+                return JobResult.failed(OrderReason.BAD_REQUEST)
         if scan.packets.status == BelowRangeStatus.COMPLETE:
             return JobResult.succeeded()
         return JobResult.partly(Counter(g.reason.value for g in scan.packets.coverage_gaps))
