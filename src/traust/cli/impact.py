@@ -30,7 +30,8 @@ from pathlib import Path
 
 from traust_core.v1.context import Context, Services
 from traust_core.v1.errors import NotFoundError, ServiceError, ValidationError
-from traust_core.v1.models.below_range import BelowRangeStatus
+from traust_core.v1.models.artifacts import BelowRangeVerdictsArtifact
+from traust_core.v1.models.below_range import BelowRangeInput, BelowRangeStatus
 from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.dependencies import (
     AdvisoryRecord,
@@ -38,6 +39,7 @@ from traust_core.v1.models.dependencies import (
     Version,
     parse_advisory_identifier,
 )
+from traust_core.v1.models.operations import AssetRequest, JobResult
 from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import (
     Ecosystem,
@@ -46,8 +48,9 @@ from traust_core.v1.models.vocabulary import (
     SourceType,
 )
 
-from traust.cli._doors import add_branch_arg, parser, register_commit, run
+from traust.cli._doors import add_branch_arg, answer, parser, register_commit, run
 from traust.context import load_core
+from traust.ops.materializers import MANUAL, BelowRangePacketsMaterializer
 from traust.paths import HARNESS_ROOT
 from traust.registry.feeds_config import registry_path
 from traust.registry.osv_urls import osv_access
@@ -358,11 +361,7 @@ def below_range(argv: list[str] | None = None) -> int:
     status: list[BelowRangeStatus] = []
 
     def call() -> dict:
-        if osv_access() == "air-gapped":
-            raise ValidationError(
-                "below-range needs the OSV API and the package registries; feeds.yaml sets the "
-                "osv source air-gapped"
-            )
+        _no_air_gap()
         core = _core(args.config_home)
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
@@ -373,29 +372,115 @@ def below_range(argv: list[str] | None = None) -> int:
             ref.id, out, ecosystems=ecosystems, max_candidates=args.max_candidates
         )
         status.append(found.status)
-        for packet in found.packets:
-            (out / packet.case).mkdir(parents=True, exist_ok=True)
-            (out / packet.case / "fix.patch").write_text(packet.patch)
-            doc = packet.model_dump_json(indent=1, exclude={"patch"})
-            (out / packet.case / "packet.json").write_text(doc + "\n")
-        index = found.model_dump(mode="json", exclude={"packets"})
-        index["packets"] = [
-            {"case": p.case, "kind": p.candidate.kind, "ecosystem": p.candidate.ecosystem}
-            for p in found.packets
-        ]
-        out.mkdir(parents=True, exist_ok=True)
-        (out / "below-range.json").write_text(json.dumps(index, indent=1) + "\n")
-        return {
-            "out": str(out),
-            "installed_exact": found.installed_exact,
-            "candidates": found.candidates,
-            "packets": len(found.packets),
-            "coverage_gaps": dict(Counter(g.reason.value for g in found.coverage_gaps)),
-            "status": found.status.value,
-        }
+        return write_packets(found, out)
 
     code = run(call)
     return code or BELOW_RANGE_EXIT[status[0]]
+
+
+def write_packets(
+    found: BelowRangeInput, out: Path, packets_assessment_id: uuid.UUID | None = None
+) -> dict:
+    """What the review reads: `<case>/packet.json` and `fix.patch` beside the sources, and the
+    `below-range.json` index (with the recorded packets' assessment when there is one)."""
+    for packet in found.packets:
+        (out / packet.case).mkdir(parents=True, exist_ok=True)
+        (out / packet.case / "fix.patch").write_text(packet.patch)
+        doc = packet.model_dump_json(indent=1, exclude={"patch"})
+        (out / packet.case / "packet.json").write_text(doc + "\n")
+    index = found.model_dump(mode="json", exclude={"packets"})
+    index["packets"] = [
+        {"case": p.case, "kind": p.candidate.kind, "ecosystem": p.candidate.ecosystem}
+        for p in found.packets
+    ]
+    if packets_assessment_id is not None:
+        index["packets_assessment_id"] = str(packets_assessment_id)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "below-range.json").write_text(json.dumps(index, indent=1) + "\n")
+    return {
+        "out": str(out),
+        "installed_exact": found.installed_exact,
+        "candidates": found.candidates,
+        "packets": len(found.packets),
+        "coverage_gaps": dict(Counter(g.reason.value for g in found.coverage_gaps)),
+        "status": found.status.value,
+    }
+
+
+def _no_air_gap() -> None:
+    if osv_access() == "air-gapped":
+        raise ValidationError(
+            "below-range needs the OSV API and the package registries; feeds.yaml sets the "
+            "osv source air-gapped"
+        )
+
+
+def below_range_scan(argv: list[str] | None = None) -> int:
+    ap = _parser(
+        "below-range-scan",
+        "The below_range_packets asset's materializer: packets for an inventory repository's "
+        "default-branch head, recorded for review. Prints the JobResult; its outcome is the "
+        "exit code.",
+    )
+    ap.add_argument("--repo", required=True, help="https URL of an inventory repository")
+    ap.add_argument("--run-id", default=MANUAL, help="the run order this scan is for")
+    args = ap.parse_args(argv)
+    try:
+        _no_air_gap()
+    except ValidationError as e:
+        return answer(JobResult.refused(str(e)))
+    core = _core(args.config_home)
+    materializer = BelowRangePacketsMaterializer(core.services(), core.config.forge_hosts)
+    request = AssetRequest(asset=materializer.asset, run_id=args.run_id, partition=args.repo)
+    return answer(materializer.materialize(request))
+
+
+def below_range_review(argv: list[str] | None = None) -> int:
+    ap = _parser(
+        "below-range-review",
+        "Write a repository's newest recorded below-range packets for review, with each "
+        "installed source refetched and checked against its recorded digest.",
+    )
+    ap.add_argument("--repo", required=True, help="https URL of an inventory repository")
+    ap.add_argument("--out", type=Path, required=True, help="packet directory to write")
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        _no_air_gap()
+        core = _core(args.config_home)
+        services = core.services()
+        url = HttpsRepoUrl.parse(args.repo, core.config.forge_hosts)
+        repo = services.portfolio.find_repository(url)
+        if repo is None or repo.id is None:
+            raise NotFoundError(f"{url} is not in the inventory")
+        latest = services.below_range.latest(repo.id)
+        services.below_range.fetch(latest.packets, args.out)
+        return {
+            "packets_assessment_id": str(latest.assessment_id),
+            **write_packets(latest.packets, args.out, latest.assessment_id),
+        }
+
+    return run(call)
+
+
+def below_range_record(argv: list[str] | None = None) -> int:
+    ap = _parser(
+        "below-range-record",
+        "Record a below-range review (verdicts.json): each applicable case becomes the "
+        "commit's dependency finding; the rest stay in the recorded document.",
+    )
+    ap.add_argument("verdicts", type=Path, help="the below-range-verdicts document")
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        services = _core(args.config_home).services()
+        doc = BelowRangeVerdictsArtifact.parse(args.verdicts.read_bytes())
+        source = Provenance(
+            run_id=uuid.uuid4(), source=SourceType.IMPACT_REPORT, occurred_at=datetime.now(UTC)
+        )
+        return services.below_range.record(doc, source).model_dump(mode="json")
+
+    return run(call)
 
 
 def clone(url: str, sha: str, dest: Path) -> Path:

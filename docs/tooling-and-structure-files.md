@@ -40,6 +40,9 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | `schemas/v1/sla-policy.schema.json` | JSON Schema for SLA policy files (sla-view) — adopters configuring their own service levels start at [sla-policy.md](sla-policy.md) |
 | `schemas/v1/model-registry.schema.json` | JSON Schema for the model registry (config/model-registry.yaml — role routing, tier floors, spend policy) |
 | `schemas/v1/benchmark-target.schema.json` | JSON Schema for recall-benchmark target definitions |
+| `schemas/v1/below-range-packets.schema.json` | JSON Schema for a commit's below-range evidence packets (traust-core `BelowRangeService.scan`) |
+| `schemas/v1/below-range-verdicts.schema.json` | JSON Schema for a below-range review: two blind reviews, a judge on a split, the verdict per packet |
+| `schemas/v1/validation-plan.schema.json` | JSON Schema for the validate-findings plan `plan.py` emits |
 | `schemas/v1/attack-mapping.schema.json` | JSON Schema for the finding-category→ATT&CK mapping table |
 | `schemas/v1/adr-registry.schema.json` | JSON Schema for the architecture-decision-record registry |
 | `schemas/v1/org-parameters.schema.json` | JSON Schema for org-wide parameter files |
