@@ -505,6 +505,17 @@ traust-engine diff $E --shadow shadow.jsonl --routes rescan-worklist.json
 one open order per asset and repository. `shadow` reaps, plans and admits
 nothing. `traust-engine run` is the loop itself, for after the cutover.
 
+### Running orders: `traust-engine claim`
+
+After the cutover, `traust-engine run` plans and admits, and a runner does the
+work. `traust-engine claim $E` leases one queued order of an asset with a `run`
+command, fills its `{run_id}` and `{repo_url}` tokens from the order, renews the
+lease while the command runs, completes the order with the command's JobResult
+and exits (0 succeeded, 1 failed, 4 degraded, 5 refused; nothing queued is 0).
+It is claim-once, started by an operator or a scheduler, never a daemon.
+Skill sessions (`model: {role}`) stay queued for a session launcher; `claim`
+never takes them.
+
 ## Standing weekly drain — orchestrator contract
 
 The weekly trickle-drain is designed to run under an external orchestrator
