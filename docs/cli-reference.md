@@ -36,7 +36,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `isolation` | Tenant-isolation review | `repos` |
 | `ledger` | Ledger audit (traust-core) and the doc-variance register | `audit`, `doc-variance` |
 | `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `spend` |
-| `portfolio` | Portfolio graph; `observe` is the `repo_state` materializer; `plan` / `onboard` / `owner-hints` / `file` / `import-owners` / `import-release` are add-inputs' and inventory-repositories' doors on traust-core; `dependencies` / `dependents` read traust-core's SBOMs | `artifacts`, `build`, `dependencies`, `dependents`, `file`, `freshness`, `import-owners`, `import-release`, `interfaces`, `liveness`, `observe`, `onboard`, `owner-hints`, `plan`, `population`, `query`, `stats`, `symbols` |
+| `portfolio` | Portfolio graph; `observe` is the `repo_state` materializer; `plan` / `onboard` / `owner-hints` / `file` / `import-owners` / `import-release` / `release-changes` are add-inputs' and inventory-repositories' doors on traust-core; `dependencies` / `dependents` read traust-core's SBOMs | `artifacts`, `build`, `dependencies`, `dependents`, `file`, `freshness`, `import-owners`, `import-release`, `interfaces`, `liveness`, `observe`, `onboard`, `owner-hints`, `plan`, `population`, `query`, `release-changes`, `stats`, `symbols` |
 | `pqc` | The pqc-readiness skill's doors on traust-core | `blockers`, `check`, `prepare`, `record`, `summary` |
 | `products` | corpus-intake's doors on traust-core: products and their corpus ownership | `add`, `list`, `update` |
 | `registry` | Model/product registry | `models`, `products` |

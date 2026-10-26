@@ -107,6 +107,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "file": portfolio.FILE,
         "import-owners": portfolio.IMPORT_OWNERS,
         "import-release": portfolio.IMPORT_RELEASE,
+        "release-changes": portfolio.RELEASE_CHANGES,
         "population": portfolio.POPULATION,
         "liveness": portfolio.LIVENESS,
     },

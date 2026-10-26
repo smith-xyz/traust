@@ -80,7 +80,7 @@ dropped.
 
 | Cadence | What runs |
 |---|---|
-| Daily (automated, deterministic) | fleet refresh + router → fresh worklist; `harnessing/2-threat-model/threat-model/scripts/build_release_events.py` — the release/dist-git event feeders (see *Event feeders*); `/dependency-watch` — the advisory-driven deps lane end to end (feeds → `/impact-analysis` → python3 -m traust.cli route impact-findings direct-entry filing) |
+| Daily (automated, deterministic) | fleet refresh + router → fresh worklist (a recorded release's change is derived on demand: see *Event feeders*); `/dependency-watch` — the advisory-driven deps lane end to end (feeds → `/impact-analysis` → python3 -m traust.cli route impact-findings direct-entry filing) |
 | Weekly session | dispatch the worklist's full-audit rows as a batch; `/verify-remediation` treadmill sweep (`traust remediation verify-sweep`); triage new findings |
 | Monthly | sensitive-change P2 diff scans; validation session (criticals validated-or-blocked inside the SLA window); spend reconcile against the budget policy |
 | Weekly (trickle) | the `diff-scan-quarterly` pool drains as a risk-ordered weekly trickle: dispatch rows with `drain_order < weekly rate` (default ceil(pool/13) — the same quarterly volume as a 90-day batch, but a short stable queue instead of a long tail; external-band rows first, target ≤14 days in-pool). Dispatching the drain is an operator decision informed by the deployment's measured per-run cost (see *The diff lane*); the drain ordering accumulates until scheduled |
@@ -104,11 +104,11 @@ rows named in the last column are the backstop that makes a dead timer visible.
 |---|---|---|---|---|
 | Fleet refresh + rescan router | daily | timer | python3 -m traust.cli build rescan-worklist | routes only, never authors findings; the engine tick is the cadence |
 | **Feed-source liveness** | *retired* with `check drift`; returns as traust-core provider readiness once the live sources are core providers | probe | — | Probes every source in `config/feeds.yaml` carrying a `probe` — both tiers — so a live-tier source that answers with an error is visible. A definitive HTTP error is `drift`; a transport failure is `unavailable`, never `drift`, so an offline workstation does not report every source as broken |
-| Release/dist-git event feeder | daily, beside the router | timer (inventory-CSV diff + dist-git `ls-remote` movement vs the committed seen-set) | `python3 harnessing/2-threat-model/threat-model/scripts/build_release_events.py` | emits events only; the router routes them; dispatch marks `consumed` |
+| Release/dist-git event feeder | on demand | a recorded release (`traust portfolio import-release`) | `python3 -m traust.cli portfolio release-changes --product <slug> --version <v>` | derived from recorded releases, nothing stored (`PortfolioService.release_changes`); a dist-git head is the `repo_state` observation of a registered repository |
 | `/dependency-watch` (deps lane end to end) | daily | timer (advisory publication) | `/dependency-watch` | findings enter the **ledger** via direct-entry at `not_verified` — the claim rides on the event, the baseline is never written (gate A15); `/triage` adjudicates downstream; severity from the advisory, never invented. See [findings-routing.md](findings-routing.md) |
 | **Feed router** — security-data refresh (EPSS / KEV / vendor CVE and VEX feeds) | **daily** | timer | `python3 -m traust.cli feeds fetch --feed all` | Orchestrator-neutral ([routers.md](routers.md)), deliberately not bound to a CI pipeline in this repo. Snapshots every `tier: cached` source in `config/feeds.yaml` through traust-core (`ExposureService.refresh_feeds`: a `feed_snapshot` per source, the bytes in core's object store; `rh-cve` fetches only what published since its last snapshot). A dedicated job exists because consumer-triggered refresh only holds while something runs daily; without one the snapshots silently age. Every source in `config/feeds.yaml` is public. A source that fails keeps its last snapshot and the order is **degraded**, keyed by the source; one with no snapshot at all fails the order. **Backstop:** drift rows `feeds:*` at **48h** — one missed run plus slack; a threshold looser than the cadence it guards is how a dead job stays green |
-| Weekly diff-drain tranche | weekly | timer over the router's drain ordering | `python3 harnessing/2-threat-model/threat-model/scripts/emit_drain_tranche.py`, then one run per tranche row **by lane** (`dispatch_by_lane` in the manifest — see *Standing weekly drain* below) | fail-closed selection (refuses a worklist >48h old or a second tranche per ISO week); dispatching is an operator decision informed by measured cost |
-| Threat-model re-model lanes | rides the router (daily) + the weekly tranche | change (`pr` stamp), major/minor release event, calendar backstop | python3 -m traust.cli build rescan-worklist routes; `harnessing/2-threat-model/threat-model/scripts/emit_drain_tranche.py` schedules; `/threat-model pr\|review` dispatches | **report-only** — no lane auto-applies an `update`. Drift row `threat-model` (held in lockstep with the lane's calendar threshold) is the dead-timer if the quarterly pool stops draining |
+| Weekly diff-drain tranche | weekly | timer over the router's drain ordering | *retired*: the pack router's lane pacing and approval (*The security pack's router and its routed lanes*); until then dispatch from the worklist by lane (see *Standing weekly drain* below) | fail-closed selection (refuses a worklist >48h old or a second tranche per ISO week); dispatching is an operator decision informed by measured cost |
+| Threat-model re-model lanes | rides the router (daily) + the weekly tranche | change (`pr` stamp), major/minor release event, calendar backstop | python3 -m traust.cli build rescan-worklist routes; the pack router schedules (the tranche script is retired); `/threat-model pr\|review` dispatches | **report-only** — no lane auto-applies an `update`. Drift row `threat-model` (held in lockstep with the lane's calendar threshold) is the dead-timer if the quarterly pool stops draining |
 | Verify-remediation treadmill | weekly (worklist rebuilt per sweep) | timer | `traust remediation verify-sweep` → `/verify-remediation full-sweep` | verdicts gated by the verification schema + soundness lint; `traust remediation verify-record` records verdicts as decisions and regressions as findings |
 | Rule-mining lane | weekly + post-wave | timer + drift row `rule-mining` (ledger changes >7d newer than the artifact) | python3 -m traust.cli sweep rule-lane, then the scheduled `/mine-ledger` session | never auto-files findings; rule promotion sits behind the mechanical test-and-calibrate gate; sweep hits route to `/triage` |
 | Ledger audit | weekly | timer | python3 -m traust.cli ledger audit (`LedgerService.audit`) | verifies every ledger layer against its stored events and signature, so an edit to stored decision events is found within a week (appends no longer re-verify the layer); a layer that fails or can't be verified degrades the order, never green |
@@ -410,57 +410,32 @@ honored in `events_honored` and marks nothing consumed — flip `consumed` to
 
 ### Event feeders
 
-`rescan-events.jsonl` is fed two ways: operators append
-`external-report`/`methodology`/`cve` rows by hand (or via feed importers), and
-**`release` rows originate from a feeder** —
-`harnessing/2-threat-model/threat-model/scripts/build_release_events.py`, run
-daily alongside the router. Two legs, one committed state file
-(`findings/_manifest/release-events-state.json` — the seen-set, so re-runs are
-idempotent and a movement-free run emits nothing):
+`rescan-events.jsonl` is fed by operators: `external-report`/`methodology`/`cve`
+rows by hand (or via feed importers), and `release` rows when a release should
+reach the router before the pack router reads releases itself.
 
-- **Container leg** — diffs the image inventories in the inputs repository
-  (the `*-payload-repos.csv` payload and operator-catalog files' image columns)
-  against the seen-set; a never-seen digest/tag appends one release event
-  carrying the image ref and the CSV-mapped source repo. **CSV diff only** — no
-  registry polling (no skopeo/network); a new digest becomes visible when the
-  inventory refresh lands. Quota-aware registry tag polling against the same
-  state file is the natural extension.
-- **Dist-git leg** — reads the operator-curated
-  `$TRAUST_CONFIG_HOME/rpm-distgit-watch.yaml` (the template ships with an
-  empty `active` list) and runs `git ls-remote` per active https URL (rule S3
-  discipline: https-only gate, `GIT_ALLOW_PROTOCOL=https`, `--` separator); a
-  moved HEAD appends a release event noting "dist-git commit — route
-  secure-rpm-audit". Failures degrade to per-repo skip counts, never a crash.
+**Releases are recorded, not fed.** A product version is recorded with
+`traust portfolio import-release` (the commits it ships); its change is derived
+on demand, never stored:
 
-**Release identity.** Because the router re-models on major/minor releases
-only, every event carries a structured version — never free text parsed back
-out of `note`. The identity is the **inventory path**, not the image tag: image
-tokens are almost always bare keys or digest-pinned and carry no parseable
-version, while inventory CSV paths do (for example
-`<product>/<product>-<version>-payload-repos.csv`,
-`operator-catalog/<operator>/<version>/…`). Each path normalizes to a `family`
-(the path with its version replaced by `{V}`) plus a version tuple; the
-committed state file remembers the highest version seen per family, and a new
-inventory file classifies as `major` / `minor` / `patch` / `backfill` (a version
-*below* the high-water mark — an old release inventoried late) / `initial` /
-`none`. Events stamp `release_family`, `release_version`, `release_previous`,
-`release_change`.
+```bash
+python3 -m traust.cli portfolio release-changes --product <slug> --version <v> [--previous <v0>]
+```
 
-Two coverage limits, stated rather than papered over: the **dist-git leg has no
-version at all** — a moved HEAD is a commit sha, not a release — so it
-classifies `unknown` and never reaches the threat-model lane; and a state file
-that predates version tracking seeds its high-water marks on the first run
-(emitting nothing new, since those inventories are already in the seen-set), so
-the *next* new inventory version is the first one that classifies against a
-real predecessor. The router counts every skipped kind in
-`summary.threat_model.release_changes` so "no reviews fired" is always
-distinguishable from "nothing qualified".
+returns the bump (`major` / `minor` / `patch` / `backfill` — a version *below*
+the high-water mark, an old release recorded late — / `none` / `unknown`, a
+label that is no version) against the highest version recorded before it,
+`remodels` (major or minor: the only bumps the threat-model-review lane acts
+on), and the commits it ships that the previous didn't (`added`) and the other
+way round (`removed`). A product's first recorded release has nothing to
+compare against and is refused. The committed seen-set
+(`release-events-state.json`) and the inventory-CSV diff are retired with
+`build_release_events.py`.
 
-The first run (no state file) seeds the state and emits nothing — the existing
-inventory is baseline, not news. `--dry-run` prints would-be events without
-writing. The feeder produces events only; the router routes them (release →
-`release-passthrough`), and dispatch marks `consumed` — three components, one
-verdict-free chain.
+**Dist-git heads** are not releases: register the dist-git repository in the
+inventory and the `repo_state` asset observes its head (`portfolio observe`);
+the pack router routes on that observation. The `rpm-distgit-watch.yaml` watch
+list is retired.
 
 ## Running the router
 
@@ -500,12 +475,9 @@ dispatch per row:
 # 1. DAILY — refresh the routed worklist (deterministic; quota-aware)
 python3 -m traust.cli build rescan-worklist
 
-# 2. WEEKLY — emit this week's tranche manifest (deterministic;
-#    selection only, no spend). Fail-closed: refuses a worklist older
-#    than 48h, one predating the refusal pre-route, or a second
-#    tranche in the same ISO week.
-python3 harnessing/2-threat-model/threat-model/scripts/emit_drain_tranche.py [--include-immediate]
-#    → analysis-results/findings/_manifest/drain-tranche-<YYYY-Www>.json
+# 2. WEEKLY — select this week's rows from the worklist (the tranche
+#    script is retired: the pack router's lane pacing and approval
+#    replace it, *The security pack's router and its routed lanes*)
 
 # 3. PER ROW — one headless run (agentic; this is the spend). A tranche
 #    carries more than one dispatchable lane, so BRANCH ON row.lane

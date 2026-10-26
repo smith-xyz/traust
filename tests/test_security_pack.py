@@ -22,7 +22,6 @@ STANDING_JOBS = Path(__file__).resolve().parents[1] / "docs" / "continuous-opera
 ASSETS = {
     # the refresh half; its rescan router is the pack router (route_on: repo_state)
     "Fleet refresh + rescan router": "repo_state",
-    "Release/dist-git event feeder": "release_events",
     "/dependency-watch (deps lane end to end)": "dependency_watch",
     "Feed router — security-data refresh (EPSS / KEV / vendor CVE and VEX feeds)": "feeds_cache",
     "Verify-remediation treadmill": "verify_remediation",
@@ -40,6 +39,8 @@ ASSETS = {
 # Rows that stay outside the pack, and why.
 EXCLUDED = {
     "Weekly diff-drain tranche": "replaced by the pack router: lane pacing and approval",
+    "Release/dist-git event feeder": "derived on demand from recorded releases "
+    "(PortfolioService.release_changes); dist-git heads are repo_state observations",
     "Threat-model re-model lanes": "routed lanes, added with the pack router",
     "/drift-watch": "replaced by each asset's freshness (FreshnessQuery.stale)",
     "Feed-source liveness": "cached sources: feeds_cache degrades per source; live-tier probes "
