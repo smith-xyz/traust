@@ -73,7 +73,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | Retired FP-precedent corpus CLI | Formerly built a tiered refutation-precedent index for triage and the Precision Gate; core finding precedents own the replacement, but the skill port is unfinished and there is no executable fallback |
 | python3 -m traust.cli sweep | Class-generalization sweep loop: confirmed finding → candidate rule → corpus-wide sweep → triage-ready candidates |
 | python3 -m traust.cli sweep mine | The /mine-ledger miner on traust-core (`DetectionQualityService.mine_rules`) — confirmed-TP corpus, cluster coverage vs the opengrep pack, per-rule campaign precision |
-| harnessing/mine-ledger/scripts/emit_rule_drafts.py | Regression-rule draft staging from resolved-at-fix-commit findings (pre/post calibration pairs) |
+| python3 -m traust.cli sweep regression-drafts / verify-draft | Regression-rule draft staging from confirmed findings recorded fixed on a later commit (`DetectionQualityService.regression_pairs`: pre/post calibration pairs), and the opengrep fires-before / silent-after gate |
 | python3 -m traust.cli sweep rule-lane | The weekly rule-mining lane runner — miner → sweep collect/draft → bounded draft staging → `lane-delta.{json,md}` vs the previous mine; exit 1 when the delta needs authoring attention |
 | python3 -m traust.cli portfolio liveness | Census-owned repo liveness on traust-core (`PortfolioService.liveness`) — active/archived/unknown per registered repository from stored observations |
 | python3 -m traust.cli check skill-alignment | Pre-commit cross-skill contract gate (A-series rules) |
