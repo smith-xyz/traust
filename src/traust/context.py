@@ -14,7 +14,7 @@ from typing import TypeVar
 
 from traust_contracts import DeploymentConfigMissing
 from traust_contracts.config import TRAUST_CONFIG_HOME_DEFAULT, TRAUST_CONFIG_HOME_ENV
-from traust_core.v1.context import Config, Context, Locations, Services
+from traust_core.v1.context import Config, Context, Locations
 from traust_core.v1.errors import AuthenticationError, ConfigError
 from traust_core.v1.models.identity import Credential, Principal
 from traust_engine import HarnessEngine
@@ -139,27 +139,6 @@ def load(
     # NEED(engine Policy): the tools' config still comes from the engine facade, loaded lazily.
     register_providers(core, lambda: HarnessEngine.load(config_home=home), canaries=canaries)
     return core
-
-
-# Folded into load; the callers move onto it in the next PR of this stack, which deletes these.
-def load_core(config_home: Path | None = None) -> Context:
-    return load(config_home)
-
-
-def load_insight_core(config_home: Path | None = None, sla_policy: Path | None = None) -> Context:
-    return load(config_home, sla_policy=sla_policy)
-
-
-def load_engine_core(config_home: Path | None = None, *, canaries: str = "canaries") -> Context:
-    return load(config_home, canaries=canaries)
-
-
-def load_services(config_home: Path | None = None) -> Services:
-    return load(config_home).services()
-
-
-def load_compliance_services(config_home: Path | None = None) -> Services:
-    return load(config_home).services()
 
 
 def load_caller(core: Context) -> Principal:

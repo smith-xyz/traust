@@ -25,7 +25,7 @@ from typing import Any
 import yaml
 from traust_engine.assets import compliance_data_dir
 
-from traust.context import inputs_dir, load_core
+from traust.context import inputs_dir, load
 from traust.paths import optional_config_path
 
 PROVENANCE_REVIEW_DAYS = 180
@@ -346,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
         *check_adr_registry(),
         *check_yara_rules_pin(),
         *check_argus_rules_pin(),
-        *check_docs_product_map(inputs_dir(load_core())),
+        *check_docs_product_map(inputs_dir(load())),
     ]
     print(json.dumps({"items": items}, indent=2))
     return 0

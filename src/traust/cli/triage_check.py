@@ -14,7 +14,7 @@ from pathlib import Path
 from traust_core.v1.errors import ValidationError
 from traust_core.v1.models.artifacts import TriageArtifact
 
-from traust.context import add_config_home_arg, load_services
+from traust.context import add_config_home_arg, load
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,7 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValidationError) as e:
         print(f"ERROR: {args.triage}: {e}", file=sys.stderr)
         return 2
-    report = load_services(args.config_home).findings.decisions.check(doc, args.repo)
+    report = load(args.config_home).services().findings.decisions.check(doc, args.repo)
     if args.json:
         print(json.dumps([v.model_dump(mode="json") for v in report.violations], indent=2))
         return 0

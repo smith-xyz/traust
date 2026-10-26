@@ -12,7 +12,7 @@ from traust_engine.sweep.engine import DEFAULT_SWEEP_LIMIT
 
 from traust.cli._doors import run
 from traust.cli.groups._registry import OpSpec, passthrough_op
-from traust.context import load_engine_core, rule_drafts_dir
+from traust.context import load, rule_drafts_dir
 
 
 def _add_common_sweep_args(ap) -> None:
@@ -333,7 +333,7 @@ def call_mine(engine, args) -> int:
     """The confirmed TPs in traust-core against a rule pack from traust-engine's RulePackSource."""
 
     def call() -> dict:
-        quality = load_engine_core(args.config_home).services().detection_quality
+        quality = load(args.config_home).services().detection_quality
         packs = {p.name: p for p in quality.rule_packs()}
         if args.pack not in packs:
             raise NotFoundError(f"no rule pack {args.pack!r}; have {sorted(packs)}")

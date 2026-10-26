@@ -23,7 +23,7 @@ from traust.context import (
     DeploymentConfigMissing,
     add_config_home_arg,
     campaign_settings,
-    load_core,
+    load,
     progress_tracker_dir,
     resolve_results_root,
     workspace_dir,
@@ -413,7 +413,7 @@ def _ledger_soft(config_home):
         import importlib
 
         mod = importlib.import_module("traust_engine.metrics.history")
-        ws = workspace_dir(load_core(config_home))
+        ws = workspace_dir(load(config_home))
         return mod, ws
     except SystemExit:
         return None, None
@@ -751,7 +751,7 @@ document.querySelectorAll('rect.seg').forEach(r => {{
 
 def _dashboards_home(config_home):
     try:
-        dashboards = progress_tracker_dir(load_core(config_home)) / "metrics" / "dashboards"
+        dashboards = progress_tracker_dir(load(config_home)) / "metrics" / "dashboards"
         dashboards.mkdir(parents=True, exist_ok=True)
         return dashboards
     except (SystemExit, DeploymentConfigMissing):

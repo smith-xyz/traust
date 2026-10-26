@@ -8,7 +8,7 @@ from traust_core.v1.models.operations import AssetRequest
 
 from traust.cli._doors import answer, parser
 from traust.cli.fetch_feeds import NAME as PRODUCT_DEFINITIONS
-from traust.context import load_core
+from traust.context import load
 from traust.ops.materializers import MANUAL, FeedsCacheMaterializer
 from traust.registry.feeds_config import registry_path
 
@@ -24,8 +24,8 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     if args.feed == PRODUCT_DEFINITIONS:
         ap.error("product-definitions isn't a security feed: `traust feeds fetch-products`")
-    core = load_core(args.config_home)
-    core.register_feeds(registry_path())
+    core = load(args.config_home)
+    core.register_feeds(registry_path(args.config_home))  # NEED(core: feeds registered lazily)
     materializer = FeedsCacheMaterializer(core.services())
     return answer(
         materializer.materialize(

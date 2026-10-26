@@ -20,7 +20,7 @@ from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import SourceType
 
 from traust.cli._doors import add_branch_arg, parser, register_commit, run
-from traust.context import load_core
+from traust.context import load
 
 
 def _parser(op: str, about: str) -> argparse.ArgumentParser:
@@ -38,7 +38,7 @@ def intake(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, args.public)
@@ -63,7 +63,7 @@ def prepare(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str | None:
-        decisions = load_core(args.config_home).services().findings.decisions
+        decisions = load(args.config_home).services().findings.decisions
         prepared = decisions.prepare(args.assessment_id)
         text = prepared.model_dump_json(indent=2)
         if args.out is None:
@@ -85,7 +85,7 @@ def record(argv: list[str] | None = None) -> int:
         doc = TriageArtifact.parse(args.triage.read_bytes())
         when = datetime.now(UTC)
         made = (
-            load_core(args.config_home)
+            load(args.config_home)
             .services()
             .findings.decisions.record(
                 args.assessment_id,
@@ -123,7 +123,7 @@ def render(argv: list[str] | None = None) -> int:
 
     def call() -> str | None:
         doc = TriageArtifact.parse(args.triage.read_bytes())
-        markdown = load_core(args.config_home).services().findings.decisions.render(doc).decode()
+        markdown = load(args.config_home).services().findings.decisions.render(doc).decode()
         if args.out is None:
             return markdown
         args.out.write_text(markdown, encoding="utf-8")

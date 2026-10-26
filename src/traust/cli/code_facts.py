@@ -22,7 +22,7 @@ from traust_core.v1.models.code_facts import CodeFactKind
 from traust_core.v1.models.common import ToolRequest
 
 from traust.cli._doors import parser, run
-from traust.context import load_core, load_services
+from traust.context import load
 from traust.registry.feeds_config import registry_path
 
 
@@ -52,8 +52,12 @@ def route_guards(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict:
-        matrix = load_services(args.config_home).code_facts.route_guards(
-            ToolRequest(workspace=args.checkout), resolve_handlers=args.resolve_handlers
+        matrix = (
+            load(args.config_home)
+            .services()
+            .code_facts.route_guards(
+                ToolRequest(workspace=args.checkout), resolve_handlers=args.resolve_handlers
+            )
         )
         return _emit(matrix.model_dump(mode="json"), args.out)
 
@@ -66,8 +70,10 @@ def llm_app(argv: list[str] | None = None) -> int:
     )
 
     def call() -> dict:
-        fact = load_services(args.config_home).code_facts.llm_app(
-            ToolRequest(workspace=args.checkout)
+        fact = (
+            load(args.config_home)
+            .services()
+            .code_facts.llm_app(ToolRequest(workspace=args.checkout))
         )
         return _emit(fact.model_dump(mode="json"), args.out)
 
@@ -78,8 +84,10 @@ def config_matrix(argv: list[str] | None = None) -> int:
     args = _parser("config-matrix", "A checkout's effective deployed defaults.").parse_args(argv)
 
     def call() -> dict:
-        [matrix] = load_services(args.config_home).code_facts.enumerate(
-            CodeFactKind.CONFIG, ToolRequest(workspace=args.checkout)
+        [matrix] = (
+            load(args.config_home)
+            .services()
+            .code_facts.enumerate(CodeFactKind.CONFIG, ToolRequest(workspace=args.checkout))
         )
         return _emit(matrix.model_dump(mode="json", by_alias=True), args.out)
 
@@ -90,8 +98,10 @@ def sanitizers(argv: list[str] | None = None) -> int:
     args = _parser("sanitizers", "A checkout's sanitizer-shaped functions.").parse_args(argv)
 
     def call() -> dict:
-        found = load_services(args.config_home).code_facts.enumerate(
-            CodeFactKind.SANITIZER, ToolRequest(workspace=args.checkout)
+        found = (
+            load(args.config_home)
+            .services()
+            .code_facts.enumerate(CodeFactKind.SANITIZER, ToolRequest(workspace=args.checkout))
         )
         return _emit({"candidates": [c.model_dump(mode="json") for c in found]}, args.out)
 
@@ -104,8 +114,9 @@ def fork_lag(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict:
-        core = load_core(args.config_home)
-        core.register_feeds(registry_path())  # advisories come from the registry's osv source
+        core = load(args.config_home)
+        # advisories come from the registry's osv source. NEED(core: feeds registered lazily)
+        core.register_feeds(registry_path(args.config_home))
         fork = core.services().code_facts.fork_lag(
             ToolRequest(workspace=args.checkout), offline=args.offline
         )
@@ -120,8 +131,10 @@ def priv_profile(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict:
-        doc = load_services(args.config_home).code_facts.priv_profile(
-            ToolRequest(workspace=args.checkout), args.name
+        doc = (
+            load(args.config_home)
+            .services()
+            .code_facts.priv_profile(ToolRequest(workspace=args.checkout), args.name)
         )
         return _emit(json.loads(doc.payload), args.out)
 

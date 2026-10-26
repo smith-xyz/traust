@@ -34,7 +34,7 @@ from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import ThreatStatus
 
 from traust.cli._doors import parser, run
-from traust.context import load_core
+from traust.context import load
 
 REFUSED = 3
 
@@ -79,7 +79,7 @@ def prepare(argv: list[str] | None = None) -> int:
             )
         except pydantic.ValidationError as e:
             raise ValidationError(f"--since {args.since}: give 7-40 hex characters") from e
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.find_repository(url)
@@ -110,7 +110,7 @@ def coverage(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         urls = _repositories(core)
         kind = None if args.kind is None else AssessmentKind(args.kind)
         found = core.services().assessment.coverage(AssessmentFilter(kind=kind), list(urls))
@@ -139,7 +139,7 @@ def threats(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         urls = _repositories(core)
         scope = ThreatFilter(
             repository_ids=tuple(urls),

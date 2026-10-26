@@ -71,7 +71,7 @@ from traust_core.v1.providers.comments import FORGE, JIRA
 from traust_core.v1.services.insight import SarifExport
 
 from traust.cli._doors import parser, run, when
-from traust.context import load_caller, load_core
+from traust.context import load, load_caller
 
 _JIRA_KEY = re.compile(r"^[A-Z][A-Z0-9]+-\d+$")
 _BROWSE = re.compile(r"/browse/([A-Z][A-Z0-9]+-\d+)")
@@ -301,7 +301,7 @@ def _human_review(args: argparse.Namespace) -> int:
             return 2
 
     try:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         if token is None:
             principal = load_caller(core)
@@ -416,7 +416,7 @@ def find(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         entries = json.loads(args.report.read_text(encoding="utf-8")).get("findings") or []
         entry = next((e for e in entries if e.get("id") == args.label), None)
         if entry is None:
@@ -434,7 +434,7 @@ def status(argv: list[str] | None = None) -> int:
     ap = parser("findings", "status", "Show one finding's current state.")
     ap.add_argument("finding_id", type=uuid.UUID)
     args = ap.parse_args(argv)
-    return run(lambda: _json(load_core(args.config_home).services().findings.get(args.finding_id)))
+    return run(lambda: _json(load(args.config_home).services().findings.get(args.finding_id)))
 
 
 def history(argv: list[str] | None = None) -> int:
@@ -444,8 +444,7 @@ def history(argv: list[str] | None = None) -> int:
 
     def call() -> list[Any]:
         return [
-            _json(d)
-            for d in load_core(args.config_home).services().findings.history(args.finding_id)
+            _json(d) for d in load(args.config_home).services().findings.history(args.finding_id)
         ]
 
     return run(call)
@@ -458,7 +457,7 @@ def baseline(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list[Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         repo = _repository(core, args.repo_url)
         assert repo.id is not None
         as_of = when(args.as_of) or datetime.now(UTC)
@@ -533,7 +532,7 @@ def decide(argv: list[str] | None = None) -> int:
 
     def call() -> Any:
         statement = _statement(args, args.finding_id)
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         return _json(core.services().findings.decisions.decide(statement, load_caller(core)))
 
     return run(call)
@@ -546,7 +545,7 @@ def import_(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         repo = _repository(core, args.repo_url)
         source = JIRA if _JIRA_KEY.match(args.ref) else FORGE
         report = core.services().attestation.import_statements(
@@ -602,7 +601,7 @@ def review_cases(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> None:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         attestation = services.attestation
         page = attestation.pending(
@@ -667,7 +666,7 @@ def queue(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list[dict[str, Any]]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         attestation = core.services().attestation
         names: dict[str, uuid.UUID] = {}
         if args.repo_url:
@@ -699,7 +698,7 @@ def confirm(argv: list[str] | None = None) -> int:
 
     def call() -> Any:
         statement = _statement(args, args.finding_id)
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         caller = load_caller(core)
         attestation = core.services().attestation
         answer = AttestationDecision.CONFIRM
@@ -717,7 +716,7 @@ def reject(argv: list[str] | None = None) -> int:
 
     def call() -> Any:
         statement = _statement(args, args.finding_id)
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         attestation = core.services().attestation
         caller = load_caller(core)
         return _json(
@@ -733,7 +732,7 @@ def refuted(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list[Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         repo = _repository(core, args.repo_url)
         assert repo.id is not None
         wanted = FindingFilter(repository_id=repo.id, validity=Validity.FALSE_POSITIVE)
@@ -755,7 +754,7 @@ def surfaces(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         repo = _repository(core, args.repo_url)
         assert repo.id is not None
         merged = core.services().findings.review_surfaces(repo.id, when(args.as_of))
@@ -772,7 +771,7 @@ def sarif(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> Any:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         repo = _repository(core, args.repo_url)
         assert repo.id is not None
         views = core.services().findings.baseline(repo.id, when(args.as_of) or datetime.now(UTC))
@@ -791,7 +790,7 @@ def tickets(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list[str]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         repo = _repository(core, args.repo_url)
         assert repo.id is not None
         found = (_BROWSE.search(t.ref) for t in core.services().attestation.tickets(repo.id))
@@ -827,7 +826,7 @@ def summary(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list[Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         group_by = FindingDimension(args.group_by)
         return [_json(r) for r in core.services().findings.summary(_filter(core, args), group_by)]
 
@@ -843,7 +842,7 @@ def timeline(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list[Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         bucket = TimeBucket(args.bucket)
         return [_json(p) for p in core.services().findings.timeline(_filter(core, args), bucket)]
 

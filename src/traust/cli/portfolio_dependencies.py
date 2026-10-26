@@ -16,7 +16,7 @@ from traust_core.v1.models.vocabulary import Ecosystem
 
 from traust.cli._doors import package_id as find_package_id
 from traust.cli._doors import parser, run
-from traust.context import load_core
+from traust.context import load
 
 
 def dependencies(argv: list[str] | None = None) -> int:
@@ -26,7 +26,7 @@ def dependencies(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> Any:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.find_repository(url)
@@ -59,7 +59,7 @@ def dependents(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> Any:
-        services = load_core(args.config_home).services()
+        services = load(args.config_home).services()
         package_id = args.package_id or find_package_id(services, args.ecosystem, args.name)
         narrowed = () if args.version is None else (args.version,)
         out = []

@@ -23,7 +23,7 @@ from traust_core.v1.providers.process import ProcessResult
 
 from tests.test_products_doors import _postgres
 from traust.cli import crypto
-from traust.context import load_core
+from traust.context import load
 
 FIXTURES = Path(__file__).parent / "fixtures" / "crypto"
 REPO = "https://github.com/org/app"
@@ -83,8 +83,8 @@ def process(monkeypatch: pytest.MonkeyPatch) -> FakeProcess:
     fake = FakeProcess({"openshift-kube-apiserver": ["kube-apiserver-0"], "app": ["web-0"]})
     monkeypatch.setattr(
         crypto,
-        "load_services",
-        lambda home: Context(load_core(home).config, process=fake).services(),  # type: ignore[arg-type]
+        "load",
+        lambda home: Context(load(home).config, process=fake),  # type: ignore[arg-type]
     )
     monkeypatch.setattr("shutil.which", lambda name: f"/usr/bin/{name}")
     return fake

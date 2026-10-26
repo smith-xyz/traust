@@ -86,9 +86,5 @@
   },
   "src/traust/paths.py": {
     "contracts": 3
-  },
-  "src/traust/registry/feeds_config.py": {
-    "contracts": 1,
-    "engine-internal": 1
   }
 }
