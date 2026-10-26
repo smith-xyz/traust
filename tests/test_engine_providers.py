@@ -55,11 +55,13 @@ def test_the_scanner_tools_and_their_inspector_are_wired(home: Path) -> None:
         "gitleaks-history",
         "govulncheck",
         "grype",
+        "joern",
         "opengrep",
         "osv",
+        "osv_sbom",
         "yara",
     }
-    assert core.tool_inspector is not None
+    assert core.tool_inspector is None  # each tool reports its own version and database
     assert core.tool_floors.get("gitleaks")  # external-tools.yaml pins are the floors
 
 

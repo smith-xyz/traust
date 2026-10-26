@@ -252,6 +252,8 @@ traust pqc check <slug>-pqc-readiness.json
 traust pqc record --repo-url <URL> --sha <commit> --report <slug>-pqc-readiness.json
 ```
 
+`check` validates the report against core's `PqcReadinessArtifact` schema (it rejects an
+invalid dominant provenance, an out-of-range overall score and incomplete tool provenance);
 (`record` refuses a report that fails `check`, or one for another repository or commit.)
 
 One-line recap: status, who sets TLS, quantum_ready, top do_next.

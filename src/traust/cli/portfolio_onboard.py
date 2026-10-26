@@ -8,6 +8,8 @@ owner-hints    OWNERS / CODEOWNERS approvers, then top contributors: hints, neve
 file           one file's text at a pinned commit, read at the forge: untrusted, never stored
 import-owners  mirror the declared ownership source onto every registered repository
 import-release a product version and the commits it ships (a payload's commit URLs)
+release-changes a recorded version against the highest one recorded before it (or --previous):
+               its bump, whether it re-models the threat surface (major/minor), the commits moved
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ from typing import Any
 import pydantic
 import yaml
 from traust_core.v1.context import Context
-from traust_core.v1.errors import ValidationError
+from traust_core.v1.errors import NotFoundError, ValidationError
 from traust_core.v1.models.base import Dto, Model
 from traust_core.v1.models.inventory import (
     OrgName,
@@ -210,5 +212,29 @@ def import_release(argv: list[str] | None = None) -> int:
         [product] = _doors.products(services, [args.product])
         release = services.portfolio.import_release(product.id, VersionLabel(args.version), commits)
         return release.model_dump(mode="json")
+
+    return run(call)
+
+
+def release_changes(argv: list[str] | None = None) -> int:
+    ap = parser("portfolio", "release-changes", "What a recorded product version changed.")
+    ap.add_argument("--product", required=True, help="the product slug")
+    ap.add_argument("--version", required=True, help="the recorded release version, e.g. 4.21.0")
+    ap.add_argument("--previous", help="compare with this version (default: the high-water mark)")
+    args = ap.parse_args(argv)
+
+    def call() -> Any:
+        services = load_core(args.config_home).services()
+        [product] = _doors.products(services, [args.product])
+
+        def release(version: str) -> Any:
+            found = services.portfolio.find_release(product.id, VersionLabel(version))
+            if found is None:
+                raise NotFoundError(f"{args.product} {version} is not a recorded release")
+            return found.id
+
+        previous = None if args.previous is None else release(args.previous)
+        change = services.portfolio.release_changes(release(args.version), previous)
+        return {**change.model_dump(mode="json"), "remodels": change.remodels()}
 
     return run(call)

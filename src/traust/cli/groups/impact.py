@@ -25,6 +25,26 @@ IMPACT: dict[str, object] = {
     "sweep": passthrough_op(
         "impact", "Which known advisories touch the recorded SBOMs at all.", "sweep"
     ),
+    "below-range": passthrough_op(
+        "impact",
+        "Evidence packets for advisories whose stated range starts above the installed version.",
+        "below_range",
+    ),
+    "below-range-scan": passthrough_op(
+        "impact",
+        "Record a repository head's below-range packets (the below_range_packets asset).",
+        "below_range_scan",
+    ),
+    "below-range-review": passthrough_op(
+        "impact",
+        "Write a repository's recorded below-range packets for review, sources refetched.",
+        "below_range_review",
+    ),
+    "below-range-record": passthrough_op(
+        "impact",
+        "Record a below-range review; applicable cases become dependency findings.",
+        "below_range_record",
+    ),
     "calibrate-rule-pack": passthrough_op(
         "calibrate_rule_pack", "Score a rule pack's recorded scans against confirmed TPs."
     ),

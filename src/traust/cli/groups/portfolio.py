@@ -382,6 +382,9 @@ IMPORT_OWNERS = passthrough_op(
 IMPORT_RELEASE = passthrough_op(
     "portfolio_onboard", "Record a product version and its commits.", "import_release"
 )
+RELEASE_CHANGES = passthrough_op(
+    "portfolio_onboard", "What a recorded product version changed.", "release_changes"
+)
 POPULATION = passthrough_op(
     "portfolio_population", "What the registered repositories had assessed.", "main"
 )

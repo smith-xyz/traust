@@ -49,7 +49,7 @@ allowed-tools:
   # execution. Scope every script individually — the A11 alignment gate
   # (python3 -m traust.cli check skill-alignment) blocks broad entries.
   - Bash(python3 *-m traust.cli reporting validate:*)
-  - Bash(python3 *-m traust_engine.adapters.checkov:*)
+  - Bash(python3 *-m traust.cli adapters checkov:*)
   - Bash(python3 *-m traust.cli adapters opengrep:*)
   # Diff-mode scope and context packet ONLY (see "## Diff mode (--diff)"):
   # traust-core reads the existing clone read-only (list-argv git, no
@@ -177,7 +177,7 @@ Ask traust-core for the scope and its evidence in one call (it routes
 attention only — it never authors a finding):
 
 ```bash
-python3 -m traust.cli assessments prepare --kind vuln-scan \
+python3 -m traust.cli assessments prepare --kind vuln_scan \
     --repo-url <https URL of the origin remote> \
     --sha <git -C <target-dir> rev-parse HEAD> \
     --diff <target-dir> [--since <commit>] [--baseline-assessment <id>] \
@@ -906,7 +906,7 @@ Tell the user:
 
      ```bash
      python3 -m traust.cli reporting record <target-dir>/<repo>-vuln-findings.json \
-         --kind vuln-scan --repo-url <https URL of the origin remote> \
+         --kind vuln_scan --repo-url <https URL of the origin remote> \
          --sha <the scanned commit>
      ```
 

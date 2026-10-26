@@ -23,7 +23,7 @@ allowed-tools:
   - Read
   - Glob
   - Bash(python3 *-m traust.cli.checkpoint:*)
-  - Bash(python3 *-m traust_engine.reporting.lint:*)
+  - Bash(python3 *-m traust.cli reporting lint:*)
   - Bash(python3 *-m traust.cli reporting record:*)
   - Grep
   - Write
@@ -318,7 +318,7 @@ python3 -m traust.cli reporting rate-threats <repo>-threat-model.json
 python3 -m traust.cli reporting validate <repo>-threat-model.json
 python3 -m traust.cli reporting render   <repo>-threat-model.json \
     -o <repo>-threat-model.md
-python3 -m traust.cli reporting record <repo>-threat-model.json --kind threat-model \
+python3 -m traust.cli reporting record <repo>-threat-model.json --kind threat_model \
     --repo-url <https URL of the origin remote> --sha <the modelled commit>
 ```
 
@@ -379,8 +379,7 @@ from never tagging the surface.
 
 **Findings-tree placement (wiring contract, 2026-07-31).** The checkout
 copy alone is invisible to every downstream consumer — `/secure-code-audit`
-(coverage diff), `/vuln-scan`, `/triage`, `/threat-register`, and
-`traust_engine.corpus.resolver` all resolve threat models from the campaign findings
+(coverage diff), `/vuln-scan`, `/triage`, and `/threat-register` all resolve threat models from the campaign findings
 tree, and target checkouts are disposable. Whenever the target has a
 findings directory (`analysis-results/findings/<product>/<repo>/`), copy
 the emitted `<model-file>` there in the same step that writes it. If no
@@ -492,13 +491,13 @@ python3 -m traust.cli ledger doc-variance.
 shipped 2026-08-05 — `docs/continuous-operations.md`, plan
 `progress-tracker/plans/threat-model-cadence-plan.md`). Models are no
 longer written once at bootstrap and left to age; three router lanes
-re-model them, and `harnessing/2-threat-model/threat-model/scripts/emit_drain_tranche.py` puts each row in a
-weekly tranche the orchestrator dispatches headless:
+re-model them, and the pack router paces each row into the runs
+the orchestrator dispatches headless:
 
 | Trigger | Router output | Mode dispatched |
 |---|---|---|
 | diff-lane change touching a sensitive path or an interface-bearing path | `threat_model_pr` stamp on the existing diff row | `pr <clone> --base <anchor>` — **report-only**, on the clone the diff scan already made; writes no model |
-| major/minor release (`release_change` from `harnessing/2-threat-model/threat-model/scripts/build_release_events.py`) | `threat-model-review` lane row | `review <clone> --auto` |
+| major/minor release (`bump` from `traust portfolio release-changes`) | `threat-model-review` lane row | `review <clone> --auto` |
 | model older than 92d with no change-triggered re-model | `threat-model-quarterly` lane row (trickle-drained over a quarter) | `review <clone> --auto` |
 
 The provenance `date:` this skill stamps in section 7 is what the

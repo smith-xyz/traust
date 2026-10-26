@@ -28,6 +28,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--since", help="window start, ISO time with a zone")
     ap.add_argument("--until", help="window end (default: --as-of, else now)")
     ap.add_argument("--bucket", choices=[b.value for b in TimeBucket], default="month")
+    ap.add_argument(
+        "--artifact-id", type=uuid.UUID, help="the document a one-item view renders (oscal)"
+    )
     ap.add_argument("--out", type=Path, required=True, help="the folder the view is written to")
     ap.add_argument(
         "--sla-policy", type=Path, help="the sla view's policy (default: the config home's)"
@@ -44,6 +47,7 @@ def main(argv: list[str] | None = None) -> int:
             as_of=as_of,
             window=None if since is None else TimeWindow(start=since, end=until),
             bucket=TimeBucket(args.bucket),
+            artifact_id=args.artifact_id,
         )
         rendered = services.insight.publish(ViewName(args.view), scope)
         written = write_view(rendered, args.out / rendered.stem, model=True)

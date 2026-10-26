@@ -26,8 +26,10 @@ from traust.cli.groups import (
     remediation,
     reporting,
     sweep,
+    tools,
     triage,
     util,
+    validation,
 )
 
 GROUPS: dict[str, dict[str, object]] = {
@@ -63,6 +65,14 @@ GROUPS: dict[str, dict[str, object]] = {
         "declare": compliance.DECLARE,
         "scopes": compliance.SCOPES,
         "resolve": compliance.RESOLVE,
+        "policy": compliance.POLICY,
+        "evaluate": compliance.EVALUATE,
+        "evidence": compliance.EVIDENCE,
+        "check": compliance.CHECK,
+        "record": compliance.RECORD,
+        "latest": compliance.LATEST,
+        "adrs": compliance.ADRS,
+        "calibrate": compliance.CALIBRATE,
     },
     "dashboard": dict(dashboard.DASHBOARD),
     "feeds": dict(feeds.FEEDS),
@@ -99,6 +109,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "file": portfolio.FILE,
         "import-owners": portfolio.IMPORT_OWNERS,
         "import-release": portfolio.IMPORT_RELEASE,
+        "release-changes": portfolio.RELEASE_CHANGES,
         "population": portfolio.POPULATION,
         "liveness": portfolio.LIVENESS,
     },
@@ -124,10 +135,12 @@ GROUPS: dict[str, dict[str, object]] = {
         "mine": sweep.MINE,
         "cards": sweep.CARDS,
     },
+    "tools": dict(tools.TOOLS),
     "triage": dict(triage.TRIAGE),
     "util": {
         "redact": util.REDACT,
         "elf": util.ELF,
         "safe-exec": util.SAFE_EXEC,
     },
+    "validation": dict(validation.VALIDATION),
 }

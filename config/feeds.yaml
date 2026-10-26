@@ -25,6 +25,9 @@
 #   - `traust dashboard view freshness` — `feeds:*` rows from the cached
 #     tier (traust-core's FreshnessQuery.stale), `feed-source:*` liveness
 #     rows from every source carrying a `probe` (ProviderCatalog readiness).
+#   - `traust impact below-range` (traust-core's BelowRangeService) — fetches
+#     only from the hosts of `role: fix-patches` / `role: package-source`
+#     sources; those sources are hosts, not per-identifier documents.
 #
 # NOT HERE, deliberately:
 #   - Tool-managed vulnerability DBs (grype, govulncheck): the tools own
@@ -234,6 +237,7 @@ sources:
       expect_status: 200
     consumers:
       - traust.cli adapters osv (traust_engine.adapters.osv resolve_transitive)
+      - traust impact below-range (dependency source in packets, traust-core BelowRangeService)
     license:
       id: CC-BY-4.0
       terms: >-
@@ -245,6 +249,199 @@ sources:
         under CC BY 4.0".
       url: https://docs.deps.dev/api/v3/
       verified: 2026-10-21
+
+  # BELOW-RANGE VERIFICATION SOURCES (owner decision D3, 2026-10-23).
+  # `traust impact below-range` (traust-core's BelowRangeService) fetches fix patches (`role: fix-patches`)
+  # and installed package source (`role: package-source`) ONLY from the hosts
+  # these entries name: the url_template's host, `extra_hosts`, and redirects
+  # to `redirect_hosts`. Anything else is a recorded coverage gap. Remove an
+  # entry, or set `access: disabled`, to stop fetching from that host. Nothing
+  # fetched is executed. No probe: these are fetched on demand per candidate.
+  github-patches:
+    tier: live
+    role: fix-patches
+    summary: Fix commit and pull-request patches (`<commit or PR url>.patch`) on github.com.
+    url_template: https://github.com/{ident}.patch
+    redirect_hosts: [patch-diff.githubusercontent.com]
+    access: api
+    consumers:
+      - traust impact below-range (traust-core BelowRangeService)
+    license:
+      id: pass-through
+      terms: >-
+        Each patch keeps its repository's license. Fetched for local analysis,
+        never redistributed. Use of github.com is subject to the GitHub Terms
+        of Service.
+      url: https://docs.github.com/en/site-policy/github-terms/github-terms-of-service
+      verified: 2026-10-23
+
+  gitlab-patches:
+    tier: live
+    role: fix-patches
+    summary: Fix commit and merge-request patches (`<commit or MR url>.patch`) on gitlab.com.
+    url_template: https://gitlab.com/{ident}.patch
+    access: api
+    consumers:
+      - traust impact below-range (traust-core BelowRangeService)
+    license:
+      id: pass-through
+      terms: >-
+        Each patch keeps its project's license. Fetched for local analysis,
+        never redistributed. Use of gitlab.com is subject to the GitLab terms.
+      url: https://about.gitlab.com/terms/
+      verified: 2026-10-23
+
+  go-module-proxy:
+    tier: live
+    role: package-source
+    summary: Go module zips for an installed version, from the Go module proxy.
+    url_template: https://proxy.golang.org/{ident}
+    # the proxy serves zips from its own storage bucket
+    redirect_hosts: [storage.googleapis.com]
+    access: api
+    consumers:
+      - traust impact below-range (traust-core BelowRangeService)
+    license:
+      id: pass-through
+      terms: >-
+        Each module keeps its own license. Fetched for local analysis, never
+        redistributed. The proxy is run by Google under its published privacy
+        and terms page.
+      url: https://proxy.golang.org/privacy
+      verified: 2026-10-23
+
+  pypi-packages:
+    tier: live
+    role: package-source
+    summary: >-
+      Python sdists (or wheels when no sdist exists) for an installed version:
+      metadata from pypi.org, files from files.pythonhosted.org.
+    url_template: https://pypi.org/pypi/{ident}/json
+    extra_hosts: [files.pythonhosted.org]
+    access: api
+    consumers:
+      - traust impact below-range (traust-core BelowRangeService)
+    license:
+      id: pass-through
+      terms: >-
+        Each package keeps its own license. Fetched for local analysis, never
+        redistributed. Use of PyPI is subject to the PyPI Terms of Use.
+      url: https://policies.python.org/pypi.org/Terms-of-Use/
+      verified: 2026-10-23
+
+  npm-packages:
+    tier: live
+    role: package-source
+    summary: npm package tarballs for an installed version, from the public npm registry.
+    url_template: https://registry.npmjs.org/{ident}
+    access: api
+    consumers:
+      - traust impact below-range (traust-core BelowRangeService)
+    license:
+      id: pass-through
+      terms: >-
+        Each package keeps its own license. Fetched for local analysis, never
+        redistributed. Use of the registry is subject to the npm Open-Source
+        Terms.
+      url: https://docs.npmjs.com/policies/open-source-terms
+      verified: 2026-10-23
+
+  maven-central-sources:
+    tier: live
+    role: package-source
+    summary: >-
+      Maven `-sources.jar` artifacts for an installed version, from Maven
+      Central. An artifact published without sources is a coverage gap.
+    url_template: https://repo1.maven.org/maven2/{ident}
+    access: api
+    consumers:
+      - traust impact below-range (traust-core BelowRangeService)
+    license:
+      id: pass-through
+      terms: >-
+        Each artifact keeps its own license. Fetched for local analysis, never
+        redistributed. Use of Maven Central is subject to the Central
+        Repository Terms of Service.
+      url: https://central.sonatype.org/terms.html
+      verified: 2026-10-23
+
+  crates-io-packages:
+    tier: live
+    role: package-source
+    summary: Rust `.crate` files for an installed version, from the crates.io CDN.
+    url_template: https://static.crates.io/crates/{ident}
+    access: api
+    consumers:
+      - traust impact below-range (traust-core BelowRangeService)
+    license:
+      id: pass-through
+      terms: >-
+        Each crate keeps its own license. Fetched for local analysis, never
+        redistributed. crates.io requires automated clients to send a
+        User-Agent that identifies them, with contact details; traust-core sends
+        one naming its project.
+      url: https://crates.io/policies
+      verified: 2026-10-23
+
+  rubygems-packages:
+    tier: live
+    role: package-source
+    summary: >-
+      Ruby `.gem` files for an installed version, and version publish times,
+      from rubygems.org.
+    url_template: https://rubygems.org/downloads/{ident}
+    access: api
+    consumers:
+      - traust impact below-range (traust-core BelowRangeService)
+    license:
+      id: pass-through
+      terms: >-
+        Each gem keeps its own license. Fetched for local analysis, never
+        redistributed. Use of rubygems.org is subject to its Terms of Service.
+      url: https://rubygems.org/policies/terms-of-service
+      verified: 2026-10-24
+
+  nuget-packages:
+    tier: live
+    role: package-source
+    summary: >-
+      nuget.org metadata. A `.nuspec` names the repository and commit an
+      installed version's source is read from (NuGet packages hold compiled
+      assemblies), and the registration index gives an id's published casing,
+      under which an empty OSV lookup is retried (OSV matches NuGet ids
+      case-sensitively).
+    url_template: https://api.nuget.org/v3-flatcontainer/{ident}
+    access: api
+    consumers:
+      - traust impact below-range (traust-core BelowRangeService)
+      - traust impact sweep|package (traust-core OsvAdvisoryLookup retries an empty NuGet answer in published casing)
+    license:
+      id: pass-through
+      terms: >-
+        Each package keeps its own license. Fetched for local analysis, never
+        redistributed. Use of nuget.org is subject to its Terms of Use.
+      url: https://www.nuget.org/policies/Terms
+      verified: 2026-10-24
+
+  github-source-archives:
+    tier: live
+    role: package-source
+    summary: >-
+      Repository archives at a commit (`<owner>/<repo>/archive/<commit>.tar.gz`):
+      the source of a NuGet package, at the commit its nuspec declares.
+    url_template: https://github.com/{ident}
+    redirect_hosts: [codeload.github.com]
+    access: api
+    consumers:
+      - traust impact below-range (traust-core BelowRangeService)
+    license:
+      id: pass-through
+      terms: >-
+        Each archive keeps its repository's license. Fetched for local
+        analysis, never redistributed. Use of github.com is subject to the
+        GitHub Terms of Service.
+      url: https://docs.github.com/en/site-policy/github-terms/github-terms-of-service
+      verified: 2026-10-24
 
   nvd:
     tier: live

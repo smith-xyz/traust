@@ -519,7 +519,7 @@ writes a new version of a model (`update`, or `review --apply`) rates
 every threat that lacks `risk_rating` and drops its legacy labels.** The
 whole model moves at once, so a table never mixes the two scales for
 long. Until then, fleet roll-ups order legacy threats beside rated ones
-with a fixed crosswalk (`traust_engine.reporting.threat_rating`) and mark
+with a fixed crosswalk (traust-core's threat-register view) and mark
 them `legacy-crosswalk`. That crosswalk orders threats; it isn't a
 rating.
 

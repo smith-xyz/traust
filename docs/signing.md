@@ -49,10 +49,11 @@ Signing a stale root is impossible by construction.
 
 A scan does not sign anything by itself. A finding reaches the ledger as a
 disposition event, and that event causes the write, the stamp, and the
-signature. The writers are the triage and validation event emitters, the
-countersign recorder, the cumulative-report rebuild, and the two findings
-routers. `rebaseline()` is the exception: it re-points a layer's `audit_report`
-and leaves stamping to the next recording write.
+signature. The legacy layer writers are the triage and validation event emitters,
+the cumulative-report rebuild, and the two findings routers. `rebaseline()` is
+the exception: it re-points a layer's `audit_report` and leaves stamping to the
+next recording write. The ported direct severity recorder calls core services;
+it does not serialize, stamp or sign a legacy layer file.
 
 A write that moves the root **drops a signature it cannot renew**. If the
 recomputed root differs and no key is configured, the stale signature and its
@@ -137,7 +138,6 @@ Two methods:
 | `signing.oidc_issuer`, `signing.oidc_client_id`, `signing.expected_identity` | identity | provider, client, expected certificate SAN |
 | `signing.ca_url`, `signing.tlog_url` | identity | private certificate authority and transparency log for self-hosted sigstore; set both together |
 | _(secret, never in config)_ `COSIGN_PASSWORD` | keypair | the key passphrase, read by cosign from the environment where it runs |
-| _(config-owned)_ `ledger-signing-key.pub` | verification | the validator uses `ctx.signing_pubkey` from `$TRAUST_CONFIG_HOME`. It is **optional**: with no key configured, signature verification is skipped |
 
 Where the key lives, operationally: mounted from the secret store into the job
 that runs the ledger writers, at the path `signing.key_path` names, with the
@@ -159,12 +159,16 @@ ledger verify-signature <layer>.json --key $TRAUST_CONFIG_HOME/ledger-signing-ke
 ledger verify --path <layer>.json --check-signatures
 ledger verify --all --check-signatures
 
-# the harness validator checks signatures as part of report validation
-python3 -m traust.cli reporting validate <layer>.json --signing-pubkey $TRAUST_CONFIG_HOME/ledger-signing-key.pub
 ```
 
 `ledger` is the console script installed by traust-ledger. `--rekor` on `sign`
 uploads the signature to a transparency log; it is opt-in and off by default.
+
+`traust reporting validate` checks artifact structure and semantic consistency;
+it does not verify stored ledger proofs or accept a signing-key option.
+Use core's `Context.services().ledger.verify(layer_id)` for a stored layer's
+integrity and signature verification. The standalone file commands above do not
+replace that domain service.
 
 ## cosign v3 behaviour that matters
 

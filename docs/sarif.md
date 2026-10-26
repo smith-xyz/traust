@@ -128,9 +128,12 @@ ledger, never from a file that passed through a third-party tool.
 
 ```bash
 python3 -m traust.cli triage intake scan.sarif --format sarif \
-    --repo-url https://github.com/org/repo --sha <scanned commit> --origin vuln-scan
+    --repo-url https://github.com/org/repo --sha <scanned commit>
 ```
 
 It prints the new assessment's id; `/triage` takes it from there
 (`traust triage prepare`), and the verdicts are recorded as decisions
 (`traust triage record`).
+The scanner name/version in SARIF supplies the assessment's source metadata; no
+caller origin flag is accepted. Later observations do not replace the first
+reporting assessor used for origin grouping.

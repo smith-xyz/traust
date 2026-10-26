@@ -109,7 +109,7 @@ def record(argv: list[str] | None = None) -> int:
             "assessment_id": assessment.id,
             "status": assessment.status,
             "decisions": len(decisions),
-            "needs_review": sum(d.validity == "not_verified" for d in decisions),
+            "needs_review": sum(d.validity is None for d in decisions),
         }
 
     return run(call)

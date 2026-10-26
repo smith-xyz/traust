@@ -665,13 +665,14 @@ def main():
     ap.add_argument("--from-sbom")
     ap.add_argument("--validate-facts")
     args = ap.parse_args()
-    load_engine(args.config_home)
+    # Pure report validation needs the installed contract, not engine config.
 
     if args.validate_facts:
         p = Path(args.validate_facts)
         raise SystemExit(min(validate_facts(json.loads(p.read_text()), str(p)), 1))
     if not args.out or not (args.repo_dir or args.from_sbom):
         ap.error("need --out and one of --repo-dir/--from-sbom")
+    load_engine(args.config_home)
 
     doc = build_facts(args)
     serialized = doc.to_dict()

@@ -218,10 +218,11 @@ three of them mechanically enforced, keep that from recurring:
 - Consider operational security when handling credentials or sensitive findings
 - **Untrusted text never reaches an emitter raw** — finding titles, repo/
   team names, URLs, and anything quoted from an audited repository must
-  pass through `traust_engine.escaping` before landing in generated HTML
-  (`esc_html`), inline `<script>` JSON (`json_script`), Markdown table
-  cells (`md_cell`), fenced blocks (`fence_untrusted`), CSV cells
-  (`csv_cell`), or path/API segments (`safe_slug`). One sibling having
+  use the workbench's single `_quoted_json` renderer for private review Markdown.
+  Other emitter formats use shared `traust_engine.escaping` helpers: generated
+  HTML (`esc_html`), inline `<script>` JSON (`json_script`), Markdown table
+  cells (`md_cell`), CSV cells (`csv_cell`), or path/API segments (`safe_slug`).
+  One sibling having
   the control while its neighbor lacks it was the measured failure shape
   (assessment 2026-07-31 root cause 4) — import the shared helpers, do
   not re-implement them locally

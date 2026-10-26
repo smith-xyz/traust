@@ -264,10 +264,8 @@ TM_SURFACE_RX = re.compile(
     r"|\.proto$",
     re.I,
 )
-# Phase 2: only these release-bump kinds re-model. The feeder classifies
-# (harnessing/2-threat-model/threat-model/scripts/build_release_events.py
-#  REMODEL_CHANGES) — kept as a literal
-# here so the router never depends on the feeder being importable.
+# Phase 2: only these release-bump kinds re-model (traust-core's ReleaseChange.remodels;
+# `traust portfolio release-changes` stamps the bump).
 RELEASE_REMODEL_CHANGES = ("major", "minor")
 # Phase 3: calendar backstop for repos whose code is quiet but whose
 # threat landscape isn't. Held in LOCKSTEP with traust-core's
@@ -1682,8 +1680,8 @@ def read_policy_shadow_ceiling(path: Path) -> tuple[float | None, str]:
     path's reader and reports `observe` as no ceiling, so no future
     edit there can accidentally start withholding work under a mode
     whose entire contract is that it withholds nothing. This reader is
-    the only way to see an observe ceiling, and its caller
-    (traust.cli.budget_shadow) cannot filter a work list.
+    the only way to see an observe ceiling; its one caller, the retired budget shadow, never
+    filtered a work list (traust-engine's admission records verdicts now).
     """
     if not path.is_file():
         return None, f"no budget policy at {path}"

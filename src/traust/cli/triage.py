@@ -17,7 +17,7 @@ from traust_core.v1.models.artifacts import TriageArtifact
 from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.findings import CandidateFormat
 from traust_core.v1.models.values import HttpsRepoUrl
-from traust_core.v1.models.vocabulary import FindingOrigin, SourceType
+from traust_core.v1.models.vocabulary import SourceType
 
 from traust.cli._doors import add_branch_arg, parser, register_commit, run
 from traust.context import load_core
@@ -35,12 +35,6 @@ def intake(argv: list[str] | None = None) -> int:
     ap.add_argument("--sha", required=True, help="the scanned commit")
     ap.add_argument("--public", action="store_true", help="the repository is public")
     add_branch_arg(ap)
-    ap.add_argument(
-        "--origin",
-        required=True,
-        choices=[o.value for o in FindingOrigin],
-        help="the skill that produced the scan",
-    )
     args = ap.parse_args(argv)
 
     def call() -> dict:
@@ -54,7 +48,6 @@ def intake(argv: list[str] | None = None) -> int:
             ref.id,
             args.scan.read_bytes(),
             CandidateFormat(args.format),
-            FindingOrigin(args.origin),
             Provenance(run_id=uuid.uuid4(), source=SourceType.VULN_SCAN_REPORT, occurred_at=when),
         )
         found, new = len(taken.findings), len(taken.created)
@@ -107,6 +100,16 @@ def record(argv: list[str] | None = None) -> int:
                 d.validity == "false_positive" and not d.auto_accept_tier for d in made
             ),
             "auto_accepted": sum(d.auto_accept_tier for d in made),
+            "baseline_assessment_id": args.assessment_id,
+            "records": [
+                {
+                    "decision_id": decision.id,
+                    "assessment_id": decision.assessment_id,
+                    "artifact_id": decision.artifact_id,
+                    "finding_id": decision.finding_id,
+                }
+                for decision in made
+            ],
         }
 
     return run(call)

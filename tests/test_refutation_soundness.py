@@ -9,13 +9,12 @@ error-correction plan):
   - execute.py — step-level gating at dispatch time (+ audit log flag)
   - report.py — finding-level rollup carries soundness_flag; backstop
     gate on results that bypassed execute
-  - traust.cli.emit_validation_ledger_events — flagged refutations route
-    to needs_review (queue_reason unsound_refutation), never to the
-    FP/countersign path or the refuted register
+  - tests/test_validation_record.py exercises the actual registered core-backed
+    record path: unsound observations reach review without validity decisions
+    or false-positive signoff paths
   - traust.ops.lint_refutation_soundness — retroactive corpus linter
 """
 
-import hashlib
 import json
 import sys
 
@@ -353,68 +352,10 @@ class TestReportRollup:
 
 
 # ======================================================================
-# emit_validation_ledger_events.py — ledger routing
+# Retroactive linter fixtures (recording integration lives in test_validation_record.py)
 # ======================================================================
 
 RECORDED = "2026-07-22T12:00:00+00:00"
-RUNNER = "/home/runner/ws"
-
-
-def _mk_corpus(
-    tmp_path, observed=FORBIDDEN, soundness_flag=None, verdict="refuted", install_failure=False
-):
-    results = tmp_path / "analysis-results"
-    audit_dir = results / "findings" / "prodA" / "repoX"
-    audit_dir.mkdir(parents=True)
-    audit = {
-        "metadata": {"repository": "https://example.invalid/repoX", "commit": "abc1234"},
-        "findings": [
-            {
-                "id": "FIND-001",
-                "title": "over-broad RBAC",
-                "severity": "high",
-                "description": "wildcard ClusterRole",
-            }
-        ],
-    }
-    audit_path = audit_dir / "repoX-security-audit.json"
-    audit_path.write_text(json.dumps(audit))
-
-    vdir = results / "validations" / "prodA"
-    vdir.mkdir(parents=True)
-    if install_failure:
-        (vdir / "install-failure.yaml").write_text("reason: CSV failed\n")
-    vf = {
-        "source_id": "prodA:repoX/FIND-001",
-        "source_report": f"{RUNNER}/analysis-results/findings/prodA/"
-        f"repoX/repoX-security-audit.json",
-        "title": "over-broad RBAC",
-        "claimed_severity": "high",
-        "verdict": verdict,
-        "technique": "replay",
-        "steps": [],
-        "evidence": [],
-        "observed_impact": observed,
-        "deviation_from_claim": "",
-    }
-    if soundness_flag:
-        vf["soundness_flag"] = soundness_flag
-    audit_sha = hashlib.sha256(audit_path.read_bytes()).hexdigest()
-    report = {
-        "metadata": {"harness_version": "0.136.0-abc1234", "date": "2026-07-22"},
-        "source_reports": [
-            {"kind": "security-audit", "path": vf["source_report"], "sha256": audit_sha}
-        ],
-        "validated_findings": [vf],
-    }
-    report_path = vdir / "prodA-validation.json"
-    report_path.write_text(json.dumps(report))
-    return results, report, report_path
-
-
-# ======================================================================
-# countersign.py — raw probe output on cards
-# ======================================================================
 
 
 # ======================================================================

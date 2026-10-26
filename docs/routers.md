@@ -7,17 +7,17 @@ jobs, and confusing them has caused real defects. This page is the single index:
 what each one is, what it may and may not write, and where the detail lives.
 
 If you are auditing coverage, the 15 are: `build_rescan_worklist.py` (work
-routing + the budget guard inside it), `budget_shadow.py`,
+routing + the budget guard inside it), `traust.ops.router`,
 `traust_engine.registry.models`, `route_regressions.py`,
 `route_impact_findings.py`, `/assign-findings-owners` (internal extension),
 `/reassign-findings-owners` (internal extension), `/file-security-defect`,
-`emit_drain_tranche.py`, `traust remediation verify-sweep`,
+`traust remediation verify-sweep`,
 `traust impact sweep`, `traust feeds fetch` (`feeds_fetch.py`).
 
 | Kind | Routes | Implementation | Detail |
 |---|---|---|---|
-| **Work routing** — *the rescan router* | repos → one of 12 scan lanes | `build_rescan_worklist.py` | [continuous-operations.md](continuous-operations.md) |
-| **Cost routing** — *the budget guard* | **drops queued work to fit a USD ceiling** | budget guard inside `build_rescan_worklist.py`; `budget_shadow.py` | [continuous-operations.md](continuous-operations.md) |
+| **Work routing** — *the rescan router* | repos → one of 12 scan lanes | `build_rescan_worklist.py`; per repository in continuous ops, `traust.ops.router` (the security pack's router) | [continuous-operations.md](continuous-operations.md) |
+| **Cost routing** — *the budget guard* | **drops queued work to fit a USD ceiling** | budget guard inside `build_rescan_worklist.py`; in continuous ops, traust-engine's admission (lane budgets, `admission.estimate_usd`) | [continuous-operations.md](continuous-operations.md) |
 | **Model routing** | a task → a model tier, and what it costs | `traust_engine.registry.models`, `config/model-registry.yaml` | [model-routing.md](model-routing.md) |
 | **Findings routing** | a producer's findings → ledger events | `route_regressions.py`, `route_impact_findings.py` | [findings-routing.md](findings-routing.md) |
 | **Owner routing** | findings packages → teams and named maintainers | `/assign-findings-owners` (internal extension), `/reassign-findings-owners` | those skills' `SKILL.md` |
@@ -32,7 +32,6 @@ work, and none of them authors a finding:
 
 | Builder | Selects | Detail |
 |---|---|---|
-| `emit_drain_tranche.py` | this week's tranche from the router's drain ordering | [continuous-operations.md](continuous-operations.md) |
 | `traust remediation verify-sweep` (traust-core `VerificationService.sweep`) | the `/verify-remediation` full-sweep worklist | `harnessing/8-verify/verify-remediation/SKILL.md` |
 | `traust impact sweep` (traust-core `ExposureService.sweep`) | `/dependency-watch`'s bootstrap / full-baseline OSV sweep | `harnessing/3-audit/dependency-watch/SKILL.md` |
 
@@ -53,6 +52,11 @@ authors a finding, verdict, or audit**, and never self-tunes.
 baseline is cut** — exactly what a producer appending findings straight into a
 baseline used to bypass (§4).
 
+In continuous ops the same decision table runs per repository:
+`traust.ops.router` routes a repository each time its `repo_state` materializes,
+and the lane's asset in `packs/security/assets.yaml` gets the order. The worklist
+builder stays until the shadow run's cutover.
+
 → **[continuous-operations.md](continuous-operations.md)**
 
 ## 2. Cost routing — the budget guard
@@ -70,8 +74,9 @@ recorded verdict, not a control, and **nothing is ever withheld**. Only
 `advisory` and `enforced` bind a run, and moving to either is a deliberate
 deployment decision, never a side effect. The code states the principle plainly:
 *"a config that documents its own non-enforcement is honest; one that implies
-enforcement it lacks is a vulnerability."* `budget_shadow.py` does the shadow
-accounting for observe mode.
+enforcement it lacks is a vulnerability."* In continuous ops, traust-engine's
+admission records the verdict in each order's run manifest and, at `observe`,
+withholds nothing.
 
 **Writes:** the worklist's drop list and shadow ledger. Never a finding.
 

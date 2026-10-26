@@ -38,9 +38,11 @@ notes.
    find recommended fuzz entry points (findings whose `remediation` mentions
    fuzzing, or the report's remediation-roadmap "add fuzz harness" items).
    **Also check the refuted register** —
-   `python3 -m traust.cli findings refuted --repo-url <https URL>` lists
-   the repository's findings dismissed as
-   false positives; entries in fuzzable classes (parsers, decoders,
+   `traust findings refuted --repo-url <repository-URL>` returns core's
+   false positives, including human-reviewed dismissals. A retained
+   `<repo>-refuted-register.json` is historical evidence, not a current
+   projection; do not regenerate it or treat absence as no refutations.
+   Entries in fuzzable classes (parsers, decoders,
    memory safety, injection) are PRIORITY targets, because a reproducing
    crash overrides the FP assertion via evidence-class precedence
    (`fp_overridden`). An FP is a falsifiable claim, not an exclusion.
@@ -241,8 +243,9 @@ on its ledger event; the originating audit report is not modified (gate A15).
 
 ## Integrations
 
-- **Inputs:** audit reports' fuzz-worthy entry points, refuted registers
-  (`traust findings refuted`; FP falsification targets), and `/impact-analysis` artifacts (form 2b
+- **Inputs:** audit reports' fuzz-worthy entry points, core refuted findings
+  (`traust findings refuted`, maintained by triage and track-findings decisions;
+  FP falsification targets), and `/impact-analysis` artifacts (form 2b
   — the class-3→class-1 promotion path).
 - **Outputs consumed by:** the event-carried follow-up finding
   (with reproducer evidence) flows through `/track-findings` as
