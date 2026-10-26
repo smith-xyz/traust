@@ -87,3 +87,22 @@ def test_every_asset_has_a_trigger_freshness_and_runner_labels() -> None:
         # a routed lane has no cadence to fall behind: nothing is due until the router routes
         assert asset.get("freshness") or asset.get("trigger", {}).get("lanes"), name
         assert asset.get("runner", {}).get("labels"), name
+
+
+REGISTRY = Path(__file__).resolve().parents[1] / "config" / "model-registry.yaml"
+# What traust-engine's claim-once runner fills in: the order's id, and its repository's URL.
+RUNNER_PARAMS = {"run_id", "repo_url"}
+
+
+def test_every_skill_session_names_a_registry_role() -> None:
+    roles = set(yaml.safe_load(REGISTRY.read_text())["roles"])
+    sessions = {n: a.model.role for n, a in Pack.load(PACK).assets.items() if a.model}
+    assert sessions and set(sessions.values()) <= roles, sessions
+
+
+def test_every_command_param_is_one_the_runner_fills() -> None:
+    raw = yaml.safe_load(PACK.read_text())["assets"]
+    for name, asset in raw.items():
+        named = {m[1] for t in asset.get("run", []) if (m := re.fullmatch(r"\{(\w+)\}", t))}
+        assert named <= RUNNER_PARAMS, (name, named)
+        assert "repo_url" not in named or asset.get("partitions") == "dynamic:repo", name
