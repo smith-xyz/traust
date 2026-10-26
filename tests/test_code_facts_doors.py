@@ -1,4 +1,4 @@
-"""`traust adapters route-guards|config-matrix|sanitizers|fork-lag|priv-profile`: each is one traust-core
+"""`traust adapters route-guards|llm-app|config-matrix|sanitizers|fork-lag|priv-profile`: each is one traust-core
 code-facts call; services are stubbed (the pre-scans' behaviour is traust-core's tests)."""
 
 from __future__ import annotations
@@ -20,6 +20,12 @@ from traust_core.v1.models.code_facts import (
     ConfigTriple,
     ForkLagFact,
     ForkUpstream,
+    LlmAppFact,
+    LlmAppKind,
+    LlmAppSignal,
+    LlmAppStats,
+    LlmSignalSource,
+    LlmTaggedFile,
     RouteFamily,
     RouteGuardFact,
     RouteGuardRow,
@@ -59,6 +65,17 @@ FORK = ForkLagFact(
     ),
 )  # fmt: skip
 
+LLM = LlmAppFact(
+    llm_application=True,
+    kinds=(LlmAppKind.MCP_SERVER,),
+    signals=(
+        LlmAppSignal(kind=LlmAppKind.MCP_SERVER, library="mcp", via=(LlmSignalSource.IMPORT,),
+                     evidence=(CodeSpan(path="server/tools.py", line=1),)),
+    ),
+    files=(LlmTaggedFile(path="server/tools.py", kinds=(LlmAppKind.MCP_SERVER,)),),
+    stats=LlmAppStats(source_files_read=1, manifests_read=0),
+)  # fmt: skip
+
 PROFILE = PrivProfileArtifact.from_document(
     {"repo": "widget", "workloads": [], "rbac_rules": [{"verbs": ["get"]}],
      "summary": {"workloads": 0, "rbac_rules": 1, "no_scc_request_recorded": True}}
@@ -79,6 +96,9 @@ class CodeFacts:
     def route_guards(self, request, *, resolve_handlers):
         return self._answer(("route_guards", request.workspace, resolve_handlers),
                             RouteGuardFact(routes=(ROW,)))  # fmt: skip
+
+    def llm_app(self, request):
+        return self._answer(("llm_app", request.workspace), LLM)
 
     def enumerate(self, kind, request):
         found = {CodeFactKind.CONFIG: [ConfigFact(triples=(TRIPLE,))],
@@ -119,6 +139,14 @@ def test_route_guards_resolves_handlers_on_request(facts, tmp_path):
     assert facts.calls == [("route_guards", tmp_path, True)]
 
 
+def test_llm_app_is_one_call(facts, capsys, tmp_path):
+    assert code_facts.llm_app([str(tmp_path)]) == 0
+    assert facts.calls == [("llm_app", tmp_path)]
+    doc = _json(capsys)
+    assert (doc["llm_application"], doc["kinds"]) == (True, ["mcp-server"])
+    assert doc["files"][0]["path"] == "server/tools.py"
+
+
 def test_config_matrix_keeps_the_class_field_name(facts, capsys, tmp_path):
     assert code_facts.config_matrix([str(tmp_path)]) == 0
     assert facts.calls == [("enumerate", CodeFactKind.CONFIG, tmp_path)]
@@ -156,7 +184,9 @@ def test_a_refused_checkout_exits_2(facts, capsys, tmp_path):
     assert "not a directory" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("op", ["route-guards", "config-matrix", "sanitizers", "fork-lag"])
+@pytest.mark.parametrize(
+    "op", ["route-guards", "llm-app", "config-matrix", "sanitizers", "fork-lag"]
+)
 def test_ops_are_registered_under_adapters(op):
     assert op in GROUPS["adapters"]
 
