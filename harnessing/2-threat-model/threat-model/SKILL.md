@@ -10,8 +10,9 @@ description: >-
   "update" applies targeted feedback without regenerating; "pr" threat-models
   a diff and returns an approve/request-changes assessment. Output is always
   named after the target (<repo>-threat-model.md); legacy THREAT_MODEL.md
-  files are still read and are migrated on write. Emissions share one schema
-  gated by python3 -m traust.cli reporting lint. Use when
+  files are still read and are migrated on write. Mitigations use canonical
+  effort sizes or explicit unknown, with independent optional external blocking.
+  Emissions share one JSON schema, validated before rendering. Use when
   asked to "threat model", "map the attack surface", "is the threat model
   still current", "threat model this MR/PR/diff", or "what should we be
   worried about in this codebase".
@@ -309,9 +310,9 @@ rendered from it. A security report does exactly this. A threat model is
 not an exception.
 
 `threat-model.schema.json` in `traust-contracts` defines the model. All
-modes MUST compose `<target-dir>/<repo>-threat-model.json` against that
-schema, then validate and render it with the SAME two commands every
-other artifact uses:
+modes MUST compose `<target-dir>/<repo>-threat-model.json` against its
+`#/$defs/canonical_write` contract, then validate and render it with the
+SAME commands every other artifact uses:
 
 ```bash
 python3 -m traust.cli reporting rate-threats <repo>-threat-model.json
@@ -349,6 +350,21 @@ routing time; in interview mode the gap between routing and emit can be
 many turns, and an early read will be evicted before it is used.
 `schema.md` in this directory documents what each section means and the
 scoring guide; the JSON Schema is what your output is checked against.
+
+**Mitigation effort (every mode that writes).** Each `mitigations` entry
+MUST include `effort`: a canonical size, or JSON `null` when the size is
+unknown. Follow [section 8](schema.md#8-recommended-mitigations); do not
+infer a size from a missing estimate or invent duration thresholds.
+`blocked_external` is an independent optional boolean: include `true` or
+`false` only when that state is known, otherwise omit it. A known block
+does not determine the size, and a known size does not determine blocking.
+When recommending the lowest-effort controls, order known sizes by the
+registry's size order; keep unknown sizes separate, never cheapest.
+Historical uppercase labels remain readable. Only the exact registry
+replacements apply when composing a fresh canonical artifact; never
+arbitrarily lowercase other inputs or rewrite stored historical artifacts
+as part of this cutover. Preserve reported blocking when carrying a
+mitigation into a new artifact or a recommendation.
 
 **A non-zero exit is a defect in the document you just wrote, not a step
 to skip.** The command names every failing path — usually an

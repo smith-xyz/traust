@@ -521,10 +521,12 @@ pass.
 
 Populate `## 8. Recommended mitigations` from the Stage-3c working notes: one
 row per class-level `mitigation`, listing the `threat_ids` it covers, whether
-it `closes_class` (yes/partial), and a rough `effort` (S/M/L). If two
-clusters are closed by the same control, emit one row with both clusters'
-ids. Gap-fill threats from Stage 4 get rows here too where an obvious
-class-level control exists.
+it `closes_class` (yes/partial), and required `effort` per schema.md section 8:
+a canonical size when supported, or JSON `null` when unknown. Record
+`blocked_external` independently only when known; otherwise omit it, not
+`false`. If two clusters are closed by the same control, emit one row with
+both clusters' ids. Gap-fill threats from Stage 4 get rows here too where
+an obvious class-level control exists.
 
 **Emit the JSON, then render.** Compose `<target-dir>/<repo>-threat-model.json`
 against `threat-model.schema.json`, exactly as SKILL.md *Step 2 — Shared
@@ -569,7 +571,9 @@ Hand back to the user:
 3. Count of threats with evidence vs without (shows gap-fill ran).
 4. Stage-3b sibling locations as candidate leads for `/vuln-scan` or the
    pipeline `find` stage.
-5. The section 8 recommended mitigations, top 3 by (closes_class, effort asc).
+5. The section 8 recommended mitigations, top 3 by (closes_class, known
+   effort in size order). Keep unknown effort separate, never cheapest;
+   carry any reported external-blocking state with each recommendation.
 6. The section 6 open questions, framed as "ask the owner".
 7. If `--context` was used: per-source one-line ingestion summaries and any
    doc-vs-code conflicts recorded (so the user can course-correct a
