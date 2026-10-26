@@ -90,8 +90,9 @@ def test_every_asset_has_a_trigger_freshness_and_runner_labels() -> None:
 
 
 REGISTRY = Path(__file__).resolve().parents[1] / "config" / "model-registry.yaml"
-# What traust-engine's claim-once runner fills in: the order's id, and its repository's URL.
-RUNNER_PARAMS = {"run_id", "repo_url"}
+# What traust-engine's claim-once runner fills in: the order's id, its repository's URL, and a
+# skill session's model role.
+RUNNER_PARAMS = {"run_id", "repo_url", "role"}
 
 
 def test_every_skill_session_names_a_registry_role() -> None:
@@ -106,3 +107,14 @@ def test_every_command_param_is_one_the_runner_fills() -> None:
         named = {m[1] for t in asset.get("run", []) if (m := re.fullmatch(r"\{(\w+)\}", t))}
         assert named <= RUNNER_PARAMS, (name, named)
         assert "repo_url" not in named or asset.get("partitions") == "dynamic:repo", name
+
+
+def test_every_runnable_skill_session_starts_through_traust_session_with_its_role() -> None:
+    from traust.paths import skill_dir
+
+    for name, asset in yaml.safe_load(PACK.read_text())["assets"].items():
+        if "model" not in asset or "run" not in asset:
+            continue
+        run = asset["run"]
+        assert run[3:5] == ["session", "run"] and "{role}" in run, name
+        skill_dir(run[run.index("--skill") + 1])

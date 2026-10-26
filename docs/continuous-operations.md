@@ -487,7 +487,7 @@ with none unexplained. `traust-engine` is installed with traust; every command
 takes the same three paths:
 
 ```bash
-E="--core $TRAUST_CONFIG_HOME/core.yaml --pack packs/security/assets.yaml --pin config/external-tools.yaml"
+E="--core $TRAUST_CONFIG_HOME/core.yaml --pack packs/security/assets.yaml --pin config/external-tools.yaml --feeds config/feeds.yaml"
 
 # each cron job, wrapped: its run becomes an order the engine counts
 traust-engine record $E feeds_cache -- traust feeds fetch --feed all
@@ -513,8 +513,13 @@ command, fills its `{run_id}` and `{repo_url}` tokens from the order, renews the
 lease while the command runs, completes the order with the command's JobResult
 and exits (0 succeeded, 1 failed, 4 degraded, 5 refused; nothing queued is 0).
 It is claim-once, started by an operator or a scheduler, never a daemon.
-Skill sessions (`model: {role}`) stay queued for a session launcher; `claim`
-never takes them.
+A skill session is a command too: its `run` is `traust session run --skill
+<skill> --role {role}`, which resolves the role's model from the registry and
+starts the skill headless in the harness (a repository it reviews is passed by
+URL, or as a temporary checkout outside the harness with `--checkout`). Its
+outcome is the session's exit. Pass `--feeds config/feeds.yaml` to every
+`traust-engine` command so core knows the pack's feeds when a run reports one
+degraded.
 
 ## Standing weekly drain — orchestrator contract
 

@@ -38,6 +38,7 @@ assets:
     # full-audit+validate (rule 1, an external report) comes with the feed, and the pack schema's
     # name pattern rejects its `+` (NEED(contracts: the work_lane value as a pack lane)).
     model: {role: deep-audit}
+    run: [python3, -m, traust.cli, session, run, --skill, secure-code-audit, --role, "{role}", --repo, "{repo_url}", --run-id, "{run_id}"]
     partitions: dynamic:repo
     deps: [repo_state]
     trigger: {lanes: [full-audit]}
@@ -46,6 +47,7 @@ assets:
 
   diff_scan:  # skill session: /vuln-scan <clone> --diff; rule 3 on P2/P3, outside the drain
     model: {role: vuln-scan}
+    run: [python3, -m, traust.cli, session, run, --skill, vuln-scan, --role, "{role}", --repo, "{repo_url}", --checkout, --run-id, "{run_id}", --, --diff]
     partitions: dynamic:repo
     deps: [repo_state]
     trigger: {lanes: [diff-scan]}
@@ -57,17 +59,19 @@ assets:
     # the highest-priority rows (external band first) each tick. Tune per_tick to the tick
     # interval so a week drains what the tranche did.
     model: {role: vuln-scan}
+    run: [python3, -m, traust.cli, session, run, --skill, vuln-scan, --role, "{role}", --repo, "{repo_url}", --checkout, --run-id, "{run_id}", --, --diff]
     partitions: dynamic:repo
     deps: [repo_state]
     trigger: {lanes: [diff-scan-quarterly]}
     admission: {approval: operators, estimate_usd: "6.24", pacing: {per_tick: 5}}
     runner: {labels: [llm]}
 
-  # A skill session is `model: {role: <model-registry role>}`, not a `run`. `traust-engine claim`
-  # runs only commands, so these orders wait queued for a session launcher. PENDING(roles): each
-  # role is the registry role closest to the session's work, until the pack owner confirms.
+  # A skill session is `model: {role}` plus a `run` that starts it (`traust session run`);
+  # `traust-engine claim` fills `{role}`. PENDING(roles): each role is the registry role closest
+  # to the session's work, until the pack owner confirms.
   dependency_watch:
     model: {role: fact-judge}
+    run: [python3, -m, traust.cli, session, run, --skill, dependency-watch, --role, "{role}", --run-id, "{run_id}"]
     deps: [feeds_cache]
     trigger: {every: 24h}
     priority: 40
@@ -94,6 +98,7 @@ assets:
   below_range_review:  # skill session: /dependency-watch below-range, recorded with
     # `traust impact below-range-record`; applicable cases become dependency findings
     model: {role: fact-judge}
+    run: [python3, -m, traust.cli, session, run, --skill, dependency-watch, --role, "{role}", --run-id, "{run_id}", --, below-range, "{repo_url}"]
     partitions: dynamic:repo
     deps: [below_range_packets]
     trigger: {every: 7d}
@@ -114,6 +119,7 @@ assets:
 
   verify_remediation:  # skill session: traust remediation verify-sweep → /verify-remediation full-sweep
     model: {role: verification-verdict}
+    run: [python3, -m, traust.cli, session, run, --skill, verify-remediation, --role, "{role}", --run-id, "{run_id}", --, full-sweep]
     trigger: {every: 7d}
     priority: 50
     freshness: {fail: 14d}
@@ -121,6 +127,7 @@ assets:
 
   spend_capture:  # skill session: /financial-tracking capture; lossy when late
     model: {role: render-narrate}
+    run: [python3, -m, traust.cli, session, run, --skill, financial-tracking, --role, "{role}", --run-id, "{run_id}", --, capture]
     trigger: {every: 7d}
     priority: 50
     freshness: {fail: 8d}
@@ -151,13 +158,14 @@ assets:
   # PENDING(quarterly): `90d` stands for quarterly (durations are minutes, hours or days).
   recall_benchmark:  # skill session: /recall-benchmark run; release scoring has no trigger form yet
     model: {role: deep-audit}
+    run: [python3, -m, traust.cli, session, run, --skill, recall-benchmark, --role, "{role}", --run-id, "{run_id}", --, run]
     trigger: {every: 90d}
     priority: 70
     freshness: {fail: 180d}
     runner: {labels: [llm]}
 
-  class_sweep:  # skill session: targeted class-sweep
-    model: {role: vuln-scan}
+  class_sweep:  # targeted class-sweep sessions: a purpose-built prompt per weakness class, no skill
+    # to start (NEED(skill: class-sweep)); unrunnable until one exists
     trigger: {every: 90d}
     priority: 70
     freshness: {fail: 180d}
