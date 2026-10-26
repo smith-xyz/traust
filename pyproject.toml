@@ -46,7 +46,7 @@ override-dependencies = [
 
 [tool.uv.sources]
 traust-core = { git = "https://github.com/traust-security/traust-core.git", rev = "6023a3ce763d632702a09ac6335733628560b7dc" }
-traust-engine = { git = "https://github.com/traust-security/traust-engine.git", rev = "814d4f7c90405db1690872d36ab4619f31a1bb76" }
+traust-engine = { git = "https://github.com/traust-security/traust-engine.git", rev = "58112f1b43d5dc7dbcc435ba2494501beb10cd44" }
 
 # Multi-skill CLIs live under src/traust/; harnessing/<skill>/ for single-skill
 # scripts. Install for deps + importable path helpers.
