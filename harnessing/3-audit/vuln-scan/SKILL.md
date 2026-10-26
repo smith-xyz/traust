@@ -2,11 +2,11 @@
 name: vuln-scan
 description: >-
   Static source-code vulnerability scan. Reads a target directory (and its
-  threat model — <repo>-threat-model.md, or legacy THREAT_MODEL.md — if
-  present), spawns parallel review subagents per focus area, and writes
+  threat model recorded in traust-core, if present), spawns parallel
+  review subagents per focus area, and writes
   <repo>-vuln-findings.{json,md} with campaign finding IDs
   ({REPO_SLUG}-{SHORTSHA}-{NNN}) and the shared severity enum, for /triage
-  to consume. When a <repo>-security-audit.json baseline exists, the scan
+  to consume. When traust-core holds a baseline for the repository, the scan
   supplements it: known findings are deduped against the baseline and new
   verified findings enter traust-core directly (as findings of the scan's assessment; the baseline is never written — gate A15) at
   not_verified (no triage precondition; triage adjudicates downstream) —
@@ -15,7 +15,7 @@ description: >-
   building, running, or network. Use when asked to "scan for vulns",
   "review this code for security issues", "find bugs in <dir>", "re-sweep
   an audited repo", or as the step between /threat-model and /triage.
-argument-hint: "<target-dir> [--diff [--since <commit>] [--baseline-assessment <id>]] [--baseline <audit.json>] [--focus <area>] [--single] [--extra <file>] [--no-score]"
+argument-hint: "<target-dir> [--diff [--since <commit>] [--baseline-assessment <id>]] [--focus <area>] [--single] [--extra <file>] [--no-score]"
 user-invocable: true
 metadata:
   harness.tier: "primary"
@@ -51,7 +51,7 @@ allowed-tools:
   - Bash(python3 *-m traust.cli reporting validate:*)
   - Bash(python3 *-m traust.cli adapters checkov:*)
   - Bash(python3 *-m traust.cli adapters opengrep:*)
-  # Diff-mode scope and context packet ONLY (see "## Diff mode (--diff)"):
+  # Scope and context packet ONLY (Step 1.2/1.3, "## Diff mode (--diff)"):
   # traust-core reads the existing clone read-only (list-argv git, no
   # network) and traust's store; writes only its -o. Never authors a
   # finding. Do not widen to other interpreters/scripts.
@@ -81,8 +81,8 @@ ingests directly.
 - **`/secure-code-audit` is the preferred baseline.** It is the
   comprehensive assessment: multi-framework mappings (ASVS, K8s Top 10,
   CIS, STIG, SLSA, Scorecard), severity criteria, LoC accounting, and the
-  full `contracts/schemas/report.schema.json` contract. When no
-  `<repo>-security-audit.json` exists for the target and campaign-grade
+  full `contracts/schemas/report.schema.json` contract. When traust-core
+  holds no audit of the target and campaign-grade
   coverage is wanted, recommend running it instead of (or after) this
   skill.
 - **`/verify-remediation` re-audits after fixes.** Checking
@@ -122,8 +122,8 @@ do not provision them — `allowed-tools` is a permission filter, not a loader,
 so listing them here does not make them appear. When Glob/Grep are
 unavailable, fall back to the read-only Bash commands whitelisted above:
 `rg --files <scope>` / `ls -R` for enumeration, `rg -n` / `grep -rn` for
-search, `wc` / `head` / `file` for sniffing, `jq` for reading the baseline
-JSON. These are the ONLY permitted Bash commands; do not write helper
+search, `wc` / `head` / `file` for sniffing, `jq` for reading the scope
+packet. These are the ONLY permitted Bash commands; do not write helper
 scripts or pipe target content into a shell interpreter.
 
 ## Arguments
@@ -131,15 +131,15 @@ scripts or pipe target content into a shell interpreter.
 - `<target-dir>` (required) — directory to scan. Relative or absolute.
 - `--diff` — diff mode: scope the scan to what changed since the target's
   baseline audit instead of the whole tree (see "## Diff mode (--diff)").
-  The baseline and anchor are AUTO-RESOLVED; `--since`/`--baseline` are
-  overrides only.
+  The baseline and anchor are AUTO-RESOLVED; `--since`/`--baseline-assessment`
+  are overrides only.
 - `--since <commit>` (diff mode only) — explicit anchor commit,
   overriding the baseline audit's commit (for cross-ref
   diffs, ad-hoc comparisons, or pre-branch-awareness reports).
 - `--baseline-assessment <id>` (diff mode only) — the recorded audit to
   diff against, overriding the auto-resolved baseline.
-- `--baseline <audit.json>` — explicit path to the target's existing
-  `<repo>-security-audit.json` (overrides auto-discovery, Step 1.3).
+- `--baseline <audit.json>` — *retired*: the baseline is the repository's
+  findings recorded in traust-core (Step 1.3), not a file.
 - `--focus <area>` — scan only this focus area (repeatable). Skips recon.
 - `--single` — no subagent fan-out; one sequential pass. Use on tiny targets
   or when debugging the prompt.
@@ -232,7 +232,8 @@ The review scope is ONLY:
 2. their **direct callers** (the packet's `callers` entries — files
    containing those references join the scope);
 3. the baseline threat-model rows (section 3 entry points / section 4
-   threats of `<repo>-threat-model.md`, when present) touching those
+   threats: the packet's `threat_model_document` `entry_points` /
+   `threats`, when present) touching those
    entry points — they seed each cluster's TRUST BOUNDARY line.
 
 Focus areas = the packet's `clusters` (already capped at 1–5). Spawn
@@ -353,22 +354,32 @@ exactly as it does to files read from the checkout.
    - `SHORTSHA`: `git -C <target-dir> rev-parse --short=7 HEAD`; if the
      target is not a git checkout, use `0000000` and say so in the output
      metadata.
-2. Look for the target's threat model, resolving per the `/threat-model`
-   skill's naming rule: exactly one `*-threat-model.md` in `<target-dir>`,
-   else the legacy `<target-dir>/THREAT_MODEL.md`. If present, parse its
-   section 3 "Entry points & trust boundaries" table and section 4 "Threats"
-   table for focus areas and threat classes. This is the preferred scoping
-   input.
-3. **Locate the baseline audit**, in order: the `--baseline` argument; then
-   `<target-dir>/<repo>-security-audit.json`; then (when the harness runs
-   inside the campaign workspace)
-   `analysis-results/findings/**/<repo>/<repo>-security-audit.json`. If
-   found, Read its `findings[]` (id, title, locations, cwes/category,
-   severity) into a **baseline table** for Step 3 dedupe, and record the
-   baseline path + its `metadata.harness_version` for the output metadata.
-   If none is found, note that the target has no audit baseline and
-   recommend `/secure-code-audit` for campaign-grade coverage in the Step 5
-   hand-back.
+2. Ask traust-core for the target's threat model and baseline (diff
+   mode's Step 0 door, without `--diff`):
+
+   ```bash
+   python3 -m traust.cli assessments prepare --kind vuln_scan \
+       --repo-url <https URL of the origin remote> \
+       --sha <git -C <target-dir> rev-parse HEAD> \
+       -o /tmp/<repo>-scope.json
+   ```
+
+   Its `threat_model_document` is the repository's latest recorded threat
+   model (`/threat-model` records it). If present, parse its section 3
+   "Entry points & trust boundaries" (`entry_points`) and section 4
+   "Threats" (`threats`) for focus areas and threat classes. This is the
+   preferred scoping input. `null`: no threat model recorded — quick recon
+   (item 4). Exit 2 (repository not registered): no threat model and no
+   baseline; say so plainly, and the Step 5 hand-back asks to register it.
+3. **The baseline** is the repository's findings recorded in traust-core:
+   the packet's `findings.baseline` (every assessment's, earlier scans'
+   included) and `baseline_assessment_id` (the default branch's newest
+   completed code audit, or null). If there are any, Read them (id
+   `finding.id`, title, locations, cwes, severity) into a **baseline
+   table** for Step 3 dedupe, and record `baseline_assessment_id` + the
+   finding count for the output metadata. If there are none, note that
+   the target has no audit baseline and recommend `/secure-code-audit` for
+   campaign-grade coverage in the Step 5 hand-back.
 4. If no threat model and no `--focus`: do a **quick recon** — list the
    source tree, read entry points and dispatch code, and propose 3-10 focus
    areas using the pattern `<subsystem> (<function/file>) — <key operations>`.
@@ -404,7 +415,7 @@ exactly as it does to files read from the checkout.
    output `metadata.additional.deterministic_steps`.
 
 Tell the user the focus areas you'll scan, the source-file count, and
-whether a baseline audit was found (path + finding count) before fanning
+whether a baseline audit was found (assessment id + finding count) before fanning
 out.
 
 ## Step 2 — Fan out
@@ -783,8 +794,9 @@ convention as `<repo>-security-audit.{json,md}` and
     "repo_slug": "<REPO_SLUG>",
     "scanned_ref": "<SHORTSHA or '0000000 (not a git checkout)'>",
     "harness_version": "<VERSION file semver>-<harness git short SHA>",
-    "baseline": "<path to the matched *-security-audit.json, or null>",
-    "baseline_findings": 0
+    "baseline": null,
+    "baseline_findings": 0,
+    "additional": {"baseline_assessment_id": "<the packet's baseline_assessment_id, or null>"}
   },
   "findings": [
     {
@@ -816,6 +828,11 @@ convention as `<repo>-security-audit.{json,md}` and
 
 Findings are sorted by `confidence` desc (then severity, file, line), so
 the top of the file is the highest-signal material.
+
+`metadata.baseline` stays null (no audit file is matched);
+`metadata.additional.baseline_assessment_id` names the traust-core audit
+the scan deduped against, and `baseline_findings` counts the packet's
+`findings.baseline`.
 
 **Review-surface coverage (required from traust 0.21.0).** Add a top-level
 `review_surface_coverage` recording how this scan answered each of the six
@@ -931,6 +948,9 @@ Tell the user:
      findings.**
    - No baseline? Recommend `/secure-code-audit <target>` to establish
      one; this scan's report then serves as a leads file for it.
+   - Repository not registered (Step 1.2 exit 2)? Say so, and ask to
+     register it (`/add-inputs <repo-url> --product <slug>`): until then
+     traust-core holds no threat model or baseline for it.
    - Remind: to check whether **existing** baseline findings are fixed,
      use `/verify-remediation` — that is the tool for updating the
      baseline after remediation, not a re-scan.
@@ -948,14 +968,14 @@ Tell the user:
   authorized targets) or the external `vuln-pipeline` CLI (offline ASAN
   reproduction).
 - **Never modify the baseline audit.** This skill reads
-  `<repo>-security-audit.json` for dedupe only. Appending verified
+  the repository's recorded findings for dedupe only. Appending verified
   findings to it happens *after* `/triage`, and disposition changes go
   through the append-only ledger — a scan must not rewrite the
   portfolio's memory.
 - **Don't fabricate line numbers.** Every `file:line` you emit must be
   something you Read or Grep'd. If unsure of the exact line, cite the
   function and say so in the description.
-- **Stay in `<target-dir>`** (plus the read-only baseline path). Don't
+- **Stay in `<target-dir>`**. Don't
   follow symlinks or `..` out of it.
 - Findings are candidates for `/triage`, not final verdicts. **This skill
   never drops a finding** — Step 3b only ranks and Step 3 dedupe only
@@ -966,15 +986,15 @@ Tell the user:
 
 Consumed artifacts (producer named per artifact):
 
-- `<repo>-threat-model.md` — produced by `/threat-model`; preferred
+- the threat model `/threat-model` records in traust-core; preferred
   scoping input (Step 1.2; diff mode uses its rows touching changed
   entry points).
-- `<repo>-security-audit.json` baseline — produced by
-  `/secure-code-audit`; read-only dedupe table (Step 1.3 / diff-mode
-  dedupe), never modified here.
-- traust-core's assessments and findings — diff mode's baseline audit,
-  its commit and the repository's findings as of it, read through
-  `traust assessments prepare` (Step 0).
+- the `/secure-code-audit` baseline recorded in traust-core; read-only
+  dedupe table (Step 1.3 / diff-mode dedupe), never modified here.
+- traust-core's assessments and findings — the repository's findings and
+  its newest code audit (Step 1.3), diff mode's baseline audit, its
+  commit and the repository's findings as of it, read through
+  `traust assessments prepare` (Step 1.2, Step 0).
 - `<repo>-diff-packet.json` — produced and consumed inside this skill's
   diff mode (Step 0, `traust assessments prepare` → cluster briefs); a
   scratch evidence bundle, not a campaign artifact.
