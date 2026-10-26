@@ -1,5 +1,5 @@
-"""``traust impact find|package|sbom|symbols|analyze|sweep``: the impact-analysis and
-dependency-watch skills' doors on traust-core.
+"""``traust impact find|package|sbom|symbols|analyze|sweep|below-range``: the impact-analysis
+and dependency-watch skills' doors on traust-core.
 
 find     an advisory as its source states it now: identity, aliases, affected packages and ranges
 package  the advisories affecting one package version, as their source lists them now
@@ -12,6 +12,8 @@ sweep    which known advisories touch the recorded SBOMs at all, each with its `
 document a registered feed source's document for one identifier (NVD, Red Hat CSAF or VEX, ...)
 enrich   EPSS and KEV on the CVE-bearing items of findings/candidates artifacts, with the
          repository's product reach (an enrichment tagger: routes attention, never a severity)
+below-range  evidence packets for advisories whose stated range starts above a commit's installed
+         version, for review; every candidate is a packet or a coverage gap
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ from pathlib import Path
 
 from traust_core.v1.context import Context, Services
 from traust_core.v1.errors import NotFoundError, ServiceError, ValidationError
+from traust_core.v1.models.below_range import BelowRangeStatus
 from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.dependencies import (
     AdvisoryRecord,
@@ -47,9 +50,11 @@ from traust.cli._doors import add_branch_arg, parser, register_commit, run
 from traust.context import load_core
 from traust.paths import HARNESS_ROOT
 from traust.registry.feeds_config import registry_path
+from traust.registry.osv_urls import osv_access
 
 UNDECIDED = (ImpactClassification.INCONCLUSIVE, ImpactClassification.LIKELY_AFFECTED)
 SWEEP_EXIT = {SweepStatus.COMPLETE: 0, SweepStatus.DEGRADED: 3, SweepStatus.FAILED: 2}
+BELOW_RANGE_EXIT = {BelowRangeStatus.COMPLETE: 0, BelowRangeStatus.DEGRADED: 3}
 
 
 def _parser(op: str, about: str) -> argparse.ArgumentParser:
@@ -326,6 +331,71 @@ def enrich(argv: list[str] | None = None) -> int:
         return text
 
     return run(call)
+
+
+def below_range(argv: list[str] | None = None) -> int:
+    ap = _parser(
+        "below-range",
+        "Evidence packets for advisories whose stated range starts above the installed version, "
+        "for the commit's recorded manifest SBOM (`traust impact sbom` first). Exit 0 complete, "
+        "3 degraded (some packages or advisories unanswered), 2 refused.",
+    )
+    ap.add_argument("--repo-url", required=True, help="https URL of the repository")
+    ap.add_argument("--sha", required=True, help="the commit whose installed packages are checked")
+    add_branch_arg(ap)
+    ap.add_argument("--out", type=Path, help="packet directory (default: ./<repo>-below-range)")
+    ap.add_argument(
+        "--ecosystems",
+        default="go,pypi,npm,maven,cargo,ruby,nuget",
+        help="comma list of the ecosystems to check",
+    )
+    ap.add_argument("--max-candidates", type=int, default=100)
+    args = ap.parse_args(argv)
+    try:
+        ecosystems = {Ecosystem(e.strip()) for e in args.ecosystems.lower().split(",") if e.strip()}
+    except ValueError as e:
+        ap.error(str(e))
+    status: list[BelowRangeStatus] = []
+
+    def call() -> dict:
+        if osv_access() == "air-gapped":
+            raise ValidationError(
+                "below-range needs the OSV API and the package registries; feeds.yaml sets the "
+                "osv source air-gapped"
+            )
+        core = _core(args.config_home)
+        services = core.services()
+        url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
+        repo = services.portfolio.register_repository(url, False)
+        ref = register_commit(services, repo.id, args.sha, args.branch)
+        out = args.out or Path(f"{url.path.rsplit('/', 1)[-1]}-below-range")
+        found = services.below_range.prepare(
+            ref.id, out, ecosystems=ecosystems, max_candidates=args.max_candidates
+        )
+        status.append(found.status)
+        for packet in found.packets:
+            (out / packet.case).mkdir(parents=True, exist_ok=True)
+            (out / packet.case / "fix.patch").write_text(packet.patch)
+            doc = packet.model_dump_json(indent=1, exclude={"patch"})
+            (out / packet.case / "packet.json").write_text(doc + "\n")
+        index = found.model_dump(mode="json", exclude={"packets"})
+        index["packets"] = [
+            {"case": p.case, "kind": p.candidate.kind, "ecosystem": p.candidate.ecosystem}
+            for p in found.packets
+        ]
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "below-range.json").write_text(json.dumps(index, indent=1) + "\n")
+        return {
+            "out": str(out),
+            "installed_exact": found.installed_exact,
+            "candidates": found.candidates,
+            "packets": len(found.packets),
+            "coverage_gaps": dict(Counter(g.reason.value for g in found.coverage_gaps)),
+            "status": found.status.value,
+        }
+
+    code = run(call)
+    return code or BELOW_RANGE_EXIT[status[0]]
 
 
 def clone(url: str, sha: str, dest: Path) -> Path:
