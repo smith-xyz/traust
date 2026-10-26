@@ -35,12 +35,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument(
         "--sla-policy", type=Path, help="the sla view's policy (default: the config home's)"
     )
+    ap.add_argument(
+        "--invoice",
+        type=Path,
+        help="the spend view's billed amounts: CSV period,amount_usd[,note]",
+    )
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
         as_of, since = when(args.as_of), when(args.since)
         until = when(args.until) or as_of or datetime.now(UTC)
-        services = _core(ViewName(args.view), args.config_home, args.sla_policy).services()
+        services = _core(ViewName(args.view), args).services()
         scope = ViewFilter(
             product_ids=tuple(p.id for p in _doors.products(services, args.product)),
             team_ids=tuple(args.team_id),
@@ -57,10 +62,10 @@ def main(argv: list[str] | None = None) -> int:
     return run(call)
 
 
-def _core(view: ViewName, config_home: Path | None, sla_policy: Path | None) -> Context:
+def _core(view: ViewName, args: Any) -> Context:
     if view is not ViewName.FRESHNESS:
-        return load_insight_core(config_home, sla_policy)
+        return load_insight_core(args.config_home, args.sla_policy, args.invoice)
     # freshness reads the feed snapshots and the scanners' readiness, databases and versions
-    core = load_engine_core(config_home)
+    core = load_engine_core(args.config_home)
     core.register_feeds(registry_path())
     return core
