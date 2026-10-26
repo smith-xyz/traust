@@ -234,11 +234,11 @@ Use when a reviewer wants to steer a security code audit between phases — Phas
 
 ## vuln-scan
 
-Static source-code vulnerability scan. Reads a target directory (and its threat model — <repo>-threat-model.md, or legacy THREAT_MODEL.md — if present), spawns parallel review subagents per focus area, and writes <repo>-vuln-findings.{json,md} with campaign finding IDs ({REPO_SLUG}-{SHORTSHA}-{NNN}) and the shared severity enum, for /triage to consume. When a <repo>-security-audit.json baseline exists, the scan supplements it: known findings are deduped against the baseline and new verified findings enter traust-core directly (as findings of the scan's assessment; the baseline is never written — gate A15) at not_verified (no triage precondition; triage adjudicates downstream) — /secure-code-audit remains the preferred baseline and /verify-remediation the way to update it after fixes. Read-only — no building, running, or network. Use when asked to "scan for vulns", "review this code for security issues", "find bugs in <dir>", "re-sweep an audited repo", or as the step between /threat-model and /triage.
+Static source-code vulnerability scan. Reads a target directory (and its threat model recorded in traust-core, if present), spawns parallel review subagents per focus area, and writes <repo>-vuln-findings.{json,md} with campaign finding IDs ({REPO_SLUG}-{SHORTSHA}-{NNN}) and the shared severity enum, for /triage to consume. When traust-core holds a baseline for the repository, the scan supplements it: known findings are deduped against the baseline and new verified findings enter traust-core directly (as findings of the scan's assessment; the baseline is never written — gate A15) at not_verified (no triage precondition; triage adjudicates downstream) — /secure-code-audit remains the preferred baseline and /verify-remediation the way to update it after fixes. Read-only — no building, running, or network. Use when asked to "scan for vulns", "review this code for security issues", "find bugs in <dir>", "re-sweep an audited repo", or as the step between /threat-model and /triage.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
-- **Invoke:** `/vuln-scan` — arguments: `<target-dir> [--diff [--since <commit>] [--baseline-assessment <id>]] [--baseline <audit.json>] [--focus <area>] [--single] [--extra <file>] [--no-score]`
+- **Invoke:** `/vuln-scan` — arguments: `<target-dir> [--diff [--since <commit>] [--baseline-assessment <id>]] [--focus <area>] [--single] [--extra <file>] [--no-score]`
 - **Skill:** [harnessing/3-audit/vuln-scan/SKILL.md](../harnessing/3-audit/vuln-scan/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/3-audit/vuln-scan/SKILL.md#integrations)
 
