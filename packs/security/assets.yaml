@@ -5,6 +5,11 @@
 # PENDING(labels): runner labels are a proposed vocabulary, `deterministic` (a command) and `llm`
 # (a skill session), until the engine's label set is agreed.
 pack: security
+# A repository is re-routed whenever repo_state materializes for it: traust.ops.router decides
+# its lane, and the lane's asset below (trigger.lanes) gets the order.
+route_on: repo_state
+# Dispatching an audit or a diff scan was an operator decision on the legacy worklist.
+approvers: [operators]
 assets:
   feeds_cache:  # ExposureService.refresh_feeds; a source that doesn't answer is degraded
     run: [python3, -m, traust.cli, feeds, fetch, --feed, all]
@@ -20,7 +25,43 @@ assets:
     trigger: {every: 24h}
     priority: 20
     freshness: {fail: 72h}
+    # One observation is about 4 forge calls (repo, branch, compare, rate limit): a quarter of
+    # GitHub's 5000/h, shared by every asset that calls the same host.
+    admission: {quota: {key: "forge:{host}", per_hour: 1000}}
     runner: {labels: [deterministic]}
+
+  # Routed lanes: planned only when traust.ops.router routes a repository to one of their lanes;
+  # no freshness, since a repository nothing routes needs no visit. Estimates are the legacy
+  # budget shadow's measured per-run medians (its retired LANE_UNIT_COST); a lane budget binds
+  # only on assets that declare one.
+  full_audit:  # skill session: a full audit; rules 1-bootstrap, 2, 3 (P0/P1), 4 and no-pinned-sha
+    # full-audit+validate (rule 1, an external report) comes with the feed, and the pack schema's
+    # name pattern rejects its `+` (NEED(contracts: the work_lane value as a pack lane)).
+    model: {role: deep-audit}
+    partitions: dynamic:repo
+    deps: [repo_state]
+    trigger: {lanes: [full-audit]}
+    admission: {approval: operators, estimate_usd: "29.04"}
+    runner: {labels: [llm]}
+
+  diff_scan:  # skill session: /vuln-scan <clone> --diff; rule 3 on P2/P3, outside the drain
+    model: {role: vuln-scan}
+    partitions: dynamic:repo
+    deps: [repo_state]
+    trigger: {lanes: [diff-scan]}
+    admission: {approval: operators, estimate_usd: "4.73"}
+    runner: {labels: [llm]}
+
+  diff_scan_quarterly:  # skill session: /vuln-scan <clone> --diff; rule 5's below-threshold pool
+    # Replaces the weekly diff-drain tranche (ceil(pool/13) a week, risk-ordered): pacing takes
+    # the highest-priority rows (external band first) each tick. Tune per_tick to the tick
+    # interval so a week drains what the tranche did.
+    model: {role: vuln-scan}
+    partitions: dynamic:repo
+    deps: [repo_state]
+    trigger: {lanes: [diff-scan-quarterly]}
+    admission: {approval: operators, estimate_usd: "6.24", pacing: {per_tick: 5}}
+    runner: {labels: [llm]}
 
   # A skill session is `model: {role: <model-registry role>}`, not a `run` (traust-engine counts
   # either as runnable). Each gets its role when a runner can start a session (*Shadow run and

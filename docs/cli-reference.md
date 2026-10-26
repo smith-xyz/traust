@@ -89,8 +89,8 @@ the docs gate on any dot-separated invocation in `README.md`, `AGENTS.md`,
 `PROCESS.md`, `docs/*.md`, `config/*`, `harnessing/*/SKILL.md`, or
 `.claude/commands/*.md`.
 
-> Not every `traust.cli.*` module is a CLI. `traust.cli.budget_shadow`, for
-> instance, has no argparse or `__main__` — refer to it as a module path, never
+> Not every `traust.cli.*` module is a CLI. `traust.cli._doors`, for
+> instance, has no `__main__` — refer to it as a module path, never
 > as `python3 -m`.
 
 See [tooling-and-structure-files.md](tooling-and-structure-files.md) for what

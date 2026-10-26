@@ -22,6 +22,7 @@ STANDING_JOBS = Path(__file__).resolve().parents[1] / "docs" / "continuous-opera
 ASSETS = {
     # the refresh half; its rescan router is the pack router (route_on: repo_state)
     "Fleet refresh + rescan router": "repo_state",
+    "Weekly diff-drain tranche": "diff_scan_quarterly",
     "/dependency-watch (deps lane end to end)": "dependency_watch",
     "Feed router — security-data refresh (EPSS / KEV / vendor CVE and VEX feeds)": "feeds_cache",
     "Verify-remediation treadmill": "verify_remediation",
@@ -36,12 +37,15 @@ ASSETS = {
     "spend, scoreboard)": "dashboards",
 }
 
+# The rescan router's routed lanes: assets planned from traust.ops.router's lane, not a row.
+ROUTED = {"Fleet refresh + rescan router": ("full_audit", "diff_scan")}
+
 # Rows that stay outside the pack, and why.
 EXCLUDED = {
-    "Weekly diff-drain tranche": "replaced by the pack router: lane pacing and approval",
     "Release/dist-git event feeder": "derived on demand from recorded releases "
     "(PortfolioService.release_changes); dist-git heads are repo_state observations",
-    "Threat-model re-model lanes": "routed lanes, added with the pack router",
+    "Threat-model re-model lanes": "routed lanes the router can't decide yet: the release review "
+    "waits on recorded releases reaching it, the quarterly backstop on the model's age in RepoState",
     "/drift-watch": "replaced by each asset's freshness (FreshnessQuery.stale)",
     "Feed-source liveness": "cached sources: feeds_cache degrades per source; live-tier probes "
     "retired, back as core readiness once the live sources are core providers",
@@ -67,12 +71,13 @@ def test_every_standing_job_is_an_asset_or_an_explicit_exclusion() -> None:
     assert sorted(jobs) == sorted([*ASSETS, *EXCLUDED])
     pack = Pack.load(PACK)
     assert set(ASSETS.values()) <= set(pack.assets)
-    assert set(pack.assets) <= set(ASSETS.values())
+    assert set(pack.assets) <= {*ASSETS.values(), *(a for row in ROUTED.values() for a in row)}
 
 
 def test_every_asset_has_a_trigger_freshness_and_runner_labels() -> None:
     raw = yaml.safe_load(PACK.read_text())["assets"]
     for name, asset in raw.items():
         assert asset.get("trigger") or asset.get("deps"), name
-        assert asset.get("freshness"), name
+        # a routed lane has no cadence to fall behind: nothing is due until the router routes
+        assert asset.get("freshness") or asset.get("trigger", {}).get("lanes"), name
         assert asset.get("runner", {}).get("labels"), name

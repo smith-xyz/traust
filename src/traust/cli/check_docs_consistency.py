@@ -876,7 +876,7 @@ def skills_reference_failures(repo: Path = REPO) -> list[str]:
 # grouped form; this catches the dot-separated one.
 #
 # `traust.cli.<module>` WITHOUT the `python3 -m` prefix is a module path, not an
-# invocation (e.g. traust.cli.budget_shadow, which has no CLI at all), so only
+# invocation (e.g. traust.cli._doors, which has no CLI at all), so only
 # the runnable spelling is flagged.
 _DOT_INVOKE_RX = re.compile(r"python3 -m traust\.cli\.([a-z_][a-z0-9_]*)")
 

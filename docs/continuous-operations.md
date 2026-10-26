@@ -117,7 +117,7 @@ rows named in the last column are the backstop that makes a dead timer visible.
 | Release/dist-git event feeder | on demand | a recorded release (`traust portfolio import-release`) | `python3 -m traust.cli portfolio release-changes --product <slug> --version <v>` | derived from recorded releases, nothing stored (`PortfolioService.release_changes`); a dist-git head is the `repo_state` observation of a registered repository |
 | `/dependency-watch` (deps lane end to end) | daily | timer (advisory publication) | `traust feeds fetch`, `traust impact sweep` and `traust impact analyze` | Core exposure services record per-commit impact assessments and dependency finding intake for `affected` commits without changing baselines. Advisory/classification provenance and evidence admission remain core-owned; never invent severity or promote an OSV match directly to a verdict. |
 | **Feed router** — security-data refresh (EPSS / KEV / vendor CVE and VEX feeds) | **daily** | timer | `python3 -m traust.cli feeds fetch --feed all` | Orchestrator-neutral ([routers.md](routers.md)), deliberately not bound to a CI pipeline in this repo. Snapshots every `tier: cached` source in `config/feeds.yaml` through traust-core (`ExposureService.refresh_feeds`: a `feed_snapshot` per source, the bytes in core's object store; `rh-cve` fetches only what published since its last snapshot). A dedicated job exists because consumer-triggered refresh only holds while something runs daily; without one the snapshots silently age. Every source in `config/feeds.yaml` is public. A source that fails keeps its last snapshot and the order is **degraded**, keyed by the source; one with no snapshot at all fails the order. **Backstop:** drift rows `feeds:*` at **48h** — one missed run plus slack; a threshold looser than the cadence it guards is how a dead job stays green |
-| Weekly diff-drain tranche | weekly | timer over the router's drain ordering | *retired*: the pack router's lane pacing and approval (*The security pack's router and its routed lanes*); until then dispatch from the worklist by lane (see *Standing weekly drain* below) | fail-closed selection (refuses a worklist >48h old or a second tranche per ISO week); dispatching is an operator decision informed by measured cost |
+| Weekly diff-drain tranche | weekly | timer over the router's drain ordering | *retired*: `diff_scan_quarterly`'s pacing and approval in `packs/security/assets.yaml`, routed by `traust.ops.router`; until the cutover, dispatch from the worklist by lane (see *Standing weekly drain* below) | fail-closed selection (refuses a worklist >48h old or a second tranche per ISO week); dispatching is an operator decision informed by measured cost |
 | Threat-model re-model lanes | rides the router (daily) + the weekly tranche | change (`pr` stamp), major/minor release event, calendar backstop | python3 -m traust.cli build rescan-worklist routes; the pack router schedules (the tranche script is retired); `/threat-model pr\|review` dispatches | **report-only** — no lane auto-applies an `update`. Drift row `threat-model` (held in lockstep with the lane's calendar threshold) is the dead-timer if the quarterly pool stops draining |
 | Verify-remediation treadmill | weekly (worklist rebuilt per sweep) | timer | `traust remediation verify-sweep` → `/verify-remediation full-sweep` | verdicts gated by the verification schema + soundness lint; `traust remediation verify-record` records verdicts as decisions and regressions as findings |
 | Rule-mining lane | weekly + post-wave | timer + drift row `rule-mining` (ledger changes >7d newer than the artifact) | python3 -m traust.cli sweep rule-lane, then the scheduled `/mine-ledger` session | never auto-files findings; rule promotion sits behind the mechanical test-and-calibrate gate; sweep hits route to `/triage` |
@@ -544,14 +544,13 @@ counting real verdicts rather than predicted.
 The safety property is structural, not a convention: `read_policy_budget()`
 (the drop path's reader) reports `observe` as **no ceiling**, so `apply_budget()`
 physically cannot see one. The ceiling is visible only through
-`read_policy_shadow_ceiling()`, whose sole caller is
-traust.cli.budget_shadow — a module that returns a
-*report* and has no ability to filter a work list.
+`read_policy_shadow_ceiling()`, which can't filter a work list.
 
-Each tranche manifest gains a `budget_shadow` block: month-to-date lane spend,
-this tranche's estimate, the verdict, and the exact rows that *would* have been
-withheld. `--append-shadow` records the verdict to the metrics ledger
-(`budget-shadow`) so the hit rate accumulates.
+In continuous ops the verdict is traust-engine's: admission checks each planned
+order against its lane budget (`Config.budgets`) with the asset's
+`admission.estimate_usd`, and records the verdict in the order's run manifest
+(`budget`), so the hit rate is a count over manifests. At `observe` nothing is
+withheld. (The weekly tranche's `budget_shadow` block retired with the tranche.)
 
 Three details that keep the number honest:
 
