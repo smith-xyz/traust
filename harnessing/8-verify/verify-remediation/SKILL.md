@@ -26,7 +26,7 @@ allowed-tools:
   - Bash(python3 *traust* -m traust.cli.check_fix_propagation:*)
   - Bash(python3 *traust* -m traust.cli registry models:*)
   - Bash(python3 *traust* -m traust.cli adapters opengrep:*)
-  - Bash(python3 *traust* -m traust_engine.adapters.checkov:*)
+  - Bash(python3 *traust* -m traust.cli adapters checkov:*)
   - Bash(python3 *traust* -m traust.cli reporting validate:*)
   - Bash(python3 *traust* -m traust.cli remediation verify-sweep:*)
   - Bash(python3 *traust* -m traust.cli remediation verify-prepare:*)

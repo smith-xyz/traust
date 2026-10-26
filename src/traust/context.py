@@ -126,8 +126,8 @@ def load_insight_core(config_home: Path | None = None, sla_policy: Path | None =
 def load_engine_core(config_home: Path | None = None, *, canaries: str = "canaries") -> Context:
     """traust-core with traust-engine's providers for its protocols: ADR and docs sources, the
     rule-pack source and canary materialiser (``canaries``: the ``recall-benchmark/<canaries>``
-    source dir), the fleet-fix applier and golden runner, and the scanner tool providers with the
-    toolchain inspector (``ProviderCatalog`` stamps and database freshness)."""
+    source dir), the fleet-fix applier and golden runner, and the scanner tool providers, each
+    reporting its own version and database (``ProviderCatalog`` stamps and freshness)."""
     core, engine = load_core(config_home), load_engine(config_home)
     home = config_home or deployment_config_dir()
     assert home is not None  # load_engine exits when there is no config home

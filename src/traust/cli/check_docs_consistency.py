@@ -951,8 +951,6 @@ def cli_reference_failures(repo: Path = REPO) -> list[str]:
         for m in re.finditer(r"^\| `([a-z][a-z-]*)` \| [^|]* \| (.+?) \|$", text, re.MULTILINE)
     }
     for group, ops in GROUPS.items():
-        if group == "tools":  # deprecated; listed prose-side, not in the table
-            continue
         if group not in documented:
             failures.append(f"docs/cli-reference.md: group `{group}` is not listed")
             continue
