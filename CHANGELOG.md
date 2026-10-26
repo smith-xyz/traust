@@ -86,6 +86,23 @@ All notable changes to Traust are documented here.
   a traust-core import during the build. `requirements.txt` drops ldap3 and
   PyJWT (the ledger's auth) and adds sqlalchemy (core).
 
+## [0.37.0]
+
+- **LLM, agent and MCP application review on `development`.** This brings
+  the deepsec comparison gap plan's steps 1 and 2 over from `main`, on
+  traust-core:
+  - **`traust adapters llm-app <checkout>`** is a thin door to traust-core's
+    `code_facts.llm_app` (`LlmAppDetector`, traust-core#184). It writes
+    whether the checkout is an LLM application, the kinds found, the
+    signals and the tagged files.
+  - **`llm-application-review.md`** is the OWASP LLM Top 10 checklist,
+    wired into `/secure-code-audit` and `/vuln-scan` as on `main`. This
+    branch's report schema has no `owasp_llm_references` field, so findings
+    name the OWASP category and check number in their description. Where
+    the category lives in the data model is an open decision.
+  - **Pins:** traust-core development (with traust-core#184) and traust-engine
+    development (with engine#92, the LLM-application rule pack).
+
 ## [0.36.0]
 
 - **Per-technology review checks for Kubernetes operators and gRPC**
