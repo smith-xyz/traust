@@ -28,6 +28,7 @@ from traust.paths import HARNESSING_DIR
 
 CORE_CONFIG = "core.yaml"
 SLA_POLICY = "sla-policy.yaml"
+MODEL_REGISTRY = "model-registry.yaml"
 # Security-pack content (home: traust-pack-security): the pinned ATT&CK release and its mapping.
 _ATTACK = HARNESSING_DIR / "attack-coverage" / "tables"
 ATTACK_TABLES = (_ATTACK / "attack-techniques.json", _ATTACK / "attack-mapping.json")
@@ -102,10 +103,14 @@ def load_core(config_home: Path | None = None) -> Context:
         raise SystemExit(2) from e
 
 
-def load_insight_core(config_home: Path | None = None, sla_policy: Path | None = None) -> Context:
-    """``load_core`` with the ATT&CK coverage view on the pack's pinned ATT&CK tables, and the SLA
+def load_insight_core(
+    config_home: Path | None = None, sla_policy: Path | None = None, invoices: Path | None = None
+) -> Context:
+    """``load_core`` with the ATT&CK coverage view on the pack's pinned ATT&CK tables, the SLA
     view built on ``sla_policy``, else on ``<config home>/sla-policy.yaml`` when there is one
-    (template: config/sla-policy.example.yaml); exit 2 when either is unreadable or invalid."""
+    (template: config/sla-policy.example.yaml), and the spend view on the config home's
+    model registry when there is one, reconciled against ``invoices``; exit 2 when any is
+    unreadable or invalid."""
     core = load_core(config_home)
     try:
         core.register_attack_catalog(*ATTACK_TABLES)
@@ -120,7 +125,31 @@ def load_insight_core(config_home: Path | None = None, sla_policy: Path | None =
         except ConfigError as e:
             print(f"SLA policy not resolvable: {e}", file=sys.stderr)
             raise SystemExit(2) from e
+    if home is not None and (home / MODEL_REGISTRY).is_file():
+        _register_spend(core, home / MODEL_REGISTRY, invoices)
+    elif invoices is not None:
+        print(f"invoices need the spend view: no {MODEL_REGISTRY} in {home}", file=sys.stderr)
+        raise SystemExit(2)
     return core
+
+
+def load_spend_core(config_home: Path | None = None) -> Context:
+    """``load_core`` pricing spend on ``<config home>/model-registry.yaml`` (template:
+    config/model-registry.yaml); exit 2 when it is missing or invalid."""
+    core = load_core(config_home)
+    home = config_home or deployment_config_dir()
+    _register_spend(core, (home or Path()) / MODEL_REGISTRY, None)
+    return core
+
+
+def _register_spend(core: Context, registry: Path, invoices: Path | None) -> None:
+    try:
+        core.register_model_catalog(registry)
+        if invoices is not None:
+            core.register_invoices(invoices)
+    except ConfigError as e:
+        print(f"spend not resolvable: {e}", file=sys.stderr)
+        raise SystemExit(2) from e
 
 
 def load_engine_core(config_home: Path | None = None, *, canaries: str = "canaries") -> Context:
