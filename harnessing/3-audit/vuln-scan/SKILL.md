@@ -419,7 +419,13 @@ sink (launch/bulk/schedule/copy; REST/websocket/callback), and
 (c) enumerate all emitters to an unchecked sink before rating it, and
 (d) apply the check for each review surface
 ([review-surfaces.md](../secure-code-audit/review-surfaces.md)) that the
-focus area touches, reporting what it examined. On
+focus area touches, reporting what it examined, and (e) when the target
+selects a section of
+[framework-checks.md](../secure-code-audit/framework-checks.md)
+(Kubernetes operators, gRPC), answer each of that section's checks in the
+focus areas they belong to, citing the check ID in findings and negatives.
+Record `"framework-checks": "ran: <sections>"` in
+`metadata.additional.deterministic_steps`. On
 targets ≥ ~50 kLoC add one **shadow lane**: a subsystem-scoped
 depth-first subagent with no vulnerability-class checklist, merged
 through the same triage bar.
