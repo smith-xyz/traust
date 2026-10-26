@@ -13,7 +13,7 @@ import pytest
 import yaml
 from traust_core.v1.context import Context
 from traust_core.v1.models.common import every_item
-from traust_core.v1.models.operations import OrderFilter, OrderState, RunOrder
+from traust_core.v1.models.operations import OrderFilter, OrderReason, OrderState, RunOrder
 from traust_engine.ops import cli
 from traust_engine.ops.shadow import Tick
 
@@ -50,7 +50,7 @@ def test_a_traust_door_is_recorded_as_it_answered(home: Path) -> None:
     rc, _ = _engine(home, "record", "ledger_audit", "--", *audit)
     (order,) = _orders(home)
     assert (rc, order.asset, order.state) == (5, "ledger_audit", OrderState.REFUSED)
-    assert order.reason and "no ledger configured" in order.reason
+    assert order.reason == OrderReason.LEDGER_UNCONFIGURED
 
 
 def test_shadow_routes_a_recorded_repo_state_with_the_security_router(

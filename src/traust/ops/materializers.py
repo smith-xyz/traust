@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import tempfile
 from collections import Counter
 from collections.abc import Iterable
@@ -14,8 +15,10 @@ from traust_core.v1.models.below_range import BelowRangeStatus
 from traust_core.v1.models.dependencies import FeedName
 from traust_core.v1.models.insight import RenderedView, ViewFilter, ViewName
 from traust_core.v1.models.observation import ComparisonStatus
-from traust_core.v1.models.operations import AssetRequest, JobResult
+from traust_core.v1.models.operations import AssetRequest, DegradedKey, JobResult, OrderReason
 from traust_core.v1.models.values import HttpsRepoUrl
+
+log = logging.getLogger(__name__)
 
 # The forge answered, or there was nothing to ask; any other status is a gap, never green.
 ANSWERED = frozenset(
@@ -36,11 +39,13 @@ class RepoStateMaterializer:
         try:
             url = HttpsRepoUrl.parse(request.partition or "", self._hosts)
         except ValidationError as e:
-            return JobResult.failed(f"bad request: {e}")
+            log.warning("run %s: %s: %s", request.run_id, OrderReason.BAD_REQUEST, e)
+            return JobResult.failed(OrderReason.BAD_REQUEST)
         try:
             facts = self._portfolio.record_forge_facts(repo_url=str(url))
         except NotFoundError as e:
-            return JobResult.refused(str(e))
+            log.warning("run %s: %s: %s", request.run_id, OrderReason.NOT_FOUND, e)
+            return JobResult.refused(OrderReason.NOT_FOUND)
         if facts.status in ANSWERED:
             return JobResult.succeeded()
         return JobResult.partly({facts.status.value: 1})
@@ -66,17 +71,24 @@ class FeedsCacheMaterializer:
         try:
             order = _order_id(request.run_id)
         except ValueError:
-            return JobResult.failed(f"bad request: run id {request.run_id!r} is not an order id")
+            log.warning(
+                "run %s: %s: run id is not an order id", request.run_id, OrderReason.BAD_REQUEST
+            )
+            return JobResult.failed(OrderReason.BAD_REQUEST)
         feeds = None if request.partition is None else [FeedName(request.partition)]
         try:
             statuses = self._exposure.refresh_feeds(feeds, order)
         except ConfigError as e:
-            return JobResult.failed(f"bad request: {e}")
+            log.warning("run %s: %s: %s", request.run_id, OrderReason.BAD_REQUEST, e)
+            return JobResult.failed(OrderReason.BAD_REQUEST)
         failed = [s for s in statuses if s.last_error]
-        reason = "; ".join(f"{s.name}: {s.last_error}" for s in failed) or None
+        for status in failed:
+            log.warning("run %s feed %s: %s", request.run_id, status.name, status.last_error)
         if any(s.fetched_at is None for s in failed):
-            return JobResult.failed(f"no usable snapshot: {reason}")
-        return JobResult.partly({s.name: 1 for s in failed}).model_copy(update={"reason": reason})
+            return JobResult.failed(OrderReason.SNAPSHOT_UNAVAILABLE)
+        return JobResult.partly({s.name: 1 for s in failed}).model_copy(
+            update={"reason": OrderReason.SOURCE_UNAVAILABLE if failed else None}
+        )
 
 
 class LedgerAuditMaterializer:
@@ -90,12 +102,20 @@ class LedgerAuditMaterializer:
 
     def materialize(self, request: AssetRequest) -> JobResult:
         if self._ledger is None:
-            return JobResult.refused("no ledger configured (core.yaml `ledger:`); nothing to audit")
+            log.warning("run %s: no ledger configured; nothing to audit", request.run_id)
+            return JobResult.refused(OrderReason.LEDGER_UNCONFIGURED)
         results = self._ledger.audit()
         failed = sum(1 for r in results if r.errors)
         unverified = sum(1 for r in results if r.warnings and not r.errors)
         return JobResult.partly(
-            {k: n for k, n in (("failed", failed), ("unverified", unverified)) if n}
+            {
+                key.value: count
+                for key, count in (
+                    (DegradedKey.FAILED, failed),
+                    (DegradedKey.UNVERIFIED, unverified),
+                )
+                if count
+            }
         )
 
 
@@ -128,14 +148,16 @@ class DashboardsMaterializer:
             views = None if request.partition is None else [ViewName(request.partition)]
             result = self._insight.refresh(views, ViewFilter())
         except (ValueError, ConfigError) as e:
-            return JobResult.failed(f"bad request: {e}")
+            log.warning("run %s: %s: %s", request.run_id, OrderReason.BAD_REQUEST, e)
+            return JobResult.failed(OrderReason.BAD_REQUEST)
         written: list[Path] = []
         for view in result.rendered.values():
             written += write_view(view, self._out / view.view / view.stem, model=True)
-        reason = "; ".join(f"{name}: {why}" for name, why in result.failed.items()) or None
+        for name, why in result.failed.items():
+            log.warning("run %s view %s: %s", request.run_id, name, why)
         degraded = {name.value: 1 for name in result.failed}
         return JobResult.partly(degraded, tuple(map(str, written))).model_copy(
-            update={"reason": reason}
+            update={"reason": OrderReason.SOURCE_UNAVAILABLE if result.failed else None}
         )
 
 
@@ -156,17 +178,23 @@ class BelowRangePacketsMaterializer:
             url = HttpsRepoUrl.parse(request.partition or "", self._hosts)
             order = _order_id(request.run_id)
         except (ValidationError, ValueError) as e:
-            return JobResult.failed(f"bad request: {e}")
+            log.warning("run %s: %s: %s", request.run_id, OrderReason.BAD_REQUEST, e)
+            return JobResult.failed(OrderReason.BAD_REQUEST)
         repo = self._portfolio.find_repository(url)
         if repo is None or repo.id is None:
-            return JobResult.refused(f"{url} is not in the inventory")
+            log.warning(
+                "run %s: %s: %s is not in the inventory", request.run_id, OrderReason.NOT_FOUND, url
+            )
+            return JobResult.refused(OrderReason.NOT_FOUND)
         with tempfile.TemporaryDirectory(prefix="below-range-") as workdir:
             try:
                 scan = self._below_range.scan(repo.id, Path(workdir), run_order_id=order)
             except NotFoundError as e:
-                return JobResult.refused(str(e))
+                log.warning("run %s: %s: %s", request.run_id, OrderReason.NOT_FOUND, e)
+                return JobResult.refused(OrderReason.NOT_FOUND)
             except ConfigError as e:
-                return JobResult.failed(f"bad request: {e}")
+                log.warning("run %s: %s: %s", request.run_id, OrderReason.BAD_REQUEST, e)
+                return JobResult.failed(OrderReason.BAD_REQUEST)
         if scan.packets.status == BelowRangeStatus.COMPLETE:
             return JobResult.succeeded()
         return JobResult.partly(Counter(g.reason.value for g in scan.packets.coverage_gaps))
