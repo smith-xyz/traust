@@ -18,11 +18,10 @@ from traust_core.v1.models.cloud_config import CHECKOV, CloudConfigFacts
 from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import SourceType
-from traust_engine.adapters.cloud_config import register_checkov
 
 from traust.cli import _doors
 from traust.cli._doors import add_branch_arg, parser, register_commit, run
-from traust.context import load_core, load_services
+from traust.context import load
 
 
 def _parser(op: str, about: str) -> argparse.ArgumentParser:
@@ -41,10 +40,9 @@ def run_(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict:
-        core = load_core(args.config_home)
-        register_checkov(core)
         facts = (
-            core.services()
+            load(args.config_home)
+            .services()
             .assessment.run_tools(args.target_dir, [CHECKOV])
             .data(CHECKOV, CloudConfigFacts)
         )
@@ -73,7 +71,7 @@ def check(argv: list[str] | None = None) -> int:
     def call() -> str:
         nonlocal failed
         doc = CloudConfigAuditArtifact.parse(args.report.read_bytes())
-        violations = load_services(args.config_home).assessment.check_audit(doc).violations
+        violations = load(args.config_home).services().assessment.check_audit(doc).violations
         failed = bool(violations)
         lines = [f"ERROR {v.item}: {v.message}" for v in violations]
         return "\n".join([*lines, f"{len(violations)} errors"])
@@ -93,7 +91,7 @@ def record(argv: list[str] | None = None) -> int:
 
     def call() -> dict:
         doc = CloudConfigAuditArtifact.parse(args.report.read_bytes())
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, args.public)
