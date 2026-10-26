@@ -20,7 +20,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 
 | Group | Description | Operations |
 |---|---|---|
-| `adapters` | Scanner adapters (deterministic pre-scans) | `checkov`, `config-matrix`, `crypto-audit`, `crypto-cluster`, `crypto-image`, `crypto-probe`, `crypto-source`, `fork-lag`, `gitleaks`, `govulncheck`, `image-packages`, `image-sbom`, `joern`, `opengrep`, `osv`, `priv-profile`, `route-guards`, `sanitizers`, `yara` |
+| `adapters` | Scanner adapters (deterministic pre-scans) | `checkov`, `config-matrix`, `crypto-audit`, `crypto-cluster`, `crypto-image`, `crypto-probe`, `crypto-source`, `fork-lag`, `gitleaks`, `govulncheck`, `image-packages`, `image-sbom`, `joern`, `llm-app`, `opengrep`, `osv`, `priv-profile`, `route-guards`, `sanitizers`, `yara` |
 | `admin` | Operator tooling | `attest-target`, `checkpoint`, `doctor`, `query-index`, `scan-internal-refs`, `toolchain` |
 | `assessments` | The audit skills' doors on traust-core | `coverage`, `prepare`, `threats` |
 | `attack` | The pack's pinned MITRE ATT&CK release | `validate` |

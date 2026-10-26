@@ -51,6 +51,7 @@ allowed-tools:
   - Bash(python3 *-m traust.cli reporting validate:*)
   - Bash(python3 *-m traust.cli adapters checkov:*)
   - Bash(python3 *-m traust.cli adapters opengrep:*)
+  - Bash(python3 *-m traust.cli adapters llm-app:*)
   # Diff-mode scope and context packet ONLY (see "## Diff mode (--diff)"):
   # traust-core reads the existing clone read-only (list-argv git, no
   # network) and traust's store; writes only its -o. Never authors a
@@ -402,6 +403,16 @@ exactly as it does to files read from the checkout.
    the focus-area review runs fully manual as before — do not stall;
    record `"opengrep": "skipped: not on PATH"` (vs `"ran"`) in the
    output `metadata.additional.deterministic_steps`.
+8. **LLM application pre-scan.** Run
+   python3 -m traust.cli adapters llm-app <target-dir> --out /tmp/<repo>-llm-app.json.
+   When it reports `llm_application: true`, add an **LLM, agent and MCP
+   application** focus area. Its brief carries the tagged `files`, the
+   `kinds`, and the sections of
+   `harnessing/3-audit/secure-code-audit/llm-application-review.md` those
+   kinds select. Findings follow that checklist's rules: the check's CWE,
+   the OWASP category and check number in the description, and evidence
+   for every finding. Record `"llm-app": "ran: <kinds>"`, or `"ran: none"`
+   when nothing is detected (no LLM focus area then).
 
 Tell the user the focus areas you'll scan, the source-file count, and
 whether a baseline audit was found (path + finding count) before fanning
@@ -975,6 +986,9 @@ Consumed artifacts (producer named per artifact):
 - Deterministic pre-scan facts from python3 -m traust.cli adapters checkov,
   python3 -m traust.cli adapters opengrep, python3 -m traust.cli adapters gitleaks, and
   python3 -m traust.cli adapters osv — candidate context, never findings.
+- `<repo>-llm-app.json` from python3 -m traust.cli adapters llm-app — a
+  fact that gates the LLM application focus area and its checklist
+  (`/secure-code-audit`'s `llm-application-review.md`); never a finding.
 - `fp-precedent-cache.json` — produced by
   python3 -m traust.cli corpus precedent build (Phase-4 fleet
   mechanism); Step 3c consults it read-only (`match` mode) as citeable

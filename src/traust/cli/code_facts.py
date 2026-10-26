@@ -1,8 +1,9 @@
-"""``traust adapters route-guards|config-matrix|sanitizers|fork-lag|priv-profile``: the
-deterministic pre-scans on traust-core's code facts. Each reads a checkout and records nothing;
+"""``traust adapters route-guards|llm-app|config-matrix|sanitizers|fork-lag|priv-profile``:
+the deterministic pre-scans on traust-core's code facts. Each reads a checkout and records nothing;
 every result is a candidate worklist the audit judges, never a finding.
 
 route-guards    the route x guard matrix (go-http, django-drf, flask), asymmetry groups first
+llm-app         whether the checkout is an LLM, agent or MCP application, and the files that use it
 config-matrix   effective deployed defaults as (key, default, sink) triples
 sanitizers      sanitizer-shaped Python functions (discovery only; probing executes target code
                 and is `probe_sanitizers.py --run`)
@@ -55,6 +56,20 @@ def route_guards(argv: list[str] | None = None) -> int:
             ToolRequest(workspace=args.checkout), resolve_handlers=args.resolve_handlers
         )
         return _emit(matrix.model_dump(mode="json"), args.out)
+
+    return run(call)
+
+
+def llm_app(argv: list[str] | None = None) -> int:
+    args = _parser("llm-app", "Whether a checkout is an LLM, agent or MCP application.").parse_args(
+        argv
+    )
+
+    def call() -> dict:
+        fact = load_services(args.config_home).code_facts.llm_app(
+            ToolRequest(workspace=args.checkout)
+        )
+        return _emit(fact.model_dump(mode="json"), args.out)
 
     return run(call)
 
