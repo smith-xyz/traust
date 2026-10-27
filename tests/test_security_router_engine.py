@@ -16,6 +16,7 @@ import pytest
 import yaml
 from traust_core.v1.context import Config, Context
 from traust_core.v1.context.context import Services
+from traust_core.v1.models.artifacts import AdapterResultArtifact
 from traust_core.v1.models.assessment import Assessment, AssessmentKind
 from traust_core.v1.models.common import every_item
 from traust_core.v1.models.identity import Principal
@@ -31,7 +32,9 @@ from traust_core.v1.models.operations import (
 )
 from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import ActorKind, BudgetEnforcement
+from traust_core.v1.providers.base import Acquisition, Readiness, Result
 from traust_core.v1.providers.process import ProcessResult, ProcessRunner
+from traust_core.v1.providers.tools import ToolRequest
 from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
 from traust_engine import EngineLoop, Pack
 
@@ -194,6 +197,62 @@ def test_an_iac_change_routes_the_cloud_config_lane_beside_the_tables(
         ("diff_scan_quarterly", "diff-scan-quarterly", "rule-5"),
         ("cloud_config_audit", "iac-baseline", "lever-6"),  # no cloud-config baseline yet
     ]
+
+
+class FakeGitleaks:
+    """The secret scanner `traust._tools` registers, as a hit per `AKIA` in the scanned patch."""
+
+    name = "gitleaks"
+
+    def check(self) -> Readiness:
+        return Readiness(ready=True)
+
+    def acquire(self, request: ToolRequest) -> Result[AdapterResultArtifact]:
+        assert request.workspace is not None
+        patch = (request.workspace / "change.patch").read_text(encoding="utf-8")
+        finding = {
+            "id": "gitleaks/aws-access-token",
+            "title": "AWS access token",
+            "severity": "high",
+            "cwes": [],
+            "locations": [{"path": "change.patch", "lines": "2"}],
+            "description": "AWS access token",
+            "remediation": "",
+            "category": "aws-access-token",
+        }
+        found = AdapterResultArtifact.from_document(
+            {
+                "target": "change",
+                "scanned_at": "2026-10-01T06:00:00Z",
+                "metadata": {"tool": "gitleaks", "scanner_version": "8.30.0"},
+                "findings": [finding] * patch.count("AKIA"),
+            }
+        )
+        return Result(found, Acquisition(provider=self.name, acquired_at=T0))
+
+
+def test_a_secret_in_the_patch_escalates_the_quarterly_change_to_an_immediate_diff_scan(
+    loop: tuple[Context, Clock, EngineLoop], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    context, clock, engine = loop
+    forge_run = ProcessRunner.run
+
+    def run(self: ProcessRunner, argv: list[str], **kwargs: Any) -> ProcessResult:
+        if argv[2:4] == ["-H", "Accept: application/vnd.github.v3.diff"]:
+            patch = b"+++ b/src/app.py\n+KEY = 'AKIA-example'\n"
+            return ProcessResult(tuple(argv), 0, patch, b"", 0)
+        return forge_run(self, argv, **kwargs)
+
+    monkeypatch.setattr(ProcessRunner, "run", run)
+    context.tools.register("gitleaks", FakeGitleaks)
+    repository_id = _audited(context, "app")
+    _materialize_repo_state(context, repository_id)
+    clock.at += timedelta(minutes=1)
+
+    assert engine.run_once().tick.routed == 1
+    (order,) = _orders(context.services(), "diff_scan")
+    assert (order.lane, order.rule) == ("diff-scan", "tripwire")
+    assert _orders(context.services(), "diff_scan_quarterly") == []
 
 
 def test_a_lane_over_its_budget_is_withheld(tmp_path: Path, forge: dict[str, Any]) -> None:
