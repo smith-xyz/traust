@@ -1315,8 +1315,8 @@ PQC-blind.
 
 When a finding's category is `cryptography` (or its evidence names a
 key-establishment, signature, certificate, TLS-configuration, or
-crypto-policy mechanism), set two optional finding fields by **table
-lookup** against the shared reference data — never free-authored:
+crypto-policy mechanism), populate the optional finding fields from the
+shared reference data and explicit source evidence — never invent labels:
 
 1. `pqc_classification` — from
    [`../pqc-readiness/notes/reference/ir8547-mapping.json`](../pqc-readiness/notes/reference/ir8547-mapping.json)
@@ -1326,9 +1326,17 @@ lookup** against the shared reference data — never free-authored:
    (RSA-2048 / P-224 / DH-2048 / 3DES), `classically-broken`,
    `hndl-exposure`, `pqc-blocker-config` (TLS group/KEX pins,
    `GODEBUG=tlsmlkem=0`-style kill-switches), or `pqc-adoption`.
-2. `remediation_effort` — from the decision tree's `remediation_effort`
-   rules (provenance × agility): `trivial` / `moderate` / `significant` /
-   `blocked-external`.
+2. `remediation_effort` — use the canonical sizes `xs`, `s`, `m`, `l`,
+   `xl` from traust-contracts `enums/v1/effort.json`, or `null` for unknown
+   size. The decision tree's provenance/agility rules establish no size,
+   so each returns `null`. A non-null size requires independent, explicit
+   size evidence; do not infer one from older effort labels, provenance,
+   agility, pin count, or blocking. No duration thresholds are defined.
+3. `blocked_external` — record the independent boolean wherever known.
+   The decision tree establishes `true` for vendored/externalized
+   provenance, or a delegated library with no PQC roadmap. Other matches
+   do not establish `false`; without separate evidence, omit this field.
+   Its absence means unknown, and neither value establishes effort size.
 
 Rules of the pass:
 

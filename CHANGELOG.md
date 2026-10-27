@@ -4,6 +4,13 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- Cut over PQC effort producers and the active JSON decision tree to the approved
+  nullable size contract with independent external blocking. Keep readiness
+  predicates, thresholds, precedence, buckets and the fleet/2030-clock override
+  independent of size; no legacy effort-to-size mapping is inferred.
+- Consume Core's canonical PQC new-write gate and lossless blocking projections.
+  Historical reports remain readable and exact stored reports replay unchanged;
+  different reports with deprecated new-write effort are refused.
 - Cut over threat-model mitigation effort to canonical sizes or explicit
   unknown, with independent optional blocking. Bootstrap, interview, seeded,
   review and update emissions share the existing contract; unknown is never

@@ -19,14 +19,33 @@ class TestDecisionTree(unittest.TestCase):
     def _load(self, rel):
         return json.loads((ROOT / rel).read_text(encoding="utf-8"))
 
+    def _write_validator(self):
+        import jsonschema
+        from referencing import Registry, Resource
+
+        tree = _load_schema("pqc-decision-tree")
+        report = _load_schema("report")
+        resources = [(schema["$id"], Resource.from_contents(schema)) for schema in (tree, report)]
+        return jsonschema.Draft202012Validator(
+            {"$ref": tree["$id"] + "#/definitions/canonical_write"},
+            registry=Registry().with_resources(resources),
+        )
+
     def test_tree_validates_against_schema(self):
+        tree = self._load(
+            "harnessing/3-audit/pqc-readiness/notes/reference/pqc-readiness-decision-tree.json"
+        )
+        self._write_validator().validate(tree)
+
+    def test_external_blocking_is_not_a_new_effort_size(self):
         import jsonschema
 
         tree = self._load(
             "harnessing/3-audit/pqc-readiness/notes/reference/pqc-readiness-decision-tree.json"
         )
-        schema = _load_schema("pqc-decision-tree")
-        jsonschema.validate(tree, schema)
+        tree["remediation_effort"]["rules"][0]["effort"] = "blocked-external"
+        with self.assertRaises(jsonschema.ValidationError):
+            self._write_validator().validate(tree)
 
     def test_crosswalk_covers_every_provenance_class(self):
         tree = self._load(
