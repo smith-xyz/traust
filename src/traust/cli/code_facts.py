@@ -1,8 +1,9 @@
-"""``traust adapters route-guards|llm-app|config-matrix|sanitizers|fork-lag|priv-profile``:
-the deterministic pre-scans on traust-core's code facts. Each reads a checkout and records nothing;
-every result is a candidate worklist the audit judges, never a finding.
+"""``traust adapters route-guards|grpc-guards|llm-app|config-matrix|sanitizers|fork-lag|
+priv-profile``: the deterministic pre-scans on traust-core's code facts. Each reads a checkout
+and records nothing; every result is a candidate worklist the audit judges, never a finding.
 
 route-guards    the route x guard matrix (go-http, django-drf, flask), asymmetry groups first
+grpc-guards     the gRPC service x interceptor matrix (Go): servers, services, diagnostic services
 llm-app         whether the checkout is an LLM, agent or MCP application, and the files that use it
 config-matrix   effective deployed defaults as (key, default, sink) triples
 sanitizers      sanitizer-shaped Python functions (discovery only; probing executes target code
@@ -58,6 +59,22 @@ def route_guards(argv: list[str] | None = None) -> int:
             .code_facts.route_guards(
                 ToolRequest(workspace=args.checkout), resolve_handlers=args.resolve_handlers
             )
+        )
+        return _emit(matrix.model_dump(mode="json"), args.out)
+
+    return run(call)
+
+
+def grpc_guards(argv: list[str] | None = None) -> int:
+    args = _parser("grpc-guards", "A checkout's gRPC service x interceptor matrix.").parse_args(
+        argv
+    )
+
+    def call() -> dict:
+        matrix = (
+            load(args.config_home)
+            .services()
+            .code_facts.grpc_guards(ToolRequest(workspace=args.checkout))
         )
         return _emit(matrix.model_dump(mode="json"), args.out)
 

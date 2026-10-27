@@ -49,6 +49,7 @@ allowed-tools:
   - Bash(python3 *-m traust.cli adapters fork-lag:*)
   - Bash(python3 *-m traust.cli adapters config-matrix:*)
   - Bash(python3 *-m traust.cli adapters route-guards:*)
+  - Bash(python3 *-m traust.cli adapters grpc-guards:*)
   - Bash(python3 *-m traust.cli adapters llm-app:*)
   - Bash(python3 *-m traust.cli adapters sanitizers:*)
   - Bash(python3 *-m traust.cli adapters priv-profile:*)

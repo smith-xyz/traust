@@ -1489,7 +1489,7 @@ wheels = [
 
 [[package]]
 name = "traust"
-version = "0.37.1"
+version = "0.38.0"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
