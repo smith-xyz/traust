@@ -551,7 +551,7 @@ Use when the user asks for campaign metrics, a leadership scoreboard, or to (re)
 
 ## validation-fuzz-dashboard
 
-Use when the user asks for a live-validation dashboard, fuzzing-results dashboard, validation coverage roll-up, or "how many findings were confirmed exploitable / refuted" — e.g. "build the validation dashboard", "combine validation and fuzz results", "what did live validation confirm", "validation false-positive rate". Aggregates every validations/*/*validation*.json report plus FUZZ-CAMPAIGN-SUMMARY.md into one self-contained HTML dashboard.
+Use when the user asks for a live-validation dashboard, fuzzing-results dashboard, validation coverage roll-up, or "how many findings were confirmed exploitable / refuted" — e.g. "build the validation dashboard", "combine validation and fuzz results", "what did live validation confirm", "validation false-positive rate". Renders traust-core's validation-fuzz view from recorded validation and fuzz runs into a self-contained dashboard (md/html/json).
 
 - **Stage:** —
 - **Tier:** `secondary`
