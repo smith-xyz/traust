@@ -133,6 +133,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "benchmark": sweep.BENCHMARK,
         "benchmark-targets": sweep.BENCHMARK_TARGETS,
         "build-canaries": sweep.BUILD_CANARIES,
+        "score-benchmark": sweep.SCORE_BENCHMARK,
         "screen-injection": sweep.SCREEN_INJECTION,
         "rule-lane": sweep.RULE_LANE,
         "mine": sweep.MINE,
