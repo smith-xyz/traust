@@ -206,7 +206,7 @@ def call_attribute_spend(args) -> int:
         print(f"no session transcripts under {transcripts.projects} for {ws}", file=sys.stderr)
         return 3
 
-    source = transcripts.source(ws, ())
+    source = transcripts.source(ws, skill_names())
     window = _window(args.date, month)
     spend = core.services().spend
     if args.json:

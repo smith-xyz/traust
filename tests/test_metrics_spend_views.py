@@ -2,7 +2,9 @@
 `SpendService.usage_summary`, against traust-engine's `collect_spend.collect` and
 `attribute_spend.collect_attributed` + `render` on the same transcripts.
 
-The engine side goes when lane (f) drops traust-engine; the parity it proves stays proven.
+Attribution runs on the skills that exist (`known_skills(HARNESSING_DIR)`, as `--append` does);
+the engine's `attribute-spend` passed none, so it attributed nothing (bug fixed here). The engine
+side goes when lane (f) drops traust-engine; the parity it proves stays proven.
 """
 
 from __future__ import annotations
@@ -22,6 +24,9 @@ from traust_engine.metrics import attribute_spend, collect_spend
 from traust_engine.registry.models import long_prompt_thresholds
 
 from traust.cli.groups import metrics
+from traust.paths import HARNESSING_DIR
+
+SKILLS = attribute_spend.known_skills(HARNESSING_DIR)
 
 REGISTRY = Path(__file__).resolve().parents[1] / "config" / "model-registry.yaml"
 WORKSPACE = Path("/w/workspace")
@@ -124,7 +129,7 @@ def test_the_attribution_table_matches_the_engine_render(
 ) -> None:
     reg = registry(config)
     agg = attribute_spend.collect_attributed(
-        [projects], date, month, None, long_prompt_thresholds(reg)
+        [projects], date, month, SKILLS, long_prompt_thresholds(reg)
     )
     expected = attribute_spend.render(agg, date or month, reg=reg)
     rc, out = stdout(metrics.call_attribute_spend, args(config, date=date, month=month))
@@ -133,7 +138,7 @@ def test_the_attribution_table_matches_the_engine_render(
 
 def test_the_attribution_json_matches_the_engine_buckets(projects: Path, config: Path) -> None:
     agg = attribute_spend.collect_attributed(
-        [projects], None, "2026-10", None, long_prompt_thresholds(registry(config))
+        [projects], None, "2026-10", SKILLS, long_prompt_thresholds(registry(config))
     )
     expected = {
         d: {
@@ -144,7 +149,17 @@ def test_the_attribution_json_matches_the_engine_buckets(projects: Path, config:
     }
     rc, out = stdout(metrics.call_attribute_spend, args(config, month="2026-10", json=True))
     assert rc == 0 and json.loads(out) == expected
-    assert "long_prompt" in json.loads(out)[DAY1]["unattributed"]["claude-haiku-5-5"]
+    assert "long_prompt" in json.loads(out)[DAY1]["triage"]["claude-haiku-5-5"]
+
+
+def test_attribution_lands_on_the_lanes_the_engine_as_called_dropped(
+    projects: Path, config: Path
+) -> None:
+    as_called = attribute_spend.collect_attributed([projects], None, "2026-10")
+    assert {s for skills in as_called.values() for s in skills} == {"unattributed"}
+    rc, out = stdout(metrics.call_attribute_spend, args(config, month="2026-10", json=True))
+    lanes = {s for skills in json.loads(out).values() for s in skills}
+    assert rc == 0 and lanes == {"unattributed", "triage", "secure-code-audit", "validate-findings"}
 
 
 def test_without_transcripts_the_live_view_exits_1_and_attribution_3(
