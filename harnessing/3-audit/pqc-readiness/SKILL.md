@@ -86,8 +86,9 @@ If facts already exist (`--from-facts`), load them. Otherwise run the
 deterministic scanner:
 
 ```bash
+syft dir:<checkout> -o cyclonedx-json > <slug>-sbom.json
 python3 <skill-base>/scripts/pqc_facts.py \
-  --repo-dir <checkout> --repo-url <URL> \
+  --repo-dir <checkout> --repo-url <URL> --sha <commit> --sbom <slug>-sbom.json \
   --out <slug>-pqc-facts.json --cbom-out <slug>-cbom.json
 traust pqc record --repo-url <URL> --sha <commit> --facts <slug>-pqc-facts.json
 traust pqc prepare --repo-url <URL> --sha <commit>
@@ -562,8 +563,8 @@ anything uncertain `posture: unknown`.
 ## Two-layer probe model
 
 ```
-Layer 1 (census):   python3 -m traust.cli adapters crypto-source   → CRYPTO_* facts
-                     ↓ imported by
+Layer 1 (census):   python3 -m traust.cli adapters crypto-source   → CRYPTO_* facts (traust-core census)
+                     ↓ read by
                     pqc_facts.py                → HP_CHAIN_* PQC facts + pqc_capable flag
 
 Layer 2 (TLS/code): pqc-scan rules (opengrep)  → CWE/algorithm-level crypto usage
@@ -576,7 +577,7 @@ Chain reasoning:    crypto-analysis SKILL.md    → governance chains (who owns 
 | ----------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `crypto-source`         | python3 -m traust.cli adapters crypto-source                       | Provider census: Go, Node, JDK, Python, Rust, .NET, Ruby, C/C++ crypto stacks, base images, RPM locks, GODEBUG, crypto-policies                                                  |
 | `crypto-cluster`        | python3 -m traust.cli adapters crypto-cluster                      | Unopinionated data collector — `cluster` tier with `--groups` provides raw TLS negotiation facts for PQC probing                                                                 |
-| `pqc_facts.py`          | `harnessing/3-audit/pqc-readiness/scripts/pqc_facts.py`          | Imports crypto*probe, maps `CRYPTO*_`→`HP*CHAIN*_`, adds PQC capability assessment via `\_pqc_capable_version()`(reads thresholds from[`notes/reference/pqc-version-matrix.yaml`](notes/reference/pqc-version-matrix.yaml)) |
+| `pqc_facts.py`          | `harnessing/3-audit/pqc-readiness/scripts/pqc_facts.py`          | Reads traust-core's crypto census of the commit (checkout + manifest SBOM), maps `CRYPTO*_`→`HP*CHAIN*_`, adds PQC capability assessment via `\_pqc_capable_version()`(reads thresholds from[`notes/reference/pqc-version-matrix.yaml`](notes/reference/pqc-version-matrix.yaml)) |
 | `scan_xcrypto_usage.py` | `harnessing/3-audit/pqc-readiness/scripts/scan_xcrypto_usage.py` | golang.org/x/crypto evidence: first-party import sites, go.mod versions, optional callgraph reachability (somepath witness)                                                      |
 | `traust pqc blockers`   | traust-core `PqcService.blockers`                                | Derives each recorded report's `remediations[]` in the findings vocabulary (severity, classification, `patchable`) for `/patch` and other findings consumers                        |
 | `novel.py`              | `harnessing/5-validate/validate-findings/novel.py`          | Runtime probes: `pqc-tls-negotiation`, `pqc-cert-algorithm`, `pqc-crypto-policy`, `pqc-backend-tls`                                                                              |

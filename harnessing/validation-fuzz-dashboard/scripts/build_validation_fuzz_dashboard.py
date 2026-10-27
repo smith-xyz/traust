@@ -26,7 +26,6 @@ from traust.context import (
     load,
     progress_tracker_dir,
     resolve_results_root,
-    workspace_dir,
 )
 
 VERDICTS = ["CONFIRMED", "INCONCLUSIVE", "BLOCKED_BY_SCOPE", "REFUTED"]  # attempted, bad->good
@@ -405,103 +404,6 @@ def build_markdown(v, fz, now, totals, attempted, grand, cov, stacked_tbl):
     return "\n".join(lines)
 
 
-# --- shared metrics ledger (best-effort; dashboards never fail on it) -------
-
-
-def _ledger_soft(config_home):
-    try:
-        import importlib
-
-        mod = importlib.import_module("traust_engine.metrics.history")
-        ws = workspace_dir(load(config_home))
-        return mod, ws
-    except SystemExit:
-        return None, None
-    except Exception:
-        pass
-    return None, None
-
-
-def _inject_trend(path, text):
-    """Insert the trend line into an already-rendered output (md or html)."""
-    try:
-        import re as _re
-        from pathlib import Path as _P
-
-        p = _P(path)
-        s = p.read_text(encoding="utf-8")
-        if p.suffix == ".md":
-            head, _, rest = s.partition("\n")
-            s = head + f"\n\n\U0001f4c8 *{text}*\n" + rest
-        else:
-            s = _re.sub(
-                r"(<body[^>]*>)",
-                lambda m: (
-                    m.group(1) + "<div style='max-width:1280px;margin:10px auto 0;"
-                    "padding:0 28px;font-size:13px;color:#6a6e73'>"
-                    "\U0001f4c8 " + text + "</div>"
-                ),
-                s,
-                count=1,
-            )
-        p.write_text(s, encoding="utf-8")
-    except OSError:
-        pass
-
-
-# --- standard population block (traust.cli.groups.corpus; best-effort) ------------
-
-
-def _population_lines(counts):
-    """Markdown lines of the standard population block, [] if corpus.py is
-    unavailable — the dashboard must render either way."""
-    try:
-        import importlib
-
-        corpus = importlib.import_module("traust_engine.corpus.resolver")
-        cfg = corpus.load_config()
-        roots = corpus.roots_description(
-            cfg,
-            None,
-            extra=[
-                "`validations/*/` (live-validation verdicts)",
-                "`FUZZ-CAMPAIGN-SUMMARY.md` (offline fuzz results)",
-            ],
-        )
-        return corpus.population_block_lines(
-            tool="validation-fuzz-dashboard",
-            roots=roots,
-            unit="per-finding live-validation verdicts (CONFIRMED/REFUTED/"
-            "INCONCLUSIVE/BLOCKED_BY_SCOPE/NOT_ATTEMPTED) + attack "
-            "chains",
-            filters="NOT_ATTEMPTED excluded from coverage %; REFUTED = removed false positives",
-            denominator="directory walk of validations/*/ for *validation*.json",
-            counts=counts,
-        )
-    except Exception as e:
-        print(f"[!] population block omitted: {e}", file=sys.stderr)
-        return []
-
-
-def _population_html(lines):
-    """Render the population block lines as a final HTML panel."""
-    if not lines:
-        return ""
-    lis = []
-    for ln in lines:
-        if not ln.startswith("- "):
-            continue  # heading/blank handled by the <h2> below
-        t = esc(ln[2:])
-        t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
-        t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
-        lis.append(f"<li>{t}</li>")
-    return (
-        '\n<h2>Population</h2>\n<div class="card"><ul style="margin:0;'
-        "padding-left:18px;color:var(--text-2);font-size:12.5px;"
-        'line-height:1.8">' + "".join(lis) + "</ul></div>\n"
-    )
-
-
 def markdown_path(out_path, out_md=None):
     """Resolve the Markdown companion for the HTML output.
 
@@ -514,7 +416,7 @@ def markdown_path(out_path, out_md=None):
     return Path(out_md) if out_md else Path(out_path).with_suffix(".md")
 
 
-def build(root, out_path, out_md=None, config_home=None):
+def build(root, out_path, out_md=None):
     v = scan_validations(root)
     fz = scan_fuzz(root)
     now = datetime.date.today().isoformat()
@@ -563,16 +465,6 @@ def build(root, out_path, out_md=None, config_home=None):
         ],
         cls="num",
     )
-
-    pop_lines = _population_lines(
-        {
-            "Validation reports parsed": f"{v['reports']:,}",
-            "Finding-checks attempted": f"{attempted:,} / {grand:,} ({cov:.1f}% coverage)",
-            "Confirmed": f"{confirmed:,}",
-            "Refuted": f"{totals['REFUTED']:,}",
-        }
-    )
-    pop_html = _population_html(pop_lines)
 
     page = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -681,7 +573,6 @@ footer{{margin-top:40px;color:var(--muted);font-size:12px}}
 {table(["Target", "Finding", "Observed impact"], [(t, ti, (im[:110] + "…") if len(im) > 110 else im) for t, ti, im in crit_rows])}
 <div class="muted">First 25 of {len(v["confirmed_crit"])} confirmed-Critical validations, alphabetical by target.</div>
 </div>
-{pop_html}
 <footer>Built by <code>traust/harnessing/validation-fuzz-dashboard/scripts/build_validation_fuzz_dashboard.py</code> —
  verdicts from live validation reports; fuzz results from the offline campaign summary.
  Tooltips supplement the table views; every value is reachable without hover.</footer>
@@ -711,8 +602,6 @@ document.querySelectorAll('rect.seg').forEach(r => {{
     with Path(out_path).open("w", encoding="utf-8") as f:
         f.write(page)
     md = build_markdown(v, fz, now, totals, attempted, grand, cov, stacked_tbl)
-    if pop_lines:
-        md += "\n---\n\n" + "\n".join(pop_lines) + "\n"
     out_md = markdown_path(out_path, out_md)
     with Path(out_md).open("w", encoding="utf-8") as f:
         f.write(md)
@@ -722,29 +611,6 @@ document.querySelectorAll('rect.seg').forEach(r => {{
         + f", NOT_ATTEMPTED={v['not_attempted']:,}"
     )
     print(f"[+] fuzz: {len(fz['bugs'])} confirmed bugs, {len(fz['patterns'])} patterns")
-    ml, _ws = _ledger_soft(config_home)
-    if ml:
-        headline = {
-            "confirmed_exploitable": confirmed,
-            "refuted": totals.get("REFUTED"),
-            "checks_attempted": attempted,
-            "chains_confirmed": v.get("chains_live"),
-            "fuzz_bugs": int(b)
-            if str(b := (fz.get("totals") or {}).get("bugs", "")).isdigit()
-            else None,
-        }
-        prev = ml.previous("validation-fuzz")
-        tline = ml.trend_line(
-            headline,
-            prev,
-            ["confirmed_exploitable", "refuted", "checks_attempted", "chains_confirmed"],
-        )
-        if tline:
-            _inject_trend(out_path, tline)
-            _inject_trend(out_md, tline)
-        if ml.append_if_changed("validation-fuzz", headline):
-            print("[+] metrics snapshot appended (validation-fuzz)")
-
     print(f"[+] wrote {out_path}")
     print(f"[+] wrote {out_md}")
 
@@ -783,7 +649,7 @@ def main(argv=None) -> int:
     results = resolve_results_root(args)
     dash = _dashboards_home(args.config_home)
     out = args.out or str((dash or results) / "Live-validation-fuzz-dashboard.html")
-    build(results, out, args.out_md, config_home=args.config_home)
+    build(results, out, args.out_md)
     return 0
 
 

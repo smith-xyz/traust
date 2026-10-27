@@ -4,6 +4,7 @@ progress-tracker/plans/harness-security-remediation-plan.md."""
 from pathlib import Path
 
 import pytest
+from traust_core.v1.errors import ConfigError
 
 _ROOT = Path(__file__).resolve().parents[1]
 
@@ -12,8 +13,8 @@ from adapters.base import AdapterBase
 # ---- C2: step-text execution gate ----------------------------------
 
 
-# Reason fragments follow traust_engine._util.safe_exec wording since v0.229.0
-# (base.py delegates string-step vetting there).
+# Reason fragments follow traust-core's safe-exec wording (base.py delegates
+# string-step vetting there).
 @pytest.mark.parametrize(
     "cmd,frag",
     [
@@ -44,6 +45,13 @@ def test_vet_shell_string_allows_legit():
 def test_run_blocks_instead_of_crashing():
     rc, _out, err = AdapterBase._run("python3 -c 'print(1)'")
     assert rc == 126 and "step blocked" in err
+
+
+def test_string_steps_need_the_config_homes_safe_exec_profiles(tmp_path, monkeypatch):
+    monkeypatch.setenv("TRAUST_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(AdapterBase, "_safe_exec_policy", None)
+    with pytest.raises(ConfigError, match="safe-exec-profiles"):
+        AdapterBase._vet_shell_string("oc get pods")
 
 
 def test_classify_ifs_evasion_not_safe():

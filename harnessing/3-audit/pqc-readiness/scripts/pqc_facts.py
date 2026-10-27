@@ -22,9 +22,12 @@ Kept until traust-engine registers core's PqcScanner (NEED(engine: pqc-scan prov
 `PqcService.prescan` replaces it; record its output with `traust pqc record --facts`.
 
 Usage:
-  pqc_facts.py --repo-dir DIR --repo-url URL --out FACTS.json \
-      [--scanner BIN] [--rules-dir DIR] [--cbom-out CBOM.json]
-  pqc_facts.py --from-sbom SBOM.json --repo-url URL --out FACTS.json
+  pqc_facts.py --repo-dir DIR --repo-url URL --sha SHA --out FACTS.json \
+      [--sbom SBOM.json] [--scanner BIN] [--rules-dir DIR] [--cbom-out CBOM.json]
+  pqc_facts.py --from-sbom SBOM.json --repo-url URL --sha SHA --out FACTS.json
+
+The commit's manifest SBOM (`syft dir:<checkout> -o cyclonedx-json`) is recorded first:
+`--sbom` in source mode (unless already recorded), `--from-sbom` alone in SBOM mode.
 """
 
 from __future__ import annotations
@@ -41,17 +44,20 @@ from pathlib import Path
 from typing import Any
 
 import yaml  # PyYAML — already in harness deps
-from traust_contracts.paths import schema_path
+from traust_core.v1.models.code_facts import CryptoFact, CryptoProbeId
+from traust_core.v1.models.common import ToolRequest
+from traust_core.v1.models.dependencies import NoManifestSbomError
+from traust_core.v1.models.values import HttpsRepoUrl
 
-from traust.cli.groups._registry import load_engine  # wave 2 lane (e)
-from traust.context import add_config_home_arg
+from traust.cli._doors import register_commit
+from traust.context import add_config_home_arg, load
+from traust.paths import schema_path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent
 HERE = SKILL_DIR
 ADAPTER_VERSION = "1.4.0"  # 1.4.0: HP_TLS_LISTENER_* census rules; HP_GOV_* facts first-party only
 PQC_SCAN_COMMIT = "be5c760adb7d1d4d99e39d35d87d2956079db76e"
-from traust_engine.adapters.crypto_probe import *  # noqa: F403, E402
 
 VENDOR_RX = re.compile(
     r"(^|/)(vendor|node_modules|third_party|_vendor|3rdparty|third-party|"
@@ -164,16 +170,17 @@ class Coverage:
     no_crypto_detected_assertion: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        d: dict[str, Any] = {"assessment_basis": self.assessment_basis}
+        d: dict[str, Any] = {
+            "assessment_basis": self.assessment_basis,
+            "scanned_files": self.scanned_files,
+            "skipped_files": self.skipped_files,
+            "rules_in_pack": self.rules_in_pack,
+        }
         if self.assessment_basis == "sbom-only":
             d["sbom"] = self.sbom
             d["components_seen"] = self.components_seen
-        else:
-            d["scanned_files"] = self.scanned_files
-            d["skipped_files"] = self.skipped_files
-            d["rules_in_pack"] = self.rules_in_pack
-            if self.no_crypto_detected_assertion:
-                d["no_crypto_detected_assertion"] = self.no_crypto_detected_assertion
+        elif self.no_crypto_detected_assertion:
+            d["no_crypto_detected_assertion"] = self.no_crypto_detected_assertion
         return d
 
 
@@ -424,10 +431,35 @@ def _parse_scanner_findings(report: dict) -> list[Fact]:
     return facts
 
 
-def _adapter_native_facts(repo: Path, tables: dict) -> list[Fact]:
-    """Provider / policy / kill-switch / material facts via crypto_probe."""
+def crypto_census(args: argparse.Namespace) -> list[CryptoFact]:
+    """The commit's crypto census from traust-core, recording the repository, the commit and
+    its manifest SBOM: the checkout's configured stacks and the SBOM's crypto packages, or the
+    packages alone (`--from-sbom`)."""
+    core = load(args.config_home)
+    services = core.services()
+    url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
+    repo = services.portfolio.register_repository(url, args.public)
+    ref = register_commit(services, repo.id, args.sha, None)
+    assert ref.id is not None
+    sbom = args.from_sbom or args.sbom
+    if sbom:
+        services.exposure.ingest_sbom(Path(sbom).read_bytes(), ref.id)
+    try:
+        if args.from_sbom:
+            return services.code_facts.packages(ref.id)
+        census = services.code_facts.crypto(ref.id, ToolRequest(workspace=Path(args.repo_dir)))
+    except NoManifestSbomError as e:
+        raise SystemExit(
+            f"pqc_facts: commit {args.sha} has no manifest SBOM recorded: run "
+            f"`syft dir:{args.repo_dir} -o cyclonedx-json` and pass it as --sbom"
+        ) from e
+    # A source scan reads the packages its ecosystems name; keyword components are SBOM-mode only.
+    return [f for f in census if f.probe_id != CryptoProbeId.SBOM_COMPONENT]
+
+
+def _adapter_native_facts(repo: Path, general_facts: list[CryptoFact], tables: dict) -> list[Fact]:
+    """Provider / policy / kill-switch / material facts from the crypto census."""
     cap = tables["provider_capability"]
-    general_facts = crypto_probe.probe_repo(repo)  # noqa: F405
     facts: list[Fact] = []
 
     fips_mode = any(
@@ -442,10 +474,11 @@ def _adapter_native_facts(repo: Path, tables: dict) -> list[Fact]:
         if not rule_id:
             continue
 
+        at = gf.location
         fact = Fact(
             rule_id=rule_id,
-            file=gf.file,
-            line=gf.line,
+            file="" if at is None else str(at.path),
+            line=None if at is None else at.line,
             detail=gf.detail[:200],
             provider=gf.provider or None,
             pqc_capable=_pqc_capable_version(gf.provider, gf.version),
@@ -499,14 +532,12 @@ def _adapter_native_facts(repo: Path, tables: dict) -> list[Fact]:
     return facts
 
 
-def _sbom_facts(sbom_path: Path, tables: dict) -> list[Fact]:
-    """--from-sbom mode: provider + delegated facts from a CycloneDX SBOM."""
-    general_facts = crypto_probe.probe_sbom(sbom_path)  # noqa: F405
+def _sbom_facts(general_facts: list[CryptoFact], tables: dict) -> list[Fact]:
+    """--from-sbom mode: provider + delegated facts from the SBOM's crypto packages."""
     return [
         Fact(
             rule_id="HP_SBOM_CRYPTO_COMPONENT",
-            file=gf.file,
-            line=gf.line,
+            file="",
             detail=gf.detail[:200],
             pqc_capable=_pqc_capable_version(gf.provider, gf.version),
         )
@@ -560,7 +591,7 @@ def _build_summary(facts: list[Fact]) -> dict[str, dict[str, int]]:
 # ---------------------------------------------------------------------------
 
 
-def build_facts(args) -> FactsDocument:
+def build_facts(args, census: list[CryptoFact]) -> FactsDocument:
     tables = load_tables()
     rules_dir = Path(args.rules_dir or (HERE / "rules"))
     stamps = {
@@ -570,7 +601,7 @@ def build_facts(args) -> FactsDocument:
     }
 
     if args.from_sbom:
-        facts = _sbom_facts(Path(args.from_sbom), tables)
+        facts = _sbom_facts(census, tables)
         coverage = Coverage(
             assessment_basis="sbom-only",
             sbom=str(args.from_sbom),
@@ -590,7 +621,7 @@ def build_facts(args) -> FactsDocument:
 
         raw_summary = report.get("summary") or {}
         facts = _parse_scanner_findings(report)
-        facts.extend(_adapter_native_facts(repo, tables))
+        facts.extend(_adapter_native_facts(repo, census, tables))
 
         n_rules = sum(
             len(re.findall(r"(?m)^- id:", p.read_text())) for p in sorted(rules_dir.glob("*.yml"))
@@ -659,6 +690,9 @@ def main():
     add_config_home_arg(ap)
     ap.add_argument("--repo-dir")
     ap.add_argument("--repo-url", default=None)
+    ap.add_argument("--sha", help="the checked-out commit")
+    ap.add_argument("--public", action="store_true", help="the repository is public")
+    ap.add_argument("--sbom", help="the commit's manifest SBOM (syft dir:<checkout>)")
     ap.add_argument("--out")
     ap.add_argument("--scanner")
     ap.add_argument("--rules-dir")
@@ -671,11 +705,10 @@ def main():
     if args.validate_facts:
         p = Path(args.validate_facts)
         raise SystemExit(min(validate_facts(json.loads(p.read_text()), str(p)), 1))
-    if not args.out or not (args.repo_dir or args.from_sbom):
-        ap.error("need --out and one of --repo-dir/--from-sbom")
-    load_engine(args.config_home)
+    if not (args.out and args.repo_url and args.sha) or not (args.repo_dir or args.from_sbom):
+        ap.error("need --out, --repo-url, --sha and one of --repo-dir/--from-sbom")
 
-    doc = build_facts(args)
+    doc = build_facts(args, crypto_census(args))
     serialized = doc.to_dict()
     if validate_facts(serialized, args.out):
         raise SystemExit(
