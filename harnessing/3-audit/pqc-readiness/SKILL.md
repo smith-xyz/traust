@@ -563,7 +563,7 @@ anything uncertain `posture: unknown`.
 ## Two-layer probe model
 
 ```
-Layer 1 (census):   traust adapters crypto-source  → CRYPTO_* facts (traust-core census)
+Layer 1 (census):   python3 -m traust.cli adapters crypto-source   → CRYPTO_* facts (traust-core census)
                      ↓ read by
                     pqc_facts.py                → HP_CHAIN_* PQC facts + pqc_capable flag
 
