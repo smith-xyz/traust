@@ -182,11 +182,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
     "(cargo build at a pinned commit), not target code",
     (
         "S10",
-        "harnessing/validation-fuzz-dashboard/scripts/build_validation_fuzz_dashboard.py",
-    ): "reviewed — dashboard builder; 'go test -fuzz' appears in "
-    "rendered method strings, no execution",
-    (
-        "S10",
         "harnessing/remediate-finding/run_checks.sh",
     ): "reviewed — build/test leg is container-sandboxed (rootless "
     "podman, cap-drop, --network=none test phase, env-stripped "
