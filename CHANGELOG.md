@@ -125,6 +125,31 @@ All notable changes to Traust are documented here.
   a traust-core import during the build. `requirements.txt` drops ldap3 and
   PyJWT (the ledger's auth) and adds sqlalchemy (core).
 
+## [0.39.0]
+
+- **`traust check coverage <checkout> [--repo-url URL --sha SHA]`** is the
+  coverage check before paid audit work (deepsec comparison gap plan,
+  step 4), on traust-core's `code_facts.coverage` (traust-core#218). Core
+  reports every entry point as covered, uncovered or unexplained:
+  - the repository's latest threat-model entry points, matched by `kind`
+    to the pre-scan that enumerates that kind;
+  - each family the pre-scans enumerated, and each framework they detected
+    but couldn't enumerate.
+
+  traust adds the security pack's policy in **observe mode**. `would_route`
+  names the `coverage-repair` lane, with reasons, when a pre-scan detected a
+  framework it can't enumerate or a threat-model entry point of a kind a
+  pre-scan covers came back uncovered. It never blocks or reroutes.
+- **`/secure-code-audit`** runs the check before the review. It records the
+  counts in `deterministic_steps`, copies uncovered entries into
+  `coverage_gaps`, and records `would_route` as
+  `metadata.additional.coverage_check`.
+- **`/threat-model`** gives every section 3 entry point a `kind` from
+  traust-contracts' `entry-point-kind` vocabulary (traust-contracts#87), and
+  the bootstrap surface mapper carries it.
+- **Pins:** traust-core at traust-core#218's head. Both of traust's
+  traust-core pins now agree; they had pointed at two different commits.
+
 ## [0.38.0]
 
 - **`traust adapters grpc-guards <checkout>`** is a thin door to traust-core's

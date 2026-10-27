@@ -26,7 +26,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `attack` | The pack's pinned MITRE ATT&CK release | `validate` |
 | `auth` | Who you act as, over traust-core's identity provider | `local`, `login`, `logout`, `refresh`, `service-account`, `status`, `token` |
 | `build` | Deterministic builders | `rescan-worklist`, `skills-reference`, `symbol-index` |
-| `check` | Deterministic gates | `citations`, `content-licenses`, `docs-consistency`, `estate-data`, `drift`, `fix-propagation`, `location-paths`, `reference-integrity`, `skill-alignment`, `skill-security` |
+| `check` | Deterministic gates | `citations`, `content-licenses`, `coverage`, `docs-consistency`, `estate-data`, `drift`, `fix-propagation`, `location-paths`, `reference-integrity`, `skill-alignment`, `skill-security` |
 | `cloud-config` | The cloud-config-audit skill's doors on traust-core | `check`, `record`, `run` |
 | `compliance` | compliance-check doors on traust-core (posture: `dashboard view compliance`) | `adrs`, `calibrate`, `check`, `declare`, `evaluate`, `evidence`, `latest`, `policy`, `record`, `resolve`, `scopes` |
 | `dashboard` | Dashboard rebuilds, the team report and one insight view | `refresh`, `team-report`, `view` |
