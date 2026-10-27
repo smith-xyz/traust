@@ -103,6 +103,7 @@ def run(home: Path, *argv: str) -> tuple[int, Any]:
         ("rpm", security_audit(), SecurityAuditArtifact, "secure-rpm-audit"),
         ("isolation_review", isolation_review(), IsolationReviewArtifact, "isolation-review"),
         ("priv_profile", PRIV_PROFILE, PrivProfileArtifact, "operator-priv-profile"),
+        ("benchmark_audit", security_audit(), SecurityAuditArtifact, "recall-benchmark"),
     ],
 )
 def test_record_files_the_document_on_the_commit(
