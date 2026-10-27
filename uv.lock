@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [manifest]
-overrides = [{ name = "traust-core", git = "https://github.com/traust-security/traust-core.git?rev=083d18bcef220e3be4c071b643a107cceeea3b80" }]
+overrides = [{ name = "traust-core", git = "https://github.com/traust-security/traust-core.git?rev=4c516c515a41955223da97429c54a1c96f0e71e9" }]
 
 [[package]]
 name = "annotated-types"
@@ -1531,8 +1531,8 @@ requires-dist = [
     { name = "pyyaml" },
     { name = "referencing" },
     { name = "sigstore", marker = "extra == 'signing'", specifier = ">=4.0,<5.0" },
-    { name = "traust-core", git = "https://github.com/traust-security/traust-core.git?rev=083d18bcef220e3be4c071b643a107cceeea3b80" },
-    { name = "traust-core", extras = ["postgres"], marker = "extra == 'postgres'", git = "https://github.com/traust-security/traust-core.git?rev=083d18bcef220e3be4c071b643a107cceeea3b80" },
+    { name = "traust-core", git = "https://github.com/traust-security/traust-core.git?rev=4c516c515a41955223da97429c54a1c96f0e71e9" },
+    { name = "traust-core", extras = ["postgres"], marker = "extra == 'postgres'", git = "https://github.com/traust-security/traust-core.git?rev=4c516c515a41955223da97429c54a1c96f0e71e9" },
     { name = "traust-engine", git = "https://github.com/traust-security/traust-engine.git?rev=7c6aa5858f0d364b9a2fbd9a746b7a179e5b3bae" },
     { name = "tree-sitter", marker = "extra == 'graph'" },
     { name = "tree-sitter-go", marker = "extra == 'graph'" },
@@ -1562,7 +1562,7 @@ dependencies = [
 [[package]]
 name = "traust-core"
 version = "0.1.0"
-source = { git = "https://github.com/traust-security/traust-core.git?rev=083d18bcef220e3be4c071b643a107cceeea3b80#083d18bcef220e3be4c071b643a107cceeea3b80" }
+source = { git = "https://github.com/traust-security/traust-core.git?rev=4c516c515a41955223da97429c54a1c96f0e71e9#4c516c515a41955223da97429c54a1c96f0e71e9" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "pydantic" },
