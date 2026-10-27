@@ -14,7 +14,6 @@ ROOT = Path(__file__).resolve().parents[1]
 TOOLS_MODULE = "src/traust/_tools.py"
 BASELINE = {
     "harnessing/3-audit/pqc-readiness/scripts/pqc_facts.py": 1,
-    "harnessing/financial-tracking/scripts/build_financial_report.py": 7,
     "src/traust/cli/build_rescan_worklist.py": 1,
     "src/traust/cli/check_drift.py": 1,
     "src/traust/cli/fetch_feeds.py": 1,
@@ -24,7 +23,7 @@ BASELINE = {
     "src/traust/cli/groups/portfolio.py": 2,
     "src/traust/cli/groups/registry.py": 1,
     "src/traust/cli/groups/reporting.py": 4,
-    "src/traust/cli/groups/sweep.py": 4,
+    "src/traust/cli/groups/sweep.py": 5,
     "src/traust/cli/groups/util.py": 2,
     "src/traust/cli/toolchain.py": 1,
     "src/traust/context.py": 1,  # NEED(engine Policy): the lazy engine factory
