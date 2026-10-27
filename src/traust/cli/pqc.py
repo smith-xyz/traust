@@ -1,5 +1,5 @@
-"""``traust pqc record|check|prepare|summary|blockers``: the pqc-readiness skill's doors
-on traust-core.
+"""``traust pqc record|check|prepare|summary|blockers|vendor-claims``: the pqc-readiness
+skill's doors on traust-core.
 
 record    a commit's Layer-1 facts (`pqc_facts.py`; `PqcService.prescan` waits on the engine's
           pqc-scan provider) or its Layer-2 report; a verified zero-hit is not applicable
@@ -7,6 +7,7 @@ check     a readiness report against its gate past the schema (`record` applies 
 prepare   what Layer 2 scores from: the commit's facts, its route (full/light/skip) and prior report
 summary   the latest readiness per commit in scope, rolled up by bucket or dominant provenance
 blockers  the remediations of each commit's latest readiness, in the vocabulary /patch reads
+vendor-claims  the next version of the curated vendor PQC claims (`dashboard view pqc-vendors`)
 """
 
 from __future__ import annotations
@@ -19,7 +20,11 @@ from uuid import UUID
 
 from traust_core.v1.context import Context
 from traust_core.v1.errors import NotFoundError
-from traust_core.v1.models.artifacts import PqcFactsArtifact, PqcReadinessArtifact
+from traust_core.v1.models.artifacts import (
+    PqcFactsArtifact,
+    PqcReadinessArtifact,
+    PqcVendorClaimsArtifact,
+)
 from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.pqc import PqcDimension, PqcFilter
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
@@ -52,6 +57,12 @@ def _register(core: Context, args: argparse.Namespace) -> UUID:
     return ref.id
 
 
+def _provenance() -> Provenance:
+    return Provenance(
+        run_id=uuid.uuid4(), source=SourceType.INTERACTIVE, occurred_at=datetime.now(UTC)
+    )
+
+
 def _find(core: Context, repo_url: str, sha: str) -> UUID:
     portfolio = core.services().portfolio
     repo = portfolio.find_repository(HttpsRepoUrl.parse(repo_url, core.config.forge_hosts))
@@ -73,9 +84,7 @@ def record(argv: list[str] | None = None) -> int:
     def call() -> str:
         core = load(args.config_home)
         ref_id = _register(core, args)
-        source = Provenance(
-            run_id=uuid.uuid4(), source=SourceType.INTERACTIVE, occurred_at=datetime.now(UTC)
-        )
+        source = _provenance()
         pqc = core.services().pqc
         if args.facts is not None:
             done = pqc.record(ref_id, PqcFactsArtifact.parse(args.facts.read_bytes()), source)
@@ -184,5 +193,20 @@ def blockers(argv: list[str] | None = None) -> int:
             )
         )
         return [{**b.model_dump(mode="json"), "patchable": b.patchable} for b in found]
+
+    return run(call)
+
+
+def vendor_claims(argv: list[str] | None = None) -> int:
+    ap = _parser(
+        "vendor-claims", "Record the next version of the curated vendor claims.", commit=False
+    )
+    ap.add_argument("claims", type=Path, help="a pqc-vendor-claims document (JSON)")
+    args = ap.parse_args(argv)
+
+    def call() -> str:
+        doc = PqcVendorClaimsArtifact.parse(args.claims.read_bytes())
+        recorded = load(args.config_home).services().pqc.record_claims(doc, _provenance())
+        return recorded.model_dump_json(indent=2)
 
     return run(call)

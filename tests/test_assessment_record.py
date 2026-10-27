@@ -104,6 +104,7 @@ def run(home: Path, *argv: str) -> tuple[int, Any]:
         ("rpm", security_audit(), SecurityAuditArtifact, "secure-rpm-audit"),
         ("isolation_review", isolation_review(), IsolationReviewArtifact, "isolation-review"),
         ("priv_profile", PRIV_PROFILE, PrivProfileArtifact, "operator-priv-profile"),
+        ("benchmark_audit", security_audit(), SecurityAuditArtifact, "recall-benchmark"),
     ],
 )
 def test_record_files_the_document_on_the_commit(
@@ -445,7 +446,10 @@ def test_record_on_core_takes_a_fuzz_reports_crashers_in(core_home, tmp_path):
     reported = FingerprintInput(
         repo=repo.url, cwes=("CWE-129",), locations=({"path": "api/v1/helper.go"},)
     )
-    assert services.findings.intake.match(repo.id, reported) is not None
+    finding_id = services.findings.intake.match(repo.id, reported)
+    assert finding_id is not None
+    [decision] = services.findings.decisions.list_for_finding(finding_id)
+    assert (decision.validity, decision.evidence_grade) == ("confirmed", "E0")
 
 
 def test_record_on_core_refuses_a_crasher_of_an_unlisted_harness(core_home, tmp_path):

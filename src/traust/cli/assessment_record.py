@@ -38,6 +38,7 @@ RECORDS: dict[AssessmentKind, tuple[str, type[ArtifactDocument]]] = {
     AssessmentKind.SECURE_CODE_CANONICAL: ("secure-code-audit", SecurityAuditArtifact),
     AssessmentKind.THREAT_MODEL_CANONICAL: ("threat-model", ThreatModelArtifact),
     AssessmentKind.FUZZ: ("create-fuzzing", FuzzReportArtifact),
+    AssessmentKind.BENCHMARK_AUDIT: ("recall-benchmark", SecurityAuditArtifact),
 }
 
 
