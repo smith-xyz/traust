@@ -4,6 +4,14 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- Cut over authored report and roadmap effort/priority producers to the existing
+  canonical contract, with explicit unknown size and independent optional
+  external blocking. Priorities remain explicitly authored; no duration,
+  severity, urgency or prose-to-priority mapping is inferred.
+- Consume Core's serialized-byte report admission and the renderer's lossless
+  effort/blocking output. Historical reports and exact stored-run replay remain
+  compatible; unrelated severity-override policy is unchanged.
+
 - Cut over PQC effort producers and the active JSON decision tree to the approved
   nullable size contract with independent external blocking. Keep readiness
   predicates, thresholds, precedence, buckets and the fleet/2030-clock override
