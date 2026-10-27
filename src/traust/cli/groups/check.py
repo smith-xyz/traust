@@ -6,6 +6,11 @@ from traust.cli.groups._registry import passthrough_op
 
 _ENTRIES: tuple[tuple[str, str, str], ...] = (
     (
+        "coverage",
+        "check_coverage",
+        "A checkout's entry points against the pre-scans that enumerate them (observe mode).",
+    ),
+    (
         "citations",
         "check_citations",
         "Citation gate: deterministic pre-verification check for triage reports.",

@@ -1,6 +1,6 @@
 ---
 name: secure-rpm-audit
-description: Use when the user asks to perform a security audit, security review, or vulnerability assessment of an RPM packaging repository (CentOS Stream / Fedora / RHEL dist-git) — a repo containing a .spec file, downstream patches, and a sources lookaside manifest — using OWASP ASVS, the SEI CERT C/C++ Coding Standards, Fedora Packaging Guidelines, SLSA, and OpenSSF Scorecard.
+description: Use when the user asks to perform a security audit, security review, or vulnerability assessment of an RPM packaging repository (CentOS Stream / Fedora / RHEL dist-git) — a repo containing a .spec file, downstream patches, and a sources lookaside manifest — using OWASP ASVS, the SEI CERT C/C++ Coding Standards, Fedora Packaging Guidelines, SLSA, and OpenSSF Scorecard. Authors canonical remediation sizes or explicit unknowns, independent blocking, and explicit roadmap priorities through Core's report record door.
 metadata:
   harness.tier: "primary"
 ---
@@ -640,6 +640,13 @@ top-level keys, the finding object fields (including the script-computed
 (`contracts/schemas/report.schema.json`) remains the authoritative source for types
 and constraints. Do not restate the tables here — duplicated copies drift.
 
+Follow the shared
+[Remediation authoring](../../../docs/report-structure.md#remediation-authoring)
+rules for findings and roadmap items. Packaging category, patch scope,
+Image Count, severity, release stream, or an upstream dependency do not
+establish size or roadmap priority. Preserve unknown size and omit unknown
+blocking; author each required roadmap priority explicitly.
+
 Key profile obligations for this skill:
 - Set `metadata.audit_profile: "rpm"`.
 - `metadata.repository` = dist-git URL; upstream Source0/Version/Release/patches under `metadata.additional`.
@@ -697,7 +704,11 @@ python3 -m traust.cli reporting record <path-to-report.json> --kind rpm \
   --repo-url <dist-git url> --sha <dist-git commit> [--branch <stream>]
 ```
 
-**A report is not complete until python3 -m traust.cli reporting validate exits with 0 errors. Do not begin analysis of the next component until the current report passes validation.**
+**A report is not complete until python3 -m traust.cli reporting validate
+exits with 0 errors and Core accepts its record, including the new-report
+remediation fields.** Do not begin analysis of the next component before
+both succeed. Compatibility validation and rendering alone are not
+publication; historical reports and stored-run replay are not rewritten.
 
 ## Spend declaration (calibration tuple)
 

@@ -14,7 +14,7 @@ stored source/finding bindings and the actual producer run's provenance. It does
 not discover baselines, reinterpret source labels as UUIDs, walk source paths,
 authenticate a machine as a human, or write a second ledger/state format.
 
-Core's `ValidationObservations` / `ValidationAttempt.soundness` own the policy;
+Core's `ValidationObservations.soundness` owns the policy;
 legacy executor/report adapters translate observations into those models, not a
 second app implementation of the rules.
 

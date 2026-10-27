@@ -159,8 +159,8 @@ re-running never double-counts and never freezes a partial day.
 
 ## Integrations
 
-**Consumes:** Claude Code session transcripts (via
-`metrics collect-spend`); traust-core's spend events (per skill, lane
+**Consumes:** Claude Code workstation session transcripts (via
+`metrics collect-spend`; runner sessions settle against their order instead); traust-core's spend events (per skill, lane
 and run order); run manifests' budget verdicts; the corpus registry (`business_unit`)
 and the portfolio's finding and repo counts; `config/model-registry.yaml` (prices);
 `$TRAUST_CONFIG_HOME/budget-policy.yaml` (ceiling and enforcement posture);

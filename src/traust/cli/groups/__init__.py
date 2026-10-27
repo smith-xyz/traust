@@ -88,6 +88,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "spend": metrics.SPEND,
         "collect-spend": metrics.COLLECT_SPEND,
         "attribute-spend": metrics.ATTRIBUTE_SPEND,
+        "lane-costs": metrics.LANE_COSTS,
     },
     "pqc": dict(pqc.PQC),
     "products": dict(products.PRODUCTS),
