@@ -1,11 +1,14 @@
-"""``traust sweep benchmark-targets|build-canaries|screen-injection``: recall-benchmark's doors on
-traust-core.
+"""``traust sweep benchmark-targets|build-canaries|score-benchmark|screen-injection``:
+recall-benchmark's doors on traust-core.
 
 benchmark-targets  record the benchmark-targets manifest (YAML or JSON) as a new answer-key
                    version; the newest is the one scored. Duplicate target ids and held-out seeded
                    targets are refused
 build-canaries     commit every canary (or seeded-fixture) source into a deterministic local repo
                    (traust-engine's materialiser) and record them as targets of a new version
+score-benchmark    score a runs dir of audit reports (``<id>/``, rerun ``<id>__rerun/``) against the
+                   newest answer key, derived on demand and stored nowhere; without --runs-dir, the
+                   scorecard per auditor version over the recorded benchmark audits
 screen-injection   screen recorded audit reports for the shape of obeyed prompt injection; every
                    signal is a human review item, never a verdict. Exit 1 when any is flagged
 """
@@ -15,11 +18,14 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
+from importlib.metadata import version
 from pathlib import Path
 
 import yaml
-from traust_core.v1.models.artifacts import BenchmarkTargetArtifact
+from traust_core.v1.errors import ValidationError
+from traust_core.v1.models.artifacts import BenchmarkTargetArtifact, ReportArtifact
 from traust_core.v1.models.common import Provenance
+from traust_core.v1.models.detection_quality import BenchmarkFilter, BenchmarkTargetId
 from traust_core.v1.models.vocabulary import SourceType
 
 from traust.cli._doors import parser, run
@@ -59,6 +65,78 @@ def canaries(argv: list[str] | None = None) -> int:
         ]
 
     return run(call)
+
+
+RERUN = "__rerun"
+REPORT_GLOB = "*-security-audit.json"
+
+
+def score(argv: list[str] | None = None) -> int:
+    ap = parser("sweep", "score-benchmark", "Score recall-benchmark runs against the answer key.")
+    ap.add_argument(
+        "--runs-dir",
+        type=Path,
+        help="one dir per target id holding its *-security-audit.json (rerun: <id>__rerun); "
+        "without it, the recorded benchmark audits are scored",
+    )
+    ap.add_argument(
+        "--auditor-version",
+        help="labels the runs dir's reports (default: this traust's version); filters the "
+        "recorded audits",
+    )
+    ap.add_argument(
+        "--include-held-out", action="store_true", help="release scoring: held-out targets too"
+    )
+    ap.add_argument("--out", type=Path, help="also write the result here (JSON)")
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        quality = load(args.config_home).services().detection_quality
+        if args.runs_dir is None:
+            cards = quality.scorecards(
+                BenchmarkFilter(
+                    auditor_version=args.auditor_version, include_held_out=args.include_held_out
+                )
+            )
+            out = {"scorecards": [c.model_dump(mode="json") for c in cards]}
+        else:
+            scored = quality.score_reports(
+                _runs(args.runs_dir),
+                args.auditor_version or version("traust"),
+                include_held_out=args.include_held_out,
+            )
+            out = {
+                "scorecard": scored.scorecard().model_dump(mode="json"),
+                "run": scored.model_dump(mode="json"),
+            }
+        if args.out is not None:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
+        return out
+
+    return run(call)
+
+
+def _runs(runs_dir: Path) -> dict[BenchmarkTargetId, list[ReportArtifact]]:
+    """Each target's report, then its rerun's; a dir with no report is no run of its target."""
+    if not runs_dir.is_dir():
+        raise FileNotFoundError(f"{runs_dir}: no runs dir")
+    dirs = sorted(p.name for p in runs_dir.iterdir() if p.is_dir())
+    if orphans := [d for d in dirs if d.endswith(RERUN) and d.removesuffix(RERUN) not in dirs]:
+        raise ValidationError(f"{runs_dir}: reruns {orphans} have no first run")
+    runs: dict[BenchmarkTargetId, list[ReportArtifact]] = {}
+    for d in (d for d in dirs if not d.endswith(RERUN)):
+        first, rerun = _report(runs_dir / d), _report(runs_dir / f"{d}{RERUN}")
+        if first is not None:
+            runs[BenchmarkTargetId(d)] = [first] if rerun is None else [first, rerun]
+    return runs
+
+
+def _report(run_dir: Path) -> ReportArtifact | None:
+    found = sorted(run_dir.glob(REPORT_GLOB)) if run_dir.is_dir() else []
+    if len(found) > 1:
+        raise FileExistsError(f"{run_dir}: {len(found)} reports; one run is one report")
+    return ReportArtifact.parse(found[0].read_bytes()) if found else None
 
 
 def screen(argv: list[str] | None = None) -> int:
