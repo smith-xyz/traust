@@ -393,6 +393,14 @@ threat on a surface goes unmapped. A tagged section 5 row records that the
 surface was checked and the threat set aside, which is a different claim
 from never tagging the surface.
 
+**Entry-point kind.** New emissions give every section 3 entry point a
+`kind` from traust-contracts' `entry_point_kind` vocabulary (the
+entry-point-kind file under `enums/v1`, whose note defines each value), for
+example `grpc-api` for a gRPC service and
+`ci-supply-chain` for a build pipeline. `traust check coverage` matches each
+entry point to the deterministic pre-scan for its kind, so an entry point
+without one is reported as unexplained. Use `other` only when no kind fits.
+
 **Findings-tree placement (wiring contract, 2026-07-31).** The checkout
 copy alone is invisible to every downstream consumer — `/secure-code-audit`
 (coverage diff), `/vuln-scan`, `/triage`, and `/threat-register` all resolve threat models from the campaign findings

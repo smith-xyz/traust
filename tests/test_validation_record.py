@@ -21,7 +21,7 @@ from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import ScannerSeverity, SourceType
 from traust_core.v1.services.artifact_publishing import PublishSpec, PublishSpecs
 
-from tests.test_validate_report import _valid_report as security_audit
+from tests.test_validate_report import _canonical_report as security_audit
 from traust.cli.__main__ import main
 from traust.context import load
 

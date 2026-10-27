@@ -32,7 +32,7 @@ from traust_core.v1.models.vocabulary import SourceType
 
 from tests.test_isolation_review import _valid_report as isolation_review
 from tests.test_products_doors import _postgres
-from tests.test_validate_report import _valid_report as security_audit
+from tests.test_validate_report import _canonical_report as security_audit
 from traust.cli import assessment_record
 from traust.cli.__main__ import main as cli
 

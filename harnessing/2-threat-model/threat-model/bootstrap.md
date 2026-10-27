@@ -161,7 +161,7 @@ worth the overhead there.
 | Agent | Brief | Returns |
 |---|---|---|
 | **Docs reader** | Read `README*`, `SECURITY.md`, `CHANGELOG*`, top-level `docs/`, and the build manifest (`setup.py` / `Cargo.toml` / `package.json` / `CMakeLists.txt`). Summarize what the project says it is, who uses it, and any security claims or fix entries it documents. | Prose system description; list of self-documented security fixes. |
-| **Surface mapper** | Grep the source tree for entry-point signatures (table below). For each hit, name the surface, the file:function, and what crosses it. Include supply-chain surfaces (lockfiles, vendored deps, `curl \| sh` in build scripts). Bound the scan: exclude `vendor/`, `node_modules/`, `third_party/`, generated code; cap at ~5 representative hits per surface row. | Candidate section 3 rows: `{entry_point, description, trust_boundary, file_refs, review_surfaces}` (`review_surfaces` only on rows from the review-surface kinds below). |
+| **Surface mapper** | Grep the source tree for entry-point signatures (table below). For each hit, name the surface, the file:function, and what crosses it. Include supply-chain surfaces (lockfiles, vendored deps, `curl \| sh` in build scripts). Bound the scan: exclude `vendor/`, `node_modules/`, `third_party/`, generated code; cap at ~5 representative hits per surface row. | Candidate section 3 rows: `{entry_point, kind, description, trust_boundary, file_refs, review_surfaces}` (`review_surfaces` only on rows from the review-surface kinds below). |
 | **Infra reader** | Read deploy-time config: `*.tf`/`*.tfvars`, k8s manifests (`*.yaml` under `k8s/`/`deploy/`/`manifests/`), `Dockerfile*`, CI workflows, and any IAM/service-account/dataset-ACL files. For each, name (a) the identity it runs as and what that identity can reach, (b) any access grant not managed in this tree (ad-hoc IAM, hand-created SAs, missing column/policy tags), (c) credentials or principals that survive a migration or teardown. | Candidate section 3 rows for infra surfaces + candidate section 4 rows: `{threat, surface, asset}` where the config itself is the finding. |
 | **Asset finder** | Identify what the code protects or produces: sensitive data it reads/writes (secrets, keys, user records, DBs), process integrity (always present for native code), service availability, and downstream embedder assets if it's a library. | Candidate section 2 rows: `{asset, description, sensitivity}`. |
 | **History miner** | Two steps. **(a)** Glance at the build manifest and file extensions to identify language **and domain**, then derive 6-10 commit-message keywords specific to that stack on top of the base set `CVE- security vuln fix exploit`. Derive from what the code does, not from a lookup table; the three examples below illustrate the specificity bar, not coverage: native parser → `overflow OOB UAF integer`; web service → `injection SSRF IDOR traversal`; crypto → `timing constant-time nonce`. **(b)** `git -C <target-dir> log --all -i --grep='<base ∪ derived, \|-joined>' --oneline`, then read the full message + diff of each hit. Also grep any `issues/` or `bugs/` export in-tree. | Vuln rows: `{id (commit hash), title, component, class, vector}`. |
@@ -206,7 +206,7 @@ surface, and the audit's coverage diff reads the tags from the JSON.
   "stage": 1,
   "swarm": {
     "docs_reader": "<returned text block>",
-    "surface_mapper": [ {entry_point, description, trust_boundary, file_refs, review_surfaces} ],
+    "surface_mapper": [ {entry_point, kind, description, trust_boundary, file_refs, review_surfaces} ],
     "infra_reader": { "surfaces": [...], "threats": [...] },
     "asset_finder": [ {asset, description, sensitivity} ],
     "history_miner": [ {id, title, component, class, vector} ],
@@ -275,7 +275,7 @@ into the model file verbatim. It becomes the `evidence` column in Stage 3.
   "stage": 2,
   "section1_context": "<markdown prose>",
   "section2_assets": [ {asset, description, sensitivity} ],
-  "section3_entry_points": [ {entry_point, description, trust_boundary, reachable_assets, review_surfaces} ],
+  "section3_entry_points": [ {entry_point, kind, description, trust_boundary, reachable_assets, review_surfaces} ],
   "vuln_table": [ {id, title, component, class, vector, entry_point} ]
 }
 ```

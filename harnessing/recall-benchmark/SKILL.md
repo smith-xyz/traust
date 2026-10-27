@@ -1,6 +1,6 @@
 ---
 name: recall-benchmark
-description: Use when the user asks to measure the auditor's detection recall, run the recall benchmark, score a harness release against ground truth, bootstrap/admit benchmark targets, or asks "what fraction of real vulnerabilities do we find". Audits pinned pre-fix refs of repos with known-real findings (self-replay from the disposition ledger, CVE replay, seeded) on clean clones, scores detection with the finding_identity match ladder via traust-core (`traust sweep score-benchmark`), and emits benchmark.json — recall overall/per-CWE/per-severity/per-language, held-out split, and run-to-run stability.
+description: Use when the user asks to measure the auditor's detection recall, run the recall benchmark, score a harness release against ground truth, bootstrap/admit benchmark targets, or asks "what fraction of real vulnerabilities do we find". Audits pinned pre-fix refs of repos with known-real findings (self-replay from the disposition ledger, CVE replay, seeded) on clean clones using the shared canonical remediation-authoring rules, records real-target reports through Core, scores detection with the finding_identity match ladder via traust-core (`traust sweep score-benchmark`), and emits benchmark.json — recall overall/per-CWE/per-severity/per-language, held-out split, and run-to-run stability.
 argument-hint: "[bootstrap|admit|run|score] [--sample N] [--release]"
 metadata:
   harness.tier: "secondary"
@@ -158,6 +158,13 @@ target, optionally `--sample N`:
 2. Spawn one audit agent per target following the secure-code-audit batch
    rules (reference `harnessing/3-audit/secure-code-audit/SKILL.md` +
    `contracts/schemas/report.schema.json`; pin one harness version for the whole run).
+   Audit authors also follow
+   [`docs/report-structure.md` → Remediation authoring](../../docs/report-structure.md#remediation-authoring)
+   for every new report, including canary/seeded scratch reports: unknown
+   size is not a guessed size, unknown blocking stays absent, and every
+   roadmap priority is explicitly authored. Answer-key severity, a known
+   fix, and fixture labels supply no size or priority mapping. Do not
+   expose the answer key to obtain those decisions.
    Output goes to the runs scratch dir `/tmp/recall-bench/runs/<id>/` —
    **never** under `analysis-results/` (these are benchmark artifacts, not
    campaign reports) and never inside the clone. The prompt gives repo, SHA,
@@ -173,6 +180,9 @@ target, optionally `--sample N`:
    a public https repository): record each run, and its rerun, as a
    benchmark audit of the pinned commit, so it trends across runs:
    `python3 -m traust.cli reporting record /tmp/recall-bench/runs/<id>/<slug>-security-audit.json --kind benchmark_audit --repo-url <repo_url> --sha <pre_fix_sha> --public`.
+   Core owns new-report admission at this existing door; compatibility
+   validation or successful scoring alone does not establish publication.
+   Never rewrite a historical run or recreate a retired benchmark writer.
    Canary and seeded targets (`file://` repositories) are never recorded;
    their scores are derived from the runs dir each time.
 6. Continue with `score` (a headless `run` session ends with the score).
