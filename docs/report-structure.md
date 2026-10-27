@@ -31,7 +31,7 @@ projections.
 | `severity_criteria` | Array of ≥4 entries, each with `level` (critical/high/medium/low/informational) and `definition` (≥20 chars). Must include at least critical, high, medium, low. |
 | `findings` | Array of finding objects (below). |
 | `findings_summary` | Array of ≥4 severity count entries (`severity`, `count`, `finding_ids`) — counts and IDs must match the findings. |
-| `remediation_roadmap` | Array of ≥1 items (`priority`, `action` ≥10 chars, `addresses` finding-ID array). |
+| `remediation_roadmap` | Array of ≥1 items with required explicitly authored `priority`, `action` ≥10 chars, and `addresses` finding-ID array. Optional `effort` and independent `blocked_external`; see [Remediation authoring](#remediation-authoring). |
 
 ## Finding object fields
 
@@ -57,7 +57,8 @@ projections.
 | `passes` | No | Audit passes that independently surfaced this finding under dual-pass union-merge: `[1,2]` both passes, `[2]` second pass only. Single-pass reports omit it. |
 | `dependency` | No | Supply-chain provenance for a dependency finding (ecosystem, package, version, advisory), so the finding is self-describing and does not depend on a sibling impact-analysis artifact. |
 | `pqc_classification` | No | PQC relevance, assigned by table lookup against the PQC reference tables — never free-authored: `shor-key-establishment` \| `shor-signature` \| `clock-2030-parameter` \| `classically-broken` \| `hndl-exposure` \| `pqc-blocker-config` \| `pqc-adoption`. |
-| `remediation_effort` | No | `trivial` \| `moderate` \| `significant` \| `blocked-external` \| `xs` \| `s` \| `m` \| `l` \| `xl` — PQC findings use the first four, derived deterministically per the PQC decision tree and emitted alongside `pqc_classification`; the size labels are the shared effort scale. |
+| `remediation_effort` | No | New findings: `xs` \| `s` \| `m` \| `l` \| `xl`, or `null` for unknown size, from traust-contracts `enums/v1/effort.json`. Omission also leaves size unknown. Historical effort labels remain readable, not valid choices for new authorship; see [Remediation authoring](#remediation-authoring). |
+| `blocked_external` | No | Independent boolean: an external dependency blocks remediation (`true`) or is affirmatively known not to (`false`). Omit when unknown; absence is not `false`, and neither value establishes size or priority. |
 | `validation_status` | No | Historical-compatible finding validity; accepted values follow core's installed [contracts validity vocabulary](https://github.com/traust-security/traust-contracts/blob/development/enums/v1/validity.json). New state is recorded through core decisions, never authored in a baseline. |
 | `disposition` | No | Present only on cumulative reports (`*-findings-current.json`): both disposition axes, conflict and awaiting-signoff flags, and event history, derived from the ledger. Never authored in a baseline. |
 | `effective_severity` | No | Present only on cumulative reports: equals a human severity override from the ledger when one exists, else the original severity. The original `severity` is never rewritten. |
@@ -76,6 +77,46 @@ projections.
 | `peach_isolation_review` | Always emitted on `code` and `container` profiles — see deltas. |
 | `disposition_summary` | Cumulative reports only: counts per validity and resolution state, derived from the ledger. |
 | `footer` | Free-text footer. |
+
+## Remediation authoring
+
+These rules apply to newly authored findings and roadmap items across all
+three profiles and the audit reports produced for `/recall-benchmark`.
+The installed traust-contracts report schema owns the vocabulary:
+`$defs/canonical_finding` narrows finding effort; the findings and
+`remediation_roadmap` subnodes of `$defs/canonical_write` narrow the
+corresponding new-report fields. Historical full-schema validation and
+stored-run replay remain unchanged; do not rewrite old reports or source
+notes to make them look newly authored.
+
+- **Size:** finding `remediation_effort` and roadmap `effort` use the
+  same canonical effort scale above. If size is not explicitly established,
+  use `null` when emitting the field, or omit the optional field. There are
+  no defined duration thresholds or unconditional conversions from legacy
+  effort labels. Existing prose, provenance, agility, pin counts, urgency,
+  deadlines, severity, and external blocking do not establish size.
+- **Priority:** every roadmap item requires an explicitly authored `p0`,
+  `p1`, `p2`, `p3`, or `p4`, from traust-contracts
+  `enums/v1/roadmap-priority.json` (`$defs/roadmap_priority` in the report
+  schema). Preserve a supplied canonical priority. The labels are ordered;
+  no severity, urgency, deadline, effort, or legacy-text mapping is defined.
+  Never invent a default, use `null`, or omit the required priority. If an
+  automated source cannot supply one, identify the source and intended
+  consumer and obtain an explicit authoring decision before publishing.
+- **Blocking:** assess `blocked_external` separately for each finding and
+  roadmap item. Only emit a boolean supported by evidence; unknown blocking
+  stays absent, not `false`. An unknown size can be externally blocked.
+- **Reference data is producer input:** the PQC tagging pass reads
+  [`pqc-readiness-decision-tree.json`](../harnessing/3-audit/pqc-readiness/notes/reference/pqc-readiness-decision-tree.json).
+  Its effort rules return unknown size and only its explicit blocking rule
+  establishes blocking; they supply no roadmap priority. Do not turn its
+  readiness buckets or the IR8547 clocks into sizes or priorities.
+
+Use `traust reporting record` for publication (below): Core owns admission
+of newly recorded report fields. The compatibility validator and renderer
+also read historical reports; their acceptance alone does not establish
+that a new report is ready to record. Do not add a local vocabulary gate,
+apply unrelated classifier policies, or recreate retired report writers.
 
 ## Profile deltas
 
@@ -177,13 +218,16 @@ projections.
    errors required.
 2. Fingerprint: python3 -m traust.cli corpus finding-identity fingerprint <report.json> --write
    (deterministic; safe — fingerprints are outside the claim-hash fields).
-3. On a full re-audit of an already-audited repo:
-   python3 -m traust.cli corpus finding-identity rebaseline <old.json> <new.json> <layer.json>
-   so the disposition ledger's history transfers (fingerprint matches auto-map;
-   looser matches queue for human confirmation; unmatched old findings queue as
-   needs_review — never silently dropped). Rebaseline also migrates the layer's
-   claim-hash pins to the new baseline (superseded old ids with an alias or a
-   queued decision are unpinned; run
-   `harnessing/4-triage/track-findings/scripts/baseline_claims.py record`
-   afterwards to pin the new report's claims) and repoints
-   `metadata.audit_commit`.
+3. Record the report through `python3 -m traust.cli reporting record
+   <report.json> --kind <kind> --repo-url <https source repository URL>
+   --sha <audited source commit> [--branch <audited branch>]`.
+   Use `secure_code`, `rpm`, or `container` for the corresponding audit
+   skill; `/recall-benchmark` records public real-target reports as
+   `benchmark_audit` with `--public`. Follow each skill's provenance
+   instructions (container source labels identify its source commit).
+   A new report is not published until Core accepts the record. An
+   admission error is not a reason to guess a size or priority.
+4. Preserve historical reports and raw notes. A re-audit is a new report
+   and assessment, not a rewrite of the old report. Use the current Core
+   finding doors for later decisions; the former layer emitters and
+   cumulative-report rebuild are retired and must not be recreated.

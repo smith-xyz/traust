@@ -138,9 +138,9 @@ The engine's `llm-application` opengrep rules (Python, TypeScript, Go)
 decide the code-level shapes of some checks. Their hits arrive with the
 other opengrep facts, and each fact carries the category in `owasp_llm`.
 A hit is evidence for the check, and you still confirm it in context. A
-promoted fact's `owasp_llm` category is named in the finding's
-`description` (see Recording). No hit is not a negative, because the rules
-see only the SDK call shapes they name.
+promoted fact's `owasp_llm` goes into the finding's
+`owasp_llm_references`. No hit is not a negative, because the rules see
+only the SDK call shapes they name.
 
 | Rule (`traust-<lang>-llm-application-…`) | Check |
 |---|---|
@@ -169,14 +169,14 @@ the tool, so judge it from the code.
   "<file>", "reason": "tagged, not reviewed"}`).
 - **Findings** carry:
   - the check's CWE in `cwes`;
-  - any ASVS requirement they also break in `asvs_references`;
-  - the OWASP category ID and the check number in the `description`, for
-    example "OWASP LLM06, check 06.5". This report schema has no
-    structured field for the OWASP LLM category yet; where it lives in the
-    data model is an open decision, and the description carries it until
-    then.
-- **`/vuln-scan` findings** (the `vuln-findings` format) name the category
-  and check number in the `description` the same way.
+  - the OWASP category ID in `owasp_llm_references`, for example
+    `["LLM06"]`;
+  - any ASVS requirement they also break in `asvs_references`.
+
+  Name the check number in the `description`, for example "check 06.5".
+- **`/vuln-scan` findings** (the `vuln-findings` format) have no reference
+  fields, so they name the category and check number in the
+  `description`, for example "OWASP LLM06, check 06.5".
 - **Negative results** state the check number, what was examined and the
   evidence, for example "06.5: every MCP tool handler in `server/tools.py`
   calls `require_scope()` before acting".
