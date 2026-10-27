@@ -188,3 +188,11 @@ class TestStateDiff(unittest.TestCase):
 
         s = self._snap([{"metadata": {"name": "x"}}])
         self.assertEqual(diff(s, s, set()), [])
+
+    def test_discovery_does_not_adjudicate_candidate_validity(self):
+        from traust.cli.cluster_state_diff import diff
+
+        before = self._snap([])
+        after = self._snap([{"metadata": {"name": "unexpected-binding"}}])
+        [claim] = diff(before, after, set())
+        self.assertNotIn("validation_status", claim)
