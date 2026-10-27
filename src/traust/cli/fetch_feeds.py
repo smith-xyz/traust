@@ -6,8 +6,8 @@ traust-core: ``traust feeds fetch`` snapshots them through
 ``ExposureService.refresh_feeds``. What stays here is the one source that
 is not a security feed: the product/ownership/notification registry
 (ps_products, contacts, cc_lists; zero vulnerability data), read from
-``<feeds cache>/product_definitions.json`` by traust-engine's product
-registry and the SLA view. It moves with them (*Skill port: sla-view*).
+``<feeds cache>/product_definitions.json`` by the product registry and
+the SLA view. It moves with them (*Skill port: sla-view*).
 
 A copy younger than its max age is reused; a failed refresh falls back to
 the stale copy with a loud warning, so off-VPN runs degrade instead of
@@ -33,9 +33,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from traust_engine import locations
+from traust_core.v1.context import Context
 
-from traust.context import add_config_home_arg, load
+from traust.context import add_config_home_arg, load, locations
 from traust.registry.feeds_config import feeds_cache_dir
 
 USER_AGENT = "traust fetch_feeds.py"
@@ -45,10 +45,10 @@ FILE = "product_definitions.json"
 MAX_AGE_HOURS = 24.0
 
 
-def _url() -> str | None:
+def _url(core: Context) -> str | None:
     """Config-owned (``locations.product_definitions``): a deployment-specific registry, so no
     endpoint ships; unset means the source is absent and its consumers degrade."""
-    return locations.product_definitions_url(locations.configured_locations())
+    return locations(core).product_definitions
 
 
 def _now():
@@ -132,11 +132,12 @@ def main(argv=None) -> int:
         "--offline", action="store_true", help="never touch the network; use the cached copy only"
     )
     args = ap.parse_args(argv)
-    url = _url()
+    core = load(args.config_home)
+    url = _url(core)
     if url is None:
         print(f"! {NAME}: not configured (locations.product_definitions) — UNUSABLE")
         return 1
-    cache_dir = args.cache_dir or feeds_cache_dir(core=load(args.config_home))
+    cache_dir = args.cache_dir or feeds_cache_dir(core=core)
     usable, status = fetch(url, cache_dir, args.max_age_hours, offline=args.offline)
     marker = "✓" if usable and not status.startswith("STALE") else "!"
     print(f"{marker} {NAME}: {status}" + ("" if usable else " — UNUSABLE"))

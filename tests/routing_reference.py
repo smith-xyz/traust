@@ -77,7 +77,7 @@ def load_reference(source: Path):
         "json": json,
         "_dt": datetime,
         # This corpus supplies canonical URLs; identity normalization is not tested.
-        "normalize_repo_url": lambda value: value,
+        "_normalize_repo_url": lambda value: value,
     }
     exec(compile(ast.Module(body=selected, type_ignores=[]), str(source), "exec"), namespace)
     main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")

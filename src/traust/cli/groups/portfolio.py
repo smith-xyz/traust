@@ -11,14 +11,16 @@ from traust.cli.groups._registry import OpSpec, load_engine, passthrough_op
 
 
 def _graph() -> ModuleType:
-    """traust-engine's portfolio graph (wave 2 lane (d))."""
+    """traust-engine's portfolio graph."""
+    # PENDING(decision: portfolio graph layers — retire or port)
     from traust_engine.portfolio import graph
 
     return graph
 
 
 def _resolve_spine_db(args, spine: str | None, db: str | None) -> tuple[Path, Path] | None:
-    engine = load_engine(args.config_home)  # wave 2 lane (d)
+    # PENDING(decision: portfolio graph layers — retire or port)
+    engine = load_engine(args.config_home)
     try:
         return _graph()._resolve_portfolio_paths(
             spine,

@@ -7,7 +7,6 @@
   },
   "src/traust/cli/build_rescan_worklist.py": {
     "database": 2,
-    "engine-internal": 1,
     "state-file": 2
   },
   "src/traust/cli/build_symbol_index.py": {
@@ -17,14 +16,8 @@
     "contracts": 1,
     "state-file": 2
   },
-  "src/traust/cli/check_drift.py": {
-    "engine-internal": 1
-  },
   "src/traust/cli/check_skill_alignment.py": {
     "state-file": 1
-  },
-  "src/traust/cli/fetch_feeds.py": {
-    "engine-internal": 1
   },
   "src/traust/cli/findings.py": {
     "core-internal": 2
@@ -46,7 +39,6 @@
   },
   "src/traust/cli/groups/reporting.py": {
     "contracts": 1,
-    "engine-internal": 4,
     "state-file": 1
   },
   "src/traust/cli/groups/sweep.py": {

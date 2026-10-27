@@ -23,10 +23,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from traust_engine.assets import compliance_data_dir
 
 from traust.context import inputs_dir, load
-from traust.paths import optional_config_path
+from traust.paths import HARNESS_ROOT, optional_config_path
 
 PROVENANCE_REVIEW_DAYS = 180
 DOCS_MAP_STALE_DAYS = 30
@@ -109,7 +108,7 @@ def check_adr_registry() -> list[dict]:
 
 def _rules_pin(row: str, module: str, constant: str, branch: str, landed: str) -> list[dict]:
     """A rule pack pinned by `<constant>_SHA` / `<constant>_REPO` in `module` vs upstream
-    `branch` HEAD; the pack ages faster than the engine that runs it."""
+    `branch` HEAD; the pack ages faster than the tool provider that runs it."""
     text = _module_text(module)
     if text is None:
         return [item(row, "pending", f"{module} not installed")]
@@ -141,7 +140,7 @@ def _rules_pin(row: str, module: str, constant: str, branch: str, landed: str) -
 def check_yara_rules_pin() -> list[dict]:
     return _rules_pin(
         "yara-rules-pin",
-        "traust_engine.adapters.yara",
+        "traust_core.v1.providers.tools.yara",
         "RL_RULES",
         "develop",
         "new malware-family rules may have landed that scans won't match",
@@ -152,7 +151,7 @@ def check_argus_rules_pin() -> list[dict]:
     # An opt-in crypto/PQC supplement, uncalibrated against the ledger: watched, never promoted.
     return _rules_pin(
         "argus-rules-pin",
-        "traust_engine.adapters.opengrep",
+        "traust_core.v1.providers.tools.opengrep",
         "ARGUS_RULES",
         "main",
         "new crypto/PQC rules may have landed that the opt-in supplement won't match",
@@ -183,7 +182,7 @@ def check_framework_upstream(compliance: Path) -> list[dict]:
                 f"derived at {pinned[:12]} but oscal-content HEAD is {head[:12]} — check "
                 "whether the SP800-53 rev5 files changed before re-deriving",
                 "review upstream diff; if the rev5 files moved, re-derive "
-                "per traust-engine's data/compliance/README.md and update provenance",
+                "per packs/security/compliance/README.md and update provenance",
             )
         ]
     return [item(row, "fresh", f"upstream HEAD matches the derivation pin ({head[:12]})")]
@@ -334,6 +333,11 @@ def check_docs_product_map(inputs: Path) -> list[dict]:
         if not newer and not gone:
             out.append(item(row, "fresh", f"{len(declared)} version(s) match live"))
     return out
+
+
+def compliance_data_dir() -> Path:
+    """The security pack's vendored framework data (NIST spine, baselines, catalogs)."""
+    return HARNESS_ROOT / "packs" / "security" / "compliance"
 
 
 def main(argv: list[str] | None = None) -> int:

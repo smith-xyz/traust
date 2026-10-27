@@ -6,7 +6,16 @@ import json
 import sys
 from pathlib import Path
 
-from traust.cli.groups._registry import OpSpec, load_engine, passthrough_op
+from traust_core.v1.errors import TraustError, ValidationError
+from traust_core.v1.models.artifacts import (
+    CloudConfigAuditArtifact,
+    RenderFormat,
+    ReportArtifact,
+    ThreatModelArtifact,
+)
+
+from traust.cli.groups._registry import OpSpec, passthrough_op
+from traust.context import load
 
 
 def add_validate_args(ap) -> None:
@@ -23,13 +32,32 @@ def add_validate_args(ap) -> None:
     )
 
 
-def call_validate(args) -> int:
-    # wave 2 lane (d)
-    from traust_engine.reporting import validate
+def _print_result(result) -> None:
+    name = Path(result.file_path).name
+    if result.passed and not result.warnings:
+        print(f"  PASS  {name}")
+        return
+    parts = [f"{len(result.errors)} error(s)"] if result.errors else []
+    if result.warnings:
+        parts.append(f"{len(result.warnings)} warning(s)")
+    print(f"  {'PASS' if result.passed else 'FAIL'}  {name} ({', '.join(parts)})")
+    for e in result.errors:
+        print(f"        ERROR: {e}")
+    for w in result.warnings:
+        print(f"        WARN:  {w}")
 
-    engine = load_engine(args.config_home)
-    files = validate.collect_report_files(args.path)
-    if not files:
+
+def call_validate(args) -> int:
+    # `--schema` names a contract schema by its file name (`triage.schema.json`) or bare name.
+    schema = None if args.schema is None else Path(args.schema).name.removesuffix(".schema.json")
+    try:
+        results = load(args.config_home).reporting.validate_reports(
+            Path(args.path), strict=args.strict, schema=schema
+        )
+    except TraustError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 2
+    if not results:
         target = Path(args.path)
         if target.is_dir():
             print(f"No .json files found in {target}")
@@ -37,30 +65,17 @@ def call_validate(args) -> int:
             print(f"Path not found: {target}")
         return 1
 
-    explicit_schema = None
-    if args.schema is not None:
-        schema_path = Path(args.schema)
-        if not schema_path.is_absolute() and not schema_path.exists():
-            schema_path = validate.SCHEMA_DIR / schema_path.name
-        explicit_schema = schema_path
-
-    print(f"\nValidating {len(files)} report(s)...\n")
-
-    results = engine.reporting.validate(
-        args.path,
-        strict=args.strict,
-        schema=explicit_schema,
-    )
+    print(f"\nValidating {len(results)} report(s)...\n")
     total_errors = 0
     total_warnings = 0
     for r in results:
-        r.print_report()
+        _print_result(r)
         total_errors += len(r.errors)
         total_warnings += len(r.warnings)
         print()
 
     print("=" * 60)
-    print(f"Total: {len(files)} file(s), {total_errors} error(s), {total_warnings} warning(s)")
+    print(f"Total: {len(results)} file(s), {total_errors} error(s), {total_warnings} warning(s)")
     failed = sum(1 for r in results if not r.passed)
     if failed:
         print(f"Result: {failed} FAILED")
@@ -90,30 +105,31 @@ def add_lint_args(ap) -> None:
 
 
 def call_lint(args) -> int:
-    from traust_engine.reporting import lint
-
-    engine = load_engine(args.config_home)  # wave 2 lane (d)
-
-    files = lint.collect(args.paths)
-    if not files:
+    try:
+        results = load(args.config_home).reporting.lint_threat_models(
+            [Path(p) for p in args.paths], strict=args.strict
+        )
+    except TraustError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 2
+    if not results:
         print("no THREAT_MODEL.md files found", file=sys.stderr)
         return 1
     total_errors = 0
     total_warnings = 0
     failed = 0
-    for f in files:
-        errors, warnings = engine.reporting.lint(f, strict=args.strict)
-        if errors or warnings:
-            print(f"\n{f}:")
-            for e in errors:
+    for r in results:
+        if r.errors or r.warnings:
+            print(f"\n{r.file_path}:")
+            for e in r.errors:
                 print(f"  ERROR: {e}")
-            for w in warnings:
+            for w in r.warnings:
                 print(f"  WARN:  {w}")
-        total_errors += len(errors)
-        total_warnings += len(warnings)
-        if errors:
+        total_errors += len(r.errors)
+        total_warnings += len(r.warnings)
+        if r.errors:
             failed += 1
-    print(f"\n{len(files)} file(s), {total_errors} error(s), {total_warnings} warning(s)")
+    print(f"\n{len(results)} file(s), {total_errors} error(s), {total_warnings} warning(s)")
     if failed:
         print(f"Result: {failed} FAILED")
         return 1
@@ -144,43 +160,20 @@ def add_render_args(ap) -> None:
     )
 
 
-def _section_bodies(markdown: str) -> dict[str, bool]:
-    """`## ` section heading -> whether it carries any content.
-
-    A section counts as empty when it holds nothing but a table header and
-    separator, or the renderer's `_not recorded_` / `_none_` placeholders.
-    """
-    from traust_engine.reporting.lint import parse_sections
-
-    out = {}
-    for heading, body in parse_sections(markdown):
-        lines = [line.strip() for line in body if line.strip()]
-        rows = [line for line in lines if line.startswith("|")]
-        prose = [line for line in lines if not line.startswith("|")]
-        has_rows = len(rows) > 2  # header + separator + at least one row
-        has_prose = any(line not in ("_not recorded_", "_none_") for line in prose)
-        out[heading] = has_rows or has_prose
-    return out
-
-
-def lost_sections(existing: str, rendered: str) -> list[str]:
-    """Sections the existing threat model fills that the new rendering drops
-    or empties. Rendering a threat model whose JSON is missing members the
-    Markdown has would otherwise erase them silently -- which is what the
-    2026-09-20 backfill's three-member JSON did on the first write-back."""
-    before, after = _section_bodies(existing), _section_bodies(rendered)
-    return [h for h, filled in before.items() if filled and not after.get(h, False)]
-
-
 def call_render(args) -> int:
-    md = load_engine(args.config_home).reporting.render(args.report)  # wave 2 lane (d)
+    """A security report or (by its `-threat-model.json` name) a threat model, as Markdown; a
+    document its contract schema refuses is not rendered."""
+    threat_model = args.report.name.endswith("-threat-model.json")
+    artifact = ThreatModelArtifact if threat_model else ReportArtifact
+    try:
+        reporting = load(args.config_home).reporting
+        md = reporting.render(artifact.parse(args.report.read_bytes()), RenderFormat.MARKDOWN)
+    except (OSError, TraustError) as e:
+        print(f"render: ERROR: {e}", file=sys.stderr)
+        return 2
     if args.out:
-        if (
-            args.report.name.endswith("-threat-model.json")
-            and args.out.exists()
-            and not args.allow_section_loss
-        ):
-            lost = lost_sections(args.out.read_text(encoding="utf-8"), md)
+        if threat_model and args.out.exists() and not args.allow_section_loss:
+            lost = reporting.lost_sections(args.out.read_text(encoding="utf-8"), md)
             if lost:
                 print(
                     f"render: refusing to overwrite {args.out}: the new rendering drops "
@@ -295,8 +288,6 @@ def add_sarif_args(ap) -> None:
 
 
 def call_sarif(args) -> int:
-    from traust_engine.reporting import sarif
-
     if bool(args.results_root) == bool(args.reports):
         print("ERROR: pass report paths OR --results-root, not both/neither", file=sys.stderr)
         return 2
@@ -307,11 +298,12 @@ def call_sarif(args) -> int:
         print("ERROR: -o/--out requires exactly one input report", file=sys.stderr)
         return 2
 
+    reporting = load(args.config_home).reporting
     sweep_root = None
     report_paths = list(args.reports)
     if args.results_root:
         sweep_root = args.results_root.resolve()
-        report_paths = sarif._sweep(sweep_root)
+        report_paths = reporting.sarif_reports(sweep_root)
         if not report_paths:
             print(f"no exportable reports under {sweep_root}")
             return 0
@@ -328,7 +320,16 @@ def call_sarif(args) -> int:
             print(f"ERROR: {report_path}: not a harness report (no findings key)", file=sys.stderr)
             rc = 1
             continue
-        sarif_doc = sarif.export(report)
+        # by content, not name: a cloud-config cumulative is a -findings-current.json
+        metadata = report.get("metadata") or {}
+        declared = metadata.get("assessment_mode") == "declared" or "facts_ref" in metadata
+        artifact = CloudConfigAuditArtifact if declared else ReportArtifact
+        try:
+            sarif_doc = reporting.sarif(artifact.from_document(report))
+        except ValidationError as e:
+            print(f"ERROR: {report_path}: {e}", file=sys.stderr)
+            rc = 1
+            continue
         sarif_name = (
             report_path.name[: -len(".json")] + ".sarif"
             if report_path.name.endswith(".json")
