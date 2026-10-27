@@ -4,6 +4,14 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- Cut over authored report and roadmap effort/priority producers to the existing
+  canonical contract, with explicit unknown size and independent optional
+  external blocking. Priorities remain explicitly authored; no duration,
+  severity, urgency or prose-to-priority mapping is inferred.
+- Consume Core's serialized-byte report admission and the renderer's lossless
+  effort/blocking output. Historical reports and exact stored-run replay remain
+  compatible; unrelated severity-override policy is unchanged.
+
 - Pin traust-core to development `083d18b` (core#216) and traust-engine to
   development `7c6aa58` (engine#107, 0.39.2). Impact classification no
   longer treats a missing first-party import as `not_observed` outside Go,

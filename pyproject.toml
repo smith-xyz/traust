@@ -7,7 +7,7 @@ name = "traust"
 # version must equal the VERSION file — check_docs_consistency.py
 # version-sync check fails the pre-push when they drift (and fails
 # closed if this field is removed)
-version = "0.38.0"
+version = "0.38.1"
 license = "Apache-2.0"
 description = "AI agent tooling for automated security audits of Red Hat Hybrid Platforms source code"
 requires-python = ">=3.11"
@@ -41,12 +41,12 @@ dev = ["ruff>=0.6", "pytest-xdist>=3", "psycopg[binary]>=3.1"]
 # traust's traust-core pin wins over the engine's, so a core bump needs no engine PR.
 [tool.uv]
 override-dependencies = [
-  "traust-core @ git+https://github.com/traust-security/traust-core.git@fb0c3c52a6f549a4653fae8c2fcce2cdff9d969c",
+  "traust-core @ git+https://github.com/traust-security/traust-core.git@e5b75ba2613d043ca31e3515e04483e763251f59",
 ]
 
 [tool.uv.sources]
-traust-core = { git = "https://github.com/traust-security/traust-core.git", rev = "4c516c515a41955223da97429c54a1c96f0e71e9" }
-traust-engine = { git = "https://github.com/traust-security/traust-engine.git", rev = "7c6aa5858f0d364b9a2fbd9a746b7a179e5b3bae" }
+traust-core = { git = "https://github.com/traust-security/traust-core.git", rev = "e5b75ba2613d043ca31e3515e04483e763251f59" }
+traust-engine = { git = "https://github.com/traust-security/traust-engine.git", rev = "4ac1c75a63d144b06d8a8c43ee23a8a5a1d5bc39" }
 
 # Multi-skill CLIs live under src/traust/; harnessing/<skill>/ for single-skill
 # scripts. Install for deps + importable path helpers.
