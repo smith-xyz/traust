@@ -12,7 +12,7 @@
 #
 # Every binary comes straight from its upstream project's GitHub release,
 # at the version pinned in config/external-tools.yaml (the single source of
-# truth — the same pins Containerfile.toolchain consumes). No third-party
+# truth — the same pins Containerfile.tools consumes). No third-party
 # package manager or package index sits in between. Where upstream publishes
 # a checksum file, the download is verified against it before install.
 #

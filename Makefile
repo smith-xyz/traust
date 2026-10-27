@@ -1,4 +1,4 @@
-.PHONY: help install test doctor setup update-vuln-dbs build-image lint lint-fix hooks sync status bump $(BUMP_PARTS)
+.PHONY: help install test doctor setup update-vuln-dbs build-image build-tools-image lint lint-fix hooks sync status bump $(BUMP_PARTS)
 .PHONY: skillsaw-lint skillsaw-fix skillsaw-badge
 
 PROFILE    ?= secure-code-audit
@@ -30,8 +30,11 @@ setup: sync ## Install toolchain for PROFILE
 update-vuln-dbs: ## Download/update vulnerability DBs for PROFILE
 	$(CLI) fetch-dbs --profile $(PROFILE)
 
-build-image: ## Build the complete toolchain image (binaries + Python + data)
+build-image: ## Build traust-toolchain (scanner binaries) and traust-runtime (FROM it, by digest)
 	bash scripts/build-toolchain-image.sh
+
+build-tools-image: ## Build only traust-toolchain (scanner binaries, no Python stack)
+	bash scripts/build-toolchain-image.sh --tools-only
 
 lint: ## ruff check + format --check
 	uv run ruff check .

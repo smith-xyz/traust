@@ -230,30 +230,57 @@ consumers query the API and do not run air-gapped: the fleet sweep
 fetches (`traust impact find` / `symbols` / `document`, the CVE-replay
 monitor) report their lookups as failed.
 
-### Container image (CI, platform worker, air gap)
+### Container images (CI, platform worker, air gap)
 
 For CI pipelines, platform worker pods, or air-gapped environments, use the
-toolchain image instead of the install script. It ships every pinned scanner
-on `PATH` with databases pre-populated. osv-scanner is the exception: an
-air-gapped deployment extends the image with osv-scanner and its offline
-database ([Air-gapped OSV scanning](#air-gapped-osv-scanning)):
+container images instead of the install script. External tooling and the
+traust Python stack are **two separate images**, so a pin advance (weekly at
+most) never forces a rebuild of the Python layer, and vice versa:
 
-The build fetches Python packages at the commit SHAs in `pyproject.toml`; sibling
-repositories are not required. Scanner versions still come from
-`config/external-tools.yaml`.
+| Image | Contains | Tag |
+|---|---|---|
+| `traust-toolchain` | Pinned scanner binaries only (`config/external-tools.yaml`): opengrep, gitleaks, syft, grype, cosign, govulncheck, skopeo, yara, pip-audit (in its own isolated Python environment). No traust Python stack, no vulnerability databases. | `toolchain-<pin-set hash>` (`scripts/containerfile-build-args.py --pin-hash`) |
+| `traust-runtime` | `FROM traust-toolchain` by digest, plus traust-core/traust-engine/traust at the Git SHAs pinned in `pyproject.toml`/`uv.lock`, and the harness skill data (`harnessing/`, `config/`, `docs/`). | the commit, plus the toolchain hash it was built on (labels `traust.commit`, `traust.toolchain-hash`) |
+
+**No vulnerability database ships in either image.** For offline scans, mount
+databases kept current by the deployment, for example under
+`/feeds/tool-dbs/<tool>/`. Set `GRYPE_DB_CACHE_DIR=/feeds/tool-dbs/grype` and
+`GRYPE_DB_AUTO_UPDATE=false` for grype; direct govulncheck invocations take
+`-db file:///feeds/tool-dbs/govulncheck`. The core-based scanner registration
+does not automatically wire `locations.feeds_cache` or `FEEDS_CACHE_DIR` into
+these tools. The caller must configure the database and verify it is usable
+before scanning: grype fails on an empty database, but govulncheck can silently
+report zero findings against an empty local database. osv-scanner
+is installed in neither image: an air-gapped deployment
+extends `traust-toolchain` with osv-scanner and its offline database
+([Air-gapped OSV scanning](#air-gapped-osv-scanning)).
+
+The runtime build fetches Python packages at the commit SHAs in
+`pyproject.toml`/`uv.lock`; sibling repositories are not required. Scanner
+versions and the pin-set hash come from `config/external-tools.yaml`.
 
 ```bash
-./scripts/build-toolchain-image.sh                       # scanner manifest + Python commit pins
-./scripts/build-toolchain-image.sh --tag <registry>/harness-toolchain:<tag>
+./scripts/build-toolchain-image.sh                      # both images, tagged by pin hash / commit
+./scripts/build-toolchain-image.sh --tools-only          # traust-toolchain only, e.g. to publish a pin advance
+./scripts/build-toolchain-image.sh --tag <registry>/traust-runtime:<tag>
+./scripts/build-toolchain-image.sh --tools-tag <registry>/traust-toolchain:<tag>
 
-podman run --rm -v "$PWD":/workspace:Z harness-toolchain:latest \
-  python3 -m traust.cli admin toolchain doctor --profile secure-code-audit
+podman run --rm -v "$PWD":/workspace:Z traust-runtime:latest \
+  admin toolchain doctor --profile secure-code-audit
 ```
 
-This is the **runtime base** a platform worker extends or mounts from; it is
-separate from the data-only `Containerfile`, which ships skills and templates
-as a mountable OCI artifact. Deployment configuration is mounted at
-`TRAUST_CONFIG_HOME` (the image sets `/harness/deploy-config`), never baked in.
+`traust-runtime` is the **runtime base** a platform worker extends or mounts
+from; it is separate from the data-only `Containerfile`, which ships skills
+and templates as a mountable OCI artifact. Deployment configuration is
+mounted at `TRAUST_CONFIG_HOME` (the image sets `/harness/deploy-config`),
+never baked in.
+
+An all-in-one image (both layers combined) is fine for local, non-air-gapped
+use only — `traust-runtime`'s label says exactly that
+(`summary: "Traust runtime on toolchain <hash>"`). The air-gap answer is
+mirroring both images separately and copying the feeds cache across on a
+cadence, so a pin advance and a code change can each ship on their own
+schedule.
 
 ## 5. Storage locations
 

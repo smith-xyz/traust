@@ -1,56 +1,95 @@
 #!/usr/bin/env bash
-# Build the toolchain image from pinned scanner and Python dependencies.
+# Build the split toolchain images: traust-toolchain (pinned scanner binaries) and
+# traust-runtime (FROM it, by digest, plus the pinned traust Python stack).
 #
 # Usage:
-#   ./scripts/build-toolchain-image.sh
-#   ./scripts/build-toolchain-image.sh --tag myregistry/harness-toolchain:v0.331
-#   ./scripts/build-toolchain-image.sh --no-db    # skip DB population (faster builds)
+#   ./scripts/build-toolchain-image.sh                      # both images
+#   ./scripts/build-toolchain-image.sh --tools-only          # just traust-toolchain
+#   ./scripts/build-toolchain-image.sh --tag myregistry/traust-runtime:v0.37.1
+#   ./scripts/build-toolchain-image.sh --tools-tag myregistry/traust-toolchain:latest
 #
-# Scanner versions come from config/external-tools.yaml; Python package SHAs
-# come from pyproject.toml. Never edit Containerfile scanner ARGs directly.
+# Scanner versions and the pin-set hash come from config/external-tools.yaml
+# (scripts/containerfile-build-args.py); the Python stack's pinned Git SHAs come from
+# pyproject.toml / uv.lock. Never edit the Containerfiles' scanner ARGs directly.
+#
+# traust-runtime always builds FROM the tools image it just built, by digest — never by a
+# floating tag — so a stale local :latest tag can't silently supply the wrong pin set.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-TAG="harness-toolchain:latest"
-EXTRA_ARGS=""
+# Prefer the repo's own uv-managed environment (pyyaml is a project dependency, not necessarily
+# on a bare system python3); fall back to plain python3 for a CI runner that installs deps
+# globally instead.
+if command -v uv >/dev/null 2>&1; then
+  PYTHON=(uv run --project "$REPO_ROOT" python3)
+else
+  PYTHON=(python3)
+fi
 
-for arg in "$@"; do
-  case "$arg" in
-    --tag=*) TAG="${arg#--tag=}" ;;
-    --tag)   shift; TAG="$1" ;;
-    --no-db) EXTRA_ARGS="$EXTRA_ARGS --build-arg SKIP_DB=1" ;;
+TOOLS_ONLY="false"
+RUNTIME_TAG=""
+TOOLS_TAG=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --tools-only)  TOOLS_ONLY="true"; shift ;;
+    --tag=*)       RUNTIME_TAG="${1#--tag=}"; shift ;;
+    --tag)         RUNTIME_TAG="$2"; shift 2 ;;
+    --tools-tag=*) TOOLS_TAG="${1#--tools-tag=}"; shift ;;
+    --tools-tag)   TOOLS_TAG="$2"; shift 2 ;;
+    *)             echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
 
-BUILD_ARGS=$(python3 "$SCRIPT_DIR/containerfile-build-args.py")
+PIN_HASH="$("${PYTHON[@]}" "$SCRIPT_DIR/containerfile-build-args.py" --pin-hash)"
+TOOLS_TAG="${TOOLS_TAG:-traust-toolchain:toolchain-$PIN_HASH}"
+RUNTIME_TAG="${RUNTIME_TAG:-traust-runtime:$PIN_HASH}"
 
-# --- Pre-build Python wheels from pinned Git sources ---
-WHEEL_DIR="$REPO_ROOT/_build/wheels"
-rm -rf "$WHEEL_DIR"
-mkdir -p "$WHEEL_DIR"
+BUILD_ARGS=$("${PYTHON[@]}" "$SCRIPT_DIR/containerfile-build-args.py")
 
-echo "Building pinned Python wheels into _build/wheels/ ..."
-python3 "$SCRIPT_DIR/build-pinned-wheels.py" "$WHEEL_DIR"
-python3 -m pip wheel --no-deps --wheel-dir "$WHEEL_DIR" "$REPO_ROOT" 2>&1 | tail -1
-echo ""
-
-echo "Building $TAG from configured pins..."
+echo "Pin-set hash: $PIN_HASH"
+echo "Building $TOOLS_TAG from configured pins..."
 echo "  $BUILD_ARGS"
 echo ""
 
 # shellcheck disable=SC2086
-podman build -f "$REPO_ROOT/Containerfile.toolchain" \
+podman build -f "$REPO_ROOT/Containerfile.tools" \
   $BUILD_ARGS \
-  $EXTRA_ARGS \
-  -t "$TAG" \
+  -t "$TOOLS_TAG" \
   "$REPO_ROOT"
 
-# Clean up build artifacts
-rm -rf "$REPO_ROOT/_build"
+echo ""
+echo "Built: $TOOLS_TAG"
+echo "Verify: podman run --rm --entrypoint grype $TOOLS_TAG --version"
+
+if [[ "$TOOLS_ONLY" == "true" ]]; then
+  exit 0
+fi
+
+# Build FROM the tools image this run just produced, by its local digest — not the tag, which
+# a later build could move. `podman image inspect --format '{{.Digest}}'` computes the manifest
+# digest of a local image without requiring a push.
+TOOLS_DIGEST="$(podman image inspect "$TOOLS_TAG" --format '{{.Digest}}')"
+VCS_REF="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+# Strip the trailing :tag only (the last colon), so a registry host with a port
+# (registry.io:5000/name:tag) keeps its port. Resolves from local storage either way — no
+# "localhost/" qualifier needed, verified against both a bare and a registry-qualified name.
+TOOLS_REPO="${TOOLS_TAG%:*}"
 
 echo ""
-echo "Built: $TAG"
-echo "Verify: podman run --rm $TAG doctor --profile secure-code-audit"
+echo "Building $RUNTIME_TAG FROM ${TOOLS_REPO}@$TOOLS_DIGEST..."
+
+podman build -f "$REPO_ROOT/Containerfile.runtime" \
+  --build-arg "TOOLS_IMAGE=${TOOLS_REPO}@${TOOLS_DIGEST}" \
+  --build-arg "TOOLCHAIN_HASH=$PIN_HASH" \
+  --build-arg "VCS_REF=$VCS_REF" \
+  -t "$RUNTIME_TAG" \
+  "$REPO_ROOT"
+
+echo ""
+echo "Built: $TOOLS_TAG (digest $TOOLS_DIGEST)"
+echo "Built: $RUNTIME_TAG (FROM $TOOLS_TAG by digest, commit $VCS_REF)"
+echo "Verify: podman run --rm $RUNTIME_TAG admin toolchain doctor --profile secure-code-audit"
