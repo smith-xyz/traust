@@ -4,7 +4,8 @@ description: >-
   Assess a repository's post-quantum TLS readiness. Use when asked whether a
   repo can negotiate ML-KEM hybrid TLS, who controls that choice, or to emit
   a pqc-readiness report. Walks the TLS control chain from platform down to
-  app, consulting capability notes for version meaning.
+  app, consulting capability notes for version meaning. Reports keep unknown
+  effort size separate from independently evidenced external blocking.
 argument-hint: "<repo-dir-or-url> [--from-facts PATH]"
 user-invocable: true
 metadata:
@@ -243,7 +244,31 @@ under `evidence` only ([notes/language.md](notes/language.md)).
 
 Scorecard compat (`scores`, `flags`, `provenance_summary`,
 `readiness_bucket`) — fill from facts, never invent from `quantum_ready`.
-Thresholds: [notes/scoring.yaml](notes/scoring.yaml).
+Thresholds and ordered predicates: [notes/scoring.yaml](notes/scoring.yaml),
+aligned with the [decision tree](notes/reference/pqc-readiness-decision-tree.json).
+Evaluate readiness rules in their listed order, then apply the fleet-impact
+override. Readiness depends on the original provenance/agility conditions,
+not effort-size comparisons; preserve the 2030 clock and existing bucket names.
+
+**Effort size and external blocking (new reports):**
+
+- Use the canonical `remediation_effort` sizes `xs`, `s`, `m`, `l`, `xl`
+  from traust-contracts `enums/v1/effort.json`, or `null` when size is unknown.
+  The contract defines no duration thresholds. The decision tree's existing
+  provenance/agility conditions establish **no size**, so every such rule
+  returns `null`; an unmatched item also remains `null`. A non-null size
+  requires explicit, independent size evidence. Never derive a size from an
+  older effort label, pin count, provenance, agility, readiness, or blocking.
+- Carry the independent boolean `blocked_external` on `clock_items[]` and
+  `remediations[]` whenever evidence establishes it. The decision tree proves
+  `true` for vendored/externalized provenance, or a delegated library with
+  no PQC roadmap. Other provenance/agility rules do not prove `false`:
+  omit the field unless separate evidence establishes its value. Absence
+  means unknown, not unblocked; it does not imply any effort size.
+- In the human companion, describe evidenced external waits separately from
+  any known size; do not invent an estimate. Historical artifacts may retain
+  older labels when read; never copy those labels into a new report or
+  rewrite the recorded bytes.
 
 ### 5. Validate
 
@@ -274,8 +299,10 @@ actionable item,
 `clock_items[]` group that is not already covered by a fix-now/upgrade
 entry. Each entry carries the `locations` from those facts (repo
 `file:line` anchors — the owner-facing map), reuses the clock item's
-`remediation_effort`/`blast_radius`
-where one exists, names the concrete `target` (version, mechanism, or
+`remediation_effort`/`blocked_external`/`blast_radius`
+where one exists (preserve unknown size as `null` and unknown blocking
+as absence; copy an evidenced blocking value independently of size),
+names the concrete `target` (version, mechanism, or
 policy value), and sets `recipe` to the matching playbook under
 `harnessing/3-audit/pqc-readiness/remediation/` (per [`remediation/index.yaml`](remediation/index.yaml)
 matching semantics; `null` when no recipe applies). `recipe` is
@@ -309,9 +336,10 @@ for that audience:
   prevents_ PQC negotiation
 - **Upgrade**: `HP_CHAIN_*` rules where `pqc_capable: false` (Go < 1.24,
   old base images, Node < 22, JDK < 24) — version bumps that flip PQC on
-- **Waiting on upstream**: `remediation_effort: blocked-external`, or
+- **Waiting on upstream**: `blocked_external: true`, or
   dominant provenance is `delegated-dependency`/`vendored`/`externalized`
-  and the dependency lacks PQC support
+  and the dependency lacks PQC support. Carry `blocked_external: true`
+  for that evidenced external wait; it does not determine effort size.
 - **Deadlines**: items from `clock_items[]` — `deprecated_after: 2030`
   means "stop using for new work by 2030"; `disallowed_after: 2035`
   means "must remove entirely by 2035" (per NIST IR 8547)
@@ -419,7 +447,7 @@ floors. No cluster → `runtime_verification_required: true`.
 | `notes/capabilities/<id>.yaml`   | Need a version floor or FIPS meaning               |
 | [`notes/who-sets-tls.yaml`](notes/who-sets-tls.yaml)        | Need an ownership seed from fact signals           |
 | [`notes/language.md`](notes/language.md)              | Writing the report (glossary, caps, banned jargon) |
-| [`notes/scoring.yaml`](notes/scoring.yaml)             | Bucket thresholds, effort labels                   |
+| [`notes/scoring.yaml`](notes/scoring.yaml)             | Bucket thresholds, ordered provenance/agility predicates, independent effort size and blocking |
 | [`notes/platform-governance.yaml`](notes/platform-governance.yaml) | Wording when a platform governs TLS                |
 
 ## Remediation playbooks (agent-only — distill into `how`; `/patch` loads full text)
