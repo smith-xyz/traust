@@ -4,6 +4,10 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- Pin traust-core to development `083d18b` (core#216) and traust-engine to
+  development `7c6aa58` (engine#107, 0.39.2). Impact classification no
+  longer treats a missing first-party import as `not_observed` outside Go,
+  and impact-analysis artifacts pass the validator's repository check.
 - Cut over PQC effort producers and the active JSON decision tree to the approved
   nullable size contract with independent external blocking. Keep readiness
   predicates, thresholds, precedence, buckets and the fleet/2030-clock override
