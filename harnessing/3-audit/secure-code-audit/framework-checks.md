@@ -22,7 +22,7 @@ These checks are Traust's own wording. Standards are cited by ID only.
 | Section | Applies when |
 |---|---|
 | Kubernetes operators | `go.mod` requires `sigs.k8s.io/controller-runtime` or `k8s.io/client-go`, the code implements a `Reconcile` method, or the tree carries `+kubebuilder` markers |
-| gRPC | `go.mod` requires `google.golang.org/grpc` and the code calls `grpc.NewServer`, or traust-core's gRPC service x interceptor matrix (`code_facts.grpc_guards`, traust-core#183) reports servers or services |
+| gRPC | `go.mod` requires `google.golang.org/grpc` and the code calls `grpc.NewServer`, or `traust adapters grpc-guards` reports servers or services |
 
 A checkout can select both. Record which sections ran (see Recording).
 
@@ -57,8 +57,7 @@ someone less privileged than the operator. Say which case applies.
 
 ## gRPC
 
-The service x interceptor matrix (traust-core's `code_facts.grpc_guards`,
-traust-core#183) gives:
+The service x interceptor matrix gives:
 - `servers`: each `grpc.NewServer` call with its `interceptors` (each
   marked `guard` when auth-shaped), `unary_guarded`, `stream_guarded` and
   `credentials`;
@@ -72,9 +71,16 @@ traust-core#183) gives:
 An empty list means the enumerator found none on the servers it resolved.
 A guard-named interceptor is still read to confirm that it rejects. The
 matrix doesn't list other server options (message sizes, keepalive), so
-read those from the `grpc.NewServer` call. Until its `traust adapters`
-command is on this branch, gather the same facts from the `grpc.NewServer`
-and `Register…Server` calls, and cite the lines.
+read those from the `grpc.NewServer` call. Produce the matrix with:
+
+```bash
+python3 -m traust.cli adapters grpc-guards <local-path> --out /tmp/<repo>-grpc-guards.json
+```
+
+Record `"grpc-guards": "ran"` (or `"skipped: <reason>"`) in
+`metadata.additional.deterministic_steps`, and copy its `coverage_gaps`
+into `metadata.additional.coverage_gaps` as
+`{"tool": "grpc-guards", "system", "reason"}`.
 
 | ID | Check | CWE | Requirement | Evidence |
 |---|---|---|---|---|

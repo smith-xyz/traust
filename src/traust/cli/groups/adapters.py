@@ -871,6 +871,9 @@ CRYPTO_CLUSTER = passthrough_op(
 
 # secure-code-audit's pre-scans on traust-core's code facts (traust.cli.code_facts)
 ROUTE_GUARDS = passthrough_op("code_facts", "A checkout's route x guard matrix.", "route_guards")
+GRPC_GUARDS = passthrough_op(
+    "code_facts", "A checkout's gRPC service x interceptor matrix.", "grpc_guards"
+)
 LLM_APP = passthrough_op(
     "code_facts", "Whether a checkout is an LLM, agent or MCP application.", "llm_app"
 )

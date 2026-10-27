@@ -101,6 +101,17 @@ All notable changes to Traust are documented here.
   a traust-core import during the build. `requirements.txt` drops ldap3 and
   PyJWT (the ledger's auth) and adds sqlalchemy (core).
 
+## [0.38.0]
+
+- **`traust adapters grpc-guards <checkout>`** is a thin door to traust-core's
+  gRPC service x interceptor matrix (`code_facts.grpc_guards`,
+  traust-core#183). It writes each server with its interceptors, the
+  services registered on it with their methods, diagnostic services, full
+  method names in server code, and coverage gaps. `framework-checks.md`'s
+  gRPC section now produces the matrix with it and records
+  `"grpc-guards": "ran"`. `/secure-code-audit` and `/vuln-scan` allow the
+  command.
+
 ## [0.37.0]
 
 - **LLM, agent and MCP application review on `development`.** This brings

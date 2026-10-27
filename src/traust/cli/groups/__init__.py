@@ -48,6 +48,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "crypto-image": adapters.CRYPTO_IMAGE,
         "crypto-cluster": adapters.CRYPTO_CLUSTER,
         "route-guards": adapters.ROUTE_GUARDS,
+        "grpc-guards": adapters.GRPC_GUARDS,
         "llm-app": adapters.LLM_APP,
         "config-matrix": adapters.CONFIG_MATRIX,
         "sanitizers": adapters.SANITIZERS,

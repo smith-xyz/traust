@@ -1,4 +1,4 @@
-"""`traust adapters route-guards|llm-app|config-matrix|sanitizers|fork-lag|priv-profile`: each is one traust-core
+"""`traust adapters route-guards|grpc-guards|llm-app|config-matrix|sanitizers|fork-lag|priv-profile`: each is one traust-core
 code-facts call; services are stubbed (the pre-scans' behaviour is traust-core's tests)."""
 
 from __future__ import annotations
@@ -20,6 +20,8 @@ from traust_core.v1.models.code_facts import (
     ConfigTriple,
     ForkLagFact,
     ForkUpstream,
+    GrpcGuardFact,
+    GrpcServerSite,
     LlmAppFact,
     LlmAppKind,
     LlmAppSignal,
@@ -65,6 +67,13 @@ FORK = ForkLagFact(
     ),
 )  # fmt: skip
 
+GRPC = GrpcGuardFact(
+    servers=(
+        GrpcServerSite(location=CodeSpan(path="main.go", line=6), variable="s",
+                       unary_guarded=False, stream_guarded=False),
+    ),
+)  # fmt: skip
+
 LLM = LlmAppFact(
     llm_application=True,
     kinds=(LlmAppKind.MCP_SERVER,),
@@ -96,6 +105,9 @@ class CodeFacts:
     def route_guards(self, request, *, resolve_handlers):
         return self._answer(("route_guards", request.workspace, resolve_handlers),
                             RouteGuardFact(routes=(ROW,)))  # fmt: skip
+
+    def grpc_guards(self, request):
+        return self._answer(("grpc_guards", request.workspace), GRPC)
 
     def llm_app(self, request):
         return self._answer(("llm_app", request.workspace), LLM)
@@ -136,6 +148,13 @@ def test_route_guards_is_one_call(facts, capsys, tmp_path):
 def test_route_guards_resolves_handlers_on_request(facts, tmp_path):
     assert code_facts.route_guards([str(tmp_path), "--resolve-handlers"]) == 0
     assert facts.calls == [("route_guards", tmp_path, True)]
+
+
+def test_grpc_guards_is_one_call(facts, capsys, tmp_path):
+    assert code_facts.grpc_guards([str(tmp_path)]) == 0
+    assert facts.calls == [("grpc_guards", tmp_path)]
+    [server] = _json(capsys)["servers"]
+    assert (server["variable"], server["unary_guarded"]) == ("s", False)
 
 
 def test_llm_app_is_one_call(facts, capsys, tmp_path):
@@ -184,7 +203,7 @@ def test_a_refused_checkout_exits_2(facts, capsys, tmp_path):
 
 
 @pytest.mark.parametrize(
-    "op", ["route-guards", "llm-app", "config-matrix", "sanitizers", "fork-lag"]
+    "op", ["route-guards", "grpc-guards", "llm-app", "config-matrix", "sanitizers", "fork-lag"]
 )
 def test_ops_are_registered_under_adapters(op):
     assert op in GROUPS["adapters"]

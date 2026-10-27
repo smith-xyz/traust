@@ -43,3 +43,8 @@ def test_both_skills_wire_the_reference():
         text = (HARNESS_ROOT / "harnessing" / "3-audit" / skill / "SKILL.md").read_text()
         assert "framework-checks.md" in text, skill
         assert '"framework-checks": "ran: <sections>"' in text, skill
+        assert "adapters grpc-guards" in text or skill == "vuln-scan", skill
+
+
+def test_the_grpc_section_names_the_matrix_command():
+    assert "python3 -m traust.cli adapters grpc-guards" in CHECKS.read_text(encoding="utf-8")

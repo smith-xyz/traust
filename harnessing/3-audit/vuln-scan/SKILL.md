@@ -52,6 +52,7 @@ allowed-tools:
   - Bash(python3 *-m traust.cli adapters checkov:*)
   - Bash(python3 *-m traust.cli adapters opengrep:*)
   - Bash(python3 *-m traust.cli adapters llm-app:*)
+  - Bash(python3 *-m traust.cli adapters grpc-guards:*)
   # Scope and context packet ONLY (Step 1.2/1.3, "## Diff mode (--diff)"):
   # traust-core reads the existing clone read-only (list-argv git, no
   # network) and traust's store; writes only its -o. Never authors a
