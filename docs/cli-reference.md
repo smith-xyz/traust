@@ -47,7 +47,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `triage` | The triage skill's doors on traust-core | `check`, `intake`, `prepare`, `record`, `render` |
 | `sweep` | Class-generalization sweep; recall-benchmark answer key | `benchmark`, `benchmark-targets`, `build-canaries`, `cards`, `collect`, `draft`, `emit`, `mine`, `regression-drafts`, `rule-lane`, `screen-injection`, `sweep`, `verify-draft` |
 | `util` | Utility commands | `elf`, `redact`, `safe-exec` |
-| `validation` | Core-backed machine validation evidence | `record` |
+| `validation` | Core-backed machine validation evidence | `prepare`, `plan`, `record` |
 
 ### Retired workflow entry points
 
@@ -316,6 +316,24 @@ The real native Gitleaks scan-to-artifact regression now passes without
 hand-completing fields. Authored audit reports keep their stricter finding
 requirements; artifact admission does not confer validity or evidence strength.
 Passing native-format SARIF intake remains a separate recorded path.
+
+## Validation planning and inputs
+
+Prepare the core-owned input for one or more findings (source assessment, prepared
+findings and their bound source artifacts). No probe runs; finding IDs must be distinct:
+
+```bash
+traust validation prepare --finding-id <uuid> [--finding-id <uuid> ...] \
+  --config-home /private/config
+```
+
+Publish an immutable proposed attack plan. Publishing a plan is not an authorization
+to execute any step:
+
+```bash
+traust validation plan --document /private/run/app-attack-plan.json \
+  --config-home /private/config
+```
 
 ## Machine validation recording
 
