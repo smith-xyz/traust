@@ -1,18 +1,26 @@
 """The security pack's router: a repository's routing state (traust-core `RepoState`) to its
-work lane, the decision table `build rescan-worklist` applied per repository (stage 2)."""
+work lanes, `build rescan-worklist`'s stage 2 per repository: the decision table, the refusal
+pre-route, the threat-model `pr` stamp, then the additive IaC and threat-model rows."""
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from traust_core.v1.models.inventory import ExposureClass, RepoState, RiskTier
+from traust_core.v1.models.observation import MAX_CHANGED_FILE_RATIO
 from traust_core.v1.models.operations import LaneName, Refusal, Route
 from traust_core.v1.models.vocabulary import ComparisonStatus
+
+log = logging.getLogger(__name__)
 
 CHURN_FULL_LINES = 8000
 CHURN_FULL_RATIO = 0.10
 SENSITIVE_MIN_LINES = 200
+# Held in lockstep with traust-core's THREAT_MODEL_MAX_AGE: the freshness view's threat-model row
+# is the dead-timer that fires only if this lane stops draining.
+THREAT_MODEL_QUARTERLY_DAYS = 92
 TIER_CEILING_DAYS = {RiskTier.P0: 180, RiskTier.P1: 270, RiskTier.P2: 365}
 # The external band (customer-facing impact) tightens the ceiling one notch (policy v1.4).
 TIGHTENED_CEILING_DAYS = {RiskTier.P0: 180, RiskTier.P1: 180, RiskTier.P2: 270}
@@ -45,6 +53,11 @@ PRIORITY_BASE = 100
 # Classified but not queued: rule 3b's manifest-only change is covered advisory-first by the
 # `dependency_watch` asset, which never read the worklist rows.
 UNQUEUED = frozenset({"deps-lane", "none"})
+DIFF_LANES = frozenset({"diff-scan", "diff-scan-quarterly"})
+# The threat-model `pr` stamp rides the diff order's rule (the legacy row's `threat_model_pr`):
+# `/threat-model pr` on the diff scan's clone, report-only. NEED(runner): the diff-scan session
+# doesn't read its order's rule yet, so nothing runs the `pr` pass.
+THREAT_MODEL_PR = "+threat-model-pr"
 
 
 @dataclass(frozen=True)
@@ -145,6 +158,45 @@ def decide(state: RepoState) -> tuple[Rule, str]:
     return rule, rule.lane(state)
 
 
+def preroute(state: RepoState) -> str | None:
+    """Why the diff resolver would refuse this repository's diff at dispatch, so a diff lane goes
+    to a full audit instead; None when it wouldn't."""
+    if state.compare_truncated:
+        return "compare truncated"
+    changed, tree = state.first_party_files or 0, state.tree_first_party_files
+    # traust-core counts the tree only on GitHub, untruncated, with enough files changed.
+    if tree and changed / tree > MAX_CHANGED_FILE_RATIO:
+        return "changed-file ratio"
+    return None
+
+
+def threat_model_pr(state: RepoState) -> bool:
+    """A diff that touches a trust boundary or an interface-bearing path, with a model to assess
+    it against."""
+    touched = bool(state.sensitive_changed) or bool(state.threat_model_files)
+    return touched and state.threat_model_age_days is not None
+
+
+def additive(state: RepoState) -> tuple[tuple[str, str], ...]:
+    """The (rule, lane) rows that ride beside the table's lane: lever 6's IaC lanes (a full audit
+    never runs Checkov's IaC policies) and the threat-model calendar backstop."""
+    rows = []
+    if state.status == ComparisonStatus.OK and state.iac_files:
+        rows.append(("lever-6", "iac-lane" if state.has_cloud_config_baseline else "iac-baseline"))
+    elif (
+        "cloud-config-audit" in state.companion_lanes
+        and not state.has_cloud_config_baseline
+        and state.repo is not None
+    ):
+        rows.append(("lever-6-companion", "iac-baseline"))
+    age = state.threat_model_age_days
+    # A never-audited repository's full audit bootstraps its threat model.
+    audited = state.status != ComparisonStatus.NEVER_AUDITED
+    if audited and age is not None and age >= THREAT_MODEL_QUARTERLY_DAYS:
+        rows.append(("threat-model-3", "threat-model-quarterly"))
+    return tuple(rows)
+
+
 def priority(lane: str, state: RepoState) -> int:
     """Lower runs sooner: lane, then exposure, then tier, as the legacy worklist sorted."""
     return PRIORITY_BASE + (
@@ -159,12 +211,24 @@ class SecurityRouter:
 
     def route(
         self, state: RepoState, events: Sequence[object], refusals: Sequence[Refusal]
-    ) -> Route:
+    ) -> tuple[Route, ...]:
         # NEED(feed): rule 1's events (external report, methodology, CVE, release) and refusal
         # re-routing arrive once *Order reads and the feed* lands; the controller passes ().
+        # NEED(tripwire): lever 1 escalates on gitleaks hits in the change's patch; traust-core
+        # records no secret count in the observation yet.
         rule, lane = decide(state)
-        return Route(
-            lane=None if lane in UNQUEUED else LaneName(lane),
-            priority=priority(lane, state),
-            reason=rule.id,
+        reason = rule.id
+        if lane in DIFF_LANES and (why := preroute(state)):
+            log.info("%s: %s, pre-routed to full-audit", state.repository_id, why)
+            reason, lane = f"{reason}+preroute", "full-audit"
+        if lane in DIFF_LANES and threat_model_pr(state):
+            reason += THREAT_MODEL_PR
+        rows = ((reason, lane), *additive(state))
+        return tuple(
+            Route(
+                lane=None if lane in UNQUEUED else LaneName(lane),
+                priority=priority(lane, state),
+                reason=reason,
+            )
+            for reason, lane in rows
         )
