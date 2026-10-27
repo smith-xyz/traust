@@ -4,6 +4,26 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- **OWASP LLM categories are structured again.** `llm-application-review.md`
+  records a finding's OWASP LLM Top 10 category in `owasp_llm_references`
+  (for example `["LLM06"]`) instead of in the description; the check number
+  stays in the description. traust-core stores each category as a finding
+  label with taxonomy `owasp-llm` (traust-core#228, pinned, with
+  traust-contracts#88). `/vuln-scan` findings have no reference fields and
+  keep naming the category in the description.
+- **Uppercase roadmap priorities record.** The same pin brings
+  traust-core#232 and traust-contracts#89: `P0`–`P4` are mapped spellings
+  of `p0`–`p4`, so a report with them is no longer refused as a new write,
+  and core stores it with lowercase priorities. Stored reports are not
+  rewritten.
+- Cut over authored report and roadmap effort/priority producers to the existing
+  canonical contract, with explicit unknown size and independent optional
+  external blocking. Priorities remain explicitly authored; no duration,
+  severity, urgency or prose-to-priority mapping is inferred.
+- Consume Core's serialized-byte report admission and the renderer's lossless
+  effort/blocking output. Historical reports and exact stored-run replay remain
+  compatible; unrelated severity-override policy is unchanged.
+
 - Pin traust-core to development `083d18b` (core#216) and traust-engine to
   development `7c6aa58` (engine#107, 0.39.2). Impact classification no
   longer treats a missing first-party import as `not_observed` outside Go,
@@ -104,6 +124,31 @@ All notable changes to Traust are documented here.
   through core), without sibling checkouts, and check package consistency plus
   a traust-core import during the build. `requirements.txt` drops ldap3 and
   PyJWT (the ledger's auth) and adds sqlalchemy (core).
+
+## [0.39.0]
+
+- **`traust check coverage <checkout> [--repo-url URL --sha SHA]`** is the
+  coverage check before paid audit work (deepsec comparison gap plan,
+  step 4), on traust-core's `code_facts.coverage` (traust-core#218). Core
+  reports every entry point as covered, uncovered or unexplained:
+  - the repository's latest threat-model entry points, matched by `kind`
+    to the pre-scan that enumerates that kind;
+  - each family the pre-scans enumerated, and each framework they detected
+    but couldn't enumerate.
+
+  traust adds the security pack's policy in **observe mode**. `would_route`
+  names the `coverage-repair` lane, with reasons, when a pre-scan detected a
+  framework it can't enumerate or a threat-model entry point of a kind a
+  pre-scan covers came back uncovered. It never blocks or reroutes.
+- **`/secure-code-audit`** runs the check before the review. It records the
+  counts in `deterministic_steps`, copies uncovered entries into
+  `coverage_gaps`, and records `would_route` as
+  `metadata.additional.coverage_check`.
+- **`/threat-model`** gives every section 3 entry point a `kind` from
+  traust-contracts' `entry-point-kind` vocabulary (traust-contracts#87), and
+  the bootstrap surface mapper carries it.
+- **Pins:** traust-core at traust-core#218's head. Both of traust's
+  traust-core pins now agree; they had pointed at two different commits.
 
 ## [0.38.0]
 

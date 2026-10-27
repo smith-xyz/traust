@@ -26,7 +26,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `attack` | The pack's pinned MITRE ATT&CK release | `validate` |
 | `auth` | Who you act as, over traust-core's identity provider | `local`, `login`, `logout`, `refresh`, `service-account`, `status`, `token` |
 | `build` | Deterministic builders | `rescan-worklist`, `skills-reference`, `symbol-index` |
-| `check` | Deterministic gates | `citations`, `content-licenses`, `docs-consistency`, `estate-data`, `drift`, `fix-propagation`, `location-paths`, `reference-integrity`, `skill-alignment`, `skill-security` |
+| `check` | Deterministic gates | `citations`, `content-licenses`, `coverage`, `docs-consistency`, `estate-data`, `drift`, `fix-propagation`, `location-paths`, `reference-integrity`, `skill-alignment`, `skill-security` |
 | `cloud-config` | The cloud-config-audit skill's doors on traust-core | `check`, `record`, `run` |
 | `compliance` | compliance-check doors on traust-core (posture: `dashboard view compliance`) | `adrs`, `calibrate`, `check`, `declare`, `evaluate`, `evidence`, `latest`, `policy`, `record`, `resolve`, `scopes` |
 | `dashboard` | Dashboard rebuilds, the team report and one insight view | `refresh`, `team-report`, `view` |
@@ -35,7 +35,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `impact` | Impact analysis; `below-range-scan` is the `below_range_packets` materializer, `below-range-review` / `below-range-record` the review lane's doors | `analyze`, `below-range`, `below-range-record`, `below-range-review`, `below-range-scan`, `calibrate-rule-pack`, `cluster-state-diff`, `document`, `enrich`, `find`, `package`, `sbom`, `sweep`, `symbols` |
 | `isolation` | Tenant-isolation review | `repos` |
 | `ledger` | Ledger audit (traust-core) and the doc-variance register | `audit`, `doc-variance` |
-| `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `spend` |
+| `metrics` | Metrics & spend | `attribute-spend`, `collect-spend`, `history`, `lane-costs`, `spend` |
 | `portfolio` | Portfolio graph; `observe` is the `repo_state` materializer; `plan` / `onboard` / `owner-hints` / `file` / `import-owners` / `import-release` / `release-changes` are add-inputs' and inventory-repositories' doors on traust-core; `dependencies` / `dependents` read traust-core's SBOMs | `artifacts`, `build`, `dependencies`, `dependents`, `file`, `freshness`, `import-owners`, `import-release`, `interfaces`, `liveness`, `observe`, `onboard`, `owner-hints`, `plan`, `population`, `query`, `release-changes`, `stats`, `symbols` |
 | `pqc` | The pqc-readiness skill's doors on traust-core | `blockers`, `check`, `prepare`, `record`, `summary`, `vendor-claims` |
 | `products` | corpus-intake's doors on traust-core: products and their corpus ownership | `add`, `list`, `update` |
