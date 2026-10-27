@@ -36,6 +36,8 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | `schemas/v1/pqc-readiness.schema.json` | JSON Schema for PQC readiness reports |
 | `schemas/v1/pqc-blockers.schema.json` | JSON Schema for the findings-shaped projection of readiness remediations (no longer emitted: `traust pqc blockers` derives the items from the recorded report) — mirrors the security-audit findings vocabulary without claiming `report.schema.json` conformance |
 | `schemas/v1/pqc-decision-tree.schema.json` | JSON Schema for the PQC provenance decision tree |
+| `schemas/v1/pqc-vendor-claims.schema.json` | JSON Schema for the curated, dated vendor PQC claims (scope-ref; recorded by `traust pqc vendor-claims`, a review is a higher `version`; fleet counts are derived by `traust dashboard view pqc-vendors`, never stored) |
+| `schemas/v1/fuzz-report.schema.json` | JSON Schema for the document a fuzz assessment holds |
 | `schemas/v1/fleet-fix.schema.json` | JSON Schema for fleet-fix transform specs |
 | `schemas/v1/sla-policy.schema.json` | JSON Schema for SLA policy files (sla-view) — adopters configuring their own service levels start at [sla-policy.md](sla-policy.md) |
 | `schemas/v1/model-registry.schema.json` | JSON Schema for the model registry (config/model-registry.yaml — role routing, tier floors, spend policy) |

@@ -370,6 +370,9 @@ BUILD_CANARIES = passthrough_op(
 CARDS = passthrough_op(
     "precedent_cards", "Validate semantic precedent cards; sweep them over a checkout.", "main"
 )
+SCORE_BENCHMARK = passthrough_op(
+    "recall", "Score recall-benchmark runs (a runs dir, or the recorded audits).", "score"
+)
 SCREEN_INJECTION = passthrough_op(
     "recall", "Screen recorded audit reports for prompt injection (report-only).", "screen"
 )

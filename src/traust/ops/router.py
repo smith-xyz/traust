@@ -1,6 +1,7 @@
 """The security pack's router: a repository's routing state (traust-core `RepoState`) to its
-work lanes, `build rescan-worklist`'s stage 2 per repository: the decision table, the refusal
-pre-route, the threat-model `pr` stamp, then the additive IaC and threat-model rows."""
+work lanes, `build rescan-worklist`'s stage 2 per repository: the decision table, the tripwire,
+the refusal pre-route, the threat-model `pr` stamp, then the additive IaC and threat-model
+rows, and a threat-model review for each recorded release that re-models."""
 
 from __future__ import annotations
 
@@ -8,7 +9,7 @@ import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from traust_core.v1.models.inventory import ExposureClass, RepoState, RiskTier
+from traust_core.v1.models.inventory import ExposureClass, RecordedRelease, RepoState, RiskTier
 from traust_core.v1.models.observation import MAX_CHANGED_FILE_RATIO
 from traust_core.v1.models.operations import LaneName, Refusal, Route
 from traust_core.v1.models.vocabulary import ComparisonStatus
@@ -54,6 +55,9 @@ PRIORITY_BASE = 100
 # `dependency_watch` asset, which never read the worklist rows.
 UNQUEUED = frozenset({"deps-lane", "none"})
 DIFF_LANES = frozenset({"diff-scan", "diff-scan-quarterly"})
+# Lever 1: the below-threshold lanes a secret in the change's patch escalates to an immediate
+# diff scan, which adjudicates the hit.
+TRIPWIRE_LANES = frozenset({"deps-lane", "diff-scan-quarterly"})
 # The threat-model `pr` stamp rides the diff order's rule (the legacy row's `threat_model_pr`):
 # `/threat-model pr` on the diff scan's clone, report-only. NEED(runner): the diff-scan session
 # doesn't read its order's rule yet, so nothing runs the `pr` pass.
@@ -158,6 +162,11 @@ def decide(state: RepoState) -> tuple[Rule, str]:
     return rule, rule.lane(state)
 
 
+def tripwire(state: RepoState) -> bool:
+    """Secret-scanner hits in a change's patch (traust-core scans it during the observation)."""
+    return bool(state.secret_hits) and _lines(state) > 0
+
+
 def preroute(state: RepoState) -> str | None:
     """Why the diff resolver would refuse this repository's diff at dispatch, so a diff lane goes
     to a full audit instead; None when it wouldn't."""
@@ -197,6 +206,13 @@ def additive(state: RepoState) -> tuple[tuple[str, str], ...]:
     return tuple(rows)
 
 
+def released(events: Sequence[RecordedRelease]) -> tuple[tuple[str, str], ...]:
+    """The legacy `threat-model-2` row: a release that is a major or minor bump over its product's
+    previous one re-models every repository it ships, once however many such releases arrive."""
+    remodels = any(e.change is not None and e.change.remodels() for e in events)
+    return (("threat-model-2", "threat-model-review"),) if remodels else ()
+
+
 def priority(lane: str, state: RepoState) -> int:
     """Lower runs sooner: lane, then exposure, then tier, as the legacy worklist sorted."""
     return PRIORITY_BASE + (
@@ -210,20 +226,27 @@ class SecurityRouter:
     """The pack router `traust-engine` calls when a repository's `repo_state` materializes."""
 
     def route(
-        self, state: RepoState, events: Sequence[object], refusals: Sequence[Refusal]
+        self, state: RepoState, events: Sequence[RecordedRelease], refusals: Sequence[Refusal]
     ) -> tuple[Route, ...]:
-        # NEED(feed): rule 1's events (external report, methodology, CVE, release) and refusal
-        # re-routing arrive once *Order reads and the feed* lands; the controller passes ().
-        # NEED(tripwire): lever 1 escalates on gitleaks hits in the change's patch; traust-core
-        # records no secret count in the observation yet.
+        # Rule 1's external-report, methodology and CVE events are orders injected with their
+        # event_source, never router input. NEED(release-passthrough): a release's rule-1
+        # passthrough row (which superseded the table's lane) has no pack asset to run it.
+        # NEED(refusals): a refused lane isn't re-decided here; the engine won't plan it again.
         rule, lane = decide(state)
         reason = rule.id
+        if lane in TRIPWIRE_LANES and tripwire(state):
+            log.info(
+                "%s: %s secret hit(s), escalated to diff-scan",
+                state.repository_id,
+                state.secret_hits,
+            )
+            reason, lane = "tripwire", "diff-scan"
         if lane in DIFF_LANES and (why := preroute(state)):
             log.info("%s: %s, pre-routed to full-audit", state.repository_id, why)
             reason, lane = f"{reason}+preroute", "full-audit"
         if lane in DIFF_LANES and threat_model_pr(state):
             reason += THREAT_MODEL_PR
-        rows = ((reason, lane), *additive(state))
+        rows = ((reason, lane), *additive(state), *released(events))
         return tuple(
             Route(
                 lane=None if lane in UNQUEUED else LaneName(lane),

@@ -504,7 +504,7 @@ Use when the user asks for a portfolio view of RBAC or multi-tenancy findings �
 
 ## recall-benchmark
 
-Use when the user asks to measure the auditor's detection recall, run the recall benchmark, score a harness release against ground truth, bootstrap/admit benchmark targets, or asks "what fraction of real vulnerabilities do we find". Audits pinned pre-fix refs of repos with known-real findings (self-replay from the disposition ledger, CVE replay, seeded) on clean clones, scores detection with the finding_identity match ladder via match_benchmark.py, and emits benchmark.{json,md} + a metrics-ledger snapshot — recall overall/per-CWE/per-severity/per-language, held-out split, and run-to-run stability.
+Use when the user asks to measure the auditor's detection recall, run the recall benchmark, score a harness release against ground truth, bootstrap/admit benchmark targets, or asks "what fraction of real vulnerabilities do we find". Audits pinned pre-fix refs of repos with known-real findings (self-replay from the disposition ledger, CVE replay, seeded) on clean clones, scores detection with the finding_identity match ladder via traust-core (`traust sweep score-benchmark`), and emits benchmark.json — recall overall/per-CWE/per-severity/per-language, held-out split, and run-to-run stability.
 
 - **Stage:** —
 - **Tier:** `secondary`

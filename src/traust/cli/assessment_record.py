@@ -13,6 +13,7 @@ from pathlib import Path
 
 from traust_core.v1.models.artifacts import (
     ArtifactDocument,
+    FuzzReportArtifact,
     IsolationReviewArtifact,
     PrivProfileArtifact,
     SecurityAuditArtifact,
@@ -36,13 +37,15 @@ RECORDS: dict[AssessmentKind, tuple[str, type[ArtifactDocument]]] = {
     AssessmentKind.VULN_SCAN_CANONICAL: ("vuln-scan", VulnFindingsArtifact),
     AssessmentKind.SECURE_CODE_CANONICAL: ("secure-code-audit", SecurityAuditArtifact),
     AssessmentKind.THREAT_MODEL_CANONICAL: ("threat-model", ThreatModelArtifact),
+    AssessmentKind.FUZZ: ("create-fuzzing", FuzzReportArtifact),
+    AssessmentKind.BENCHMARK_AUDIT: ("recall-benchmark", SecurityAuditArtifact),
 }
 
 
 def ran_at(kind: AssessmentKind, doc: ArtifactDocument) -> datetime:
     """When the audit ran, so re-recording a document is the same run."""
-    if kind is AssessmentKind.PRIV_PROFILE_CANONICAL:
-        return datetime.now(UTC)  # a profile states no run time: each record is a new run
+    if kind in (AssessmentKind.PRIV_PROFILE_CANONICAL, AssessmentKind.FUZZ):
+        return datetime.now(UTC)  # the document states no run time: each record is a new run
     if kind is AssessmentKind.ISOLATION_REVIEW_CANONICAL and (
         reviewed := when(doc.metadata.reviewed_at)
     ):
