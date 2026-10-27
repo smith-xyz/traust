@@ -26,7 +26,14 @@ from traust_core.v1.services.observation import PREROUTE_MIN_FILES
 from traust_core.v1.services.portfolio import PortfolioPolicy
 
 from traust.cli import build_rescan_worklist as rw
-from traust.ops.router import LANES, THREAT_MODEL_PR, SecurityRouter, decide, priority
+from traust.ops.router import (
+    LANES,
+    THREAT_MODEL_PR,
+    UNQUEUED,
+    SecurityRouter,
+    decide,
+    priority,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "routing"
 DECISIONS = json.loads((FIXTURES / "python_decisions.json").read_text(encoding="utf-8"))
@@ -232,6 +239,57 @@ def test_refusal_preroute_matches_the_legacy_router(
     count = {"ok": True, "fp_files": tree or 0, "truncated": False}
     rw.run_preroute([row], by_key, 1, lambda p, r: count, lambda: 100_000)
     assert _routes(state)[0] == (row["rule"], row["lane"])
+
+
+DEPS_ONLY = {"changed_lines": 10, "deps_only": True}  # rule 3b
+
+
+@pytest.mark.parametrize(
+    ("fields", "hits"),
+    [
+        (QUARTERLY, 2),
+        (QUARTERLY, 0),
+        (QUARTERLY, None),  # not scanned: never escalates
+        (DEPS_ONLY, 1),
+        (DEPS_ONLY, None),
+        (SENSITIVE, 3),  # rule 3 on P2: already an immediate diff scan
+        ({"changed_lines": 9000}, 5),  # rule 2: a full audit
+        ({"changed_lines": 0}, 4),
+        (QUARTERLY | {"compare_truncated": True}, 1),  # escalated, then pre-routed
+        (QUARTERLY | {"sensitive_changed": True, "sensitive_lines": 5}, 1),  # then stamped
+        (QUARTERLY | {"threat_model_files": 1}, 1),
+    ],
+)
+def test_tripwire_matches_the_legacy_router(
+    monkeypatch: pytest.MonkeyPatch, fields: dict[str, Any], hits: int | None
+) -> None:
+    monkeypatch.setattr(rw.shutil, "which", lambda _: "/bin/gitleaks")
+    state = _state(**fields, secret_hits=hits, threat_model_age_days=10)
+    rule, lane = decide(state)
+    row = {
+        "repo_key": "k",
+        "lane": lane,
+        "rule": rule.id,
+        "reason": "",
+        "C": state.changed_lines,
+        "truncated": state.compare_truncated,
+    }
+    entry = {
+        "host_kind": "github",
+        "project": "o/r",
+        "pinned_sha": "a" * 40,
+        "fp_files": 0,
+        "S": state.sensitive_changed,
+        "tm_files": state.threat_model_files,
+        "tm_path": "m.md",
+    }
+    rw.run_tripwire([row], {"k": entry}, 1, lambda p, s: "+patch", lambda _: hits, lambda: 100_000)
+    rw.run_preroute([row], {"k": entry}, 1, None, lambda: 0)
+    rw.stamp_threat_model_pr([row], {"k": entry})
+    legacy = row["rule"] + (THREAT_MODEL_PR if "threat_model_pr" in row else "")
+    (route,) = SecurityRouter().route(state, (), ())
+    assert (route.reason, route.lane) == (legacy, None if row["lane"] in UNQUEUED else row["lane"])
+    assert route.priority == priority(row["lane"], state)
 
 
 @pytest.mark.parametrize(
