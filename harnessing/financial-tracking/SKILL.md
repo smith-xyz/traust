@@ -16,8 +16,6 @@ allowed-tools:
   - Bash(python3 *traust* -m traust.cli metrics collect-spend:*)
   - Bash(python3 *traust* -m traust.cli metrics attribute-spend:*)
   - Bash(python3 *traust* -m traust.cli dashboard view spend:*)
-  - Bash(python3 *traust* -m traust.cli metrics spend:*)
-  - Bash(python3 *traust* -m traust.cli metrics history:*)
   - Bash(python3 *traust* -m traust.cli registry models:*)
 ---
 
@@ -172,7 +170,7 @@ artifacts and introduces no new campaign artifact for another skill to
 consume. The per-lane numbers it reads are the same ones
 the program view (`dashboard view program`) renders, so the two cannot disagree.
 
-**Related:** `/refresh-dashboards` rebuilds the spend dashboard;
+**Related:** `/refresh-dashboards` (*retired:* its spend-dashboard stage; the spend view replaces it);
 `/drift-watch` flags stale spend data; the budget-guard phases are
 tracked in
 `progress-tracker/plans/budget-guard-widening-plan.md`.

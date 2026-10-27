@@ -17,9 +17,9 @@ with --spend-actuals when running on a workstation that has transcripts.
 Usage:
   python3 -m traust.cli.refresh_dashboards               # full chain
   python3 -m traust.cli.refresh_dashboards --list        # show stages
-  python3 -m traust.cli.refresh_dashboards --only views spend
+  python3 -m traust.cli.refresh_dashboards --only views validation-fuzz
   python3 -m traust.cli.refresh_dashboards --view findings-rollup --out /tmp/dashboards
-  python3 -m traust.cli.refresh_dashboards --skip spend
+  python3 -m traust.cli.refresh_dashboards --skip validation-fuzz
   python3 -m traust.cli.refresh_dashboards --dry-run
   python3 -m traust.cli.refresh_dashboards --spend-actuals
 """
@@ -109,13 +109,6 @@ def build_stages(
                 ],
             )
         )
-    stages.append(
-        (
-            "spend",
-            "consumer",
-            [PYTHON, "-m", "traust.cli", "metrics", "spend", *cfg, "--workspace", str(workspace)],
-        )
-    )
     return stages
 
 
@@ -237,7 +230,7 @@ def main(argv=None):
     ]
     if skipped:
         print(f"  not run: {', '.join(skipped)}")
-    if not spend_actuals and (args.only is None or "spend" in args.only):
+    if not spend_actuals and args.only is None:
         print(
             "  note: spend actuals not appended (operator-side leg; "
             "rerun with --spend-actuals on a workstation with "

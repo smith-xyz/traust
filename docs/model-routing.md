@@ -85,7 +85,8 @@ sha ties every routed decision to the exact policy revision that made it.
 
 ## Spend declaration
 
-Every model-consuming batch declares a spend row into the metrics ledger:
+Every model-consuming batch declares a spend event in traust-core (priced from the registry;
+an unknown or unpriced `--model` exits 1 and records nothing):
 
 ```bash
 python3 -m traust.cli registry models spend --skill secure-code-audit \
@@ -94,7 +95,9 @@ python3 -m traust.cli registry models spend --skill secure-code-audit \
 ```
 
 `--repo`/`--loc` attribute the row to one audited target — the calibration
-tuple `(spend, repo, size)` the scan estimator fits against. Batch drivers
+tuple `(spend, repo, size)` the scan estimator fits against (*not stored* yet:
+the spend event has no column for them, nor for `--batch`/`--note`; the command
+says so on stderr). Batch drivers
 SHOULD pass both on per-repo rows; batch-level rows omit them. Every
 model-heavy per-target skill carries a "Spend declaration (calibration tuple)"
 section instructing the row; any other skill that consumes model tokens should
@@ -109,7 +112,7 @@ Two properties of declared rows to keep in mind:
   deployment's spend-collection chain, which is deployment tooling, not part
   of this contract.
 - **Embedded environments may skip the declaration cleanly.** A workspace with
-  no metrics ledger (a platform worker that records usage itself) skips at the
+  no `model-registry.yaml` in its config home (a platform worker that records usage itself) skips at the
   script level; `HARNESS_REQUIRE_SPEND_LEDGER=1` turns the skip into a failure
   where the ledger is mandatory.
 

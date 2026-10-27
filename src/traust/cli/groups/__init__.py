@@ -82,8 +82,6 @@ GROUPS: dict[str, dict[str, object]] = {
     "isolation": dict(isolation.ISOLATION),
     "ledger": dict(ledger.LEDGER),
     "metrics": {
-        "history": metrics.HISTORY,
-        "spend": metrics.SPEND,
         "collect-spend": metrics.COLLECT_SPEND,
         "attribute-spend": metrics.ATTRIBUTE_SPEND,
         "lane-costs": metrics.LANE_COSTS,

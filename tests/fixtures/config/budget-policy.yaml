@@ -2,9 +2,9 @@
 # Budget policy — spend governance for harness runs.
 #
 # ⚠️ STATUS: POLICY ARTIFACT ONLY — NOT ENFORCED YET.
-# The only consumer today is build_spend_dashboard.py, which reads the
+# *Retired:* build_spend_dashboard.py, which read the
 # `monthly_budget` block for the visibility layer (L2: budget-vs-actual
-# tracking) — it never gates a run. Enforcement lands in
+# tracking) — it never gated a run. Enforcement lands in
 # stages: advisory
 # checks in batch drivers first (Layer 1), hard enforcement on the
 # central agentic platform (Layer 4) where users cannot edit the
