@@ -69,12 +69,13 @@ def diff_anchor(url: str, clone: Path) -> str:
 
 
 def checkout(url: str, dest: Path) -> Path:
-    """The repository's default-branch head, shallow, https only, outside this harness."""
+    """The repository's default-branch head, https only, outside this harness. Full history: a
+    diff scan anchors at its baseline audit's commit, which a shallow clone doesn't hold."""
     if not url.startswith("https://"):
         raise ValidationError(f"{url}: only https repositories are checked out")
     try:
         subprocess.run(
-            ["git", "clone", "-q", "--depth", "1", "--", url, str(dest)],
+            ["git", "clone", "-q", "--", url, str(dest)],
             env={**os.environ, **_GIT_ENV},
             check=True,
             capture_output=True,
