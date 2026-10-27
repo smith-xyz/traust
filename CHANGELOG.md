@@ -11,6 +11,13 @@ All notable changes to Traust are documented here.
 - Consume Core's canonical PQC new-write gate and lossless blocking projections.
   Historical reports remain readable and exact stored reports replay unchanged;
   different reports with deprecated new-write effort are refused.
+- Cut over threat-model mitigation effort to canonical sizes or explicit
+  unknown, with independent optional blocking. Bootstrap, interview, seeded,
+  review and update emissions share the existing contract; unknown is never
+  ranked as the cheapest recommendation.
+- Consume canonical mitigation recording and quick-win comparisons with
+  compatible historical reads. The Markdown renderer/linter preserves null
+  sizes and reported blocking without changing OWASP, status or closure policy.
 
 - Repair native scanner artifact admission through the adapter-specific
   observation contract. The unchanged real scan-to-artifact regression passes
