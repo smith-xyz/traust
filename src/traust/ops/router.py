@@ -1,6 +1,7 @@
 """The security pack's router: a repository's routing state (traust-core `RepoState`) to its
-work lanes, `build rescan-worklist`'s stage 2 per repository: the decision table, the refusal
-pre-route, the threat-model `pr` stamp, then the additive IaC and threat-model rows."""
+work lanes, `build rescan-worklist`'s stage 2 per repository: the decision table, the tripwire,
+the refusal pre-route, the threat-model `pr` stamp, then the additive IaC and threat-model
+rows."""
 
 from __future__ import annotations
 
@@ -54,6 +55,9 @@ PRIORITY_BASE = 100
 # `dependency_watch` asset, which never read the worklist rows.
 UNQUEUED = frozenset({"deps-lane", "none"})
 DIFF_LANES = frozenset({"diff-scan", "diff-scan-quarterly"})
+# Lever 1: the below-threshold lanes a secret in the change's patch escalates to an immediate
+# diff scan, which adjudicates the hit.
+TRIPWIRE_LANES = frozenset({"deps-lane", "diff-scan-quarterly"})
 # The threat-model `pr` stamp rides the diff order's rule (the legacy row's `threat_model_pr`):
 # `/threat-model pr` on the diff scan's clone, report-only. NEED(runner): the diff-scan session
 # doesn't read its order's rule yet, so nothing runs the `pr` pass.
@@ -158,6 +162,11 @@ def decide(state: RepoState) -> tuple[Rule, str]:
     return rule, rule.lane(state)
 
 
+def tripwire(state: RepoState) -> bool:
+    """Secret-scanner hits in a change's patch (traust-core scans it during the observation)."""
+    return bool(state.secret_hits) and _lines(state) > 0
+
+
 def preroute(state: RepoState) -> str | None:
     """Why the diff resolver would refuse this repository's diff at dispatch, so a diff lane goes
     to a full audit instead; None when it wouldn't."""
@@ -214,10 +223,15 @@ class SecurityRouter:
     ) -> tuple[Route, ...]:
         # NEED(feed): rule 1's events (external report, methodology, CVE, release) and refusal
         # re-routing arrive once *Order reads and the feed* lands; the controller passes ().
-        # NEED(tripwire): lever 1 escalates on gitleaks hits in the change's patch; traust-core
-        # records no secret count in the observation yet.
         rule, lane = decide(state)
         reason = rule.id
+        if lane in TRIPWIRE_LANES and tripwire(state):
+            log.info(
+                "%s: %s secret hit(s), escalated to diff-scan",
+                state.repository_id,
+                state.secret_hits,
+            )
+            reason, lane = "tripwire", "diff-scan"
         if lane in DIFF_LANES and (why := preroute(state)):
             log.info("%s: %s, pre-routed to full-audit", state.repository_id, why)
             reason, lane = f"{reason}+preroute", "full-audit"
