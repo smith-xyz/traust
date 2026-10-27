@@ -43,7 +43,8 @@ from typing import Any
 import yaml  # PyYAML — already in harness deps
 from traust_contracts.paths import schema_path
 
-from traust.context import add_config_home_arg, load_engine
+from traust.cli.groups._registry import load_engine  # wave 2 lane (e)
+from traust.context import add_config_home_arg
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent

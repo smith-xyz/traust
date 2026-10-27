@@ -84,9 +84,10 @@ Rules:
                       _write_layer_file or a direct write_text — a direct
                       write bypasses the Backend.mutate lock that keeps
                       mutate+stamp+sign atomic.
-  A18 composition-root Engine and config-home resolution happen ONLY in
-                      `src/traust/context.py`, the app's single composition
-                      root. `HarnessEngine.load()`/`HarnessEngine(...)`
+  A18 composition-root Engine resolution happens ONLY in `load_engine`
+                      (`src/traust/cli/groups/_registry.py`), config-home
+                      resolution ONLY in `src/traust/context.py`, the app's
+                      single composition root. `HarnessEngine.load()`/`HarnessEngine(...)`
                       elsewhere re-resolves config on its own terms and
                       loses the fail-loud `SystemExit(2)` contract that 93
                       call sites depend on; a direct
@@ -838,7 +839,7 @@ A18_ENGINE_CALL_RE = re.compile(r"\bHarnessEngine\s*(?:\.\s*load\s*)?\(")
 #: and an `__all__` entry, neither a call), so the module list below allows it.
 A18_CONFIG_HOME_CALL_RE = re.compile(r"\bdeployment_config_dir\s*\(")
 #: The composition root itself, plus the sanctioned config-path resolver.
-A18_ENGINE_ROOTS = ("src/traust/context.py",)
+A18_ENGINE_ROOTS = ("src/traust/cli/groups/_registry.py",)
 A18_CONFIG_HOME_ROOTS = ("src/traust/context.py", "src/traust/paths.py")
 
 
@@ -960,7 +961,7 @@ def a16_layer_write_boundary_failures(repo: Path = REPO, used: list | None = Non
 def a18_composition_root_failures(repo: Path = REPO, used: list | None = None) -> list[str]:
     """A18 — the engine is resolved in exactly one place.
 
-    `src/traust/context.py` is the app's single composition root: it calls
+    `load_engine` in `src/traust/cli/groups/_registry.py` calls
     `HarnessEngine.load()` once, converts `DeploymentConfigMissing` into a
     one-line `SystemExit(2)`, and hands the engine (or one ops namespace) to
     its callers. 93 modules call `load_engine()` and 96 call
@@ -1004,9 +1005,9 @@ def a18_composition_root_failures(repo: Path = REPO, used: list | None = None) -
                 if rel not in A18_ENGINE_ROOTS and A18_ENGINE_CALL_RE.search(line):
                     failures.append(
                         f"A18: {rel}:{n} resolves the engine outside the composition "
-                        f"root — call `traust.context.load_engine()` so the "
-                        f"SystemExit(2) contract and config precedence stay in one "
-                        f"place (src/traust/context.py)"
+                        f"root — call `traust.cli.groups._registry.load_engine()` so "
+                        f"the SystemExit(2) contract and config precedence stay in one "
+                        f"place (src/traust/cli/groups/_registry.py)"
                     )
                 if rel not in A18_CONFIG_HOME_ROOTS and A18_CONFIG_HOME_CALL_RE.search(line):
                     failures.append(

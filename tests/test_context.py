@@ -8,10 +8,11 @@ from pathlib import Path
 import pytest
 import yaml
 
+from traust.cli.groups._registry import load_engine
 from traust.context import (
     add_config_home_arg,
     analysis_results_dir,
-    load_engine,
+    load,
     resolve_results_root,
 )
 
@@ -57,6 +58,17 @@ def test_load_engine_missing_config_exits_2(tmp_path, monkeypatch):
     assert exc.value.code == 2
 
 
+def test_load_engine_names_the_missing_file_on_one_line(tmp_path, monkeypatch, capsys):
+    home = _minimal_home(tmp_path)
+    (home / "safe-exec-profiles.yaml").unlink()
+    with pytest.raises(SystemExit) as exc:
+        load_engine(config_home=home)
+    err = capsys.readouterr().err
+    assert exc.value.code == 2
+    assert err.startswith("config not resolvable: ") and "safe-exec-profiles.yaml" in err
+    assert err.count("\n") == 1
+
+
 def test_add_config_home_arg():
     import argparse
 
@@ -75,7 +87,7 @@ def test_resolve_results_root_from_config(tmp_path, monkeypatch):
     add_config_home_arg(ap)
     ap.add_argument("--results-root", type=Path, default=None)
     args = ap.parse_args([])
-    assert resolve_results_root(args) == analysis_results_dir(load_engine())
+    assert resolve_results_root(args) == analysis_results_dir(load())
 
 
 def test_resolve_results_root_cli_overrides_config(tmp_path, monkeypatch):

@@ -84,7 +84,7 @@ def stage(drafts: Path, **args: Any) -> tuple[int, Any]:
     )
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        rc = sweep.call_regression_drafts(None, ns)
+        rc = sweep.call_regression_drafts(ns)
     text = out.getvalue().strip()
     return rc, json.loads(text) if text else err.getvalue()
 
@@ -92,7 +92,7 @@ def stage(drafts: Path, **args: Any) -> tuple[int, Any]:
 def verify(draft: Path, rule: Path | None = None) -> tuple[int, str]:
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        rc = sweep.call_verify_draft(None, SimpleNamespace(draft=draft, rule=rule))
+        rc = sweep.call_verify_draft(SimpleNamespace(draft=draft, rule=rule))
     return rc, out.getvalue() + err.getvalue()
 
 

@@ -6,9 +6,7 @@ import json
 import sys
 from pathlib import Path
 
-from traust_engine.reporting import validate
-
-from traust.cli.groups._registry import OpSpec, passthrough_op
+from traust.cli.groups._registry import OpSpec, load_engine, passthrough_op
 
 
 def add_validate_args(ap) -> None:
@@ -25,7 +23,11 @@ def add_validate_args(ap) -> None:
     )
 
 
-def call_validate(engine, args) -> int:
+def call_validate(args) -> int:
+    # wave 2 lane (d)
+    from traust_engine.reporting import validate
+
+    engine = load_engine(args.config_home)
     files = validate.collect_report_files(args.path)
     if not files:
         target = Path(args.path)
@@ -87,8 +89,10 @@ def add_lint_args(ap) -> None:
     )
 
 
-def call_lint(engine, args) -> int:
+def call_lint(args) -> int:
     from traust_engine.reporting import lint
+
+    engine = load_engine(args.config_home)  # wave 2 lane (d)
 
     files = lint.collect(args.paths)
     if not files:
@@ -168,8 +172,8 @@ def lost_sections(existing: str, rendered: str) -> list[str]:
     return [h for h, filled in before.items() if filled and not after.get(h, False)]
 
 
-def call_render(engine, args) -> int:
-    md = engine.reporting.render(args.report)
+def call_render(args) -> int:
+    md = load_engine(args.config_home).reporting.render(args.report)  # wave 2 lane (d)
     if args.out:
         if (
             args.report.name.endswith("-threat-model.json")
@@ -209,7 +213,7 @@ def add_rate_threats_args(ap) -> None:
     )
 
 
-def call_rate_threats(_engine, args) -> int:
+def call_rate_threats(args) -> int:
     """Fill each OWASP risk_rating's derived values from its factors.
 
     The author scores the factors (and optionally the basis and one reason
@@ -290,7 +294,7 @@ def add_sarif_args(ap) -> None:
     ap.add_argument("--compact", action="store_true", help="minified JSON")
 
 
-def call_sarif(_engine, args) -> int:
+def call_sarif(args) -> int:
     from traust_engine.reporting import sarif
 
     if bool(args.results_root) == bool(args.reports):

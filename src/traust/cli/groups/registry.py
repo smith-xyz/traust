@@ -6,11 +6,16 @@ import json
 import os
 import sys
 from pathlib import Path
+from types import ModuleType
 
-from traust_contracts import DeploymentConfigMissing
-from traust_engine.registry import products as pd
+from traust.cli.groups._registry import OpSpec, load_engine
 
-from traust.cli.groups._registry import OpSpec
+
+def _products() -> ModuleType:
+    """traust-engine's product registry (wave 2 lane (c))."""
+    from traust_engine.registry import products
+
+    return products
 
 
 def add_models_args(ap) -> None:
@@ -36,7 +41,8 @@ def add_models_args(ap) -> None:
     p.add_argument("--note", default=None)
 
 
-def call_models(engine, args) -> int:
+def call_models(args) -> int:
+    engine = load_engine(args.config_home)  # wave 2 lane (c)
     reg = engine.models.registry()
     if args.cmd == "validate":
         errors = engine.models.validate()
@@ -61,7 +67,7 @@ def call_models(engine, args) -> int:
     if args.cmd == "spend":
         try:
             engine.metrics._progress_tracker()
-        except DeploymentConfigMissing:
+        except FileNotFoundError:  # contracts' DeploymentConfigMissing
             msg = (
                 "spend: progress-tracker not configured — declaration skipped; "
                 "the embedding platform records usage itself"
@@ -108,17 +114,19 @@ def add_products_args(ap) -> None:
         action="store_true",
         help="propose a match for every package under processed-results/",
     )
-    ap.add_argument("--map", type=Path, default=pd._cli_default_map_path())
+    ap.add_argument("--map", type=Path, default=_products()._cli_default_map_path())
     ap.add_argument("--cache-dir", type=Path, default=None)
     ap.add_argument("--json", action="store_true", help="JSON only, no human-readable summary")
 
 
-def call_products(engine, args) -> int:
+def call_products(args) -> int:
+    pd = _products()
+    engine = load_engine(args.config_home)  # wave 2 lane (c)
     cache_dir = args.cache_dir
     if cache_dir is None:
         try:
             cache_dir = engine.models.feeds_cache()
-        except DeploymentConfigMissing:
+        except FileNotFoundError:  # contracts' DeploymentConfigMissing
             cache_dir = None
 
     source_status, source, doc = pd._source_block(cache_dir)

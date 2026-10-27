@@ -10,15 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from traust_engine.adapters.govulncheck import (
-    REACH_ORDER,
-    _run_govulncheck,
-    harness_version,
-    repo_head,
-)
-from traust_engine.adapters.opengrep import _execute_opengrep_scan, resolve_rule_pack_dir
-
-from traust.cli.groups._registry import OpSpec, passthrough_op
+from traust.cli.groups._registry import OpSpec, load_engine, passthrough_op
 
 
 def add_opengrep_args(ap) -> None:
@@ -50,7 +42,11 @@ def add_opengrep_args(ap) -> None:
     ap.add_argument("--opengrep", default="opengrep", help="opengrep binary (default: from PATH).")
 
 
-def call_opengrep(engine, args) -> int:
+def call_opengrep(args) -> int:
+    # wave 2 lane (b)
+    from traust_engine.adapters.opengrep import _execute_opengrep_scan, resolve_rule_pack_dir
+
+    engine = load_engine(args.config_home)
     target = Path(args.target).resolve()
     if not target.is_dir():
         print(f"not a directory: {target}", file=sys.stderr)
@@ -134,7 +130,16 @@ def add_govulncheck_args(ap) -> None:
     )
 
 
-def call_govulncheck(engine, args) -> int:
+def call_govulncheck(args) -> int:
+    # wave 2 lane (b)
+    from traust_engine.adapters.govulncheck import (
+        REACH_ORDER,
+        _run_govulncheck,
+        harness_version,
+        repo_head,
+    )
+
+    engine = load_engine(args.config_home)
     repo = args.repo.resolve()
     if not (repo / "go.mod").exists() and not list(repo.glob("*/go.mod")):
         print(
@@ -226,7 +231,7 @@ def add_checkov_args(ap) -> None:
     )
 
 
-def call_checkov(_engine, args) -> int:
+def call_checkov(args) -> int:
     from traust_engine.adapters.checkov import Scanner
 
     target = Path(args.target).resolve()
@@ -273,8 +278,10 @@ def add_gitleaks_args(ap) -> None:
     ap.add_argument("--gitleaks", default="gitleaks", help="gitleaks binary")
 
 
-def call_gitleaks(engine, args) -> int:
+def call_gitleaks(args) -> int:
     from traust_engine.adapters import gitleaks as gl
+
+    engine = load_engine(args.config_home)  # wave 2 lane (b)
 
     repo = args.repo.resolve()
     if not repo.is_dir():
@@ -435,7 +442,7 @@ def _sbom_body(args, source: str) -> dict:
     return body
 
 
-def _deps_dev_resolver(engine, args):
+def _deps_dev_resolver(args):
     """deps.dev client per feeds.yaml: on by default, off with `access: disabled`."""
     from traust_engine.depsdev import DepsDevClient
 
@@ -454,18 +461,19 @@ def _deps_dev_resolver(engine, args):
         return None
     cache = None
     try:
-        from traust.context import feeds_cache_dir
+        from traust.context import feeds_cache_dir, load
 
-        cache = feeds_cache_dir(engine) / "deps-dev" if engine is not None else None
+        cache = feeds_cache_dir(load(args.config_home)) / "deps-dev"
     except Exception:  # no configured cache: resolution still runs, uncached
         cache = None
     return DepsDevClient(url, timeout=args.timeout, cache_dir=cache)
 
 
-def call_osv(_engine, args) -> int:
+def call_osv(args) -> int:
     from traust_engine.adapters import osv as osv_mod
     from traust_engine.osv import OsvClient
 
+    from traust._tools import harness_version
     from traust.registry.osv_urls import osv_access, osv_query_url
 
     source = args.source or ("osv-scanner" if osv_access() == "air-gapped" else "api")
@@ -491,7 +499,7 @@ def call_osv(_engine, args) -> int:
         body = osv_mod.scan_api(
             repo,
             OsvClient(osv_query_url(), timeout=args.timeout),
-            resolver=_deps_dev_resolver(_engine, args),
+            resolver=_deps_dev_resolver(args),
         )
     prov = body["provenance"]
     doc = {
@@ -509,6 +517,8 @@ def call_osv(_engine, args) -> int:
 
 def _call_osv_sbom(args, source: str) -> int:
     from traust_engine.adapters import osv_sbom
+
+    from traust._tools import harness_version
 
     sbom = args.sbom.resolve()
     if not sbom.is_file():
@@ -643,7 +653,7 @@ def add_yara_args(ap) -> None:
     ap.add_argument("--max-file-mb", type=int, default=64)
 
 
-def call_yara(_engine, args) -> int:
+def call_yara(args) -> int:
     from traust_engine.adapters import yara as yara_mod
 
     target = Path(args.target).resolve()
@@ -699,7 +709,7 @@ def add_joern_args(ap) -> None:
     ap.add_argument("--max-sites", type=int, default=200)
 
 
-def call_joern(_engine, args) -> int:
+def call_joern(args) -> int:
     from traust_engine.adapters import joern as joern_mod
 
     repo = args.repo.resolve()
@@ -737,7 +747,7 @@ def add_crypto_probe_args(ap) -> None:
     ap.add_argument("--json", action="store_true", help="Emit JSON (default when -o omitted)")
 
 
-def call_crypto_probe(_engine, args) -> int:
+def call_crypto_probe(args) -> int:
     from dataclasses import asdict
 
     from traust_engine.adapters import crypto_probe as cp
@@ -821,7 +831,7 @@ def _add_crypto_audit_common(ap) -> None:
     ap.add_argument("--quiet", "-q", action="store_true", help="Suppress progress on stderr")
 
 
-def call_crypto_audit(_engine, args) -> int:
+def call_crypto_audit(args) -> int:
     from traust_engine.adapters import crypto_audit as ca
 
     out = Path(args.output) if args.output else None

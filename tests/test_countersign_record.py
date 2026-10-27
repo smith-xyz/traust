@@ -145,7 +145,7 @@ def writer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[RecordFi
     def no_engine(*args, **kwargs):
         pytest.fail("a core severity writer must not bootstrap the legacy engine")
 
-    monkeypatch.setattr("traust.cli.__main__.load_engine", no_engine)
+    monkeypatch.setattr("traust.cli.groups._registry.load_engine", no_engine)
     try:
         yield RecordFixture(config_home, store_home, finding.id, key)
     finally:
@@ -333,7 +333,7 @@ def test_countersign_help_does_not_bootstrap_the_engine(monkeypatch, capsys):
     def no_bootstrap(*args, **kwargs):
         pytest.fail("help must not require engine or core configuration")
 
-    monkeypatch.setattr("traust.cli.__main__.load_engine", no_bootstrap)
+    monkeypatch.setattr("traust.cli.groups._registry.load_engine", no_bootstrap)
     monkeypatch.setattr(findings, "load", no_bootstrap)
     with pytest.raises(SystemExit) as error:
         main(["findings", "record", "--help"])

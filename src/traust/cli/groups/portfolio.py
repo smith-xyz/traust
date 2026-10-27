@@ -5,22 +5,22 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import ModuleType
 
-from traust_engine.portfolio import graph
-from traust_engine.portfolio.graph import (
-    ALL_ECOSYSTEMS,
-    DEFAULT_LANG_CACHE,
-    DEFAULT_SUPPORTED_RELEASES,
-    MAX_SYMBOL_FILES,
-    UNIVERSAL_ECOSYSTEMS,
-)
-
-from traust.cli.groups._registry import OpSpec, passthrough_op
+from traust.cli.groups._registry import OpSpec, load_engine, passthrough_op
 
 
-def _resolve_spine_db(engine, spine: str | None, db: str | None) -> tuple[Path, Path] | None:
+def _graph() -> ModuleType:
+    """traust-engine's portfolio graph (wave 2 lane (d))."""
+    from traust_engine.portfolio import graph
+
+    return graph
+
+
+def _resolve_spine_db(args, spine: str | None, db: str | None) -> tuple[Path, Path] | None:
+    engine = load_engine(args.config_home)  # wave 2 lane (d)
     try:
-        return graph._resolve_portfolio_paths(
+        return _graph()._resolve_portfolio_paths(
             spine,
             db,
             default_spine=engine.portfolio.repo_graph(),
@@ -31,12 +31,13 @@ def _resolve_spine_db(engine, spine: str | None, db: str | None) -> tuple[Path, 
         return None
 
 
-def _resolve_db(engine, db: str | None) -> Path | None:
-    resolved = _resolve_spine_db(engine, None, db)
+def _resolve_db(args, db: str | None) -> Path | None:
+    resolved = _resolve_spine_db(args, None, db)
     return resolved[1] if resolved else None
 
 
 def add_build_args(ap) -> None:
+    graph = _graph()
     ap.add_argument("--spine")
     ap.add_argument("--db")
     ap.add_argument("--limit", type=int)
@@ -49,7 +50,7 @@ def add_build_args(ap) -> None:
         help="OPT-IN per-release ref enrichment: fetch go.mod "
         "at the supported release branches' repo-ref "
         "nodes and attach depends_on_ref edges. Bare flag "
-        f"= top {DEFAULT_SUPPORTED_RELEASES} release-X.Y "
+        f"= top {graph.DEFAULT_SUPPORTED_RELEASES} release-X.Y "
         "branches by ships_ref count; a number overrides "
         "N; a comma list names branches verbatim. "
         "Without this flag the stage never runs and "
@@ -65,7 +66,7 @@ def add_build_args(ap) -> None:
         "--ecosystems",
         default="all",
         help="Comma list of non-Go L1 ecosystems to build after "
-        f"the Go layer ({', '.join(ALL_ECOSYSTEMS)}); "
+        f"the Go layer ({', '.join(graph.ALL_ECOSYSTEMS)}); "
         '"all" (default) builds every one — the six '
         "package ecosystems plus the universal "
         "docker/actions/helm surfaces. Manifests are "
@@ -82,7 +83,7 @@ def add_build_args(ap) -> None:
     )
     ap.add_argument(
         "--lang-cache",
-        default=DEFAULT_LANG_CACHE,
+        default=graph.DEFAULT_LANG_CACHE,
         help="gh-languages jsonl used ONLY for the truncated-tree "
         "root-candidate fallback of the multi-ecosystem "
         "L1 layer.",
@@ -104,8 +105,9 @@ def add_build_args(ap) -> None:
     )
 
 
-def call_build(engine, args) -> int:
-    resolved = _resolve_spine_db(engine, args.spine, args.db)
+def call_build(args) -> int:
+    graph = _graph()
+    resolved = _resolve_spine_db(args, args.spine, args.db)
     if resolved is None:
         return 2
     spine, db = resolved
@@ -162,7 +164,7 @@ def call_build(engine, args) -> int:
         sm = result["l1_multi"]
         non_go = {e for e in graph._parse_ecosystems(args.ecosystems) if e not in ("go", "Go")}
         if args.no_universal:
-            non_go -= set(UNIVERSAL_ECOSYSTEMS)
+            non_go -= set(graph.UNIVERSAL_ECOSYSTEMS)
         graph._print_deps_multi_report(sm, non_go)
         print(f"L1 stats persisted -> {result['stats_path']}")
         if sm.get("rate_limited_incomplete"):
@@ -196,7 +198,8 @@ def add_freshness_args(ap) -> None:
     ap.add_argument("--max-age-days", type=int, default=30)
 
 
-def call_freshness(engine, args) -> int:
+def call_freshness(args) -> int:
+    graph = _graph()
     spine = Path(args.spine)
     if not spine.is_file():
         print(f"spine not found: {spine} — run /repo-graph first", file=sys.stderr)
@@ -221,7 +224,8 @@ def add_interfaces_args(ap) -> None:
     ap.add_argument("--jobs", type=int, default=6)
 
 
-def call_interfaces(engine, args) -> int:
+def call_interfaces(args) -> int:
+    graph = _graph()
     con = graph.db_connect(Path(args.db))
     s2 = graph.build_interfaces(con, args.limit, args.jobs)
     print(
@@ -248,7 +252,8 @@ def add_symbols_args(ap) -> None:
     ap.add_argument("--jobs", type=int, default=6)
 
 
-def call_symbols(engine, args) -> int:
+def call_symbols(args) -> int:
+    graph = _graph()
     if not graph._load_ts_langs():
         print(
             "tree-sitter unavailable — install the harness's "
@@ -264,7 +269,7 @@ def call_symbols(engine, args) -> int:
         f"L4 symbols: {s4['ok']}/{s4['repos']} repos swept "
         f"({s4['clone_errors']} clone/extract errors, "
         f"{s4['timeouts']} timeouts, {s4['truncated']} truncated at "
-        f"{MAX_SYMBOL_FILES} files); {s4['symbols']} exported "
+        f"{graph.MAX_SYMBOL_FILES} files); {s4['symbols']} exported "
         f"symbols, {s4['import_edges']} imports_package edges"
     )
     return 0
@@ -288,7 +293,8 @@ def add_artifacts_args(ap) -> None:
     )
 
 
-def call_artifacts(engine, args) -> int:
+def call_artifacts(args) -> int:
+    graph = _graph()
     con = graph.db_connect(Path(args.db))
     s3 = graph.build_artifacts(
         con, Path(args.findings), Path(args.sbom_dir) if args.sbom_dir else None
@@ -315,8 +321,9 @@ def add_stats_args(ap) -> None:
     ap.add_argument("--out-dir", default=".")
 
 
-def call_stats(engine, args) -> int:
-    db = _resolve_db(engine, args.db)
+def call_stats(args) -> int:
+    graph = _graph()
+    db = _resolve_db(args, args.db)
     if db is None:
         return 2
     graph.write_stats(graph.db_connect(db), Path(args.out_dir))
@@ -348,8 +355,9 @@ def add_query_args(ap) -> None:
     ap.add_argument("--limit", type=int, default=20)
 
 
-def call_query(engine, args) -> int:
-    db = _resolve_db(engine, args.db)
+def call_query(args) -> int:
+    graph = _graph()
+    db = _resolve_db(args, args.db)
     if db is None:
         return 2
     try:

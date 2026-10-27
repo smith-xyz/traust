@@ -9,10 +9,7 @@ import shlex
 import sys
 from pathlib import Path
 
-from traust_engine._util import elf as elf_util
-from traust_engine._util import safe_exec
-
-from traust.cli.groups._registry import OpSpec
+from traust.cli.groups._registry import OpSpec, load_engine
 from traust.context import load
 
 
@@ -29,7 +26,7 @@ def add_redact_args(ap) -> None:
     )
 
 
-def call_redact(_engine, args) -> int:
+def call_redact(args) -> int:
     policy = load(args.config_home).services().redaction
 
     def redact(text: str) -> tuple[str, list[dict]]:
@@ -91,7 +88,9 @@ def add_elf_args(ap) -> None:
     )
 
 
-def call_elf(_engine, args) -> int:
+def call_elf(args) -> int:
+    from traust_engine._util import elf as elf_util  # wave 2 lane (b)
+
     path = args.binary.resolve()
     if not path.is_file():
         print(f"not a file: {path}", file=sys.stderr)
@@ -146,8 +145,11 @@ def add_safe_exec_args(ap) -> None:
     sub.add_parser("list-profiles", help="list configured safe_exec profiles")
 
 
-def call_safe_exec(engine, args) -> int:
-    profile_map = engine.adapters.safe_exec_profile_map()
+def call_safe_exec(args) -> int:
+    # wave 2 lane (b)
+    from traust_engine._util import safe_exec
+
+    profile_map = load_engine(args.config_home).adapters.safe_exec_profile_map()
     if args.safe_exec_mode == "list-profiles":
         for name, profile in sorted(profile_map.items()):
             print(

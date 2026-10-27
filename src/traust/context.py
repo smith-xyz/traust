@@ -1,7 +1,7 @@
 """The app's single composition root: traust-core's Context with every provider registered.
 
 Every entry point builds it here, once (:func:`load`), and threads it into its workers. Nothing
-else in the app calls ``Context`` or ``HarnessEngine.load()``.
+else in the app calls ``Context``.
 """
 
 from __future__ import annotations
@@ -12,23 +12,25 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypeVar
 
-from traust_contracts import DeploymentConfigMissing
-from traust_contracts.config import TRAUST_CONFIG_HOME_DEFAULT, TRAUST_CONFIG_HOME_ENV
-from traust_core.v1.context import Config, Context, Locations
-from traust_core.v1.errors import AuthenticationError, ConfigError
+from traust_core.v1.context import (
+    TRAUST_CONFIG_HOME_DEFAULT,
+    Config,
+    Context,
+    Locations,
+    resolve_config_home,
+)
+from traust_core.v1.errors import AuthenticationError, ConfigError, DeploymentConfigMissing
 from traust_core.v1.models.identity import Credential, Principal
-from traust_engine import HarnessEngine
 
-from traust._tools import register_providers
 from traust.paths import HARNESSING_DIR
 
 T = TypeVar("T")
-# NEED(engine facade): an engine until the last load_engine caller moves to load.
-LocationSource = Context | HarnessEngine
 
 CORE_CONFIG = "core.yaml"
 SLA_POLICY = "sla-policy.yaml"
 MODEL_REGISTRY = "model-registry.yaml"
+EXTERNAL_TOOLS = "external-tools.yaml"
+SAFE_EXEC_PROFILES = "safe-exec-profiles.yaml"
 # Security-pack content (home: traust-pack-security): the pinned ATT&CK release and its mapping.
 _ATTACK = HARNESSING_DIR / "attack-coverage" / "tables"
 ATTACK_TABLES = (_ATTACK / "attack-techniques.json", _ATTACK / "attack-mapping.json")
@@ -42,8 +44,12 @@ ATTACK_TABLES = (_ATTACK / "attack-techniques.json", _ATTACK / "attack-mapping.j
 # ---------------------------------------------------------------------------
 #
 # TRAUST_CONFIG_HOME
-#   The config home, when no --config-home is given. Consumed by
-#   :func:`resolve_config_home`.
+#   The config home, when no --config-home is given. Consumed by core's
+#   ``resolve_config_home``.
+#
+# XDG_CACHE_HOME
+#   Where the recall benchmark commits its canary repositories
+#   (``<cache>/recall-bench/<canaries>``). Consumed by :func:`load`.
 #
 # AUDIT_RESULTS_ROOT
 #   Point a one-off run or CI matrix job at an analysis-results tree without
@@ -77,32 +83,6 @@ def _feeds_cache_dir_from_env() -> Path | None:
     return Path(str(raw).strip()).expanduser().resolve()
 
 
-def resolve_config_home(config_home: Path | None = None) -> Path | None:
-    """``config_home``, else ``$TRAUST_CONFIG_HOME``, else ``~/.traust/config`` when it exists.
-
-    PENDING(core Bindings loader): the same rule as contracts, until core's loader owns it.
-    """
-    if config_home is not None:
-        return config_home
-    if raw := os.environ.get(TRAUST_CONFIG_HOME_ENV):
-        return Path(raw).expanduser()
-    return TRAUST_CONFIG_HOME_DEFAULT if TRAUST_CONFIG_HOME_DEFAULT.is_dir() else None
-
-
-def load_engine(config_home: Path | None = None) -> HarnessEngine:
-    """Resolve the engine facade, or exit 2 with a one-line message (no traceback).
-
-    NEED(engine facade): only the grouped ``traust <group> <op>`` ops still on ``HarnessEngine``
-    namespaces (adapters, metrics, portfolio, registry, reporting, sweep, util) and the callers
-    listed in the plan's step-1 table; everything else goes through :func:`load`.
-    """
-    try:
-        return HarnessEngine.load(config_home=config_home)
-    except DeploymentConfigMissing as e:
-        print(f"config not resolvable: {e}", file=sys.stderr)
-        raise SystemExit(2) from e
-
-
 def _guarded(what: str, step: Callable[[], T]) -> T:
     try:
         return step()
@@ -125,18 +105,21 @@ def load(
     laptop install, with the home's ``locations.yaml``. The ATT&CK coverage view is built on the
     pack's pinned tables; the SLA view on ``sla_policy``, else on ``<config home>/sla-policy.yaml``
     when there is one (template: config/sla-policy.example.yaml); the spend view on the home's
-    model registry when there is one, reconciled against ``invoices``. The engine's providers
-    (``recall-benchmark/<canaries>`` for the canary source) load the engine on first use.
+    model registry when there is one, reconciled against ``invoices``. The tools read the home's
+    ``external-tools.yaml`` and ``safe-exec-profiles.yaml`` on first use; detection quality scores
+    the rule pack (:func:`_rule_pack`) against canaries from ``recall-benchmark/<canaries>``.
     """
     home = resolve_config_home(config_home)
     path = home / CORE_CONFIG if home is not None else None
     sla = sla_policy or (home / SLA_POLICY if home is not None else None)
     core = _guarded(
         "core config",
-        lambda: (
-            Context.from_file(path)
-            if path is not None and path.is_file()
-            else Context(Config(locations=Locations.from_home(home) if home else Locations()))
+        lambda: Context(
+            _with_bundled_rules(
+                Config.from_file(path)
+                if path is not None and path.is_file()
+                else Config(locations=Locations.from_home(home) if home else Locations())
+            )
         ),
     )
     _guarded("ATT&CK catalog", lambda: core.register_attack_catalog(*ATTACK_TABLES))
@@ -147,9 +130,41 @@ def load(
     elif invoices is not None:
         print(f"invoices need the spend view: no {MODEL_REGISTRY} in {home}", file=sys.stderr)
         raise SystemExit(2)
-    # NEED(engine Policy): the tools' config still comes from the engine facade, loaded lazily.
-    register_providers(core, lambda: HarnessEngine.load(config_home=home), canaries=canaries)
+    # No home: the default home's paths, so the first tool use names the file it needs.
+    files = home or TRAUST_CONFIG_HOME_DEFAULT
+    core.register_toolchain(files / EXTERNAL_TOOLS, files / SAFE_EXEC_PROFILES)
+    pack, pack_version = _rule_pack(core.config.locations)
+    core.register_rule_pack(pack)
+    cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+    core.register_detection_quality(
+        pack_version, files / "recall-benchmark" / canaries, cache / "recall-bench" / canaries
+    )
+    core.register_fleet_fix()
+    core.register_compliance_sources()
     return core
+
+
+def _with_bundled_rules(config: Config) -> Config:
+    """``config`` with the bundled gitleaks rules when ``locations.gitleaks_config`` is unset."""
+    if config.locations.gitleaks_config:
+        return config
+    # PENDING(pack: gitleaks rules): the engine-bundled rules until the security pack ships them.
+    from traust._tools import resolve_gitleaks_config
+
+    gitleaks = str(resolve_gitleaks_config())
+    locations = config.locations.model_copy(update={"gitleaks_config": gitleaks})
+    return config.model_copy(update={"locations": locations})
+
+
+def _rule_pack(locations: Locations) -> tuple[Path, str]:
+    """The opengrep rule pack and its version: ``locations.opengrep_rules``, else the bundled."""
+    if raw := locations.opengrep_rules:
+        pack = Path(raw.removeprefix("file://"))
+        return pack, f"local:{pack}"
+    # PENDING(pack: opengrep rules): the engine-bundled pack until the security pack ships one.
+    from traust._tools import default_rule_pack_dir, harness_version
+
+    return default_rule_pack_dir(), harness_version()
 
 
 def load_spend_core(config_home: Path | None = None) -> Context:
@@ -200,14 +215,8 @@ def add_config_home_arg(parser) -> None:
     )
 
 
-def locations(src: LocationSource) -> Locations:
-    """core's ``Config.locations``. An engine (callers still on ``load_engine``) gets the same
-    ``locations.yaml`` read by core, so both resolve every path the same way."""
-    return (
-        src.config.locations
-        if isinstance(src, Context)
-        else Locations.from_home(src.ctx.config_home)
-    )
+def locations(src: Context) -> Locations:
+    return src.config.locations
 
 
 def _required(value: Callable[[], Path | None], name: str) -> Path:
@@ -218,17 +227,17 @@ def _required(value: Callable[[], Path | None], name: str) -> Path:
         raise DeploymentConfigMissing(str(e)) from e
 
 
-def analysis_results_dir(src: LocationSource) -> Path:
+def analysis_results_dir(src: Context) -> Path:
     """Configured local analysis-results root (fail-loud when unset)."""
     return _required(locations(src).analysis_results_dir, "analysis_results")
 
 
-def workspace_dir(src: LocationSource) -> Path:
+def workspace_dir(src: Context) -> Path:
     """Configured workspace root (fail-loud when unset)."""
     return _required(locations(src).workspace_dir, "workspace")
 
 
-def inputs_dir(src: LocationSource) -> Path:
+def inputs_dir(src: Context) -> Path:
     """The repository-inventory tree: ``locations.inputs``, else ``<workspace>/inputs``."""
     return _required(locations(src).inputs_dir, "inputs")
 
@@ -330,22 +339,22 @@ def campaign_settings() -> dict:
     }
 
 
-def findings_db(src: LocationSource) -> Path:
+def findings_db(src: Context) -> Path:
     """``<analysis-results>/graph/findings.db`` (fail-loud when unset)."""
     return _required(locations(src).findings_db, "analysis_results")
 
 
-def progress_tracker_dir(src: LocationSource) -> Path:
+def progress_tracker_dir(src: Context) -> Path:
     """Configured progress-tracker root (fail-loud when unset)."""
     return _required(locations(src).progress_tracker_dir, "progress_tracker")
 
 
-def rule_drafts_dir(src: LocationSource) -> Path:
+def rule_drafts_dir(src: Context) -> Path:
     """Configured rule-drafts root (fail-loud when unset)."""
     return _required(locations(src).rule_drafts_dir, "rule_drafts")
 
 
-def feeds_cache_dir(src: LocationSource) -> Path:
+def feeds_cache_dir(src: Context) -> Path:
     """Feeds pull-through cache: ``FEEDS_CACHE_DIR`` > config > ``progress_tracker/feeds``."""
     override = _feeds_cache_dir_from_env()
     if override is not None:
@@ -353,7 +362,7 @@ def feeds_cache_dir(src: LocationSource) -> Path:
     return locations(src).feeds_cache_dir() or progress_tracker_dir(src) / "feeds"
 
 
-def findings_tree_dir(src: LocationSource) -> Path:
+def findings_tree_dir(src: Context) -> Path:
     """``<analysis-results>/findings`` (fail-loud when analysis_results unset)."""
     return analysis_results_dir(src) / "findings"
 
