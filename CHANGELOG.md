@@ -4,6 +4,13 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- **OWASP LLM categories are structured again.** `llm-application-review.md`
+  records a finding's OWASP LLM Top 10 category in `owasp_llm_references`
+  (for example `["LLM06"]`) instead of in the description; the check number
+  stays in the description. traust-core stores each category as a finding
+  label with taxonomy `owasp-llm` (traust-core#228, pinned, with
+  traust-contracts#88). `/vuln-scan` findings have no reference fields and
+  keep naming the category in the description.
 - Cut over authored report and roadmap effort/priority producers to the existing
   canonical contract, with explicit unknown size and independent optional
   external blocking. Priorities remain explicitly authored; no duration,
