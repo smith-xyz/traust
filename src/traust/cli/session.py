@@ -32,7 +32,6 @@ from pathlib import Path
 
 import pydantic
 from pydantic import Field
-from traust_contracts.config import TRAUST_CONFIG_HOME_DEFAULT
 from traust_core.v1.errors import ServiceError, ValidationError
 from traust_core.v1.models.assessment import DiffRefused
 from traust_core.v1.models.base import Dto
@@ -47,7 +46,7 @@ from traust_core.v1.models.operations import (
 
 from traust.cli._doors import answer, parser
 from traust.cli.assessments import REFUSED
-from traust.context import resolve_config_home
+from traust.context import TRAUST_CONFIG_HOME_DEFAULT, resolve_config_home
 from traust.ops.router import THREAT_MODEL_PR
 from traust.paths import HARNESS_ROOT, skill_dir
 
