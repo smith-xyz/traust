@@ -1131,10 +1131,22 @@ permission_classes/decorators, `DEFAULT_PERMISSION_CLASSES` baseline,
 decorators, `add_url_rule` incl. MethodView classes, Flask-RESTful /
 flask-restx resources; class `decorators`/`method_decorators`; a
 `before_request` hook that can reject a request is a receiver- or
-app-scoped baseline in `scope_guards`). Flask rows add a per-guard-family
-asymmetry shape: a check (scope, admin, role, permission, token, …) that
-most rows of one view class or blueprint carry but a guarded sibling
-lacks marks that sibling `guard_family_gaps` — judge it like any
+app-scoped baseline in `scope_guards`), fastapi (verb/`api_route`/`websocket`
+decorators and `add_api_route`; guards from `dependencies=`, `Depends`/`Security`
+parameters followed into their own dependencies, router and app dependencies,
+`include_router`/`mount` prefixes, and middleware that can refuse), aiohttp
+(`router.add_*`, `add_routes`, `RouteTableDef`, `web.View`; handler decorators,
+bare `await check_*(request)` calls and app middlewares) and express (verb
+calls, `route()` chains and `use()` mounts across modules; `use()` middleware
+guards only later registrations). In a Backstage plugin, a router mounted
+through its `httpRouter` service carries `backstage:httpRouter` (the
+framework authenticates by default), and a path its `addAuthPolicy` opens
+carries `backstage:allow-<policy>` and is judged. Express parsing needs
+tree-sitter (`traust-core[js]`, installed with traust); without it, Express
+is a coverage gap that says so. Rows of the python families and express add
+a per-guard-family asymmetry shape: a check (scope, admin, role, permission,
+token, …) that most rows of one view class or router carry but a guarded
+sibling lacks marks that sibling `guard_family_gaps` — judge it like any
 asymmetry. Rows with `pattern_dynamic: true` carry a computed path as
 source text; `test_path: true` rows sit under a test/example directory.
 Other detected frameworks appear as `coverage_gaps`. Guard recognition
