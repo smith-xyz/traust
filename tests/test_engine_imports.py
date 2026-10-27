@@ -18,9 +18,7 @@ BASELINE = {
     "src/traust/cli/check_drift.py": 1,
     "src/traust/cli/fetch_feeds.py": 1,
     "src/traust/cli/groups/_registry.py": 1,
-    "src/traust/cli/groups/metrics.py": 1,
     "src/traust/cli/groups/portfolio.py": 1,
-    "src/traust/cli/groups/registry.py": 1,
     "src/traust/cli/groups/reporting.py": 4,
     "src/traust/cli/groups/sweep.py": 5,
 }

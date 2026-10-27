@@ -5,34 +5,21 @@ from __future__ import annotations
 import datetime
 import json
 import sys
-from collections.abc import Iterator
 from pathlib import Path
-from types import ModuleType
 
 from traust_core.v1.models.common import TimeWindow
 from traust_core.v1.models.operations import (
-    ModelName,
-    ModelUsage,
-    ProviderName,
-    SkillName,
     SpendDimension,
     SpendFilter,
-    SpendSource,
+    UsageDimension,
+    UsageRollup,
 )
 
 from traust.cli.groups._registry import OpSpec, load_engine
-from traust.context import load_spend_core
-from traust.paths import HARNESSING_DIR
+from traust.context import load_spend_core, workspace_dir
+from traust.paths import skill_dirs
 
-# Claude Code transcripts record Anthropic API requests.
-_TRANSCRIPT_PROVIDER = ProviderName("anthropic")
-
-
-def _transcript_readers() -> tuple[ModuleType, ModuleType]:
-    """traust-engine's ``attribute_spend`` and ``collect_spend`` (wave 2 lane (c))."""
-    from traust_engine.metrics import attribute_spend, collect_spend
-
-    return attribute_spend, collect_spend
+UNATTRIBUTED = "unattributed"
 
 
 def add_history_args(ap) -> None:
@@ -43,7 +30,8 @@ def add_history_args(ap) -> None:
 
 
 def call_history(args) -> int:
-    metrics = load_engine(args.config_home).metrics  # wave 2 lane (c)
+    # wave 2 lane (c): PENDING(decision: metrics journal — retire or port to OpsService timeline)
+    metrics = load_engine(args.config_home).metrics
     if args.cmd == "verify":
         ok, issues = metrics.verify()
         for i in issues:
@@ -97,7 +85,8 @@ def add_spend_args(ap) -> None:
 
 
 def call_spend(args) -> int:
-    engine = load_engine(args.config_home)  # wave 2 lane (c)
+    # wave 2 lane (c): PENDING(decision: metrics journal — retire or port to OpsService timeline)
+    engine = load_engine(args.config_home)
     print(
         "note: session actuals and skill attribution are recorded in traust-core now "
         "(`metrics collect-spend --append`); this dashboard reads only the metrics ledger "
@@ -131,37 +120,37 @@ def add_collect_spend_args(ap) -> None:
 
 
 def call_collect_spend(args) -> int:
-    attr, css = _transcript_readers()
-    metrics = load_engine(args.config_home).metrics  # wave 2 lane (c)
-    ws = args.workspace or metrics.workspace()
-    dirs = metrics.session_project_dirs(ws)
+    core = load_spend_core(args.config_home)
+    transcripts = core.session_transcripts
+    ws = args.workspace or workspace_dir(core)
+    dirs = transcripts.project_dirs(ws)
     if not dirs:
         print(
-            f"no Claude Code project transcripts under {css.PROJECTS} for {ws}",
+            f"no Claude Code project transcripts under {transcripts.projects} for {ws}",
             file=sys.stderr,
         )
         return 1
 
     today = datetime.date.today().isoformat()
+    spend = core.services().spend
 
     if args.append:
-        usages = tuple(session_usages(dirs, attr.known_skills(HARNESSING_DIR)))
-        if not usages:
+        source = transcripts.source(ws, skill_names())
+        if not source.usages:
             print("recorded 0 day×model×skill spend event(s)")
             return 0
-        start = min(u.occurred_at for u in usages).astimezone(datetime.UTC)
+        start = min(u.occurred_at for u in source.usages).astimezone(datetime.UTC)
         window = TimeWindow(
             start=start.replace(hour=0, minute=0, second=0, microsecond=0),
             end=datetime.datetime.now(datetime.UTC),
         )
-        spend = load_spend_core(args.config_home).services().spend
-        recorded = spend.collect(SpendSource(name=f"sessions:{ws}", usages=usages), window)
+        recorded = spend.collect(source, window)
         print(f"recorded {recorded} day×model×skill spend event(s)")
         return 0
 
     day = args.date or today
-    agg = metrics.collect_session_spend(dirs, day)
-    rows = agg.get(day, {})
+    source = transcripts.source(ws, ())
+    rows = spend.usage_summary(source, _window(day, None), (UsageDimension.MODEL,))
     print(
         f"session spend — {day} ({'live' if day == today else 'final'}) "
         f"across {len(dirs)} project dir(s)"
@@ -169,14 +158,18 @@ def call_collect_spend(args) -> int:
     if not rows:
         print("  no usage recorded")
         return 0
-    for model, a in sorted(rows.items()):
-        r = css._row(model, a)
+    for r in rows:
+        t = r.tokens
         print(
-            f"  {model}: out={r['tokens_out']:,} in={r['tokens_in']:,} "
-            f"cache_read={r['cache_read']:,} cache_new={r['cache_creation']:,} "
-            f"({r['messages']} msgs, {r['sessions']} sessions)"
+            f"  {r.model}: out={t.tokens_out:,} in={t.tokens_in:,} "
+            f"cache_read={t.cache_read:,} cache_new={t.cache_creation:,} "
+            f"({r.messages} msgs, {r.sessions} sessions)"
         )
     return 0
+
+
+def skill_names() -> set[str]:
+    return {d.name for d in skill_dirs()}
 
 
 COLLECT_SPEND = OpSpec(
@@ -206,72 +199,112 @@ def call_attribute_spend(args) -> int:
     if args.reconcile:
         return _reconcile(args, month)
 
-    _, css = _transcript_readers()
-    metrics = load_engine(args.config_home).metrics  # wave 2 lane (c)
-    ws = args.workspace or metrics.workspace()
-    dirs = css.workspace_slugs(ws)
-    if not dirs:
-        print(f"no session transcripts under {css.PROJECTS} for {ws}", file=sys.stderr)
+    core = load_spend_core(args.config_home)
+    transcripts = core.session_transcripts
+    ws = args.workspace or workspace_dir(core)
+    if not transcripts.project_dirs(ws):
+        print(f"no session transcripts under {transcripts.projects} for {ws}", file=sys.stderr)
         return 3
 
-    agg = metrics.collect_attributed(dirs, args.date, month)
+    source = transcripts.source(ws, skill_names())
+    window = _window(args.date, month)
+    spend = core.services().spend
     if args.json:
-        out = {
-            d: {
-                s: {
-                    m: {k: v for k, v in a.items() if k != "sessions"}
-                    | {"sessions": len(a["sessions"])}
-                    for m, a in models.items()
-                }
-                for s, models in skills.items()
-            }
-            for d, skills in agg.items()
-        }
-        print(json.dumps(out, indent=1, sort_keys=True))
+        by = (UsageDimension.DAY, UsageDimension.SKILL, UsageDimension.MODEL)
+        print(
+            json.dumps(_buckets(spend.usage_summary(source, window, by)), indent=1, sort_keys=True)
+        )
         return 0
-    print("\n".join(metrics.render_attribution(agg, args.date or month or "all")))
+    lanes = spend.usage_summary(source, window, (UsageDimension.SKILL,))
+    print("\n".join(render_attribution(lanes, args.date or month or "all")))
     return 0
 
 
-def session_usages(dirs: list[Path], skills: set[str]) -> Iterator[ModelUsage]:
-    """Each transcript request's usage with the skill running then (traust-engine's skill
-    signals, walked in session order); usage before any signal has no skill."""
-    attr, _ = _transcript_readers()
-    for d in dirs:
-        for f in sorted(d.glob("*.jsonl")):
-            skill = None
-            with f.open(encoding="utf-8", errors="replace") as fh:
-                for line in fh:
-                    if not any(tok in line for tok in attr._INTERESTING):
-                        continue
-                    try:
-                        rec = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue  # a torn line in a live transcript
-                    skill = attr.detect_skill(rec, skills) or skill
-                    msg = rec.get("message") or {}
-                    usage, model = msg.get("usage"), msg.get("model")
-                    if not usage or not model or model.startswith("<") or not rec.get("timestamp"):
-                        continue
-                    yield ModelUsage(
-                        provider=_TRANSCRIPT_PROVIDER,
-                        model=ModelName(model),
-                        occurred_at=datetime.datetime.fromisoformat(rec["timestamp"]),
-                        tokens_in=usage.get("input_tokens") or 0,
-                        tokens_out=usage.get("output_tokens") or 0,
-                        cache_read=usage.get("cache_read_input_tokens") or 0,
-                        cache_creation=usage.get("cache_creation_input_tokens") or 0,
-                        skill=None if skill is None else SkillName(skill),
-                    )
+def _window(day: str | None, month: str | None) -> TimeWindow:
+    start = datetime.datetime.fromisoformat(day or f"{month}-01").replace(tzinfo=datetime.UTC)
+    if day:
+        return TimeWindow(start=start, end=start + datetime.timedelta(days=1))
+    return TimeWindow.month_of(start)
+
+
+def _buckets(rows: list[UsageRollup]) -> dict:
+    """{date: {lane: {model: usage}}}, in the field names `--json` has always printed."""
+    out: dict = {}
+    for r in rows:
+        t = r.tokens
+        bucket = {
+            "input_tokens": t.tokens_in,
+            "output_tokens": t.tokens_out,
+            "cache_read_input_tokens": t.cache_read,
+            "cache_creation_input_tokens": t.cache_creation,
+            "messages": r.messages,
+            "sessions": r.sessions,
+        }
+        if r.long_prompt:
+            bucket["long_prompt"] = r.long_prompt.model_dump()
+        out.setdefault(str(r.day), {}).setdefault(r.skill or UNATTRIBUTED, {})[r.model] = bucket
+    return out
+
+
+def render_attribution(lanes: list[UsageRollup], label: str) -> list[str]:
+    """The per-lane table: priced lanes by cost, unpriced models named, never counted as $0."""
+    costs = {r.skill or UNATTRIBUTED: r.cost_usd for r in lanes if r.cost_usd is not None}
+    tot_usd = sum(costs.values())
+    tot_out = sum(r.tokens.tokens_out for r in lanes) or 1
+    lines = [
+        f"# Per-lane spend attribution — {label}",
+        "",
+        "_Inferred from session transcripts (which skill the session "
+        "was running), not self-reported by agents — the declared "
+        "side records 0 tokens by contract. `unattributed` is "
+        "always shown._",
+        "",
+        "| Lane | Est. USD | Share | Output tokens | Cache read | Messages | Sessions |",
+        "|---|---:|---:|---:|---:|---:|---:|",
+    ]
+    for r in sorted(
+        lanes, key=lambda r: -costs.get(r.skill or UNATTRIBUTED, r.tokens.tokens_out / 1e9)
+    ):
+        usd = r.cost_usd
+        share = f"{usd / tot_usd * 100:.1f}%" if usd is not None and tot_usd else "—"
+        lines.append(
+            f"| {r.skill or UNATTRIBUTED} | {f'{usd:,.2f}' if usd is not None else 'n/a'} | "
+            f"{share} | {r.tokens.tokens_out:,} | {r.tokens.cache_read:,} | "
+            f"{r.messages:,} | {r.sessions} |"
+        )
+    lines += ["", f"**Total priced: ${tot_usd:,.2f}**"]
+    lane_usd = sum(v for k, v in costs.items() if k != UNATTRIBUTED)
+    unattributed_usd = costs.get(UNATTRIBUTED, 0)
+    if tot_usd:
+        lines += [
+            f"**Harness lanes: ${lane_usd:,.2f} ({lane_usd / tot_usd * 100:.1f}%)** · "
+            f"unattributed ${unattributed_usd:,.2f} ({unattributed_usd / tot_usd * 100:.1f}%)"
+        ]
+    else:
+        # Nothing priced: the lane vs unattributed split is the headline, so in output tokens.
+        lane_tok = sum(r.tokens.tokens_out for r in lanes if r.skill is not None)
+        un_tok = sum(r.tokens.tokens_out for r in lanes if r.skill is None)
+        lines += [
+            f"**Harness lanes: {lane_tok:,} output tokens "
+            f"({lane_tok / tot_out * 100:.1f}%)** · unattributed "
+            f"{un_tok:,} ({un_tok / tot_out * 100:.1f}%) — "
+            f"no USD: no model in this window has a registry price"
+        ]
+    if unpriced := sorted({m for r in lanes for m in r.unpriced}):
+        lines += [
+            "",
+            f"⚠ unpriced models excluded from the USD column "
+            f"(no registry price): {', '.join(unpriced)}",
+        ]
+    lines += [
+        "",
+        f"_Share of output tokens is a cross-check on the USD split; total output {tot_out:,}._",
+    ]
+    return lines
 
 
 def _reconcile(args, month: str | None) -> int:
-    start = datetime.datetime.fromisoformat(args.date or f"{month}-01").replace(tzinfo=datetime.UTC)
-    window = (
-        TimeWindow(start=start, end=start + datetime.timedelta(days=1))
-        if args.date
-        else TimeWindow.month_of(start)
-    )
+    window = _window(args.date, month)
     split = (
         load_spend_core(args.config_home)
         .services()
