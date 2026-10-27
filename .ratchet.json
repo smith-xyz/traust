@@ -32,9 +32,6 @@
   "src/traust/cli/groups/_registry.py": {
     "engine-internal": 1
   },
-  "src/traust/cli/groups/adapters.py": {
-    "engine-internal": 3
-  },
   "src/traust/cli/groups/metrics.py": {
     "engine-internal": 1
   },
@@ -52,16 +49,7 @@
   "src/traust/cli/groups/sweep.py": {
     "engine-internal": 4
   },
-  "src/traust/cli/groups/util.py": {
-    "engine-internal": 2
-  },
   "src/traust/cli/query_index.py": {
     "database": 1
-  },
-  "src/traust/cli/toolchain.py": {
-    "engine-internal": 1
-  },
-  "src/traust/lib/__init__.py": {
-    "engine-internal": 1
   }
 }
