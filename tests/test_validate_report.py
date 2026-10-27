@@ -98,6 +98,13 @@ def _valid_report():
     }
 
 
+def _canonical_report():
+    report = _valid_report()
+    for item, priority in zip(report["remediation_roadmap"], ("p0", "p1"), strict=True):
+        item.update(priority=priority, effort=None)
+    return report
+
+
 def _schema_errors(report):
     return [m for _, m in schema_errors("report", report)]
 

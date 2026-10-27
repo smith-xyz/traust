@@ -17,7 +17,7 @@ from traust_core.v1.models.operations import (
 
 from traust.cli.groups._registry import OpSpec, load_engine, passthrough_op
 from traust.context import load_spend_core, workspace_dir
-from traust.paths import HARNESSING_DIR, skill_dirs
+from traust.paths import skill_dirs
 
 UNATTRIBUTED = "unattributed"
 

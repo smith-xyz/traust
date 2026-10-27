@@ -41,12 +41,12 @@ dev = ["ruff>=0.6", "pytest-xdist>=3", "psycopg[binary]>=3.1"]
 # traust's traust-core pin wins over the engine's, so a core bump needs no engine PR.
 [tool.uv]
 override-dependencies = [
-  "traust-core @ git+https://github.com/traust-security/traust-core.git@7adfd9f7cacb3900437bd59c685544ab6642802c",
+  "traust-core @ git+https://github.com/traust-security/traust-core.git@e27bb95d2448ef1bb46376f5d6250a6e7c7c56fd",
 ]
 
 [tool.uv.sources]
-traust-core = { git = "https://github.com/traust-security/traust-core.git", rev = "7adfd9f7cacb3900437bd59c685544ab6642802c" }
-traust-engine = { git = "https://github.com/traust-security/traust-engine.git", rev = "6c78fae8bc69eea7d2a2fbfd95bc8991e3146913" }
+traust-core = { git = "https://github.com/traust-security/traust-core.git", rev = "e27bb95d2448ef1bb46376f5d6250a6e7c7c56fd" }
+traust-engine = { git = "https://github.com/traust-security/traust-engine.git", rev = "40391187c2f2428d6da2999f7cc0fd55d49a3a44" }
 
 # Multi-skill CLIs live under src/traust/; harnessing/<skill>/ for single-skill
 # scripts. Install for deps + importable path helpers.
@@ -66,7 +66,7 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["harnessing/fuzz-harnesses/clones"]
+extend-exclude = ["harnessing/fuzz-harnesses/clones", "packs/security/opengrep-rules"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "UP", "B", "SIM", "PTH", "RUF"]
