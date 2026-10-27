@@ -13,11 +13,13 @@ from pathlib import Path
 
 import pytest
 import yaml
-from traust_contracts import DeploymentConfigMissing
+from traust_contracts import DeploymentConfigMissing as EngineConfigMissing
+from traust_core.v1.errors import DeploymentConfigMissing
+from traust_engine import HarnessEngine
 from traust_engine import locations as engine_locations
 
 from traust import context
-from traust.context import load, load_engine
+from traust.context import load
 from traust.paths import HARNESS_ROOT
 
 FIXTURE = Path(__file__).parent / "fixtures" / "config"
@@ -97,7 +99,7 @@ ROWS = {
 def _outcome(fn):
     try:
         return fn()
-    except DeploymentConfigMissing:
+    except (DeploymentConfigMissing, EngineConfigMissing):
         return DeploymentConfigMissing
 
 
@@ -110,12 +112,11 @@ def test_core_locations_resolve_the_paths_the_engine_did(tmp_path, monkeypatch, 
         monkeypatch.setenv("FEEDS_CACHE_DIR", feeds_env)
     else:
         monkeypatch.delenv("FEEDS_CACHE_DIR", raising=False)
-    engine, core = load_engine(home), load(home)
+    engine, core = HarnessEngine.load(config_home=home), load(home)
     for name in HELPERS:
         helper = getattr(context, name)
         expected = _outcome(lambda name=name: _before(engine, name))
         assert _outcome(lambda helper=helper: helper(core)) == expected, name
-        assert _outcome(lambda helper=helper: helper(engine)) == expected, name
 
 
 def test_a_remote_inputs_location_is_refused(tmp_path, monkeypatch):

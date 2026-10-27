@@ -51,7 +51,7 @@ def call(**args: Any) -> tuple[int, Any]:
     ns = SimpleNamespace(**{"config_home": None, "pack": "traust", "out": None, **args})
     out, err = io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        rc = sweep.call_mine(None, ns)
+        rc = sweep.call_mine(ns)
     text = out.getvalue().strip()
     return rc, json.loads(text) if text else err.getvalue()
 

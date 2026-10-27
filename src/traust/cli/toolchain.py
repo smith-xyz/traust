@@ -27,7 +27,8 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from traust.context import add_config_home_arg, load_engine
+from traust.cli.groups._registry import load_engine  # wave 2 lane (b)
+from traust.context import add_config_home_arg
 from traust.paths import HARNESS_ROOT
 
 if TYPE_CHECKING:

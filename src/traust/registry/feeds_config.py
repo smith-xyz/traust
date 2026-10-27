@@ -32,7 +32,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from traust.context import DeploymentConfigMissing, LocationSource, resolve_config_home
+from traust_core.v1.context import Context
+
+from traust.context import DeploymentConfigMissing, resolve_config_home
 
 try:
     import yaml
@@ -70,11 +72,11 @@ class FeedsConfigError(RuntimeError):
     """
 
 
-def feeds_cache_dir(*, engine: LocationSource) -> Path:
+def feeds_cache_dir(*, core: Context) -> Path:
     """Where cached feed data lives. Resolution lives in ``traust.context``."""
     from traust.context import feeds_cache_dir as resolve_feeds_cache_dir
 
-    return resolve_feeds_cache_dir(engine)
+    return resolve_feeds_cache_dir(core)
 
 
 def _load_raw(path: Path | None = None) -> dict:

@@ -94,16 +94,17 @@ def spend(monkeypatch: pytest.MonkeyPatch) -> Spend:
     door = Spend()
     core = SimpleNamespace(services=lambda: SimpleNamespace(spend=door))
     monkeypatch.setattr(metrics, "load_spend_core", lambda home: core)
-    monkeypatch.setattr(metrics.attr, "known_skills", lambda _: {"triage"})
+    monkeypatch.setattr("traust_engine.metrics.attribute_spend.known_skills", lambda _: {"triage"})
     return door
 
 
-def engine(dirs: list[Path]) -> Any:
-    return SimpleNamespace(
+def engine(monkeypatch: pytest.MonkeyPatch, dirs: list[Path]) -> None:
+    fake = SimpleNamespace(
         metrics=SimpleNamespace(
             workspace=lambda: Path("/w/workspace"), session_project_dirs=lambda ws: dirs
         )
     )
+    monkeypatch.setattr(metrics, "load_engine", lambda home: fake)
 
 
 def args(**kw: Any) -> Any:
@@ -118,8 +119,11 @@ def call(fn: Any, *a: Any) -> tuple[int, str]:
     return rc, out.getvalue()
 
 
-def test_append_collects_every_transcript_day_into_core(spend: Spend, tmp_path: Path) -> None:
-    rc, out = call(metrics.call_collect_spend, engine(transcripts(tmp_path)), args(append=True))
+def test_append_collects_every_transcript_day_into_core(
+    spend: Spend, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine(monkeypatch, transcripts(tmp_path))
+    rc, out = call(metrics.call_collect_spend, args(append=True))
     assert (rc, out.strip()) == (0, "recorded 3 day×model×skill spend event(s)")
     [(source, window)] = spend.calls
     assert [u.skill for u in source.usages] == [None, "triage", "triage"]
@@ -127,10 +131,13 @@ def test_append_collects_every_transcript_day_into_core(spend: Spend, tmp_path: 
     assert window.end > datetime.now(UTC) - timedelta(minutes=1)
 
 
-def test_append_of_no_usage_records_nothing(spend: Spend, tmp_path: Path) -> None:
+def test_append_of_no_usage_records_nothing(
+    spend: Spend, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     empty = tmp_path / "empty"
     empty.mkdir()
-    rc, out = call(metrics.call_collect_spend, engine([empty]), args(append=True))
+    engine(monkeypatch, [empty])
+    rc, out = call(metrics.call_collect_spend, args(append=True))
     assert (rc, spend.calls) == (0, []) and "recorded 0" in out
 
 
@@ -149,14 +156,14 @@ def test_append_of_no_usage_records_nothing(spend: Spend, tmp_path: Path) -> Non
 def test_reconcile_splits_the_period_by_skill(
     spend: Spend, kw: dict[str, str], window: TimeWindow
 ) -> None:
-    rc, out = call(metrics.call_attribute_spend, None, args(reconcile=True, **kw))
+    rc, out = call(metrics.call_attribute_spend, args(reconcile=True, **kw))
     assert rc == 0 and "lossless: True" in out
     assert spend.calls == [(SpendFilter(window=window), SpendDimension.SKILL)]
 
 
 def test_reconcile_exits_1_when_the_split_is_not_lossless(spend: Spend) -> None:
     spend.lossless = False
-    rc, out = call(metrics.call_attribute_spend, None, args(reconcile=True, json=True))
+    rc, out = call(metrics.call_attribute_spend, args(reconcile=True, json=True))
     assert rc == 1 and json.loads(out)["lossless"] is False
 
 
@@ -164,12 +171,11 @@ def test_the_legacy_spend_dashboard_says_what_it_no_longer_reads(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     built = SimpleNamespace(build_spend_dashboard=lambda **kw: Path("spend-dashboard.md"))
+    fake = SimpleNamespace(metrics=built, ctx=SimpleNamespace(budget_policy=None))
+    monkeypatch.setattr(metrics, "load_engine", lambda home: fake)
     err = io.StringIO()
     with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
-        rc = metrics.call_spend(
-            SimpleNamespace(metrics=built, ctx=SimpleNamespace(budget_policy=None)),
-            SimpleNamespace(out_dir=None, budget=None),
-        )
+        rc = metrics.call_spend(SimpleNamespace(config_home=None, out_dir=None, budget=None))
     assert rc == 0 and "traust dashboard view spend" in err.getvalue()
 
 
@@ -177,21 +183,21 @@ def test_the_legacy_spend_dashboard_says_what_it_no_longer_reads(
 def test_capture_on_core_is_idempotent_and_reconciles(
     tmp_path: Path, database: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(metrics.attr, "known_skills", lambda _: {"triage"})
+    monkeypatch.setattr("traust_engine.metrics.attribute_spend.known_skills", lambda _: {"triage"})
     config = tmp_path / "config"
     config.mkdir()
     (config / "model-registry.yaml").write_text(REGISTRY.read_text())
     core: dict[str, Any] = {"home": str(tmp_path / "store")}
-    dirs = transcripts(tmp_path)
+    engine(monkeypatch, transcripts(tmp_path))
     with contextlib.ExitStack() as stack:
         if database == "postgres":
             core["database"] = {"url": stack.enter_context(_postgres())}
         (config / "core.yaml").write_text(yaml.safe_dump(core))
         append = args(append=True, config_home=config)
-        assert call(metrics.call_collect_spend, engine(dirs), append)[1].startswith("recorded 3")
-        assert call(metrics.call_collect_spend, engine(dirs), append)[1].startswith("recorded 0")
+        assert call(metrics.call_collect_spend, append)[1].startswith("recorded 3")
+        assert call(metrics.call_collect_spend, append)[1].startswith("recorded 0")
         reconciled = args(reconcile=True, config_home=config, month="2026-10", json=True)
-        rc, out = call(metrics.call_attribute_spend, None, reconciled)
+        rc, out = call(metrics.call_attribute_spend, reconciled)
     answer = json.loads(out)
     assert rc == 0 and answer["lossless"] is True
     assert answer["total"]["events"] == 3 and answer["unattributed"]["events"] == 1
@@ -199,13 +205,14 @@ def test_capture_on_core_is_idempotent_and_reconciles(
     assert Decimal(answer["total"]["cost_usd"]) == Decimal("0.0004505")
 
 
-def test_capture_without_a_model_registry_is_exit_2(tmp_path: Path) -> None:
+def test_capture_without_a_model_registry_is_exit_2(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     config = tmp_path / "config"
     config.mkdir()
     (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     err = io.StringIO()
     with pytest.raises(SystemExit) as exit, contextlib.redirect_stderr(err):
-        metrics.call_collect_spend(
-            engine(transcripts(tmp_path)), args(append=True, config_home=config)
-        )
+        engine(monkeypatch, transcripts(tmp_path))
+        metrics.call_collect_spend(args(append=True, config_home=config))
     assert exit.value.code == 2 and "spend not resolvable" in err.getvalue()

@@ -1,5 +1,5 @@
-"""`load`: traust-core gets traust-engine's providers for its protocols, so the doors behind them
-run instead of raising their NEED(engine) ConfigError."""
+"""`load`: traust-core registers its own providers for its protocols, so the doors behind them
+run instead of raising their "not registered" ConfigError."""
 
 from __future__ import annotations
 
@@ -66,17 +66,51 @@ def test_the_catalog_answers_readiness_for_every_registered_tool(home: Path) -> 
     assert {"gitleaks", "grype", "opengrep", "checkov"} <= names
 
 
-def test_run_tools_reaches_an_engine_adapter_through_core(
+def test_run_tools_reaches_a_core_tool_through_load(
     home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from traust_contracts.models import AdapterResult
+    from datetime import UTC, datetime
+
+    from traust_core.v1.models.artifacts import AdapterResultArtifact
     from traust_core.v1.models.assessment import ToolName
     from traust_core.v1.providers.base import Readiness
-    from traust_engine.adapters import grype
-    from traust_engine.adapters._contract_bridge import build_scan_result
-    from traust_engine.adapters.tools import AdapterTool
+    from traust_core.v1.providers.tools import grype
+    from traust_core.v1.providers.tools.adapter import AdapterTool, adapter_result
 
     monkeypatch.setattr(AdapterTool, "check", lambda self: Readiness(ready=True))
-    monkeypatch.setattr(grype, "scan", lambda t, **_: build_scan_result(str(t), "grype", []))
+    monkeypatch.setattr(
+        grype,
+        "scan",
+        lambda t, *_, **__: adapter_result(str(t), "grype", [], scanned_at=datetime.now(UTC)),
+    )
     run = load(home).services().assessment.run_tools(tmp_path, [ToolName("grype")])
-    assert run.data("grype", AdapterResult).metadata.tool == "grype"
+    assert run.data("grype", AdapterResultArtifact).metadata.tool == "grype"
+
+
+def test_unset_gitleaks_rules_resolve_to_the_bundled_file(home: Path) -> None:
+    from traust._tools import resolve_gitleaks_config
+
+    path = load(home).config.locations.gitleaks_config_path()
+    assert path == resolve_gitleaks_config() and path.is_file()
+
+
+def test_an_explicit_gitleaks_location_wins(home: Path, tmp_path: Path) -> None:
+    rules = tmp_path / "gitleaks.toml"
+    rules.write_text("")
+    (home / "locations.yaml").write_text(yaml.safe_dump({"gitleaks_config": str(rules)}))
+    assert load(home).config.locations.gitleaks_config_path() == rules
+
+
+def test_the_rule_pack_defaults_to_the_bundled_pack_at_the_engine_version(home: Path) -> None:
+    from traust._tools import default_rule_pack_dir, harness_version
+
+    core = load(home)
+    assert core.rule_pack == default_rule_pack_dir()
+    assert {p.version for p in core.services().detection_quality.rule_packs()} == {
+        harness_version()
+    }
+
+
+def test_an_explicit_rule_pack_location_wins(home: Path, tmp_path: Path) -> None:
+    (home / "locations.yaml").write_text(yaml.safe_dump({"opengrep_rules": "rules"}))
+    assert load(home).rule_pack == (home / "rules").resolve()

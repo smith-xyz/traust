@@ -189,7 +189,7 @@ vars). Three layers, each owning exactly one thing:
 | Layer | Repo / package | Owns |
 |-------|----------------|------|
 | **Contract** | `traust_contracts` | The config *mechanism*: the MANIFEST (what files exist), the `config/v1/*` JSON schemas, the typed section models, and the one loader — `load_context()` (full) / `load_section()` (narrow). No estate data. |
-| **Resolution** | `traust` (this app) | The *source + composition root*: templates, shipped defaults, `install_traust` seeding, and resolving the context **once** at each entry point (`traust.context.load_engine`), then injecting it. |
+| **Resolution** | `traust` (this app) | The *source + composition root*: templates, shipped defaults, `install_traust` seeding, and resolving the context **once** at each entry point (`traust.context.load`, traust-core's `Context`), then injecting it. |
 | **Consumer** | `traust_engine` | A pure *consumer*: `HarnessEngine.load()` builds from a `HarnessContext`; ops namespaces (`h.metrics`, `h.corpus`, …) hold the ctx and resolve values; stateless functions receive resolved values. **The engine never loads config itself** — no env, no cwd, no workspace-shaped guessing. |
 
 ### The one config directory
@@ -207,10 +207,9 @@ registry endpoint) live in one file, **`locations.yaml`** — see
 
 ```
 entry point (CLI main / app)
-   └─ traust.context.load_engine()          # resolve config ONCE, here
-        └─ HarnessEngine.load(ctx)           # traust_engine, from a frozen HarnessContext
-             ├─ h.metrics / h.corpus / …     # ops namespaces bind ctx, derive paths
-             └─ stateless fns(resolved args)  # never re-read config
+   └─ traust.context.load()                 # resolve config ONCE, here
+        ├─ Context.register_*(paths)         # core's providers; config read on first use
+        └─ Context.services()                # core's domain services
 ```
 
 A required-but-absent (or still-a-template) config file raises

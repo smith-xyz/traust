@@ -292,7 +292,7 @@ import sys
 from pathlib import Path
 home = Path(sys.argv[1]).resolve()
 try:
-    from traust_contracts import optional_config_path
+    from traust_core.v1.context import optional_config_path
 except ImportError:
     print("  harness not importable — run `uv sync` in the traust checkout")
     sys.exit(1)
@@ -346,7 +346,7 @@ PYEOF
     warn "skipped (no python)"
   elif comp=$(TRAUST_CONFIG_HOME="$home" "$py" - <<'PYEOF'
 import sys
-from traust_contracts import config_completeness_audit
+from traust_core.v1.context import config_completeness_audit
 errors, warnings = config_completeness_audit()
 for e in errors:
     print(f"  ERROR {e}")

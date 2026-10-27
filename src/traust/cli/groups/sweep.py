@@ -7,14 +7,16 @@ import sys
 from pathlib import Path
 
 import yaml
-from traust_contracts import DeploymentConfigMissing
-from traust_core.v1.errors import NotFoundError, ServiceError, ValidationError
+from traust_core.v1.errors import (
+    DeploymentConfigMissing,
+    NotFoundError,
+    ServiceError,
+    ValidationError,
+)
 from traust_core.v1.models.detection_quality import RegressionPair, RegressionPairFilter
-from traust_engine.locations import SWEEPS_REL
-from traust_engine.sweep.engine import DEFAULT_SWEEP_LIMIT
 
 from traust.cli._doors import run
-from traust.cli.groups._registry import OpSpec, passthrough_op
+from traust.cli.groups._registry import OpSpec, load_engine, passthrough_op
 from traust.context import load, rule_drafts_dir
 
 
@@ -50,6 +52,8 @@ def _analysis_results(engine, arg: str | None) -> Path:
 
 
 def _sweeps_root(engine, args) -> Path:
+    from traust_engine.locations import SWEEPS_REL  # wave 2 lane (d)
+
     if args.sweeps_root is not None:
         return args.sweeps_root
     return _analysis_results(engine, args.analysis_results) / SWEEPS_REL
@@ -65,11 +69,11 @@ def _resolve_pack(engine, pack: Path | None) -> Path:
         raise SystemExit(2) from e
 
 
-def _resolve_drafts_dir(engine, drafts_dir: Path | None) -> Path:
-    if drafts_dir is not None:
-        return drafts_dir
+def _resolve_drafts_dir(args) -> Path:
+    if args.drafts_dir is not None:
+        return args.drafts_dir
     try:
-        return rule_drafts_dir(engine)
+        return rule_drafts_dir(load(args.config_home))
     except DeploymentConfigMissing as e:
         print(str(e), file=sys.stderr)
         raise SystemExit(2) from e
@@ -92,7 +96,8 @@ def add_collect_args(ap) -> None:
     ap.add_argument("--force", action="store_true")
 
 
-def call_collect(engine, args) -> int:
+def call_collect(args) -> int:
+    engine = load_engine(args.config_home)  # wave 2 lane (d)
     ops = engine.sweep
     sweeps_root = _sweeps_root(engine, args)
     res = ops.collect(
@@ -119,10 +124,11 @@ def add_draft_args(ap) -> None:
     _add_common_sweep_args(ap)
 
 
-def call_draft(engine, args) -> int:
+def call_draft(args) -> int:
+    engine = load_engine(args.config_home)  # wave 2 lane (d)
     ops = engine.sweep
     pack = _resolve_pack(engine, args.pack)
-    drafts_dir = _resolve_drafts_dir(engine, args.drafts_dir)
+    drafts_dir = _resolve_drafts_dir(args)
     sweeps_root = _sweeps_root(engine, args)
     res = ops.draft(pack, drafts_dir, sweeps_root=sweeps_root)
     print(
@@ -136,6 +142,8 @@ def call_draft(engine, args) -> int:
 
 
 def add_sweep_args(ap) -> None:
+    from traust_engine.sweep.engine import DEFAULT_SWEEP_LIMIT  # wave 2 lane (d)
+
     _add_common_sweep_args(ap)
     ap.add_argument("--rule", required=True, help="rule id, yaml path, or draft dir/name")
     ap.add_argument("--limit", type=int, default=DEFAULT_SWEEP_LIMIT)
@@ -155,10 +163,11 @@ def add_sweep_args(ap) -> None:
     ap.add_argument("--timeout", type=int, default=600, help="per-repo scan timeout seconds")
 
 
-def call_sweep(engine, args) -> int:
+def call_sweep(args) -> int:
+    engine = load_engine(args.config_home)  # wave 2 lane (d)
     ops = engine.sweep
     pack = _resolve_pack(engine, args.pack)
-    drafts_dir = _resolve_drafts_dir(engine, args.drafts_dir)
+    drafts_dir = _resolve_drafts_dir(args)
     sweeps_root = _sweeps_root(engine, args)
     res = ops.sweep(
         args.rule,
@@ -186,10 +195,11 @@ def add_emit_args(ap) -> None:
     ap.add_argument("--force", action="store_true")
 
 
-def call_emit(engine, args) -> int:
+def call_emit(args) -> int:
+    engine = load_engine(args.config_home)  # wave 2 lane (d)
     ops = engine.sweep
     pack = _resolve_pack(engine, args.pack)
-    drafts_dir = _resolve_drafts_dir(engine, args.drafts_dir)
+    drafts_dir = _resolve_drafts_dir(args)
     sweeps_root = _sweeps_root(engine, args)
     res = ops.emit(args.rule, pack, drafts_dir, sweeps_root=sweeps_root, force=args.force)
     if res["skipped"]:
@@ -228,18 +238,18 @@ def add_benchmark_args(ap) -> None:
     sub.add_parser("scorecard", help="print the current scorecard state")
 
 
-def _benchmark_results_dir(engine, args) -> Path:
+def _benchmark_results_dir(args) -> Path:
     if args.benchmark_dir:
         return args.benchmark_dir
-    return engine.sweep._benchmark_dir()
+    return load_engine(args.config_home).sweep._benchmark_dir()  # wave 2 lane (d)
 
 
-def call_benchmark(engine, args) -> int:
+def call_benchmark(args) -> int:
     from traust_engine.sweep import benchmark as bench
 
     if args.benchmark_cmd == "check-trigger":
         return bench.cmd_check_trigger(args)
-    results_dir = _benchmark_results_dir(engine, args)
+    results_dir = _benchmark_results_dir(args)
     return {
         "plan": bench.cmd_plan,
         "score": bench.cmd_score,
@@ -277,8 +287,10 @@ def add_rule_lane_args(ap) -> None:
     )
 
 
-def call_rule_lane(engine, args) -> int:
+def call_rule_lane(args) -> int:
     from traust_engine.sweep import rule_lane as lane
+
+    engine = load_engine(args.config_home)  # wave 2 lane (d)
 
     return lane.execute_rule_lane(
         workspace=args.workspace,
@@ -332,8 +344,8 @@ def add_mine_args(ap) -> None:
     ap.add_argument("--out", type=Path, default=None, help="also write the result here (JSON)")
 
 
-def call_mine(engine, args) -> int:
-    """The confirmed TPs in traust-core against a rule pack from traust-engine's RulePackSource."""
+def call_mine(args) -> int:
+    """The confirmed TPs in traust-core against a rule pack from core's RulePackSource."""
 
     def call() -> dict:
         quality = load(args.config_home).services().detection_quality
@@ -396,9 +408,9 @@ def add_regression_drafts_args(ap) -> None:
     )
 
 
-def call_regression_drafts(engine, args) -> int:
+def call_regression_drafts(args) -> int:
     """Stage one draft dir per confirmed fix from `DetectionQualityService.regression_pairs`."""
-    drafts_dir = _resolve_drafts_dir(engine, args.drafts_dir)
+    drafts_dir = _resolve_drafts_dir(args)
 
     def call() -> dict:
         quality = load(args.config_home).services().detection_quality
@@ -488,7 +500,7 @@ def add_verify_draft_args(ap) -> None:
     )
 
 
-def call_verify_draft(engine, args) -> int:
+def call_verify_draft(args) -> int:
     """The calibration gate: the candidate rule fires on before/ and is silent on after/."""
     from traust_engine.adapters import opengrep
 

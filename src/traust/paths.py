@@ -9,13 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from traust_contracts import (
-    DeploymentConfigMissing,
-    config_path,
-    optional_config_path,
-)
-from traust_contracts.paths import schema_dir as _contracts_schema_dir
-from traust_contracts.paths import schema_path as _contracts_schema_path
+from traust_core.v1.context import config_path, optional_config_path, schema_dir, schema_path
+from traust_core.v1.errors import DeploymentConfigMissing
 
 _PKG_ROOT = Path(__file__).resolve().parent
 HARNESS_ROOT = _PKG_ROOT.parents[1]
@@ -31,6 +26,7 @@ __all__ = [
     "DeploymentConfigMissing",
     "config_path",
     "optional_config_path",
+    "schema_path",
 ]
 
 #: The file that makes a directory a skill (Agent Skills spec).
@@ -105,11 +101,7 @@ def skill_scripts(repo: Path | None = None, pattern: str = "*.py") -> list[Path]
 
 
 def schemas_dir() -> Path:
-    return _contracts_schema_dir()
+    return schema_dir()
 
 
 SCHEMA_DIR = schemas_dir()
-
-
-def schema_path(name: str) -> Path:
-    return _contracts_schema_path(name)

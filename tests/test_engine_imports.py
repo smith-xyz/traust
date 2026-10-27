@@ -19,14 +19,13 @@ BASELINE = {
     "src/traust/cli/fetch_feeds.py": 1,
     "src/traust/cli/groups/_registry.py": 1,
     "src/traust/cli/groups/adapters.py": 15,
-    "src/traust/cli/groups/metrics.py": 2,
-    "src/traust/cli/groups/portfolio.py": 2,
+    "src/traust/cli/groups/metrics.py": 1,
+    "src/traust/cli/groups/portfolio.py": 1,
     "src/traust/cli/groups/registry.py": 1,
     "src/traust/cli/groups/reporting.py": 4,
     "src/traust/cli/groups/sweep.py": 5,
     "src/traust/cli/groups/util.py": 2,
     "src/traust/cli/toolchain.py": 1,
-    "src/traust/context.py": 1,  # NEED(engine Policy): the lazy engine factory
     "src/traust/lib/__init__.py": 1,
 }
 

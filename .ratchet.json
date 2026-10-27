@@ -36,13 +36,12 @@
     "engine-internal": 3
   },
   "src/traust/cli/groups/metrics.py": {
-    "engine-internal": 2
+    "engine-internal": 1
   },
   "src/traust/cli/groups/portfolio.py": {
-    "engine-internal": 2
+    "engine-internal": 1
   },
   "src/traust/cli/groups/registry.py": {
-    "contracts": 1,
     "engine-internal": 1
   },
   "src/traust/cli/groups/reporting.py": {
@@ -51,7 +50,6 @@
     "state-file": 1
   },
   "src/traust/cli/groups/sweep.py": {
-    "contracts": 1,
     "engine-internal": 4
   },
   "src/traust/cli/groups/util.py": {
@@ -63,17 +61,7 @@
   "src/traust/cli/toolchain.py": {
     "engine-internal": 1
   },
-  "src/traust/context.py": {
-    "contracts": 2,
-    "engine-internal": 1
-  },
   "src/traust/lib/__init__.py": {
     "engine-internal": 1
-  },
-  "src/traust/lib/event_time.py": {
-    "contracts": 1
-  },
-  "src/traust/paths.py": {
-    "contracts": 3
   }
 }

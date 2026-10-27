@@ -7,6 +7,7 @@ import json
 import sys
 from collections.abc import Iterator
 from pathlib import Path
+from types import ModuleType
 
 from traust_core.v1.models.common import TimeWindow
 from traust_core.v1.models.operations import (
@@ -18,15 +19,20 @@ from traust_core.v1.models.operations import (
     SpendFilter,
     SpendSource,
 )
-from traust_engine.metrics import attribute_spend as attr
-from traust_engine.metrics import collect_spend as css
 
-from traust.cli.groups._registry import OpSpec
+from traust.cli.groups._registry import OpSpec, load_engine
 from traust.context import load_spend_core
 from traust.paths import HARNESSING_DIR
 
 # Claude Code transcripts record Anthropic API requests.
 _TRANSCRIPT_PROVIDER = ProviderName("anthropic")
+
+
+def _transcript_readers() -> tuple[ModuleType, ModuleType]:
+    """traust-engine's ``attribute_spend`` and ``collect_spend`` (wave 2 lane (c))."""
+    from traust_engine.metrics import attribute_spend, collect_spend
+
+    return attribute_spend, collect_spend
 
 
 def add_history_args(ap) -> None:
@@ -36,8 +42,8 @@ def add_history_args(ap) -> None:
     ap.add_argument("--note", default="")
 
 
-def call_history(engine, args) -> int:
-    metrics = engine.metrics
+def call_history(args) -> int:
+    metrics = load_engine(args.config_home).metrics  # wave 2 lane (c)
     if args.cmd == "verify":
         ok, issues = metrics.verify()
         for i in issues:
@@ -90,7 +96,8 @@ def add_spend_args(ap) -> None:
     )
 
 
-def call_spend(engine, args) -> int:
+def call_spend(args) -> int:
+    engine = load_engine(args.config_home)  # wave 2 lane (c)
     print(
         "note: session actuals and skill attribution are recorded in traust-core now "
         "(`metrics collect-spend --append`); this dashboard reads only the metrics ledger "
@@ -123,8 +130,9 @@ def add_collect_spend_args(ap) -> None:
     )
 
 
-def call_collect_spend(engine, args) -> int:
-    metrics = engine.metrics
+def call_collect_spend(args) -> int:
+    attr, css = _transcript_readers()
+    metrics = load_engine(args.config_home).metrics  # wave 2 lane (c)
     ws = args.workspace or metrics.workspace()
     dirs = metrics.session_project_dirs(ws)
     if not dirs:
@@ -190,7 +198,7 @@ def add_attribute_spend_args(ap) -> None:
     ap.add_argument("--json", action="store_true")
 
 
-def call_attribute_spend(engine, args) -> int:
+def call_attribute_spend(args) -> int:
     month = args.month
     if not month and not args.date:
         month = datetime.date.today().strftime("%Y-%m")
@@ -198,7 +206,8 @@ def call_attribute_spend(engine, args) -> int:
     if args.reconcile:
         return _reconcile(args, month)
 
-    metrics = engine.metrics
+    _, css = _transcript_readers()
+    metrics = load_engine(args.config_home).metrics  # wave 2 lane (c)
     ws = args.workspace or metrics.workspace()
     dirs = css.workspace_slugs(ws)
     if not dirs:
@@ -227,6 +236,7 @@ def call_attribute_spend(engine, args) -> int:
 def session_usages(dirs: list[Path], skills: set[str]) -> Iterator[ModelUsage]:
     """Each transcript request's usage with the skill running then (traust-engine's skill
     signals, walked in session order); usage before any signal has no skill."""
+    attr, _ = _transcript_readers()
     for d in dirs:
         for f in sorted(d.glob("*.jsonl")):
             skill = None

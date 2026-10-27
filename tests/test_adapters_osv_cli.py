@@ -32,7 +32,7 @@ def test_complete_scan_writes_candidates(tmp_path, monkeypatch):
 
     monkeypatch.setattr(osv_mod, "scan_api", lambda repo, client, resolver=None: _body("complete"))
     out = tmp_path / "o.json"
-    assert adapters.call_osv(None, _args(tmp_path, out)) == 0
+    assert adapters.call_osv(_args(tmp_path, out)) == 0
     doc = json.loads(out.read_text())
     assert doc["metadata"]["artifact"] == "osv-dependency-candidates"
     assert doc["metadata"]["source"] == "osv-api"
@@ -50,13 +50,13 @@ def test_degraded_scan_exits_3_and_warns(tmp_path, monkeypatch, capsys):
         ),
     )
     out = tmp_path / "o.json"
-    assert adapters.call_osv(None, _args(tmp_path, out)) == 3
+    assert adapters.call_osv(_args(tmp_path, out)) == 3
     assert json.loads(out.read_text())["metadata"]["status"] == "degraded"
     assert "NOT clean" in capsys.readouterr().err
 
 
 def test_not_a_directory(tmp_path):
-    assert adapters.call_osv(None, _args(tmp_path / "missing", tmp_path / "o.json")) == 2
+    assert adapters.call_osv(_args(tmp_path / "missing", tmp_path / "o.json")) == 2
 
 
 def test_partial_transitive_coverage_is_noted(tmp_path, monkeypatch, capsys):
@@ -71,7 +71,7 @@ def test_partial_transitive_coverage_is_noted(tmp_path, monkeypatch, capsys):
             unresolved_manifests=[{"path": "pom.xml", "ecosystem": "Maven", "declarations": 3}],
         ),
     )
-    assert adapters.call_osv(None, _args(tmp_path, tmp_path / "o.json")) == 0
+    assert adapters.call_osv(_args(tmp_path, tmp_path / "o.json")) == 0
     assert "without a lockfile are still unresolved" in capsys.readouterr().err
 
 
@@ -92,7 +92,7 @@ def test_an_unusable_api_is_an_error_exit_2(tmp_path, monkeypatch, capsys):
         },
     )
     out = tmp_path / "o.json"
-    assert adapters.call_osv(None, _args(tmp_path, out)) == 2
+    assert adapters.call_osv(_args(tmp_path, out)) == 2
     assert json.loads(out.read_text())["metadata"]["status"] == "failed"
     err = capsys.readouterr().err
     assert "ERROR: OSV lookup failed at https://osv.test/v1 (unreachable)" in err
@@ -111,7 +111,7 @@ def test_the_api_is_the_default_access(tmp_path, monkeypatch):
     _access(monkeypatch, "api")
     monkeypatch.setattr(osv_mod, "scan_api", lambda repo, client, resolver=None: _body("complete"))
     out = tmp_path / "o.json"
-    assert adapters.call_osv(None, _args(tmp_path, out, source=None)) == 0
+    assert adapters.call_osv(_args(tmp_path, out, source=None)) == 0
     assert json.loads(out.read_text())["metadata"]["source"] == "osv-api"
 
 
@@ -130,7 +130,7 @@ def test_air_gapped_access_runs_osv_scanner_offline(tmp_path, monkeypatch):
         osv_mod, "scan_api", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no API"))
     )
     out = tmp_path / "o.json"
-    assert adapters.call_osv(None, _args(tmp_path, out, source=None)) == 0
+    assert adapters.call_osv(_args(tmp_path, out, source=None)) == 0
     assert seen["freeze"] is True  # --offline: never phones home
     assert json.loads(out.read_text())["metadata"]["source"] == "osv-scanner"
 
@@ -145,7 +145,7 @@ def test_air_gapped_without_osv_scanner_is_an_error_exit_2(tmp_path, monkeypatch
 
     monkeypatch.setattr(osv_mod, "run_scanner", missing)
     out = tmp_path / "o.json"
-    assert adapters.call_osv(None, _args(tmp_path, out, source=None)) == 2
+    assert adapters.call_osv(_args(tmp_path, out, source=None)) == 2
     assert json.loads(out.read_text())["metadata"]["status"] == "failed"
     assert "the harness installs neither" in capsys.readouterr().err
 
@@ -184,7 +184,7 @@ def test_air_gapped_with_no_offline_database_is_an_error_not_clean(tmp_path, mon
         ),
     )
     out = tmp_path / "o.json"
-    assert adapters.call_osv(None, _args(tmp_path, out, source=None)) == 2
+    assert adapters.call_osv(_args(tmp_path, out, source=None)) == 2
     meta = json.loads(out.read_text())["metadata"]
     assert meta["status"] == "failed"
     assert "no offline version of the OSV database" in meta["failure"]["detail"]
@@ -271,10 +271,7 @@ def test_sbom_scan_marks_grype_duplicates(tmp_path, monkeypatch, capsys):
         )
     )
     out = tmp_path / "o.json"
-    assert (
-        adapters.call_osv(None, _args(None, out, source=None, sbom=_sbom(tmp_path), grype=grype))
-        == 0
-    )
+    assert adapters.call_osv(_args(None, out, source=None, sbom=_sbom(tmp_path), grype=grype)) == 0
     doc = json.loads(out.read_text())
     assert doc["metadata"]["sbom"].endswith("img.syft.json")
     assert doc["metadata"]["skipped_os_installed"] == 1
@@ -290,7 +287,7 @@ def test_sbom_scan_marks_grype_duplicates(tmp_path, monkeypatch, capsys):
 def test_a_cyclonedx_sbom_is_refused_exit_2(tmp_path, capsys):
     cdx = tmp_path / "img.cdx.json"
     cdx.write_text(json.dumps({"bomFormat": "CycloneDX", "components": []}))
-    assert adapters.call_osv(None, _args(None, tmp_path / "o.json", sbom=cdx)) == 2
+    assert adapters.call_osv(_args(None, tmp_path / "o.json", sbom=cdx)) == 2
     assert "syft JSON" in capsys.readouterr().err
 
 
@@ -308,7 +305,7 @@ def test_air_gapped_sbom_scan_runs_osv_scanner_on_the_filtered_packages(tmp_path
 
     monkeypatch.setattr(osv_sbom, "run_offline", fake_offline)
     out = tmp_path / "o.json"
-    assert adapters.call_osv(None, _args(None, out, source=None, sbom=_sbom(tmp_path))) == 0
+    assert adapters.call_osv(_args(None, out, source=None, sbom=_sbom(tmp_path))) == 0
     assert seen["purls"] == ["pkg:pypi/requests@2.19.0"]  # never the RPM-installed urllib3
     meta = json.loads(out.read_text())["metadata"]
     assert meta["source"] == "osv-scanner"
@@ -330,15 +327,12 @@ def test_air_gapped_sbom_scan_without_a_database_fails(tmp_path, monkeypatch):
         ),
     )
     out = tmp_path / "o.json"
-    assert adapters.call_osv(None, _args(None, out, source=None, sbom=_sbom(tmp_path))) == 2
+    assert adapters.call_osv(_args(None, out, source=None, sbom=_sbom(tmp_path))) == 2
     assert json.loads(out.read_text())["metadata"]["status"] == "failed"
 
 
 def test_grype_without_sbom_is_a_usage_error(tmp_path):
-    assert (
-        adapters.call_osv(None, _args(tmp_path, tmp_path / "o.json", grype=tmp_path / "g.json"))
-        == 2
-    )
+    assert adapters.call_osv(_args(tmp_path, tmp_path / "o.json", grype=tmp_path / "g.json")) == 2
 
 
 def _deps_dev(monkeypatch, settings):
@@ -351,19 +345,19 @@ def test_deps_dev_is_on_by_default(monkeypatch):
     from traust_engine.depsdev import DepsDevClient
 
     _deps_dev(monkeypatch, ("https://api.deps.dev/v3/systems/{ident}", "api"))
-    r = adapters._deps_dev_resolver(None, SimpleNamespace(timeout=5))
+    r = adapters._deps_dev_resolver(SimpleNamespace(timeout=5))
     assert isinstance(r, DepsDevClient)
     assert r.base_url == "https://api.deps.dev/v3"
 
 
 def test_deps_dev_opt_out(monkeypatch):
     _deps_dev(monkeypatch, ("https://api.deps.dev/v3/systems/{ident}", "disabled"))
-    assert adapters._deps_dev_resolver(None, SimpleNamespace(timeout=5)) is None
+    assert adapters._deps_dev_resolver(SimpleNamespace(timeout=5)) is None
 
 
 def test_a_config_without_deps_dev_says_so(monkeypatch, capsys):
     _deps_dev(monkeypatch, None)
-    assert adapters._deps_dev_resolver(None, SimpleNamespace(timeout=5)) is None
+    assert adapters._deps_dev_resolver(SimpleNamespace(timeout=5)) is None
     assert "no deps_dev source" in capsys.readouterr().err
 
 
@@ -393,7 +387,7 @@ def test_resolution_is_reported(tmp_path, monkeypatch, capsys):
 
     _deps_dev(monkeypatch, ("https://api.deps.dev/v3/systems/{ident}", "api"))
     monkeypatch.setattr(osv_mod, "scan_api", fake_scan)
-    assert adapters.call_osv(None, _args(tmp_path, tmp_path / "o.json")) == 0
+    assert adapters.call_osv(_args(tmp_path, tmp_path / "o.json")) == 0
     assert seen["resolver"] is not None
     err = capsys.readouterr().err
     assert "deps.dev resolved 3 manifest(s)" in err

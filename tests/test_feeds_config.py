@@ -103,7 +103,7 @@ def test_max_age_prefers_explicit_then_cadence_then_default():
 def test_cache_dir_honours_configured_location(tmp_path, monkeypatch):
     import yaml
 
-    from traust.context import load_engine
+    from traust.context import load
 
     home = tmp_path / "cfg"
     home.mkdir()
@@ -120,14 +120,14 @@ def test_cache_dir_honours_configured_location(tmp_path, monkeypatch):
     monkeypatch.setenv("TRAUST_CONFIG_HOME", str(home))
     monkeypatch.delenv("FEEDS_CACHE_DIR", raising=False)
 
-    assert fc.feeds_cache_dir(engine=load_engine()) == tmp_path / "elsewhere"
+    assert fc.feeds_cache_dir(core=load()) == tmp_path / "elsewhere"
 
 
 def test_cache_dir_never_lands_inside_the_harness_checkout(monkeypatch, tmp_path):
     """When workspace is the harness checkout, cache uses progress_tracker."""
     import yaml
 
-    from traust.context import load_engine, progress_tracker_dir
+    from traust.context import load, progress_tracker_dir
     from traust.paths import HARNESS_ROOT
 
     tracker = tmp_path / "progress-tracker"
@@ -151,10 +151,10 @@ def test_cache_dir_never_lands_inside_the_harness_checkout(monkeypatch, tmp_path
     monkeypatch.setenv("TRAUST_CONFIG_HOME", str(home))
     monkeypatch.delenv("FEEDS_CACHE_DIR", raising=False)
     monkeypatch.chdir(HARNESS_ROOT)
-    engine = load_engine()
-    got = fc.feeds_cache_dir(engine=engine)
+    core = load()
+    got = fc.feeds_cache_dir(core=core)
     assert HARNESS_ROOT not in got.parents and got != HARNESS_ROOT
-    assert got == progress_tracker_dir(engine) / "feeds"
+    assert got == progress_tracker_dir(core) / "feeds"
 
 
 def test_cache_dir_is_not_under_analysis_results(monkeypatch, tmp_path):
@@ -162,7 +162,7 @@ def test_cache_dir_is_not_under_analysis_results(monkeypatch, tmp_path):
     data with opposite retention and redistribution properties."""
     import yaml
 
-    from traust.context import load_engine
+    from traust.context import load
 
     home = tmp_path / "cfg"
     home.mkdir()
@@ -184,4 +184,4 @@ def test_cache_dir_is_not_under_analysis_results(monkeypatch, tmp_path):
             shutil.copy2(name, home / name.name)
     monkeypatch.setenv("TRAUST_CONFIG_HOME", str(home))
     monkeypatch.delenv("FEEDS_CACHE_DIR", raising=False)
-    assert "analysis-results" not in str(fc.feeds_cache_dir(engine=load_engine()))
+    assert "analysis-results" not in str(fc.feeds_cache_dir(core=load()))

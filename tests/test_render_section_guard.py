@@ -12,6 +12,9 @@ import json
 from argparse import Namespace
 from pathlib import Path
 
+import pytest
+
+from traust.cli.groups import reporting
 from traust.cli.groups.reporting import call_render, lost_sections
 
 FULL = {
@@ -63,7 +66,10 @@ def _render(tmp_path: Path, document: dict, existing: str | None, allow: bool = 
     out = tmp_path / "repo-threat-model.md"
     if existing is not None:
         out.write_text(existing)
-    rc = call_render(_Engine, Namespace(report=src, out=out, allow_section_loss=allow))
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(reporting, "load_engine", lambda home: _Engine)
+        args = Namespace(config_home=None, report=src, out=out, allow_section_loss=allow)
+        rc = call_render(args)
     return rc, out.read_text()
 
 
