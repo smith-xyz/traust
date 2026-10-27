@@ -11,7 +11,7 @@
 # checks in batch drivers first (Layer 1), hard enforcement on the
 # central agentic platform (Layer 4) where users cannot edit the
 # policy. Numbers below are PLACEHOLDERS — anchor yours to observed
-# session actuals (metrics ledger source model-spend:sessions) after the
+# session actuals (traust-core spend, `dashboard view spend`) after the
 # first calibrated batch.
 #
 # Companion pieces:
