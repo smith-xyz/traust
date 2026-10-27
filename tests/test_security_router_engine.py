@@ -23,7 +23,7 @@ from traust_core.v1.context.context import Services
 from traust_core.v1.models.artifacts import AdapterResultArtifact
 from traust_core.v1.models.assessment import Assessment, AssessmentKind
 from traust_core.v1.models.common import every_item
-from traust_core.v1.models.identity import Principal
+from traust_core.v1.models.identity import IdentitySource, Principal
 from traust_core.v1.models.inventory import (
     ProductSlug,
     ReleaseCommit,
@@ -56,7 +56,9 @@ PACK = Path(__file__).resolve().parents[1] / "packs" / "security" / "assets.yaml
 T0 = datetime(2026, 10, 1, 6, tzinfo=UTC)
 PINNED = "a" * 40
 WORKER = WorkerId("runner-1")
-OPERATOR = Principal(identity="op@example.com", kind=ActorKind.HUMAN, display="op")
+OPERATOR = Principal(
+    identity="op@example.com", kind=ActorKind.HUMAN, display="op", verified_by=IdentitySource.OIDC
+)
 
 
 class Clock:
