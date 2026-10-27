@@ -295,9 +295,8 @@ through the callers' report → ledger flow.
 ### From pqc-readiness
 
 `pqc-readiness` loads this skill for governance tracing. PQC-specific tables
-and assessment logic live in `pqc-readiness/`. pqc-readiness probes with
-python3 -m traust.cli adapters crypto-probe until its port; this skill with
-python3 -m traust.cli adapters crypto-source.
+and assessment logic live in `pqc-readiness/`. pqc-readiness and this skill
+probe with python3 -m traust.cli adapters crypto-source.
 
 ### From secure-code-audit
 

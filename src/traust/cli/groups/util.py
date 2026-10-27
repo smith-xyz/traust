@@ -1,16 +1,27 @@
-"""``traust util …`` — engine util wrappers (redact, elf, safe-exec)."""
+"""``traust util …`` — redact, elf, safe-exec."""
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
-import re
 import shlex
 import sys
 from pathlib import Path
 
-from traust.cli.groups._registry import OpSpec, load_engine
+from traust_core.v1.context.tool_reports import elf_report
+from traust_core.v1.errors import ConfigError
+
+from traust.cli.groups._registry import OpSpec
 from traust.context import load
+
+# SAFE_EXEC_DISABLED=<reason> runs a command unvetted, never silently: a stderr shout and a line
+# in this per-user 0700 log.
+BYPASS_LOG = (
+    Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+    / "traust-engine"
+    / "safe-exec-bypass.log"
+)
 
 
 def add_redact_args(ap) -> None:
@@ -89,37 +100,14 @@ def add_elf_args(ap) -> None:
 
 
 def call_elf(args) -> int:
-    from traust_engine._util import elf as elf_util  # wave 2 lane (b)
-
     path = args.binary.resolve()
     if not path.is_file():
         print(f"not a file: {path}", file=sys.stderr)
         return 2
-    analyzer = elf_util.ElfAnalyzer(path)
-    meta = analyzer.metadata()
-    if meta is None:
+    out = elf_report(path, args.symbol, max_scan=args.max_scan_mb * 1_000_000)
+    if out is None:
         print(f"not an ELF binary: {path}", file=sys.stderr)
         return 1
-    out: dict = {
-        "path": str(path),
-        "metadata": {
-            "arch": meta.arch,
-            "elf_class": meta.elf_class,
-            "endian": meta.endian,
-        },
-        "linked_libraries": [lib.name for lib in analyzer.linked_libraries()],
-    }
-    if args.symbol:
-        patterns = [
-            (name, re.compile(name.encode("ascii", errors="ignore"))) for name in args.symbol
-        ]
-        matches = analyzer.scan_strings(
-            patterns,
-            max_scan=args.max_scan_mb * 1_000_000,
-        )
-        out["string_matches"] = [
-            {"pattern_id": m.pattern_id, "matched": m.matched, "offset": m.offset} for m in matches
-        ]
     print(json.dumps(out, indent=2))
     return 0
 
@@ -146,17 +134,20 @@ def add_safe_exec_args(ap) -> None:
 
 
 def call_safe_exec(args) -> int:
-    # wave 2 lane (b)
-    from traust_engine._util import safe_exec
-
-    profile_map = load_engine(args.config_home).adapters.safe_exec_profile_map()
-    if args.safe_exec_mode == "list-profiles":
-        for name, profile in sorted(profile_map.items()):
-            print(
-                f"{name:18s} allow={sorted(profile.allow)} "
-                f"pipelines={profile.allow_pipelines} — {profile.description}"
-            )
-        return 0
+    core = load(args.config_home)
+    try:
+        safe_exec = core.safe_exec
+        if args.safe_exec_mode == "list-profiles":
+            for name, profile in sorted(safe_exec.profiles.items()):
+                print(
+                    f"{name:18s} allow={sorted(profile.allow)} "
+                    f"pipelines={profile.allow_pipelines} — {profile.description}"
+                )
+            return 0
+        profile = safe_exec.profile(args.profile)
+    except ConfigError as e:
+        print(f"config not resolvable: {e}", file=sys.stderr)
+        return 2
 
     mode = os.environ.get("SAFE_EXEC_MODE", "enforce").lower()
     if args.string is not None and args.cmd:
@@ -164,13 +155,9 @@ def call_safe_exec(args) -> int:
         return 2
     cmd = args.string if args.string is not None else args.cmd
     if isinstance(cmd, str):
-        verdict = safe_exec.vet_command_string(
-            cmd, safe_exec.get_profile(args.profile, profile_map=profile_map)
-        )
+        verdict = safe_exec.vet_command_string(cmd, profile)
     else:
-        verdict = safe_exec.validate_argv(
-            list(cmd), safe_exec.get_profile(args.profile, profile_map=profile_map)
-        )
+        verdict = safe_exec.validate_argv(list(cmd), profile)
 
     if args.safe_exec_mode == "check":
         if verdict.ok:
@@ -184,23 +171,32 @@ def call_safe_exec(args) -> int:
 
     if not verdict.ok and mode == "warn":
         print(f"WARN (would block, running anyway — warn mode): {verdict.reason}", file=sys.stderr)
-        segs = verdict.segments or (
-            [tuple(shlex.split(cmd))] if isinstance(cmd, str) else [tuple(cmd)]
-        )
-        profile = safe_exec.get_profile(args.profile, profile_map=profile_map)
-        rc, out, err = safe_exec.run_segments(segs, profile, timeout=args.timeout, cwd=args.cwd)
-    else:
-        rc, out, err = safe_exec.run(
-            cmd,
-            args.profile,
-            timeout=args.timeout,
-            cwd=args.cwd,
-            honor_bypass=True,
-            profile_map=profile_map,
-        )
+    elif bypass := os.environ.get("SAFE_EXEC_DISABLED", "").strip():
+        _log_bypass(cmd, args.profile, bypass)
+    elif not verdict.ok:
+        sys.stderr.write(f"[safe_exec blocked: {verdict.reason}]")
+        return 126
+    segments = verdict.segments or (
+        [tuple(shlex.split(cmd))] if isinstance(cmd, str) else [tuple(cmd)]
+    )
+    rc, out, err = safe_exec.run_segments(
+        segments, profile, timeout=args.timeout, cwd=Path(args.cwd) if args.cwd else None
+    )
     sys.stdout.write(out or "")
     sys.stderr.write(err or "")
     return rc
+
+
+def _log_bypass(cmd: str | list[str], profile: str, reason: str) -> None:
+    line = f"SAFE_EXEC BYPASS profile={profile} reason={reason!r} cmd={cmd!r}"
+    print(f"*** {line}", file=sys.stderr)
+    try:
+        BYPASS_LOG.parent.mkdir(parents=True, exist_ok=True)
+        BYPASS_LOG.parent.chmod(0o700)
+        with BYPASS_LOG.open("a", encoding="utf-8") as fh:
+            fh.write(f"{datetime.datetime.now().astimezone().isoformat()} {line}\n")
+    except OSError:
+        pass  # the stderr shout already happened
 
 
 SAFE_EXEC = OpSpec(
