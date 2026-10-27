@@ -50,6 +50,7 @@ allowed-tools:
   - Bash(python3 *-m traust.cli adapters config-matrix:*)
   - Bash(python3 *-m traust.cli adapters route-guards:*)
   - Bash(python3 *-m traust.cli adapters grpc-guards:*)
+  - Bash(python3 *-m traust.cli check coverage:*)
   - Bash(python3 *-m traust.cli adapters llm-app:*)
   - Bash(python3 *-m traust.cli adapters sanitizers:*)
   - Bash(python3 *-m traust.cli adapters priv-profile:*)
@@ -1080,6 +1081,36 @@ Judging protocol — bounded, and every verdict is judged, never bulk-set:
    override combinations by hand; if a specific combination looks
    load-bearing, file the base-default finding and name the combination
    in its description.
+
+#### Coverage check before the review (traust check coverage)
+
+When a local checkout exists, and before the review spends model time,
+compare the repository's entry points with what the pre-scans enumerate:
+
+```bash
+python3 -m traust.cli check coverage <local-path> --repo-url <url> --sha <sha> --out /tmp/<repo>-coverage.json
+```
+
+traust-core runs the route×guard, gRPC, LLM-app and config pre-scans and
+reports every entry point as `covered`, `uncovered` or `unexplained`:
+- each section 3 entry point of the latest threat model, matched by its
+  `kind` to the pre-scan for that kind (`unexplained` when it has no kind);
+- each family the pre-scans enumerated, and each framework they detected
+  but couldn't enumerate.
+
+The check runs in **observe mode**: it never stops or reroutes the audit.
+- **Record** `"coverage": "ran: <covered> covered, <uncovered> uncovered,
+  <unexplained> unexplained"` in `metadata.additional.deterministic_steps`.
+- **Copy each `uncovered` entry** into `metadata.additional.coverage_gaps`
+  as `{"tool": "coverage", "system": "<entry_point>", "reason": "<reason>"}`.
+  The review covers those entry points by hand.
+- **When `would_route` is set,** record it as
+  `metadata.additional.coverage_check` (`lane` and `reasons`). Under the
+  pack's policy the repository would go to coverage repair (a missing
+  enumerator or rule) instead of this audit; in observe mode the audit
+  continues.
+- **Unexplained entry points** mean the threat model predates entry-point
+  kinds. Report the count; they aren't gaps.
 
 #### Deterministic route×guard pre-scan (traust adapters route-guards)
 
