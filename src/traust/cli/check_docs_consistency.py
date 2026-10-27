@@ -1176,7 +1176,7 @@ def docs_estate_marker_failures(repo: Path = REPO) -> list[str]:
 
 # --- single rule pack ---------------------------------------------------------
 # The opengrep rule pack and the gitleaks config ship in the security pack
-# (packs/security/), and every default run loads that copy. A second copy
+# (packs/security/detection/), and every default run loads that copy. A second copy
 # elsewhere in this repo is where rule work silently goes stale:
 # rule pack v1.8 sat in a harness copy that no default run read. Fail on a
 # rule-pack directory in the tree, or on a skill/doc that points at one.
@@ -1185,7 +1185,7 @@ _OLD_PACK_REF = re.compile(r"harnessing/3-audit/secure-code-audit/(?:opengrep|gi
 _PACK_SCAN_SKIP = {".git", ".venv", "node_modules", "__pycache__", "fixtures", ".claude", ".crush"}
 # the gate and its own tests name the old path on purpose
 _PACK_SCAN_EXEMPT = {"src/traust/cli/check_docs_consistency.py", "tests/test_docs_consistency.py"}
-_PACK_HOME = Path("packs/security")
+_PACK_HOME = Path("packs/security/detection")
 
 
 def rule_pack_copy_failures(repo: Path = REPO) -> list[str]:
@@ -1197,7 +1197,7 @@ def rule_pack_copy_failures(repo: Path = REPO) -> list[str]:
         if path.is_dir() and path.name in _RULE_PACK_DIRS and rel.parent != _PACK_HOME:
             failures.append(
                 f"{rel.as_posix()}: a rule-pack copy in this repo — rules live only in "
-                "the security pack (packs/security/)"
+                "the security pack (packs/security/detection/)"
             )
         elif path.is_file() and path.suffix in (".md", ".py", ".yaml", ".yml", ".toml"):
             if path.name == "CHANGELOG.md" or rel.as_posix() in _PACK_SCAN_EXEMPT:
@@ -1209,14 +1209,14 @@ def rule_pack_copy_failures(repo: Path = REPO) -> list[str]:
             if _OLD_PACK_REF.search(text):
                 failures.append(
                     f"{rel.as_posix()}: points at a removed rule-pack copy — reference "
-                    "packs/security/ instead"
+                    "packs/security/detection/ instead"
                 )
     return failures
 
 
 CHECKS = [
     ("unresolved conflict markers", conflict_marker_failures),
-    ("single rule pack (rules live only in packs/security/)", rule_pack_copy_failures),
+    ("single rule pack (rules live only in packs/security/detection/)", rule_pack_copy_failures),
     ("generated skills reference (docs/skills.md matches the tree)", skills_reference_failures),
     (
         "config/ hygiene (shipped files + templates only, no estate markers)",

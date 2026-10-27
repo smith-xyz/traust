@@ -15,7 +15,7 @@ matters more than any single table cell:
 
 Each cell names the tool that provides the capability, so the table can be
 checked against the tree: the rule pack the security pack ships
-(`packs/security/opengrep-rules/`), the impact tiers in
+(`packs/security/detection/opengrep-rules/`), the impact tiers in
 traust-core (`providers/impact.py`), the fuzz templates under
 `harnessing/6-fuzz/create-fuzzing/harnesses/_templates/`, and the tool rows in
 [external-dependencies.md](external-dependencies.md).

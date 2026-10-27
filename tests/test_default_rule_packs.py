@@ -53,7 +53,7 @@ def test_default_opengrep_run_reports_a_current_rule(tmp_path):
         f["rule_id"] for f in report["facts"]
     }
     assert any(
-        "packs/security/opengrep-rules" in p
+        "packs/security/detection/opengrep-rules" in p
         for r in report["rules"]
         for p in r.get("config_paths", [])
     )

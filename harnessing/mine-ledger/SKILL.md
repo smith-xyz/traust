@@ -47,7 +47,7 @@ finding's disposition.)
 - A findings tree to mine — *retired*: `sweep mine` reads traust-core's
   recorded findings.
 - `--pack <name>` — rule pack to check coverage against (default `traust`: the
-  pack the security pack ships, `packs/security/opengrep-rules/`,
+  pack the security pack ships, `packs/security/detection/opengrep-rules/`,
   or `locations.opengrep_rules`; an enabled allowlist supplement by its name).
 - `--out <file>` — also write the whole mining (with the TP corpus) as
   JSON; the command prints it without the corpus.
@@ -128,9 +128,12 @@ python3 -m traust.cli sweep regression-drafts [--cwe CWE-494] [--limit 6]
 python3 -m traust.cli sweep verify-draft <rule-drafts>/<draft> \
     [--rule <rule-drafts>/<draft>/rule.skeleton.yaml]
 # passes (before/ fires, after/ silent)
-# 3. promote: move the rule into the pack's matching CATEGORY file
-#    in the security pack (packs/security/opengrep-rules/, the only
-#    copy) — never a regression.yaml dump — with ruleid:/ok: fixture lines,
+# 3. promote: move the rule into the matching CATEGORY file of YOUR
+#    deployment's own rule pack, in the location your config home sets
+#    (Red Hat: traust-internal/config) — never into traust's baseline pack
+#    (packs/security/detection/opengrep-rules/, the default stack every
+#    adopter starts from; adopter packs: PENDING, plan "Rule mining as an
+#    app feature"), never a regression.yaml dump — with ruleid:/ok: fixture lines,
 #    keep the regression_of metadata (fingerprint + fix commit — that is
 #    what links a future firing back to the original resolved finding),
 #    then delete the draft dir.

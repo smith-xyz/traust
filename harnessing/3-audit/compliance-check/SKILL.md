@@ -28,8 +28,8 @@ observe is a counted `not_assessed`, never a guess. Plan of record:
 
 You will not find control IDs in this file — the control↔check binding
 is **policy data**, not prompt text
-(`compliance-mapping.yaml`, shipped with traust-engine in
-`data/compliance/` beside the NIST spine, profiles and framework catalogs;
+(`compliance-mapping.yaml`, shipped with traust's security pack in
+`packs/security/compliance/` beside the NIST spine, profiles and framework catalogs;
 schema-gated; changing a mapping is a reviewed change, recorded in
 traust-core with `traust compliance policy mapping <file>`; runs use the
 newest recorded version). Org parameters
