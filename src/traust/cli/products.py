@@ -21,7 +21,7 @@ from traust_core.v1.models.values import ProductSlug
 from traust_core.v1.models.vocabulary import OwnershipClass
 
 from traust.cli._doors import parser, run
-from traust.context import load_services
+from traust.context import load
 
 OWNERSHIP = [o.value for o in OwnershipClass]
 
@@ -40,7 +40,7 @@ def list_(argv: list[str] | None = None) -> int:
     args = parser("products", "list", "Every product with its corpus ownership.").parse_args(argv)
 
     def call() -> list[dict[str, Any]]:
-        portfolio = load_services(args.config_home).portfolio
+        portfolio = load(args.config_home).services().portfolio
         doc = portfolio.corpus_registry()
         registry = CorpusRegistry() if doc is None else CorpusRegistry.of(doc)
         out, page = [], PageRequest()
@@ -64,7 +64,9 @@ def add(argv: list[str] | None = None) -> int:
 
     def call() -> dict[str, Any]:
         return _row(
-            *load_services(args.config_home).portfolio.register_corpus_product(
+            *load(args.config_home)
+            .services()
+            .portfolio.register_corpus_product(
                 ProductSlug.parse(args.name),
                 args.label,
                 OwnershipClass(args.ownership),
@@ -85,7 +87,9 @@ def update(argv: list[str] | None = None) -> int:
 
     def call() -> dict[str, Any]:
         return _row(
-            *load_services(args.config_home).portfolio.update_corpus_product(
+            *load(args.config_home)
+            .services()
+            .portfolio.update_corpus_product(
                 ProductSlug.parse(args.name),
                 label=args.label,
                 ownership=None if args.ownership is None else OwnershipClass(args.ownership),

@@ -20,7 +20,7 @@ from traust_core.v1.providers.base import Acquisition, Result
 from tests.test_triage_doors import SARIF, SHA
 from traust.cli import auth, findings, triage
 from traust.cli.__main__ import main
-from traust.context import load_core
+from traust.context import load
 
 REPO = "https://github.com/example/canary"
 
@@ -401,7 +401,7 @@ def test_stored_auth_local_records_and_applies_countersign(
     finding_id = scanned(home, tmp_path)
     assert registered(home, "auth", "local", "--identity", "alice@example.com")[0] == 0
     assert registered(home, "auth", "status")[1]["actor"] == "human:alice@example.com"
-    login = load_core(home).credentials.load()
+    login = load(home).credentials.load()
     assert login is not None
     token = login.grant.access_token.get_secret_value()
 
@@ -457,7 +457,7 @@ def test_stored_auth_local_records_and_applies_countersign(
     assert receipt["status"] == "rejected"
     assert receipt["finding"]["disposition"]["validity"] == "confirmed"
     assert registered(home, "findings", "apply", str(answer)) == (0, applied)
-    decisions = load_core(home).services().findings.history(UUID(finding_id))
+    decisions = load(home).services().findings.history(UUID(finding_id))
     assert len(decisions) == 2
     assert {d.actor for d in decisions} == {"human:alice@example.com"}
     assert {d.rationale for d in decisions} == {why, rationale}
@@ -475,7 +475,7 @@ def test_explicit_token_never_falls_back_to_the_stored_login(
 ) -> None:
     finding_id = scanned(home, tmp_path)
     registered(home, "auth", "local", "--identity", "alice@example.com")
-    core = load_core(home)
+    core = load(home)
     token = (
         core.local_issuer.mint(
             "bob@example.com", machine=explicit == "machine"
@@ -518,7 +518,7 @@ def test_stored_unauthorized_caller_cannot_countersign(
     home: Path, tmp_path: Path, state: str, operation: str
 ) -> None:
     finding_id = scanned(home, tmp_path)
-    services = load_core(home).services()
+    services = load(home).services()
     item = services.attestation.request(UUID(finding_id), None, ReviewReason.AMBIGUOUS_STATEMENT)
     if state == "machine-admin":
         (home / "core.yaml").write_text(
@@ -579,7 +579,7 @@ def test_findings_review_refusal_preserves_pending_item(
     home: Path, tmp_path: Path, capsys: Any, operation: str, boundary: str
 ) -> None:
     finding_id = scanned(home, tmp_path)
-    services = load_core(home).services()
+    services = load(home).services()
     item = services.attestation.request(UUID(finding_id), None, ReviewReason.AMBIGUOUS_STATEMENT)
     flags = ("--machine",) if boundary == "machine" else ()
     run(auth.local, home, "--identity", "alice@example.com", *flags)
@@ -603,7 +603,7 @@ def test_async_workbench_uses_stored_login_without_stdin(
     from tests.test_countersign_record import edit_workbench_answers
 
     finding_id = scanned(home, tmp_path)
-    services = load_core(home).services()
+    services = load(home).services()
     item = services.attestation.request(UUID(finding_id), None, ReviewReason.AMBIGUOUS_STATEMENT)
     assert registered(home, "auth", "local", "--identity", "alice@example.com")[0] == 0
 

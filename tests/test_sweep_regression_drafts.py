@@ -67,7 +67,7 @@ def quality(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         result=RegressionPairs(pairs=(PAIR,), skipped=(GAP,)),
     )
     core = SimpleNamespace(services=lambda: SimpleNamespace(detection_quality=stub))
-    monkeypatch.setattr(sweep, "load_engine_core", lambda home: core)
+    monkeypatch.setattr(sweep, "load", lambda home: core)
     return stub
 
 

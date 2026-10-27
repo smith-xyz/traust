@@ -14,7 +14,7 @@ from typing import TypeVar
 
 from traust_contracts import DeploymentConfigMissing
 from traust_contracts.config import TRAUST_CONFIG_HOME_DEFAULT, TRAUST_CONFIG_HOME_ENV
-from traust_core.v1.context import Config, Context, Locations, Services
+from traust_core.v1.context import Config, Context, Locations
 from traust_core.v1.errors import AuthenticationError, ConfigError
 from traust_core.v1.models.identity import Credential, Principal
 from traust_engine import HarnessEngine
@@ -152,17 +152,6 @@ def load(
     return core
 
 
-# Folded into load; the callers move onto it in the next PR of this stack, which deletes these.
-def load_core(config_home: Path | None = None) -> Context:
-    return load(config_home)
-
-
-def load_insight_core(
-    config_home: Path | None = None, sla_policy: Path | None = None, invoices: Path | None = None
-) -> Context:
-    return load(config_home, sla_policy=sla_policy, invoices=invoices)
-
-
 def load_spend_core(config_home: Path | None = None) -> Context:
     """``load_core`` pricing spend on ``<config home>/model-registry.yaml`` (template:
     config/model-registry.yaml); exit 2 when it is missing or invalid."""
@@ -181,18 +170,6 @@ def _register_spend(core: Context, registry: Path, invoices: Path | None) -> Non
     except ConfigError as e:
         print(f"spend not resolvable: {e}", file=sys.stderr)
         raise SystemExit(2) from e
-
-
-def load_engine_core(config_home: Path | None = None, *, canaries: str = "canaries") -> Context:
-    return load(config_home, canaries=canaries)
-
-
-def load_services(config_home: Path | None = None) -> Services:
-    return load(config_home).services()
-
-
-def load_compliance_services(config_home: Path | None = None) -> Services:
-    return load(config_home).services()
 
 
 def load_caller(core: Context) -> Principal:

@@ -27,7 +27,7 @@ from traust_core.v1.providers.syft import SyftSbom
 from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
 
 from traust.cli import check_fix_propagation, impact
-from traust.context import load_core
+from traust.context import load
 
 SHA = "a" * 40
 REPO = "https://github.com/org/app"
@@ -71,7 +71,7 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
 
     def core(config_home: Path | None) -> Any:
-        made = load_core(config_home)
+        made = load(config_home)
         made.advisories = Lookup()
         return made
 
@@ -191,7 +191,7 @@ def test_judged_symbols_and_the_feature_description_reach_the_record(
         "templates rendered from user input",
     )
     assert rc == 0
-    core = load_core(home)
+    core = load(home)
     with SqlTraustUnitOfWork(core.database) as uow:
         repo = uow.repositories.find_by_url(REPO)
         assert repo is not None and repo.id is not None

@@ -58,7 +58,7 @@ from traust.cli._doors import add_branch_arg, parser, products, register_commit,
 from traust.cli._doors import package_id as find_package_id
 from traust.cli.findings import _repository
 from traust.cli.impact import harness_version
-from traust.context import load_core, load_engine_core
+from traust.context import load
 
 
 def _parser(op: str, about: str) -> argparse.ArgumentParser:
@@ -80,7 +80,7 @@ def open_(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         repo = _repository(core, args.repo_url)
         ref = services.portfolio.register_ref(repo.id, GitSha.parse(args.sha), None, None)  # type: ignore[arg-type]
@@ -96,7 +96,7 @@ def work_items(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         repo = _repository(core, args.repo_url)
         wanted = WorkItemFilter(repository_id=repo.id, status=args.status)  # type: ignore[arg-type]
         found = every_item(lambda p: core.services().remediation.list(wanted, p))
@@ -111,7 +111,7 @@ def fork(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         repo = _repository(core, args.repo_url)
         found = core.services().remediation.resolve_fork(repo.id)  # type: ignore[arg-type]
         return {**found.model_dump(mode="json"), "url": str(found.url)}
@@ -126,7 +126,7 @@ def progress(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict:
-        remediation = load_core(args.config_home).services().remediation
+        remediation = load(args.config_home).services().remediation
         moved = remediation.record_progress(args.work_item_id, RemediationStatus(args.status))
         return moved.model_dump(mode="json")
 
@@ -194,7 +194,7 @@ def assemble(argv: list[str] | None = None) -> int:
             checks = [Check.model_validate(c) for c in _items(args.checks)]
         except (json.JSONDecodeError, pydantic.ValidationError) as e:
             raise ValidationError(f"assemble {args.work_item_id}: {e}") from e
-        remediation = load_core(args.config_home).services().remediation
+        remediation = load(args.config_home).services().remediation
         draft = remediation.assemble(args.work_item_id, args.worktree, narrative, checks)
         diff = args.out.parent / draft.report.patch.diff_path
         args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -211,7 +211,7 @@ def candidates(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list:
-        services = load_core(args.config_home).services()
+        services = load(args.config_home).services()
         (product,) = products(services, [args.product])
         found = services.remediation.candidates(product.id)
         return [c.model_dump(mode="json") for c in found]
@@ -258,7 +258,7 @@ def record(argv: list[str] | None = None) -> int:
         doc = RemediationArtifact.parse(args.report.read_bytes())
         when = datetime.now(UTC)
         made = (
-            load_core(args.config_home)
+            load(args.config_home)
             .services()
             .remediation.record(
                 doc,
@@ -289,7 +289,7 @@ def fleet_record(argv: list[str] | None = None) -> int:
         doc = FleetFixArtifact.parse(json.dumps(raw, default=str).encode())
         when = datetime.now(UTC)
         made = (
-            load_engine_core(args.config_home)
+            load(args.config_home)
             .services()
             .remediation.record(
                 doc,
@@ -310,7 +310,7 @@ def fleet_apply(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str | None:
-        core = load_engine_core(args.config_home)
+        core = load(args.config_home)
         repo = _repository(core, args.repo_url)
         found = core.services().remediation.apply_fleet_fix(args.fleet_fix_id, repo.id, args.order)  # type: ignore[arg-type]
         return _emit(found.model_dump_json(indent=2), args.out)
@@ -332,7 +332,7 @@ def fleet_targets(argv: list[str] | None = None) -> int:
         ap.error("--module and --ecosystem go together")
 
     def call() -> str | None:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         package_id = args.package_id
         if args.module is not None:
@@ -351,7 +351,7 @@ def next_(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict | str:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         repo = _repository(core, args.repo_url)
         item = core.services().remediation.next_pending(WorkItemFilter(repository_id=repo.id))  # type: ignore[arg-type]
         return "null" if item is None else item.model_dump(mode="json")
@@ -366,7 +366,7 @@ def prepare(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str | None:
-        prepared = load_core(args.config_home).services().remediation.prepare(args.work_item_id)
+        prepared = load(args.config_home).services().remediation.prepare(args.work_item_id)
         return _emit(prepared.model_dump_json(indent=2), args.out)
 
     return run(call)
@@ -380,7 +380,7 @@ def verify_sweep(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str | None:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         repos: dict[uuid.UUID, Repository] = {
             r.id: r  # type: ignore[misc]
@@ -417,7 +417,7 @@ def verify_prepare(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str | None:
-        prepared = load_core(args.config_home).services().verification.prepare(args.work_item_id)
+        prepared = load(args.config_home).services().verification.prepare(args.work_item_id)
         return _emit(prepared.model_dump_json(indent=2), args.out)
 
     return run(call)
@@ -441,7 +441,7 @@ def verify_differential(argv: list[str] | None = None) -> int:
         ap.error("give a work item, or --finding and --base-sha instead of one")
 
     def call() -> dict:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         repo = _repository(core, args.repo_url)
         ref = register_commit(services, repo.id, args.sha, args.branch)  # type: ignore[arg-type]
@@ -464,7 +464,7 @@ def verify_record(argv: list[str] | None = None) -> int:
         doc = VerificationArtifact.parse(args.report.read_bytes())
         when = datetime.now(UTC)
         made = (
-            load_core(args.config_home)
+            load(args.config_home)
             .services()
             .verification.record(
                 doc,
@@ -485,7 +485,7 @@ def verifications(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         repo = _repository(core, args.repo_url)
         wanted = VerificationFilter(repository_id=repo.id, work_item_id=args.work_item)  # type: ignore[arg-type]
         found = every_item(lambda p: core.services().verification.list(wanted, p))

@@ -17,7 +17,7 @@ from traust_core.v1.models.common import ToolRequest
 from traust_core.v1.models.detection_quality import CardDeck
 
 from traust.cli._doors import parser, run
-from traust.context import load_services
+from traust.context import load
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -46,8 +46,8 @@ def main(argv: list[str] | None = None) -> int:
         }
         if args.checkout is not None:
             request = ToolRequest(workspace=args.checkout.resolve())
-            sweep = load_services(args.config_home).detection_quality.sweep_cards(
-                deck.cards, request
+            sweep = (
+                load(args.config_home).services().detection_quality.sweep_cards(deck.cards, request)
             )
             result |= sweep.model_dump(mode="json")
         if args.out is None:

@@ -14,7 +14,7 @@ from traust_core.v1.errors import ConfigError, ValidationError
 from traust_core.v1.models.common import SymbolQuery, ToolRequest
 
 from traust.cli._doors import parser, run
-from traust.context import load_engine_core
+from traust.context import load
 
 TOOL = "tool"  # core's CapabilityKind.TOOL (a StrEnum; its module is core-internal to traust)
 
@@ -25,7 +25,7 @@ def list_(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list[dict]:
-        catalog = load_engine_core(args.config_home).services().catalog
+        catalog = load(args.config_home).services().catalog
         databases = {db.tool: db.model_dump(mode="json") for db in catalog.databases()}
         return [
             {
@@ -57,7 +57,7 @@ def run_(argv: list[str] | None = None) -> int:
 
     def call() -> dict:
         request = _request(args)
-        tool = load_engine_core(args.config_home).tools.get(args.name)
+        tool = load(args.config_home).tools.get(args.name)
         if not (readiness := tool.check()).ready:
             raise ConfigError(f"tool {args.name} not ready: {readiness.detail}")
         result = tool.acquire(request)

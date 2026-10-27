@@ -27,7 +27,7 @@ from traust_core.v1.services.below_range import BelowRangeService
 from tests.test_impact_below_range import PACKET
 from tests.test_impact_doors import REPO, home, run
 from traust.cli import impact
-from traust.context import load_core
+from traust.context import load
 from traust.ops.materializers import BelowRangePacketsMaterializer
 
 __all__ = ["home"]
@@ -140,7 +140,7 @@ def test_the_materializer_refuses_what_it_cannot_scan(
 
 
 def _register(home: Path) -> UUID:
-    core = load_core(home)
+    core = load(home)
     repo = core.services().portfolio.register_repository(HttpsRepoUrl.parse(REPO, HOSTS), False)
     assert repo.id is not None
     return repo.id

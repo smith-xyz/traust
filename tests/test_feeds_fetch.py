@@ -21,7 +21,7 @@ from traust_core.v1.providers.http import HttpFetcher
 from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
 
 from traust.cli import feeds_fetch
-from traust.context import load_core
+from traust.context import load
 from traust.registry.feeds_config import registry_path
 
 FIXTURES = Path(__file__).parent / "fixtures" / "feeds"
@@ -71,7 +71,7 @@ def fetch(home: Path, *argv: str) -> tuple[int, dict[str, Any]]:
 
 
 def payload(home: Path, feed: str) -> bytes | None:
-    core = load_core(home)
+    core = load(home)
     core.register_feeds(registry_path())
     return core.services().exposure.feed_payload(FeedName(feed))
 
@@ -130,7 +130,7 @@ def test_an_unknown_feed_is_a_bad_request(home: Path, hosts: dict) -> None:
 
 
 def test_a_run_for_an_order_links_its_snapshots_to_it(home: Path, hosts: dict) -> None:
-    core = load_core(home)
+    core = load(home)
     with SqlTraustUnitOfWork(core.database) as uow:
         order = uow.run_orders.add(
             RunOrder(asset="feeds_cache", state=OrderState.QUEUED, priority=10, requested_by="t")

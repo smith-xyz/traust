@@ -14,7 +14,7 @@ from traust_core.v1.models.insight import ViewFilter, ViewName
 
 from traust.cli import _doors
 from traust.cli._doors import parser, run, when
-from traust.context import load_engine_core, load_insight_core
+from traust.context import load
 from traust.ops.materializers import write_view
 from traust.registry.feeds_config import registry_path
 
@@ -63,9 +63,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _core(view: ViewName, args: Any) -> Context:
-    if view is not ViewName.FRESHNESS:
-        return load_insight_core(args.config_home, args.sla_policy, args.invoice)
-    # freshness reads the feed snapshots and the scanners' readiness, databases and versions
-    core = load_engine_core(args.config_home)
-    core.register_feeds(registry_path())
+    core = load(args.config_home, sla_policy=args.sla_policy, invoices=args.invoice)
+    if view is ViewName.FRESHNESS:
+        # freshness reads the feed snapshots. NEED(core: feeds registered lazily by name)
+        core.register_feeds(registry_path(args.config_home))
     return core

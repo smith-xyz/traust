@@ -35,7 +35,7 @@ from pathlib import Path
 
 from traust_engine import locations
 
-from traust.context import add_config_home_arg, load_engine
+from traust.context import add_config_home_arg, load
 from traust.registry.feeds_config import feeds_cache_dir
 
 USER_AGENT = "traust fetch_feeds.py"
@@ -136,7 +136,7 @@ def main(argv=None) -> int:
     if url is None:
         print(f"! {NAME}: not configured (locations.product_definitions) — UNUSABLE")
         return 1
-    cache_dir = args.cache_dir or feeds_cache_dir(engine=load_engine(args.config_home))
+    cache_dir = args.cache_dir or feeds_cache_dir(engine=load(args.config_home))
     usable, status = fetch(url, cache_dir, args.max_age_hours, offline=args.offline)
     marker = "✓" if usable and not status.startswith("STALE") else "!"
     print(f"{marker} {NAME}: {status}" + ("" if usable else " — UNUSABLE"))

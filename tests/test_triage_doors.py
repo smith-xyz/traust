@@ -15,7 +15,7 @@ import yaml
 
 from traust.cli import triage
 from traust.cli.__main__ import main
-from traust.context import load_services
+from traust.context import load
 from traust.paths import skill_dir
 
 CANARY = skill_dir("triage") / "fixtures" / "canary-target"
@@ -152,7 +152,7 @@ def test_scanner_output_triaged_and_recorded(home: Path, tmp_path: Path) -> None
     }
     assert receipt["baseline_assessment_id"] == assessment
     (native,) = receipt["records"]
-    (saved,) = load_services(home).findings.history(finding["id"])
+    (saved,) = load(home).services().findings.history(finding["id"])
     assert native == {
         "decision_id": str(saved.id),
         "assessment_id": str(saved.assessment_id),

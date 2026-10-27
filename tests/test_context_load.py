@@ -12,6 +12,7 @@ import pytest
 import yaml
 from traust_core.v1.context import Context
 
+from traust import context
 from traust.context import load
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,3 +49,10 @@ PROVIDERS: dict[str, Callable[[Context], Any]] = {
 @pytest.mark.parametrize("provider", PROVIDERS)
 def test_the_context_sees_every_registered_provider(core: Context, provider: str) -> None:
     assert PROVIDERS[provider](core)
+
+
+def test_the_context_is_the_only_loader() -> None:
+    loaders = {n for n in vars(context) if n.startswith("load")}
+    # NEED(engine facade): load_engine stays for the grouped ops; load_caller is identity;
+    # load_spend_core is load() that requires the model registry (exit 2 without it).
+    assert loaders == {"load", "load_engine", "load_caller", "load_spend_core"}

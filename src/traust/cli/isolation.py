@@ -9,7 +9,7 @@ from traust_core.v1.errors import NotFoundError
 from traust_core.v1.models.values import ProductSlug
 
 from traust.cli._doors import parser, run
-from traust.context import load_services
+from traust.context import load
 
 
 def repos(argv: list[str] | None = None) -> int:
@@ -18,7 +18,7 @@ def repos(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict:
-        portfolio = load_services(args.config_home).portfolio
+        portfolio = load(args.config_home).services().portfolio
         product = portfolio.find_product(ProductSlug(args.service))
         if product is None or product.id is None:
             raise NotFoundError(f"{args.service} is not a registered product")

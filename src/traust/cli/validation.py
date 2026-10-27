@@ -9,7 +9,7 @@ from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.validation import TargetAttestation, ValidationRecordInput
 
 from traust.cli._doors import parser, run
-from traust.context import load_services
+from traust.context import load
 
 
 def record_report(
@@ -37,7 +37,7 @@ def record_report(
         updates.update(install_failure=failure, install_failed=True)
     if updates:
         recording = ValidationRecordInput.model_validate({**recording.model_dump(), **updates})
-    result = load_services(config_home).validation.record(document, provenance, recording)
+    result = load(config_home).services().validation.record(document, provenance, recording)
     return result.model_dump(mode="json", exclude={"findings": {"__all__": {"rationale"}}})
 
 

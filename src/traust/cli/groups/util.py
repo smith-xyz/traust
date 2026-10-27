@@ -13,7 +13,7 @@ from traust_engine._util import elf as elf_util
 from traust_engine._util import safe_exec
 
 from traust.cli.groups._registry import OpSpec
-from traust.context import load_services
+from traust.context import load
 
 
 def add_redact_args(ap) -> None:
@@ -30,7 +30,7 @@ def add_redact_args(ap) -> None:
 
 
 def call_redact(_engine, args) -> int:
-    policy = load_services(args.config_home).redaction
+    policy = load(args.config_home).services().redaction
 
     def redact(text: str) -> tuple[str, list[dict]]:
         done = policy.redact(text.encode("utf-8"))
