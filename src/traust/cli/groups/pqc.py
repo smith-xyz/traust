@@ -12,4 +12,7 @@ PQC: dict[str, object] = {
     "blockers": passthrough_op(
         "pqc", "Remediations of each commit's latest readiness.", "blockers"
     ),
+    "vendor-claims": passthrough_op(
+        "pqc", "Record the next version of the curated vendor claims.", "vendor_claims"
+    ),
 }

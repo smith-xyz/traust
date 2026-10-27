@@ -1,8 +1,4 @@
 {
-  "harnessing/3-audit/pqc-readiness/scripts/build_pqc_vendor_tracker.py": {
-    "database": 1,
-    "state-file": 1
-  },
   "harnessing/3-audit/pqc-readiness/scripts/pqc_facts.py": {
     "contracts": 1
   },

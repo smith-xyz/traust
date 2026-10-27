@@ -11,14 +11,29 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from traust_core.v1.models.inventory import ExposureClass, RepoState, RiskTier
+from traust_core.v1.models.inventory import (
+    ExposureClass,
+    RecordedRelease,
+    Release,
+    ReleaseBump,
+    ReleaseChange,
+    RepoState,
+    RiskTier,
+)
 from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import ComparisonStatus
 from traust_core.v1.services.observation import PREROUTE_MIN_FILES
 from traust_core.v1.services.portfolio import PortfolioPolicy
 
 from traust.cli import build_rescan_worklist as rw
-from traust.ops.router import LANES, THREAT_MODEL_PR, SecurityRouter, decide, priority
+from traust.ops.router import (
+    LANES,
+    THREAT_MODEL_PR,
+    UNQUEUED,
+    SecurityRouter,
+    decide,
+    priority,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "routing"
 DECISIONS = json.loads((FIXTURES / "python_decisions.json").read_text(encoding="utf-8"))
@@ -226,6 +241,57 @@ def test_refusal_preroute_matches_the_legacy_router(
     assert _routes(state)[0] == (row["rule"], row["lane"])
 
 
+DEPS_ONLY = {"changed_lines": 10, "deps_only": True}  # rule 3b
+
+
+@pytest.mark.parametrize(
+    ("fields", "hits"),
+    [
+        (QUARTERLY, 2),
+        (QUARTERLY, 0),
+        (QUARTERLY, None),  # not scanned: never escalates
+        (DEPS_ONLY, 1),
+        (DEPS_ONLY, None),
+        (SENSITIVE, 3),  # rule 3 on P2: already an immediate diff scan
+        ({"changed_lines": 9000}, 5),  # rule 2: a full audit
+        ({"changed_lines": 0}, 4),
+        (QUARTERLY | {"compare_truncated": True}, 1),  # escalated, then pre-routed
+        (QUARTERLY | {"sensitive_changed": True, "sensitive_lines": 5}, 1),  # then stamped
+        (QUARTERLY | {"threat_model_files": 1}, 1),
+    ],
+)
+def test_tripwire_matches_the_legacy_router(
+    monkeypatch: pytest.MonkeyPatch, fields: dict[str, Any], hits: int | None
+) -> None:
+    monkeypatch.setattr(rw.shutil, "which", lambda _: "/bin/gitleaks")
+    state = _state(**fields, secret_hits=hits, threat_model_age_days=10)
+    rule, lane = decide(state)
+    row = {
+        "repo_key": "k",
+        "lane": lane,
+        "rule": rule.id,
+        "reason": "",
+        "C": state.changed_lines,
+        "truncated": state.compare_truncated,
+    }
+    entry = {
+        "host_kind": "github",
+        "project": "o/r",
+        "pinned_sha": "a" * 40,
+        "fp_files": 0,
+        "S": state.sensitive_changed,
+        "tm_files": state.threat_model_files,
+        "tm_path": "m.md",
+    }
+    rw.run_tripwire([row], {"k": entry}, 1, lambda p, s: "+patch", lambda _: hits, lambda: 100_000)
+    rw.run_preroute([row], {"k": entry}, 1, None, lambda: 0)
+    rw.stamp_threat_model_pr([row], {"k": entry})
+    legacy = row["rule"] + (THREAT_MODEL_PR if "threat_model_pr" in row else "")
+    (route,) = SecurityRouter().route(state, (), ())
+    assert (route.reason, route.lane) == (legacy, None if row["lane"] in UNQUEUED else row["lane"])
+    assert route.priority == priority(row["lane"], state)
+
+
 @pytest.mark.parametrize(
     ("fields", "sensitive", "tm_files", "model"),
     [
@@ -304,3 +370,40 @@ def test_additive_rows_ride_beside_a_classification_without_a_queue() -> None:
 def test_a_never_audited_repository_gets_no_calendar_backstop() -> None:
     state = _state(status=ComparisonStatus.NEVER_AUDITED, threat_model_age_days=400)
     assert _routes(state) == [("rule-1-bootstrap", "full-audit")]
+
+
+def _release(bump: ReleaseBump | None) -> RecordedRelease:
+    """A recorded release; no bump is the product's first recorded release."""
+    release = Release(id=uuid4(), product_id=uuid4(), version="4.20")
+    change = None
+    if bump is not None:
+        change = ReleaseChange(
+            release_id=release.id,  # type: ignore[arg-type]
+            previous_id=uuid4(),
+            version="4.20",
+            previous_version="4.19",
+            bump=bump,
+        )
+    return RecordedRelease(release=release, repository_ids=(uuid4(),), change=change)
+
+
+@pytest.mark.parametrize("bump", [*ReleaseBump, None])
+def test_a_release_re_models_only_on_a_major_or_minor_bump_as_the_legacy_router(
+    bump: ReleaseBump | None,
+) -> None:
+    legacy = bump is not None and str(bump) in rw.RELEASE_REMODEL_CHANGES
+    routes = [(r.reason, r.lane) for r in SecurityRouter().route(_state(), (_release(bump),), ())]
+    assert (("threat-model-2", "threat-model-review") in routes) == legacy
+    assert routes[0] == ("rule-7", None)
+
+
+def test_a_release_review_rides_beside_the_table_and_additive_rows_once() -> None:
+    state = _state(changed_lines=12, threat_model_age_days=100)
+    events = tuple(map(_release, (ReleaseBump.MINOR, ReleaseBump.MAJOR, ReleaseBump.PATCH)))
+    routes = SecurityRouter().route(state, events, ())
+    assert [(r.reason, r.lane) for r in routes] == [
+        ("rule-5", "diff-scan-quarterly"),
+        ("threat-model-3", "threat-model-quarterly"),
+        ("threat-model-2", "threat-model-review"),
+    ]
+    assert routes[-1].priority == priority("threat-model-review", state)

@@ -14,14 +14,15 @@ from typing import Any
 import pytest
 import yaml
 from traust_core.v1.context import Context
-from traust_core.v1.errors import NotFoundError, ValidationError
-from traust_core.v1.models.artifacts import PqcReadinessArtifact
+from traust_core.v1.errors import ConflictError, NotFoundError, ValidationError
+from traust_core.v1.models.artifacts import PqcReadinessArtifact, PqcVendorClaimsArtifact
 from traust_core.v1.models.pqc import PqcDimension, PqcFilter
 from traust_core.v1.models.vocabulary import PqcReadinessBucket, PqcRemediationCategory
 
 from traust.cli import pqc
 
 REPORT = Path(__file__).parent / "fixtures" / "pqc" / "widget-pqc-readiness.json"
+CLAIMS = Path(__file__).parent / "fixtures" / "pqc" / "vendor-claims.json"
 URL = "https://github.com/acme/widget"
 SHA = "f1b29843254b34f95ee1b36f1accca0380070962"
 REF = uuid.uuid4()
@@ -61,6 +62,7 @@ def doors(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         prepare=Door(Dumps({"route": "full"})),
         summary=Door([Dumps({"key": "partial"})]),
         blockers=Door([SimpleNamespace(model_dump=lambda **_: {"id": "R1"}, patchable=True)]),
+        record_claims=Door(Dumps({"version": 1})),
         find_repository=Door(repo),
         find_ref=Door(ref),
     )
@@ -71,6 +73,7 @@ def doors(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
             prepare=stub.prepare,
             summary=stub.summary,
             blockers=stub.blockers,
+            record_claims=stub.record_claims,
         ),
         portfolio=SimpleNamespace(
             register_repository=lambda url, public: repo,
@@ -253,3 +256,34 @@ def test_blockers_take_one_anchoring_flag(doors: SimpleNamespace, home: Path) ->
         call("blockers", home, "--patchable", "--not-patchable")
     assert e.value.code == 2
     assert not doors.blockers.calls
+
+
+def test_vendor_claims_are_recorded_whole(doors: SimpleNamespace, home: Path) -> None:
+    rc, out = call("vendor_claims", home, str(CLAIMS))
+    assert (rc, out) == (0, {"version": 1})
+    ((doc, source),) = doors.record_claims.calls
+    assert isinstance(doc, PqcVendorClaimsArtifact) and doc.payload == CLAIMS.read_bytes()
+    assert source.source == "interactive"
+
+
+def test_vendor_claims_that_do_not_supersede_are_exit_2(doors: SimpleNamespace, home: Path) -> None:
+    doors.record_claims.result = ConflictError(
+        "version 1 does not supersede the recorded version 1"
+    )
+    rc, err = call("vendor_claims", home, str(CLAIMS))
+    assert rc == 2 and "does not supersede" in err
+
+
+@pytest.mark.parametrize(
+    "change", [{"fleet_repos_via_graph": 4}, {"pqc_status": "in-progress"}, {"sources": []}]
+)
+def test_vendor_claims_with_derived_or_legacy_fields_are_refused(
+    doors: SimpleNamespace, home: Path, tmp_path: Path, change: dict
+) -> None:
+    body = json.loads(CLAIMS.read_text())
+    body["vendors"][0] |= change
+    bad = tmp_path / "claims.json"
+    bad.write_text(json.dumps(body))
+    rc, err = call("vendor_claims", home, str(bad))
+    assert rc == 2 and "pqc-vendor-claims" in err
+    assert doors.record_claims.calls == []
