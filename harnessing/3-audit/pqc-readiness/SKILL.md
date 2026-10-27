@@ -514,12 +514,12 @@ traust-core's copy of the [`notes/reference/pqc-version-matrix.yaml`](notes/refe
 table. Derived on demand from the recorded readiness and facts; re-run after
 mop-up or probe passes change the reports.
 
-`build_pqc_vendor_tracker.py --results-root <dir>` (Phase 3 handoff) merges
-the curated vendor registry (`<results-root>/pqc/inputs/vendor-registry.json`
-— dated status claims, curated org data held in the corpus; override with
-`PQC_VENDOR_REGISTRY`) with live fleet counts into
-`progress-tracker/metrics/dashboards/pqc/pqc-vendor-roadmap.{md,json}`;
-review the registry, then re-run.
+`traust dashboard view pqc-vendors --out <dir>` (Phase 3 handoff) merges
+the curated vendor claims (recorded with `traust pqc vendor-claims <file>`
+— dated status claims, curated org data; a review records the next
+`version`) with live fleet counts into
+`pqc-vendor-roadmap.{md,html,json}`;
+review the claims, then re-run.
 
 `build_xcrypto_tracker.py --results-root <dir>` regenerates the OCP
 "x/crypto usage tracking" workbook rows from the corpus:

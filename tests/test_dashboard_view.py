@@ -129,6 +129,34 @@ def test_the_pqc_views_replace_the_skills_report_scripts(
     assert sorted(p.name for p in out.iterdir()) == [f"{stem}.{x}" for x in ("html", "json", "md")]
 
 
+def test_the_vendor_roadmap_replaces_the_vendor_tracker_script(
+    publish: Door, home: Path, tmp_path: Path
+) -> None:
+    model = insight.PqcVendorRoadmap(
+        claims_artifact_id=uuid.uuid4(),
+        version=1,
+        updated="2026-07-19",
+        repositories=3,
+        unmeasured=1,
+        blocked_external=("https://github.com/acme/widget",),
+    )
+    publish.result = RenderedView(
+        view=ViewName.PQC_VENDORS,
+        stem="pqc-vendor-roadmap",
+        model=model,
+        markdown="# PQC vendor roadmap\n",
+        html="<title>PQC vendor roadmap</title>",
+    )
+    out = tmp_path / "pqc"
+    rc, answer = run(home, "pqc-vendors", "--out", str(out))
+    assert rc == 0
+    assert publish.calls == [(ViewName.PQC_VENDORS, ViewFilter())]
+    assert sorted(p.name for p in out.iterdir()) == [
+        f"pqc-vendor-roadmap.{x}" for x in ("html", "json", "md")
+    ]
+    assert answer["model"]["blocked_external"] == ["https://github.com/acme/widget"]
+
+
 def test_scope_window_and_bucket_go_into_one_filter(
     publish: Door, home: Path, tmp_path: Path
 ) -> None:

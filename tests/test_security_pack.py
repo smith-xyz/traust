@@ -24,8 +24,8 @@ ASSETS = {
     "Fleet refresh + rescan router": "repo_state",
     "Below-range verification (packets, then review)": "below_range_packets",
     "Weekly diff-drain tranche": "diff_scan_quarterly",
-    # the calendar backstop; the release review waits on recorded releases reaching the router,
-    # and the `pr` stamp rides diff_scan's rule
+    # the calendar backstop; the release review is routed (ROUTED), and the `pr` stamp rides
+    # diff_scan's rule
     "Threat-model re-model lanes": "threat_model_quarterly",
     "/dependency-watch (deps lane end to end)": "dependency_watch",
     "Feed router — security-data refresh (EPSS / KEV / vendor CVE and VEX feeds)": "feeds_cache",
@@ -42,7 +42,10 @@ ASSETS = {
 }
 
 # The rescan router's routed lanes: assets planned from traust.ops.router's lane, not a row.
-ROUTED = {"Fleet refresh + rescan router": ("full_audit", "diff_scan", "cloud_config_audit")}
+ROUTED = {
+    "Fleet refresh + rescan router": ("full_audit", "diff_scan", "cloud_config_audit"),
+    "Threat-model re-model lanes": ("threat_model_review",),
+}
 
 # Assets a row's asset feeds: they run once its output is fresh, as the same standing job.
 FOLLOWS = {"below_range_review": "below_range_packets"}
@@ -122,10 +125,15 @@ def test_every_runnable_skill_session_starts_through_traust_session_with_its_rol
         skill_dir(run[run.index("--skill") + 1])
 
 
-def test_only_the_scheduled_threat_model_check_up_applies_ratings() -> None:
-    # The 2026-10-01 decision: the quarterly (and, once routed, the release) review writes OWASP
-    # ratings; every other threat-model lane stays report-only.
-    runs = {n: a.run for n, a in Pack.load(PACK).assets.items() if "--apply-ratings" in a.run}
-    assert list(runs) == ["threat_model_quarterly"]
-    run = runs["threat_model_quarterly"]
-    assert run[run.index("--mode") + 1] == "review" and "--auto" in run
+def test_scheduled_check_up_applies_ratings() -> None:
+    """The quarterly and release-review lanes write OWASP ratings and leave everything else
+    report-only (decided 2026-10-01)."""
+    pack = Pack.load(PACK)
+    rating = {"threat-model-quarterly", "threat-model-review"}
+    for lane in rating:
+        run = pack.assets[pack.asset_for_lane(lane)].run  # type: ignore[arg-type]
+        skill = run[run.index("--skill") + 1], run[run.index("--mode") + 1]
+        assert skill == ("threat-model", "review"), lane
+        assert run[run.index("--") + 1 :] == ("--auto", "--apply-ratings"), lane
+    others = {n for n, a in pack.assets.items() if "--apply-ratings" in a.run}
+    assert others == {pack.asset_for_lane(lane) for lane in rating}  # type: ignore[arg-type]

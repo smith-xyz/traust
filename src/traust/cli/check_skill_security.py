@@ -172,10 +172,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
     ): "grandfathered — same WS1 batch as the Makefile",
     (
         "S10",
-        "harnessing/create-fuzzing/scripts/build_fuzz_rollup.py",
-    ): "reviewed — rollup reader; build tokens are report/status strings, no execution",
-    (
-        "S10",
         "harnessing/create-fuzzing/harnesses/_templates/python_fuzz.py",
     ): "reviewed — harness stub dropped INTO the target tree by design; "
     "runs under the target's own build, WS1 wraps the driver",

@@ -3,13 +3,45 @@
 from __future__ import annotations
 
 from pathlib import Path
+from uuid import UUID
 
-from traust_core.v1.models.artifacts import ValidationArtifact
+from traust_core.v1.models.artifacts import ValidationArtifact, ValidationPlanArtifact
 from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.validation import TargetAttestation, ValidationRecordInput
 
 from traust.cli._doors import parser, run
 from traust.context import load
+
+
+def prepare(argv: list[str] | None = None) -> int:
+    ap = parser("validation", "prepare", "Prepare validation inputs for one or more findings.")
+    ap.add_argument(
+        "--finding-id",
+        required=True,
+        action="append",
+        dest="finding_ids",
+        type=UUID,
+        help="Finding UUID to validate (repeatable; each must be distinct).",
+    )
+    args = ap.parse_args(argv)
+
+    def call() -> list:
+        inputs = load(args.config_home).services().validation.prepare_many(tuple(args.finding_ids))
+        return [item.model_dump(mode="json") for item in inputs]
+
+    return run(call, redact=True)
+
+
+def plan(argv: list[str] | None = None) -> int:
+    ap = parser("validation", "plan", "Publish an immutable proposed validation plan artifact.")
+    ap.add_argument("--document", required=True, type=Path, help="ValidationPlanArtifact JSON.")
+    args = ap.parse_args(argv)
+
+    def call() -> dict:
+        document = ValidationPlanArtifact.parse(args.document.read_bytes())
+        return load(args.config_home).services().validation.plan(document).model_dump(mode="json")
+
+    return run(call, redact=True)
 
 
 def record_report(
