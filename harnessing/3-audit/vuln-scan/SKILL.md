@@ -8,8 +8,9 @@ description: >-
   ({REPO_SLUG}-{SHORTSHA}-{NNN}) and the shared severity enum, for /triage
   to consume. When traust-core holds a baseline for the repository, the scan
   supplements it: known findings are deduped against the baseline and new
-  verified findings enter traust-core directly (as findings of the scan's assessment; the baseline is never written — gate A15) at
-  not_verified (no triage precondition; triage adjudicates downstream) —
+  reviewed findings enter traust-core directly (as findings of the scan's
+  assessment; the baseline is never written — gate A15) with no
+  authored validity answer (no triage precondition; triage adjudicates downstream) —
   /secure-code-audit remains the preferred baseline and
   /verify-remediation the way to update it after fixes. Read-only — no
   building, running, or network. Use when asked to "scan for vulns",
@@ -95,10 +96,10 @@ ingests directly.
   writes one.** It is deliberately lighter and less comprehensive than
   `/secure-code-audit`: a fast sweep for **new** candidate findings (new
   code, new release, a focus area the audit under-covered). When a
-  baseline exists this skill **reads** it to dedupe, and its verified new
+  baseline exists this skill **reads** it to dedupe, and its reviewed new
   findings enter **traust-core** as findings of the scan's assessment
-  **directly at `not_verified` — no `/triage` precondition** (user
-  directive 2026-07-27, the same convention as `/verify-remediation`
+  **directly, with no authored validity answer and no `/triage`
+  precondition** (the same entry convention as `/verify-remediation`
   regression routing). The baseline itself is off limits: only the three
   `secure*audit` skills may write one (alignment gate **A15**), and
   traust-core's finding reads count the scan's findings beside the
@@ -841,6 +842,15 @@ convention as `<repo>-security-audit.{json,md}` and
 Findings are sorted by `confidence` desc (then severity, file, line), so
 the top of the file is the highest-signal material.
 
+The `vuln-findings` schema has **no `validation_status` property** and
+rejects undeclared finding fields. Never add a legacy marker, `null`, or
+a default confirmation. Static review and confidence are candidate
+context, not a validity answer. Core owns subsequent judgments through
+its existing decision doors; see the shared
+[Validity authoring](../../../docs/report-structure.md#validity-authoring)
+contract for report-shaped findings. Keep evidence and any correction
+context in this artifact's existing description/confidence fields.
+
 `metadata.baseline` stays null (no audit file is matched);
 `metadata.additional.baseline_assessment_id` names the traust-core audit
 the scan deduped against, and `baseline_findings` counts the packet's
@@ -952,6 +962,9 @@ Tell the user:
      `traust findings surfaces` merges its `review_surface_coverage`
      into the repository's record; re-recording the same report is the
      same run (`scanned_at`) and adds no finding.
+     No validity answer is authored by this intake: do not add a
+     `validation_status` property to the scan artifact or infer a
+     confirmation from its confidence scores.
 
      `/triage` remains the **downstream adjudicator**: its verdicts, and
      any refutations, flow through the disposition ledger
@@ -1024,11 +1037,11 @@ Consumed artifacts (producer named per artifact):
 Emitted artifacts:
 
 - `<repo>-vuln-findings.json` — consumed by `/triage` (downstream
-  adjudication and ledger flow) and `/patch`; the scan's verified new
+  adjudication and ledger flow) and `/patch`; the scan's reviewed new
   findings enter traust-core as findings of its vuln-scan assessment — the
-  baseline is never written (gate A15) — at
-  `validation_status: not_verified` — no
-  triage precondition (Step 5; user directive 2026-07-27).
+  baseline is never written (gate A15) — without an authored validity
+  answer or a triage precondition (Step 5). This artifact has no
+  `validation_status` field.
 - `<repo>-vuln-findings.md` — human companion of the JSON.
 - `metadata.additional.coverage_diff` (diff mode) — consumed by the
   continuous-operations rescan telemetry: the refused/covered split feeds

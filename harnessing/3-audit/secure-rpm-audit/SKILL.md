@@ -1,6 +1,6 @@
 ---
 name: secure-rpm-audit
-description: Use when the user asks to perform a security audit, security review, or vulnerability assessment of an RPM packaging repository (CentOS Stream / Fedora / RHEL dist-git) — a repo containing a .spec file, downstream patches, and a sources lookaside manifest — using OWASP ASVS, the SEI CERT C/C++ Coding Standards, Fedora Packaging Guidelines, SLSA, and OpenSSF Scorecard. Authors canonical remediation sizes or explicit unknowns, independent blocking, and explicit roadmap priorities through Core's report record door.
+description: Use when the user asks to perform a security audit, security review, or vulnerability assessment of an RPM packaging repository (CentOS Stream / Fedora / RHEL dist-git) — a repo containing a .spec file, downstream patches, and a sources lookaside manifest — using OWASP ASVS, the SEI CERT C/C++ Coding Standards, Fedora Packaging Guidelines, SLSA, and OpenSSF Scorecard. Omits unauthored validity answers; authors canonical remediation sizes or explicit unknowns, independent blocking, and explicit roadmap priorities through Core's report record door.
 metadata:
   harness.tier: "primary"
 ---
@@ -303,7 +303,7 @@ Every critical/high candidate must pass all of:
    audit leads. A finding requires a traced untrusted flow to the sink
    in the prepared tree, or the concrete spec/patch construct.
    High-value sink with plausible-but-untraced input → medium,
-   `validation_status: not_verified`, with the untraced hop named.
+   omit `validation_status`, with the untraced hop named.
 
 **Severity floors (identical to `/secure-code-audit`'s)** —
 **verification-disable** (a downstream patch removing certificate,
@@ -421,10 +421,10 @@ When a finding originates in upstream code, note in the finding `description` wh
 > C/C++ source this manual CERT review is the *only*
 > semantic detection layer — treat it as primary detection, not a
 > supplement. Report plausible memory-safety and injection findings
-> that lack corroborating tool facts rather than dropping them: keep
-> `validation_status: not_verified`, severity per CVSS (never
-> inflated), and name in each description what would confirm or refute
-> it. Record `metadata.additional.assertive_inference: {"languages":
+> that lack corroborating tool facts rather than dropping them: omit
+> unauthored `validation_status`, keep severity per CVSS (never inflated),
+> and name in each description what would confirm or refute it.
+> Record `metadata.additional.assertive_inference: {"languages":
 > ["c", "cpp"], "trigger": "no semantic pre-scan rules for C/C++"}` so
 > triage weights the expected false-positive rate accordingly — the
 > triage N-vote and disposition ledger are the intended absorber for
@@ -639,6 +639,13 @@ top-level keys, the finding object fields (including the script-computed
 (`metadata.audit_profile: "rpm"`). The schema
 (`contracts/schemas/report.schema.json`) remains the authoritative source for types
 and constraints. Do not restate the tables here — duplicated copies drift.
+
+Follow the shared
+[Validity authoring](../../../docs/report-structure.md#validity-authoring)
+rules: unjudged findings omit `validation_status`, not `null` or a default
+confirmation. Core's installed contracts registry owns explicit new
+assertions; static-review confidence does not supply one. Preserve patch,
+backport, and correction context in existing evidence/description fields.
 
 Follow the shared
 [Remediation authoring](../../../docs/report-structure.md#remediation-authoring)
