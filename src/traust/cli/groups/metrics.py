@@ -5,11 +5,28 @@ from __future__ import annotations
 import datetime
 import json
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
+from traust_core.v1.models.common import TimeWindow
+from traust_core.v1.models.operations import (
+    ModelName,
+    ModelUsage,
+    ProviderName,
+    SkillName,
+    SpendDimension,
+    SpendFilter,
+    SpendSource,
+)
+from traust_engine.metrics import attribute_spend as attr
 from traust_engine.metrics import collect_spend as css
 
 from traust.cli.groups._registry import OpSpec
+from traust.context import load_spend_core
+from traust.paths import HARNESSING_DIR
+
+# Claude Code transcripts record Anthropic API requests.
+_TRANSCRIPT_PROVIDER = ProviderName("anthropic")
 
 
 def add_history_args(ap) -> None:
@@ -74,6 +91,12 @@ def add_spend_args(ap) -> None:
 
 
 def call_spend(engine, args) -> int:
+    print(
+        "note: session actuals and skill attribution are recorded in traust-core now "
+        "(`metrics collect-spend --append`); this dashboard reads only the metrics ledger "
+        "rows written before that. Current spend: `traust dashboard view spend`.",
+        file=sys.stderr,
+    )
     out = engine.metrics.build_spend_dashboard(
         out_dir=args.out_dir,
         budget_path=args.budget,
@@ -96,7 +119,7 @@ def add_collect_spend_args(ap) -> None:
     ap.add_argument(
         "--append",
         action="store_true",
-        help="record completed days into the metrics ledger (idempotent)",
+        help="record completed days in traust-core as spend per day, model and skill (idempotent)",
     )
 
 
@@ -114,8 +137,18 @@ def call_collect_spend(engine, args) -> int:
     today = datetime.date.today().isoformat()
 
     if args.append:
-        appended = metrics.append_session_spend(dirs)
-        print(f"appended {appended} day×model session-spend row(s)")
+        usages = tuple(session_usages(dirs, attr.known_skills(HARNESSING_DIR)))
+        if not usages:
+            print("recorded 0 day×model×skill spend event(s)")
+            return 0
+        start = min(u.occurred_at for u in usages).astimezone(datetime.UTC)
+        window = TimeWindow(
+            start=start.replace(hour=0, minute=0, second=0, microsecond=0),
+            end=datetime.datetime.now(datetime.UTC),
+        )
+        spend = load_spend_core(args.config_home).services().spend
+        recorded = spend.collect(SpendSource(name=f"sessions:{ws}", usages=usages), window)
+        print(f"recorded {recorded} day×model×skill spend event(s)")
         return 0
 
     day = args.date or today
@@ -152,18 +185,18 @@ def add_attribute_spend_args(ap) -> None:
     ap.add_argument(
         "--reconcile",
         action="store_true",
-        help="prove the split is lossless vs collect_session_spend.py and exit non-zero if not",
-    )
-    ap.add_argument(
-        "--append",
-        action="store_true",
-        help="record completed days into the metrics ledger under spend-attribution:<skill>",
+        help="prove traust-core's recorded spend splits by skill losslessly; exit 1 if not",
     )
     ap.add_argument("--json", action="store_true")
 
 
 def call_attribute_spend(engine, args) -> int:
-    from traust_engine.metrics import attribute_spend as attr
+    month = args.month
+    if not month and not args.date:
+        month = datetime.date.today().strftime("%Y-%m")
+
+    if args.reconcile:
+        return _reconcile(args, month)
 
     metrics = engine.metrics
     ws = args.workspace or metrics.workspace()
@@ -171,36 +204,6 @@ def call_attribute_spend(engine, args) -> int:
     if not dirs:
         print(f"no session transcripts under {css.PROJECTS} for {ws}", file=sys.stderr)
         return 3
-
-    month = args.month
-    if not month and not args.date:
-        month = datetime.date.today().strftime("%Y-%m")
-
-    if args.reconcile:
-        res = metrics.attribute_reconcile(dirs, args.date, month)
-        print(
-            json.dumps(res, indent=1)
-            if args.json
-            else "\n".join(
-                [
-                    "reconciliation vs collect_session_spend.py:",
-                    f"  attributed output tokens: {attr._fmt(res['attributed']['output_tokens'])}",
-                    f"  baseline   output tokens: {attr._fmt(res['baseline']['output_tokens'])}",
-                    f"  lossless: {res['lossless']}",
-                ]
-                + (
-                    []
-                    if res["lossless"]
-                    else [f"  MISMATCH {k}: {v:+d}" for k, v in res["deltas"].items() if v]
-                )
-            )
-        )
-        return 0 if res["lossless"] else 1
-
-    if args.append:
-        n = metrics.append_attribution_rows(metrics.collect_attributed(dirs))
-        print(f"appended {n} date×skill×model attribution row(s)")
-        return 0
 
     agg = metrics.collect_attributed(dirs, args.date, month)
     if args.json:
@@ -219,6 +222,61 @@ def call_attribute_spend(engine, args) -> int:
         return 0
     print("\n".join(metrics.render_attribution(agg, args.date or month or "all")))
     return 0
+
+
+def session_usages(dirs: list[Path], skills: set[str]) -> Iterator[ModelUsage]:
+    """Each transcript request's usage with the skill running then (traust-engine's skill
+    signals, walked in session order); usage before any signal has no skill."""
+    for d in dirs:
+        for f in sorted(d.glob("*.jsonl")):
+            skill = None
+            with f.open(encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    if not any(tok in line for tok in attr._INTERESTING):
+                        continue
+                    try:
+                        rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue  # a torn line in a live transcript
+                    skill = attr.detect_skill(rec, skills) or skill
+                    msg = rec.get("message") or {}
+                    usage, model = msg.get("usage"), msg.get("model")
+                    if not usage or not model or model.startswith("<") or not rec.get("timestamp"):
+                        continue
+                    yield ModelUsage(
+                        provider=_TRANSCRIPT_PROVIDER,
+                        model=ModelName(model),
+                        occurred_at=datetime.datetime.fromisoformat(rec["timestamp"]),
+                        tokens_in=usage.get("input_tokens") or 0,
+                        tokens_out=usage.get("output_tokens") or 0,
+                        cache_read=usage.get("cache_read_input_tokens") or 0,
+                        cache_creation=usage.get("cache_creation_input_tokens") or 0,
+                        skill=None if skill is None else SkillName(skill),
+                    )
+
+
+def _reconcile(args, month: str | None) -> int:
+    start = datetime.datetime.fromisoformat(args.date or f"{month}-01").replace(tzinfo=datetime.UTC)
+    window = (
+        TimeWindow(start=start, end=start + datetime.timedelta(days=1))
+        if args.date
+        else TimeWindow.month_of(start)
+    )
+    split = (
+        load_spend_core(args.config_home)
+        .services()
+        .spend.attribute_by(SpendFilter(window=window), SpendDimension.SKILL)
+    )
+    if args.json:
+        print(json.dumps(split.model_dump(mode="json") | {"lossless": split.lossless}, indent=1))
+    else:
+        t = split.total
+        print(
+            f"recorded spend by skill, {window.start.date()} to {window.end.date()}:"
+            f"\n  total: {t.events} events, {t.tokens_out:,} output tokens, ${t.cost_usd:,.2f}"
+            f"\n  unattributed: ${split.unattributed.cost_usd:,.2f}\n  lossless: {split.lossless}"
+        )
+    return 0 if split.lossless else 1
 
 
 ATTRIBUTE_SPEND = OpSpec(

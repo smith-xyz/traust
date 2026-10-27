@@ -19,8 +19,6 @@ allowed-tools:
 
 # Mine Ledger
 
-> **Being ported to traust-core** (progress-tracker skill port 34, mine-ledger): emit_rule_drafts.py retired with the traust-core hub (it ran on the old ledger / corpus code). The steps marked RETIRED don't run until the port lands.
-
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
 > default workspace layout. They resolve through `locations.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
@@ -123,13 +121,12 @@ pre-fix file (rule must fire) and post-fix file (rule must not). Stage
 drafts, author, verify, promote:
 
 ```bash
-# 1. stage drafts (deterministic; identical pairs skipped)
-python3 RETIRED:emit_rule_drafts.py --results-root ../analysis-results \
-    [--cwe CWE-494] [--limit 6]
+# 1. stage drafts (deterministic; identical pairs skipped) into
+#    locations.rule_drafts (traust-core regression_pairs; skipped fixes listed with why)
+python3 -m traust.cli sweep regression-drafts [--cwe CWE-494] [--limit 6]
 # 2. author patterns: in the draft's rule.skeleton.yaml so that
-python3 RETIRED:emit_rule_drafts.py \
-    --verify harnessing/mine-ledger/rule-drafts/<draft> \
-    --rule   harnessing/mine-ledger/rule-drafts/<draft>/rule.skeleton.yaml
+python3 -m traust.cli sweep verify-draft <rule-drafts>/<draft> \
+    [--rule <rule-drafts>/<draft>/rule.skeleton.yaml]
 # passes (before/ fires, after/ silent)
 # 3. promote: move the rule into the pack's matching CATEGORY file
 #    in traust-engine (src/traust_engine/data/secure-code-audit/
@@ -201,8 +198,9 @@ The deterministic half of this skill runs as a standing lane
 the dependency-watch pattern: identical behavior from an operator
 session, cron, or any enterprise scheduler. One entry point chains the
 miner, `sweep_engine.py collect` + `draft`, bounded regression-draft
-staging (`emit_rule_drafts.py --skip-existing --limit N` — existing
-draft dirs are never clobbered), and a **delta report** against the
+staging (`sweep regression-drafts --skip-existing --limit N` — existing
+draft dirs are never clobbered; the lane skips this stage until it moves
+to the security pack's continuous-ops lanes), and a **delta report** against the
 previous `rule-mining.json` (new/resolved/changed uncovered clusters,
 precision movements crossing the ~50% gate, TP-corpus growth) written to
 `progress-tracker/metrics/rule-mining/lane-delta.{json,md}`. Exit 0 =

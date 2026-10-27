@@ -85,6 +85,16 @@ def test_a_checkout_is_a_temporary_directory_outside_the_harness(processes: Proc
     assert not path.is_relative_to(HARNESS_ROOT) and not path.exists()  # gone after the session
 
 
+def test_a_mode_token_comes_before_the_checkout(processes: Processes) -> None:
+    run(
+        *("--skill", "threat-model", "--mode", "review", "--role", "threat-model"),
+        *("--repo", REPO, "--checkout", "--", "--auto", "--apply-ratings"),
+    )
+    skill, mode, path, *flags = processes.agent_call()[0][-1].split()
+    assert (skill, mode, flags) == ("/threat-model", "review", ["--auto", "--apply-ratings"])
+    assert Path(path).name == "checkout"
+
+
 @pytest.mark.parametrize(
     ("fake", "argv", "outcome", "reason"),
     [

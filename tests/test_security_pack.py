@@ -24,6 +24,9 @@ ASSETS = {
     "Fleet refresh + rescan router": "repo_state",
     "Below-range verification (packets, then review)": "below_range_packets",
     "Weekly diff-drain tranche": "diff_scan_quarterly",
+    # the calendar backstop; the release review waits on recorded releases reaching the router,
+    # and the `pr` stamp rides diff_scan's rule
+    "Threat-model re-model lanes": "threat_model_quarterly",
     "/dependency-watch (deps lane end to end)": "dependency_watch",
     "Feed router — security-data refresh (EPSS / KEV / vendor CVE and VEX feeds)": "feeds_cache",
     "Verify-remediation treadmill": "verify_remediation",
@@ -39,7 +42,7 @@ ASSETS = {
 }
 
 # The rescan router's routed lanes: assets planned from traust.ops.router's lane, not a row.
-ROUTED = {"Fleet refresh + rescan router": ("full_audit", "diff_scan")}
+ROUTED = {"Fleet refresh + rescan router": ("full_audit", "diff_scan", "cloud_config_audit")}
 
 # Assets a row's asset feeds: they run once its output is fresh, as the same standing job.
 FOLLOWS = {"below_range_review": "below_range_packets"}
@@ -48,8 +51,6 @@ FOLLOWS = {"below_range_review": "below_range_packets"}
 EXCLUDED = {
     "Release/dist-git event feeder": "derived on demand from recorded releases "
     "(PortfolioService.release_changes); dist-git heads are repo_state observations",
-    "Threat-model re-model lanes": "routed lanes the router can't decide yet: the release review "
-    "waits on recorded releases reaching it, the quarterly backstop on the model's age in RepoState",
     "/drift-watch": "replaced by each asset's freshness (FreshnessQuery.stale)",
     "Feed-source liveness": "cached sources: feeds_cache degrades per source; live-tier probes "
     "retired, back as core readiness once the live sources are core providers",
@@ -118,3 +119,12 @@ def test_every_runnable_skill_session_starts_through_traust_session_with_its_rol
         run = asset["run"]
         assert run[3:5] == ["session", "run"] and "{role}" in run, name
         skill_dir(run[run.index("--skill") + 1])
+
+
+def test_only_the_scheduled_threat_model_check_up_applies_ratings() -> None:
+    # The 2026-10-01 decision: the quarterly (and, once routed, the release) review writes OWASP
+    # ratings; every other threat-model lane stays report-only.
+    runs = {n: a.run for n, a in Pack.load(PACK).assets.items() if "--apply-ratings" in a.run}
+    assert list(runs) == ["threat_model_quarterly"]
+    run = runs["threat_model_quarterly"]
+    assert run[run.index("--mode") + 1] == "review" and "--auto" in run

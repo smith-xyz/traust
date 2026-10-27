@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import shutil
 import sys
 from pathlib import Path
 
+import yaml
 from traust_contracts import DeploymentConfigMissing
-from traust_core.v1.errors import NotFoundError
+from traust_core.v1.errors import NotFoundError, ServiceError, ValidationError
+from traust_core.v1.models.detection_quality import RegressionPair, RegressionPairFilter
 from traust_engine.locations import SWEEPS_REL
 from traust_engine.sweep.engine import DEFAULT_SWEEP_LIMIT
 
@@ -369,4 +372,149 @@ CARDS = passthrough_op(
 )
 SCREEN_INJECTION = passthrough_op(
     "recall", "Screen recorded audit reports for prompt injection (report-only).", "screen"
+)
+
+
+def add_regression_drafts_args(ap) -> None:
+    ap.add_argument(
+        "--drafts-dir",
+        type=Path,
+        default=None,
+        help="rule drafts dir (default: locations.rule_drafts or"
+        " <progress_tracker>/metrics/rule-mining/rule-drafts)",
+    )
+    ap.add_argument("--cwe", default=None, help="only fixes of this CWE (e.g. CWE-78)")
+    ap.add_argument("--limit", type=int, default=6, help="max drafts staged (default 6)")
+    ap.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="never re-stage a draft dir that already exists (protects authored-but-unpromoted "
+        "patterns; the rule-mining lane's mode)",
+    )
+
+
+def call_regression_drafts(engine, args) -> int:
+    """Stage one draft dir per confirmed fix from `DetectionQualityService.regression_pairs`."""
+    drafts_dir = _resolve_drafts_dir(engine, args.drafts_dir)
+
+    def call() -> dict:
+        quality = load(args.config_home).services().detection_quality
+        staged = {d.name for d in drafts_dir.glob("*/")} if args.skip_existing else set()
+        found = quality.regression_pairs(
+            RegressionPairFilter(cwe=args.cwe, limit=args.limit, staged=frozenset(staged))
+        )
+        for pair in found.pairs:
+            _stage(drafts_dir / pair.id, pair)
+        return {
+            "drafts_dir": str(drafts_dir),
+            "drafted": [
+                {"draft": p.id, "language": p.language, "cwe": p.cwes[0], "files": len(p.files)}
+                for p in found.pairs
+            ],
+            "skipped_by_reason": found.skipped_by_reason,
+            "skipped": found.model_dump(mode="json")["skipped"],
+        }
+
+    return run(call)
+
+
+def _stage(draft: Path, pair: RegressionPair) -> None:
+    if draft.exists():
+        shutil.rmtree(draft)
+    for side in ("before", "after"):
+        (draft / side).mkdir(parents=True)
+    for f in pair.files:
+        for side, text in (("before", f.before), ("after", f.after)):
+            if text is not None:
+                target = draft / side / f.path  # a RepoPath: relative, no `..`
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(text, encoding="utf-8")
+    rule = {
+        "id": pair.rule_id,
+        "languages": [pair.language],
+        "severity": pair.rule_severity,
+        "message": f"TODO: one sentence on the vulnerable shape and the fix. {pair.cwes[0]}.",
+        "metadata": {
+            "cwe": list(pair.cwes),
+            "category": "regression",
+            "confidence": "HIGH",
+            "regression_of": {
+                "fingerprint": pair.fingerprint,
+                "source_finding": str(pair.finding_id),
+                "repo": pair.repository_url,
+                "fix_commit": pair.fix_sha,
+            },
+        },
+        "patterns": [{"pattern": "TODO: author from before/ (must fire) vs after/ (must not)"}],
+    }
+    (draft / "rule.skeleton.yaml").write_text(
+        yaml.safe_dump({"rules": [rule]}, sort_keys=False, width=100), encoding="utf-8"
+    )
+    excerpt = " ".join((pair.rationale or "").split())[:500]
+    (draft / "DRAFT.md").write_text(
+        f"""# Rule draft: {pair.rule_id}
+
+**Regression guard for:** {pair.title or "(untitled finding)"}
+**CWE:** {", ".join(pair.cwes)} · **severity:** {pair.severity}
+**Repo:** {pair.repository_url}
+**Pre-fix commit:** `{pair.pre_fix_sha}` · **fix commit:** `{pair.fix_sha}`
+**Fingerprint:** `{pair.fingerprint}` · **finding:** `{pair.finding_id}`
+
+**Fix rationale (verification evidence):**
+
+> {excerpt}
+
+**Authoring contract:** write `patterns:` in `rule.skeleton.yaml` so that
+`traust sweep verify-draft {draft}` fires on every file in `before/` and on
+nothing in `after/`. Then move the rule into the pack category file in
+traust-engine (`src/traust_engine/data/secure-code-audit/opengrep-rules/`, a
+traust-engine PR; not a `regression.yaml` dump, match the pack's category
+layout) with `ruleid:`-annotated fixture lines, and delete this draft dir.
+""",
+        encoding="utf-8",
+    )
+
+
+def add_verify_draft_args(ap) -> None:
+    ap.add_argument("draft", type=Path, help="draft dir (holds before/ and after/)")
+    ap.add_argument(
+        "--rule",
+        type=Path,
+        default=None,
+        help="candidate rule (default: <draft>/rule.skeleton.yaml)",
+    )
+
+
+def call_verify_draft(engine, args) -> int:
+    """The calibration gate: the candidate rule fires on before/ and is silent on after/."""
+    from traust_engine.adapters import opengrep
+
+    rule = args.rule or args.draft / "rule.skeleton.yaml"
+    counts = {}
+    for side in ("before", "after"):
+        target = args.draft / side
+        try:
+            if not rule.is_file():
+                raise ValidationError(f"no rule file at {rule}")
+            counts[side] = len(opengrep.scan(target, rules=[str(rule)]).findings)
+        except (ValueError, OSError, RuntimeError, ServiceError) as e:
+            print(f"ERROR: opengrep over {target}: {e}", file=sys.stderr)
+            return 2
+    ok = counts["before"] > 0 and counts["after"] == 0
+    print(
+        f"{args.draft.name}: before={counts['before']} (need >0), "
+        f"after={counts['after']} (need 0) -> {'PASS' if ok else 'FAIL'}"
+    )
+    return 0 if ok else 1
+
+
+REGRESSION_DRAFTS = OpSpec(
+    add_args=add_regression_drafts_args,
+    call=call_regression_drafts,
+    help="stage regression-rule drafts (pre/post-fix fixtures) from confirmed fixes",
+)
+VERIFY_DRAFT = OpSpec(
+    add_args=add_verify_draft_args,
+    call=call_verify_draft,
+    help="check a draft rule fires on before/ and not on after/ (opengrep)",
 )
