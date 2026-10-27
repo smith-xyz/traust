@@ -4,16 +4,29 @@ import re
 from pathlib import Path
 
 import yaml
-from traust_engine import Pack
+from traust_core.v1.contracts import validate_config
 
-PACK = Path(__file__).resolve().parents[1] / "packs" / "security" / "assets.yaml"
+from traust.paths import SECURITY_PACK_DIR
+
+PACK = SECURITY_PACK_DIR / "assets.yaml"
+
+
+def _assets() -> dict:
+    """The pack's assets, after contracts' `pack` schema accepts the document."""
+    raw = yaml.safe_load(PACK.read_text())
+    validate_config("pack", raw)
+    return raw["assets"]
+
+
+def _asset_for_lane(assets: dict, lane: str) -> str:
+    return next(n for n, a in assets.items() if lane in a.get("trigger", {}).get("lanes", ()))
 
 
 def test_the_security_pack_loads_and_every_source_asset_has_a_cadence() -> None:
-    pack = Pack.load(PACK)
-    sources = [name for name, asset in pack.assets.items() if not asset.deps]
+    assets = _assets()
+    sources = [name for name, asset in assets.items() if not asset.get("deps")]
     assert {"feeds_cache", "repo_state"} <= set(sources)
-    assert all(pack.assets[name].trigger.every is not None for name in sources)
+    assert all(assets[name]["trigger"].get("every") is not None for name in sources)
 
 
 STANDING_JOBS = Path(__file__).resolve().parents[1] / "docs" / "continuous-operations.md"
@@ -77,11 +90,11 @@ def _standing_jobs() -> list[str]:
 def test_every_standing_job_is_an_asset_or_an_explicit_exclusion() -> None:
     jobs = _standing_jobs()
     assert sorted(jobs) == sorted([*ASSETS, *EXCLUDED])
-    pack = Pack.load(PACK)
-    assert set(ASSETS.values()) <= set(pack.assets)
+    assets = _assets()
+    assert set(ASSETS.values()) <= set(assets)
     routed = {a for row in ROUTED.values() for a in row}
-    assert set(pack.assets) <= {*ASSETS.values(), *routed, *FOLLOWS}
-    assert all(pack.assets[a].deps == (FOLLOWS[a],) for a in FOLLOWS)
+    assert set(assets) <= {*ASSETS.values(), *routed, *FOLLOWS}
+    assert all(assets[a]["deps"] == [FOLLOWS[a]] for a in FOLLOWS)
 
 
 def test_every_asset_has_a_trigger_freshness_and_runner_labels() -> None:
@@ -101,7 +114,7 @@ RUNNER_PARAMS = {"run_id", "repo_url", "role", "rule"}
 
 def test_every_skill_session_names_a_registry_role() -> None:
     roles = set(yaml.safe_load(REGISTRY.read_text())["roles"])
-    sessions = {n: a.model.role for n, a in Pack.load(PACK).assets.items() if a.model}
+    sessions = {n: a["model"]["role"] for n, a in _assets().items() if a.get("model")}
     assert sessions and set(sessions.values()) <= roles, sessions
 
 
@@ -128,12 +141,12 @@ def test_every_runnable_skill_session_starts_through_traust_session_with_its_rol
 def test_scheduled_check_up_applies_ratings() -> None:
     """The quarterly and release-review lanes write OWASP ratings and leave everything else
     report-only (decided 2026-10-01)."""
-    pack = Pack.load(PACK)
+    assets = _assets()
     rating = {"threat-model-quarterly", "threat-model-review"}
     for lane in rating:
-        run = pack.assets[pack.asset_for_lane(lane)].run  # type: ignore[arg-type]
+        run = assets[_asset_for_lane(assets, lane)]["run"]
         skill = run[run.index("--skill") + 1], run[run.index("--mode") + 1]
         assert skill == ("threat-model", "review"), lane
-        assert run[run.index("--") + 1 :] == ("--auto", "--apply-ratings"), lane
-    others = {n for n, a in pack.assets.items() if "--apply-ratings" in a.run}
-    assert others == {pack.asset_for_lane(lane) for lane in rating}  # type: ignore[arg-type]
+        assert run[run.index("--") + 1 :] == ["--auto", "--apply-ratings"], lane
+    others = {n for n, a in assets.items() if "--apply-ratings" in a.get("run", ())}
+    assert others == {_asset_for_lane(assets, lane) for lane in rating}

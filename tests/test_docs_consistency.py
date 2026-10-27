@@ -353,7 +353,7 @@ class TestDocsIndexCoverage(unittest.TestCase):
 
 
 class TestSingleRulePack(unittest.TestCase):
-    """Rule packs live only in traust-engine; no copy or stale pointer here."""
+    """Rule packs live only in the security pack; no other copy or stale pointer here."""
 
     def test_live_tree_has_no_rule_pack_copy(self):
         self.assertEqual(C.rule_pack_copy_failures(), [])

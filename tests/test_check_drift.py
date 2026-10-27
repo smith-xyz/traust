@@ -2,11 +2,12 @@
 The rest of drift-watch is traust-core's freshness view (core's tests)."""
 
 import json
-from pathlib import Path
 
 import pytest
 
 from traust.cli import check_drift as pc
+from traust.context import load
+from traust.paths import OPENGREP_RULES_DIR
 
 
 def _remote(monkeypatch, head: str) -> None:
@@ -109,14 +110,12 @@ def test_a_rule_pack_pin_that_cannot_be_parsed_is_unavailable(monkeypatch):
     assert pc.check_argus_rules_pin()[0]["status"] == "pending"
 
 
-def test_argus_pack_is_not_the_default_rules_source():
+def test_argus_pack_is_not_the_default_rules_source(home):
     """~500 rules uncalibrated against our triage-ledger ground truth must stay opt-in."""
-    import traust_engine.adapters.opengrep as _og
-
-    src = Path(_og.__file__).read_text(encoding="utf-8")
-    assert "ARGUS_RULES_REPO" in src
-    default = src.split("Default (no --rules):", 1)[1][:200]
-    assert "traust-authored" in default, default
+    assert "ARGUS_RULES_REPO" in pc._module_text("traust_core.v1.providers.tools.opengrep")
+    core = load()
+    assert core.rule_pack == OPENGREP_RULES_DIR and core.rule_pack_supplements == ()
+    assert "Traust-authored" in (OPENGREP_RULES_DIR / "README.md").read_text(encoding="utf-8")
 
 
 def test_main_prints_every_row(home, tmp_path, monkeypatch, capsys):

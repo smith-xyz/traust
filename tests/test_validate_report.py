@@ -1,23 +1,10 @@
 #!/usr/bin/env python3
-"""Unit tests for validate_report.py and render_report.py."""
+"""Unit tests for schema/report.schema.json and schema/verification.schema.json."""
 
 import copy
-import json
-import tempfile
 import unittest
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
-import jsonschema
-from traust_engine.reporting.render import render_report
-from traust_engine.reporting.validate import (
-    ValidationResult,
-    collect_report_files,
-    cross_validate,
-    load_schema,
-    strict_checks,
-    validate_report,
-)
+from traust_core.v1.contracts import schema_errors
 
 
 def _valid_report():
@@ -111,20 +98,8 @@ def _valid_report():
     }
 
 
-SCHEMA = load_schema()
-
-
 def _schema_errors(report):
-    """Run JSON Schema validation and return list of error messages."""
-    validator = jsonschema.Draft202012Validator(SCHEMA, format_checker=jsonschema.FormatChecker())
-    return [e.message for e in validator.iter_errors(report)]
-
-
-def _cross_errors(report):
-    """Run cross-validation and return the ValidationResult."""
-    result = ValidationResult(file_path="<test>")
-    cross_validate(report, result)
-    return result
+    return [m for _, m in schema_errors("report", report)]
 
 
 # ---------------------------------------------------------------------------
@@ -136,33 +111,6 @@ class TestValidReport(unittest.TestCase):
     def test_valid_report_passes_schema(self):
         errors = _schema_errors(_valid_report())
         self.assertEqual(errors, [])
-
-    def test_valid_report_passes_cross_checks(self):
-        result = _cross_errors(_valid_report())
-        self.assertEqual(result.errors, [])
-
-    def test_valid_report_strict_warnings(self):
-        result = ValidationResult(file_path="<test>")
-        strict_checks(_valid_report(), result)
-        self.assertEqual(result.errors, [])
-        warn_text = " ".join(result.warnings)
-        self.assertIn("dependency_audit", warn_text)
-        self.assertIn("negative_results", warn_text)
-        self.assertIn("footer", warn_text)
-        self.assertIn("CVSS", warn_text)
-
-    def test_full_round_trip_via_file(self):
-        report = _valid_report()
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump(report, f)
-            path = f.name
-        try:
-            from traust_engine.reporting.validate import validate_report
-
-            r = validate_report(path, SCHEMA)
-            self.assertTrue(r.passed, r.errors)
-        finally:
-            Path(path).unlink()
 
 
 # ---------------------------------------------------------------------------
@@ -276,113 +224,9 @@ class TestSchemaViolations(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestCrossValidation(unittest.TestCase):
-    def _mutate(self, fn):
-        r = copy.deepcopy(_valid_report())
-        fn(r)
-        return _cross_errors(r)
-
-    def test_duplicate_finding_id(self):
-        result = self._mutate(lambda r: r["findings"][1].__setitem__("id", "TEST-001"))
-        self.assertTrue(any("Duplicate finding ID" in e for e in result.errors), result.errors)
-
-    def test_severity_count_mismatch(self):
-        result = self._mutate(lambda r: r["findings_summary"][1].__setitem__("count", 5))
-        self.assertTrue(any("count is 5" in e for e in result.errors), result.errors)
-
-    def test_summary_ids_length_mismatch(self):
-        def mutate(r):
-            r["findings_summary"][1]["count"] = 2
-
-        result = self._mutate(mutate)
-        self.assertTrue(any("finding_ids has 1 entries" in e for e in result.errors), result.errors)
-
-    def test_summary_references_unknown_id(self):
-        def mutate(r):
-            r["findings_summary"][1]["finding_ids"] = ["GHOST-999"]
-
-        result = self._mutate(mutate)
-        self.assertTrue(
-            any("unknown finding ID: GHOST-999" in e for e in result.errors), result.errors
-        )
-
-    def test_finding_missing_from_summary(self):
-        def mutate(r):
-            r["findings_summary"][2]["finding_ids"] = []
-            r["findings_summary"][2]["count"] = 0
-
-        result = self._mutate(mutate)
-        self.assertTrue(any("not listed" in e.lower() for e in result.errors), result.errors)
-
-    def test_roadmap_references_unknown_id(self):
-        def mutate(r):
-            r["remediation_roadmap"][0]["addresses"] = ["NONEXISTENT-001"]
-
-        result = self._mutate(mutate)
-        self.assertTrue(
-            any("unknown finding ID: NONEXISTENT-001" in e for e in result.errors), result.errors
-        )
-
-    def test_missing_mandatory_severity_criterion(self):
-        def mutate(r):
-            r["severity_criteria"] = [c for c in r["severity_criteria"] if c["level"] != "high"]
-            # keep minItems happy by adding a duplicate
-            r["severity_criteria"].append(r["severity_criteria"][0])
-
-        result = self._mutate(mutate)
-        self.assertTrue(
-            any("missing mandatory level: high" in e for e in result.errors), result.errors
-        )
-
-    def test_executive_summary_count_mismatch(self):
-        def mutate(r):
-            r["executive_summary"]["severity_counts"]["high"] = 5
-
-        result = self._mutate(mutate)
-        self.assertTrue(
-            any("executive_summary.severity_counts[high]" in e for e in result.errors),
-            result.errors,
-        )
-
-    def test_executive_summary_counts_match_findings(self):
-        result = self._mutate(lambda r: None)
-        es_errors = [e for e in result.errors if "executive_summary.severity_counts" in e]
-        self.assertEqual(es_errors, [])
-
-
 # ---------------------------------------------------------------------------
 # Directory validation (rglob)
 # ---------------------------------------------------------------------------
-
-
-class TestDirectoryValidation(unittest.TestCase):
-    def test_directory_mode_finds_nested_json(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            nested = Path(tmpdir) / "product" / "repo"
-            nested.mkdir(parents=True)
-            report_path = nested / "repo-security-audit.json"
-            report_path.write_text(json.dumps(_valid_report()), encoding="utf-8")
-
-            target = Path(tmpdir)
-            files = sorted(target.rglob("*.json"))
-            self.assertEqual(len(files), 1)
-            self.assertEqual(files[0].name, "repo-security-audit.json")
-
-            r = validate_report(str(files[0]), SCHEMA)
-            self.assertTrue(r.passed, r.errors)
-
-    def test_collect_report_files_finds_nested_json(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            nested = Path(tmpdir) / "product" / "repo"
-            nested.mkdir(parents=True)
-            (nested / "repo-security-audit.json").write_text("{}", encoding="utf-8")
-            (Path(tmpdir) / "top-level.json").write_text("{}", encoding="utf-8")
-
-            files = collect_report_files(tmpdir)
-            names = [f.name for f in files]
-            self.assertIn("repo-security-audit.json", names)
-            self.assertIn("top-level.json", names)
-            self.assertEqual(len(files), 2)
 
 
 # ---------------------------------------------------------------------------
@@ -390,241 +234,15 @@ class TestDirectoryValidation(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestRenderer(unittest.TestCase):
-    def test_render_produces_expected_sections(self):
-        report = _valid_report()
-        report["negative_results"] = [
-            {"area": "SQL Injection", "result": "No issues found."},
-        ]
-        report["footer"] = "End of report."
-        md = render_report(report)
-
-        self.assertIn("# Security Assessment", md)
-        self.assertIn("## 1. Executive Summary", md)
-        self.assertIn("## 2. Severity Criteria", md)
-        self.assertIn("## 3. Detailed Findings", md)
-        self.assertIn("## 4. Findings Summary", md)
-        self.assertIn("## 5. Remediation Roadmap", md)
-        self.assertIn("Negative Results", md)
-        self.assertIn("*End of report.*", md)
-
-    def test_render_includes_finding_details(self):
-        md = render_report(_valid_report())
-
-        self.assertIn("TEST-001", md)
-        self.assertIn("TEST-002", md)
-        self.assertIn("CWE-918", md)
-        self.assertIn("CWE-770", md)
-        self.assertIn("**High**", md)
-        self.assertIn("**Medium**", md)
-        self.assertIn("handler.go:42-58", md)
-
-    def test_render_evidence_code_block(self):
-        report = copy.deepcopy(_valid_report())
-        report["findings"][0]["evidence"] = [
-            {"language": "go", "code": "http.Post(url, ct, body)", "caption": "Vulnerable call"},
-        ]
-        md = render_report(report)
-        self.assertIn("```go", md)
-        self.assertIn("http.Post(url, ct, body)", md)
-        self.assertIn("*Vulnerable call*", md)
-
-    def test_render_metadata_table_format(self):
-        report = copy.deepcopy(_valid_report())
-        report["metadata"]["repository"] = "github.com/example/test"
-        report["metadata"]["commit"] = "abc123"
-        md = render_report(report)
-        self.assertIn("| **Date**", md)
-        self.assertIn("| **Repository**", md)
-
-    def test_render_metadata_inline_format(self):
-        md = render_report(_valid_report())
-        self.assertIn("**Date:** 2026-05-21", md)
-        self.assertIn("**Scope:**", md)
-
-
 # ---------------------------------------------------------------------------
 # 0.15.0 consistency conventions
 # ---------------------------------------------------------------------------
-
-
-def _consistency_report():
-    """Fixture upgraded to the 0.15.0 conventions (canonical IDs, commit,
-    harness_version) so the CONSISTENCY_MIN_VERSION gates fire."""
-    r = copy.deepcopy(_valid_report())
-    r["metadata"]["commit"] = "abcdef0123456789abcdef0123456789abcdef01"
-    r["metadata"]["additional"] = {"harness_version": "0.15.0-1234567"}
-    text = json.dumps(r)
-    text = text.replace("TEST-001", "TEST_WIDGET-abcdef0-001")
-    text = text.replace("TEST-002", "TEST_WIDGET-abcdef0-002")
-    r = json.loads(text)
-    for f in r["findings"]:
-        f["validation_status"] = "not_verified"
-    r["peach_isolation_review"] = {
-        "applicable": False,
-        "rationale": "Single-tenant operator: one deployment serves exactly one cluster and trust domain.",
-    }
-    return r
-
-
-class TestConsistencyGates(unittest.TestCase):
-    """Hard cross-validation gates for harness >= 0.15.0."""
-
-    def test_consistency_fixture_passes(self):
-        result = _cross_errors(_consistency_report())
-        self.assertEqual(result.errors, [])
-
-    def test_missing_peach_review_is_error_at_0_15(self):
-        r = _consistency_report()
-        del r["peach_isolation_review"]
-        result = _cross_errors(r)
-        self.assertTrue(any("peach_isolation_review is required" in e for e in result.errors))
-
-    def test_missing_peach_review_not_error_pre_0_15(self):
-        r = _consistency_report()
-        del r["peach_isolation_review"]
-        r["metadata"]["additional"]["harness_version"] = "0.14.0-1234567"
-        result = _cross_errors(r)
-        self.assertFalse(any("peach_isolation_review" in e for e in result.errors))
-
-    def test_missing_validation_status_is_error_at_0_15(self):
-        r = _consistency_report()
-        del r["findings"][0]["validation_status"]
-        result = _cross_errors(r)
-        self.assertTrue(any("validation_status is required" in e for e in result.errors))
-
-
-class TestStrictConventions(unittest.TestCase):
-    """Strict-mode warnings added with the 0.15.0 conventions."""
-
-    def _warnings(self, report):
-        result = ValidationResult(file_path="<test>")
-        strict_checks(report, result)
-        return result.warnings
-
-    def test_repository_url_must_parse_org_repo(self):
-        r = copy.deepcopy(_valid_report())
-        r["metadata"]["repository"] = "https://github.com/someorg"
-        self.assertTrue(
-            any("metadata.repository" in w and "does not parse" in w for w in self._warnings(r))
-        )
-        r["metadata"]["repository"] = "free text about Azure repos"
-        self.assertTrue(any("does not parse" in w for w in self._warnings(r)))
-        r["metadata"]["repository"] = ""
-        self.assertTrue(any("metadata.repository missing" in w for w in self._warnings(r)))
-        # accepted shapes: plain, <>-wrapped, dot-leading repo, gitlab nesting
-        for ok in (
-            "https://github.com/org/repo",
-            "<https://github.com/org/repo>",
-            "https://github.com/org/.github",
-            "https://gitlab.example.com/service/iac-declarations",
-        ):
-            r["metadata"]["repository"] = ok
-            self.assertFalse(any("repository" in w for w in self._warnings(r)), ok)
-
-    def test_no_cvss_warning_for_informational(self):
-        r = copy.deepcopy(_valid_report())
-        r["findings"][1]["severity"] = "informational"
-        warns = self._warnings(r)
-        self.assertTrue(any("TEST-001" in w and "CVSS" in w for w in warns))
-        self.assertFalse(any("TEST-002" in w and "CVSS" in w for w in warns))
-
-    def test_attack_pattern_warning_on_high_only(self):
-        warns = self._warnings(_valid_report())
-        self.assertTrue(any("TEST-001" in w and "attack_pattern" in w for w in warns))
-        self.assertFalse(any("TEST-002" in w and "attack_pattern" in w for w in warns))
-
-    def test_all_confirmed_warning(self):
-        r = copy.deepcopy(_valid_report())
-        r["findings"] = [
-            dict(r["findings"][0], id=f"TEST-{i:03d}", validation_status="confirmed")
-            for i in range(1, 6)
-        ]
-        warns = self._warnings(r)
-        self.assertTrue(any("'confirmed'" in w and "not_verified" in w for w in warns))
-
-    def test_mixed_statuses_no_overclaim_warning(self):
-        r = copy.deepcopy(_valid_report())
-        r["findings"] = [
-            dict(
-                r["findings"][0],
-                id=f"TEST-{i:03d}",
-                validation_status="confirmed" if i > 1 else "not_verified",
-            )
-            for i in range(1, 6)
-        ]
-        warns = self._warnings(r)
-        self.assertFalse(any("'confirmed'" in w and "not_verified" in w for w in warns))
-
-    def test_off_vocabulary_category_warning_at_0_15(self):
-        r = _consistency_report()
-        r["findings"][0]["category"] = "Improper Widget Management"
-        r["findings"][1]["category"] = "Supply Chain"  # normalizes to supply-chain
-        warns = self._warnings(r)
-        self.assertTrue(any("Improper Widget Management" in w for w in warns))
-        self.assertFalse(any("Supply Chain" in w for w in warns))
-
-    def test_no_category_warning_pre_0_15(self):
-        r = copy.deepcopy(_valid_report())
-        r["findings"][0]["category"] = "Improper Widget Management"
-        warns = self._warnings(r)
-        self.assertFalse(any("vocabulary" in w for w in warns))
-
-    def test_implausible_date_warning(self):
-        r = copy.deepcopy(_valid_report())
-        r["metadata"]["date"] = "2023-03-22"
-        warns = self._warnings(r)
-        self.assertTrue(any("audit execution date" in w for w in warns))
-
-    def test_stale_date_warning(self):
-        r = copy.deepcopy(_valid_report())
-        r["metadata"]["date"] = (datetime.now(UTC).date() - timedelta(days=10)).isoformat()
-        warns = self._warnings(r)
-        self.assertTrue(any("audit execution date" in w for w in warns))
-
-    def test_current_date_no_warning(self):
-        r = copy.deepcopy(_valid_report())
-        r["metadata"]["date"] = datetime.now(UTC).date().isoformat()
-        warns = self._warnings(r)
-        self.assertFalse(any("audit execution date" in w for w in warns))
-
-    def test_yesterday_no_warning(self):
-        r = copy.deepcopy(_valid_report())
-        r["metadata"]["date"] = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
-        warns = self._warnings(r)
-        self.assertFalse(any("audit execution date" in w for w in warns))
-
-    def test_short_peach_rationale_warning(self):
-        r = copy.deepcopy(_valid_report())
-        r["peach_isolation_review"] = {"applicable": False, "rationale": "single tenant"}
-        warns = self._warnings(r)
-        self.assertTrue(any("rationale" in w for w in warns))
-
-    def test_loc_breakdown_warning_at_0_15(self):
-        r = _consistency_report()
-        r["metadata"]["loc_reviewed"] = "1234"
-        warns = self._warnings(r)
-        self.assertTrue(any("loc_breakdown" in w for w in warns))
-
-
-class TestRendererNumbering(unittest.TestCase):
-    def test_scanner_correlation_numbered(self):
-        report = copy.deepcopy(_valid_report())
-        report["scanner_correlation"] = [{"tool": "Trivy", "result": "not configured"}]
-        md = render_report(report)
-        self.assertIn("## 6. Scanner Correlation", md)
 
 
 # ---------------------------------------------------------------------------
 # Remediation verification reports (verification.schema.json)
 # ---------------------------------------------------------------------------
 
-from traust_engine.reporting.validate import build_registry, cross_validate_verification
-
-from traust.paths import SCHEMA_DIR
-
-VERIFICATION_SCHEMA = load_schema(SCHEMA_DIR / "verification.schema.json")
-REGISTRY = build_registry()
 
 ORIGINAL_SHA = "abcdef0123456789abcdef0123456789abcdef01"
 PATCHED_SHA = "1234567890abcdef1234567890abcdef12345678"
@@ -756,18 +374,7 @@ def _valid_verification_report():
 
 
 def _verification_schema_errors(report):
-    validator = jsonschema.Draft202012Validator(
-        VERIFICATION_SCHEMA,
-        format_checker=jsonschema.FormatChecker(),
-        registry=REGISTRY,
-    )
-    return [e.message for e in validator.iter_errors(report)]
-
-
-def _verification_cross(report):
-    result = ValidationResult(file_path="<test>")
-    cross_validate_verification(report, result)
-    return result
+    return [m for _, m in schema_errors("verification", report)]
 
 
 class TestVerificationSchema(unittest.TestCase):
@@ -778,22 +385,6 @@ class TestVerificationSchema(unittest.TestCase):
 
     def test_valid_report_passes_schema(self):
         self.assertEqual(_verification_schema_errors(_valid_verification_report()), [])
-
-    def test_valid_report_passes_cross_checks(self):
-        result = _verification_cross(_valid_verification_report())
-        self.assertEqual(result.errors, [])
-        self.assertEqual(result.warnings, [])
-
-    def test_valid_report_round_trip_via_file(self):
-        report = _valid_verification_report()
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-            json.dump(report, f)
-            path = f.name
-        try:
-            r = validate_report(path, VERIFICATION_SCHEMA, registry=REGISTRY)
-            self.assertTrue(r.passed, r.errors)
-        finally:
-            Path(path).unlink()
 
     def test_unknown_verdict_rejected(self):
         errors = self._mutate(lambda r: r["verified_findings"][0].__setitem__("verdict", "fixed"))
@@ -820,188 +411,9 @@ class TestVerificationSchema(unittest.TestCase):
         self.assertTrue(any("'explanation' is a required property" in e for e in errors), errors)
 
 
-class TestVerificationCrossChecks(unittest.TestCase):
-    def _mutate(self, fn):
-        r = copy.deepcopy(_valid_verification_report())
-        fn(r)
-        return _verification_cross(r)
-
-    def test_verdict_count_mismatch(self):
-        result = self._mutate(lambda r: r["summary"]["by_verdict"].__setitem__("resolved", 2))
-        self.assertTrue(any("by_verdict[resolved]" in e for e in result.errors), result.errors)
-
-    def test_total_findings_mismatch(self):
-        result = self._mutate(lambda r: r["summary"].__setitem__("total_findings", 5))
-        self.assertTrue(any("summary.total_findings" in e for e in result.errors), result.errors)
-
-    def test_regressions_count_mismatch(self):
-        result = self._mutate(lambda r: r["summary"].__setitem__("regressions", 3))
-        self.assertTrue(any("summary.regressions" in e for e in result.errors), result.errors)
-
-    def test_duplicate_original_id(self):
-        result = self._mutate(
-            lambda r: r["verified_findings"][1].__setitem__("original_id", "SG_CORE-abcdef0-001")
-        )
-        self.assertTrue(any("Duplicate" in e for e in result.errors), result.errors)
-
-    def test_false_positive_requires_disposition_rationale(self):
-        def mutate(r):
-            f = r["verified_findings"][0]
-            f["verdict"] = "false_positive"
-            f["remediation_commits"] = []
-            f["unattributed"] = True
-            r["summary"]["by_verdict"]["resolved"] = 0
-            r["summary"]["by_verdict"]["false_positive"] = 1
-
-        result = self._mutate(mutate)
-        self.assertTrue(any("disposition_rationale" in e for e in result.errors), result.errors)
-
-    def test_partially_resolved_requires_residual_risk(self):
-        result = self._mutate(
-            lambda r: r["verified_findings"][1].__setitem__("residual_risk", None)
-        )
-        self.assertTrue(any("residual_risk" in e for e in result.errors), result.errors)
-
-    def test_resolved_without_commits_or_unattributed(self):
-        def mutate(r):
-            r["verified_findings"][0]["remediation_commits"] = []
-
-        result = self._mutate(mutate)
-        self.assertTrue(any("unattributed" in e for e in result.errors), result.errors)
-
-    def test_unattributed_with_commits_contradiction(self):
-        result = self._mutate(lambda r: r["verified_findings"][0].__setitem__("unattributed", True))
-        self.assertTrue(any("unattributed is true" in e for e in result.errors), result.errors)
-
-    def test_short_sha_not_prefix(self):
-        result = self._mutate(
-            lambda r: r["verified_findings"][0]["remediation_commits"][0].__setitem__(
-                "short_sha", "1234567"
-            )
-        )
-        self.assertTrue(any("not a prefix" in e for e in result.errors), result.errors)
-
-    def test_timeline_out_of_order(self):
-        def mutate(r):
-            second = copy.deepcopy(r["commit_timeline"][0])
-            second["date"] = "2026-06-01T10:00:00+00:00"
-            r["commit_timeline"].append(second)
-
-        result = self._mutate(mutate)
-        self.assertTrue(any("chronological" in e for e in result.errors), result.errors)
-
-    def test_timeline_unknown_finding_id(self):
-        result = self._mutate(
-            lambda r: r["commit_timeline"][0].__setitem__("addresses", ["GHOST-1234567-001"])
-        )
-        self.assertTrue(any("unknown finding ID" in e for e in result.errors), result.errors)
-
-    def test_regression_shortsha_mismatch_warns(self):
-        result = self._mutate(
-            lambda r: r["regressions"][0].__setitem__("id", "SG_CORE-0000000-REG-001")
-        )
-        self.assertTrue(any("patched_commit" in w for w in result.warnings), result.warnings)
-
-    def test_identical_commits_warn(self):
-        result = self._mutate(lambda r: r["metadata"].__setitem__("patched_commit", ORIGINAL_SHA))
-        self.assertTrue(any("identical" in w for w in result.warnings), result.warnings)
-
-    def test_commit_missing_from_timeline_warns(self):
-        result = self._mutate(lambda r: r.__setitem__("commit_timeline", []))
-        self.assertTrue(
-            any("not in commit_timeline" in w for w in result.warnings),
-            result.warnings,
-        )
-
-
 # ---------------------------------------------------------------------------
 # Findings disposition layers (layer.schema.json) and cumulative reports
 # ---------------------------------------------------------------------------
-
-
-LAYER_SCHEMA = load_schema(SCHEMA_DIR / "layer.schema.json")
-
-
-def _layer_schema_errors(layer):
-    validator = jsonschema.Draft202012Validator(
-        LAYER_SCHEMA,
-        format_checker=jsonschema.FormatChecker(),
-        registry=REGISTRY,
-    )
-    return [e.message for e in validator.iter_errors(layer)]
-
-
-class TestDispositionCrossChecks(unittest.TestCase):
-    """Cumulative-report disposition consistency (base report schema)."""
-
-    def _cumulative(self):
-        r = _consistency_report()
-        for f in r["findings"]:
-            f["disposition"] = {
-                "validity": f["validation_status"],
-                "resolution": "open",
-                "last_updated": "2026-07-10T12:00:00+00:00",
-                "events": [],
-            }
-        r["disposition_summary"] = {
-            "layer_ref": "test-widget-findings-layer.json",
-            "generated_at": "2026-07-10T12:00:00+00:00",
-            "by_resolution": {
-                "open": 2,
-                "fix_in_progress": 0,
-                "resolved": 0,
-                "partially_resolved": 0,
-                "risk_accepted": 0,
-                "regression_introduced": 0,
-            },
-            "by_validity": {
-                "confirmed": 0,
-                "corrected": 0,
-                "false_positive": 0,
-                "not_verified": 2,
-            },
-            "conflicts": [],
-            "needs_review_count": 0,
-        }
-        return r
-
-    def _mutate(self, fn):
-        r = self._cumulative()
-        fn(r)
-        return _cross_errors(r)
-
-    def test_valid_cumulative_passes(self):
-        r = self._cumulative()
-        self.assertEqual(_schema_errors(r), [])
-        self.assertEqual(_cross_errors(r).errors, [])
-
-    def test_validation_status_disposition_mismatch(self):
-        result = self._mutate(
-            lambda r: r["findings"][0]["disposition"].__setitem__("validity", "confirmed")
-        )
-        self.assertTrue(any("does not equal" in e for e in result.errors), result.errors)
-
-    def test_resolution_count_mismatch(self):
-        result = self._mutate(
-            lambda r: r["disposition_summary"]["by_resolution"].__setitem__("resolved", 2)
-        )
-        self.assertTrue(any("by_resolution[resolved]" in e for e in result.errors), result.errors)
-
-    def test_missing_disposition_on_one_finding(self):
-        result = self._mutate(lambda r: r["findings"][1].pop("disposition"))
-        self.assertTrue(any("no disposition block" in e for e in result.errors), result.errors)
-
-    def test_conflict_flag_summary_mismatch(self):
-        result = self._mutate(
-            lambda r: r["findings"][0]["disposition"].__setitem__("conflict", True)
-        )
-        self.assertTrue(
-            any("disposition_summary.conflicts" in e for e in result.errors), result.errors
-        )
-
-    def test_audit_report_without_dispositions_unaffected(self):
-        result = _cross_errors(_consistency_report())
-        self.assertEqual(result.errors, [])
 
 
 if __name__ == "__main__":

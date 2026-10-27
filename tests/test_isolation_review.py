@@ -9,7 +9,7 @@ from traust.paths import skill_dir
 
 
 def _schema():
-    from traust_contracts.paths import schema_path as _sp
+    from traust.paths import schema_path as _sp
 
     return json.loads(_sp("isolation-review").read_text(encoding="utf-8"))
 

@@ -18,6 +18,8 @@ from types import SimpleNamespace
 import pytest
 import yaml
 from traust_core.v1.context import tool_reports
+
+# delete with the engine (final-drop follow-up)
 from traust_engine._util import safe_exec as engine_safe_exec
 from traust_engine._util.elf import ElfAnalyzer
 from traust_engine.adapters import checkov as engine_checkov

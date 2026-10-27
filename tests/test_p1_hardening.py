@@ -6,8 +6,6 @@ import importlib.util
 import sys
 from pathlib import Path
 
-import pytest
-
 from traust.paths import skill_dir
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -19,46 +17,6 @@ def _load(name, rel):
     sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
-
-
-def test_opengrep_url_rules_require_hex_sha(tmp_path):
-    """E6: movable refs silently change scan results — 40-hex only."""
-    ro = importlib.import_module("traust_engine.adapters.opengrep")
-    with pytest.raises(SystemExit, match="40-hex"):
-        ro.resolve_rules(["https://github.com/x/rules@main"], tmp_path)
-    with pytest.raises(SystemExit, match="40-hex"):
-        ro.resolve_rules(["https://github.com/x/rules"], tmp_path)
-    with pytest.raises(SystemExit, match="https"):
-        ro.resolve_rules(["git@github.com:x/rules@" + "a" * 40], tmp_path)
-
-
-def test_opengrep_bare_fork_url_gets_documented_pin(tmp_path, monkeypatch):
-    ro = importlib.import_module("traust_engine.adapters.opengrep")
-    seen = {}
-
-    def fake_run(argv, **kw):
-        seen["argv"] = argv
-        seen.setdefault("env", kw.get("env"))
-
-        class R:
-            returncode = 0
-            stdout = ""
-
-        if "rev-parse" in argv:
-            # cache verification (self-audit -009) checks HEAD == pin
-            R.stdout = ro.FORK_RULES_SHA + "\n"
-        elif "status" in argv:
-            R.stdout = ""  # pristine worktree
-        return R()
-
-    monkeypatch.setattr(ro.subprocess, "run", fake_run)
-    monkeypatch.setattr(ro, "CACHE_ROOT", tmp_path)
-    ro.resolve_rules([ro.FORK_RULES_REPO], tmp_path)
-    assert (
-        any(ro.FORK_RULES_SHA[:12] in str(a) for a in seen["argv"])
-        or (tmp_path / f"opengrep-rules-{ro.FORK_RULES_SHA[:12]}").exists()
-        or seen["env"].get("GIT_ALLOW_PROTOCOL") == "https"
-    )
 
 
 def test_symbol_index_skips_file_symlinks(tmp_path):

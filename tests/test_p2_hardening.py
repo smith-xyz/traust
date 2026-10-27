@@ -138,6 +138,7 @@ def test_p3_endpoint_host_gate():
 
 
 def test_p3_sweep_engine_dir_prefix():
+    # PENDING(decision: sweep stages — retire or port)
     # traust_engine is a pip-installed sibling package (pyproject.toml
     # [tool.uv.sources]). Read it through the import system — a relative
     # ../traust-engine path only resolves in a workspace that happens to

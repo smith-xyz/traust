@@ -487,9 +487,9 @@ def _stage(draft: Path, pair: RegressionPair) -> None:
 **Authoring contract:** write `patterns:` in `rule.skeleton.yaml` so that
 `traust sweep verify-draft {draft}` fires on every file in `before/` and on
 nothing in `after/`. Then move the rule into the pack category file in
-traust-engine (`src/traust_engine/data/secure-code-audit/opengrep-rules/`, a
-traust-engine PR; not a `regression.yaml` dump, match the pack's category
-layout) with `ruleid:`-annotated fixture lines, and delete this draft dir.
+the security pack (`packs/security/opengrep-rules/`; not a `regression.yaml`
+dump, match the pack's category layout) with `ruleid:`-annotated fixture
+lines, and delete this draft dir.
 """,
         encoding="utf-8",
     )

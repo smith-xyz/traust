@@ -1,7 +1,8 @@
-"""traust reaches traust-engine only through `src/traust/_tools.py` (until traust-tools exists).
+"""traust depends on traust-core only: no `traust_engine`, `traust_contracts` or `traust_ledger`
+import (static, or through `importlib.import_module`) under src/, harnessing/ or scripts/.
 
-Every other `traust_engine` import under src/ and harnessing/ is counted per file against
-BASELINE, which only shrinks: a new file, a higher count or a stale entry fails.
+What still imports the engine is counted per file against BASELINE, which only shrinks: a new
+file, a higher count or a stale entry fails.
 """
 
 from __future__ import annotations
@@ -11,42 +12,53 @@ from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOLS_MODULE = "src/traust/_tools.py"
+PACKAGES = ("traust_engine", "traust_contracts", "traust_ledger")
 BASELINE = {
-    "src/traust/cli/groups/_registry.py": 1,
-    "src/traust/cli/groups/portfolio.py": 1,
-    "src/traust/cli/groups/sweep.py": 5,
+    "src/traust/cli/groups/_registry.py": 1,  # load_engine, for the three decisions below
+    "src/traust/cli/groups/portfolio.py": 1,  # PENDING(decision: portfolio graph layers — retire or port)
+    "src/traust/cli/groups/sweep.py": 5,  # PENDING(decision: sweep stages — retire or port)
 }
+# metrics history/spend/declare-spend reach the engine through load_engine only:
+# PENDING(decision: metrics journal — retire or port to OpsService timeline)
 
 
-def _engine_imports(source: str) -> int:
+def _named(name: str) -> bool:
+    return any(name == p or name.startswith(f"{p}.") for p in PACKAGES)
+
+
+def _package_imports(source: str) -> int:
     count = 0
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):
-            names = [a.name for a in node.names]
+            count += sum(_named(a.name) for a in node.names)
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
-            names = [node.module]
-        else:
-            continue
-        count += sum(n == "traust_engine" or n.startswith("traust_engine.") for n in names)
+            count += _named(node.module)
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(f := node.func, ast.Attribute | ast.Name)
+            and (f.attr if isinstance(f, ast.Attribute) else f.id) == "import_module"
+            and node.args
+            and isinstance(arg := node.args[0], ast.Constant)
+            and isinstance(arg.value, str)
+        ):
+            count += _named(arg.value)
     return count
 
 
 def _hits() -> Counter[str]:
     return Counter(
         {
-            rel: n
-            for root in ("src", "harnessing")
+            path.relative_to(ROOT).as_posix(): n
+            for root in ("src", "harnessing", "scripts")
             for path in (ROOT / root).rglob("*.py")
-            if (rel := path.relative_to(ROOT).as_posix()) != TOOLS_MODULE
-            and (n := _engine_imports(path.read_text(encoding="utf-8")))
+            if (n := _package_imports(path.read_text(encoding="utf-8")))
         }
     )
 
 
-def test_engine_imports_never_grow_past_the_baseline() -> None:
+def test_package_imports_never_grow_past_the_baseline() -> None:
     grown = {f: n for f, n in _hits().items() if n > BASELINE.get(f, 0)}
-    assert not grown, f"import traust_engine through {TOOLS_MODULE} instead: {grown}"
+    assert not grown, f"use traust-core's doors instead: {grown}"
 
 
 def test_the_baseline_only_shrinks() -> None:
@@ -55,13 +67,19 @@ def test_the_baseline_only_shrinks() -> None:
     assert not stale, f"lower BASELINE to what remains (baseline, now): {stale}"
 
 
-def test_counted_imports_include_adapters_and_nested_ones() -> None:
+def test_counted_imports_include_every_package_and_nested_and_dynamic_ones() -> None:
     source = (
         "import traust_engine\n"
         "from traust_engine.adapters import grype\n"
         "def f():\n"
         "    from traust_engine import HarnessEngine\n"
+        "from traust_contracts.config import load_section\n"
+        "import traust_ledger.v1\n"
+        "importlib.import_module('traust_engine.corpus.resolver')\n"
+        "import_module('traust_contracts')\n"
         "from traust_enginex import y\n"
         "from . import traust_engine\n"
+        "importlib.import_module('traust_core.v1.context')\n"
+        "importlib.import_module(name)\n"
     )
-    assert _engine_imports(source) == 3
+    assert _package_imports(source) == 7

@@ -108,6 +108,7 @@ class TestValidationBenchmark(unittest.TestCase):
     """P7: scorer semantics — flags count as misses; floors bite."""
 
     def _score(self, verdict, flag=None, est=None, variant="vuln"):
+        # PENDING(decision: sweep stages — retire or port)
         from traust_engine.sweep.benchmark import _score_variant, load_expected
 
         bench = skill_dir("validate-findings") / "benchmark"

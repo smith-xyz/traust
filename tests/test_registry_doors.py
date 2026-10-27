@@ -17,6 +17,8 @@ from typing import Any
 
 import pytest
 import yaml
+
+# delete with the engine (final-drop follow-up)
 from traust_engine.registry import products
 
 from traust.cli.groups import registry
