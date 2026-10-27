@@ -3,28 +3,26 @@
 import json
 
 import pytest
-from traust_contracts import Locations
 from traust_engine.registry import feeds as pd_feeds
 
 from traust.cli import fetch_feeds as ff
 
 
 @pytest.fixture(autouse=True)
-def _product_definitions_configured(monkeypatch):
+def _product_definitions_configured(monkeypatch, tmp_path):
     """product-definitions is config-gated (locations.product_definitions) since it
     targets a deployment-specific registry. The suite exercises it as a configured
     estate would. Tests that want the open-source default (absent) override it."""
-    monkeypatch.setattr(
-        ff.locations,
-        "configured_locations",
-        lambda: Locations(product_definitions="https://feeds.test/product-definitions.json"),
-    )
+    home = tmp_path / "config-home"
+    home.mkdir()
+    (home / "locations.yaml").write_text(f"product_definitions: {URL}\n")
+    monkeypatch.setenv("TRAUST_CONFIG_HOME", str(home))
 
 
-def test_product_definitions_absent_without_config(monkeypatch, tmp_path, capsys):
+def test_product_definitions_absent_without_config(tmp_path, capsys):
     """Open-source default: locations.product_definitions unset → the internal
     product registry is not registered at all; nothing is fetched, the run says so."""
-    monkeypatch.setattr(ff.locations, "configured_locations", lambda: Locations())
+    (tmp_path / "config-home" / "locations.yaml").unlink()
     assert ff.main(["--cache-dir", str(tmp_path)]) == 1
     assert "not configured" in capsys.readouterr().out
     assert not (tmp_path / "product_definitions.json").exists()

@@ -2009,3 +2009,22 @@ class TestShippedPolicyPosture:
         assert rw.read_policy_budget(live)[0] is None
         shadow, _ = rw.read_policy_shadow_ceiling(live)
         assert shadow is None or shadow > 0
+
+
+@pytest.mark.parametrize(
+    ("raw", "url"),
+    [
+        ("https://github.com/org/repo", "https://github.com/org/repo"),
+        ("<https://github.com/org/repo>", "https://github.com/org/repo"),
+        ("https://github.com/org/repo.git", "https://github.com/org/repo"),
+        ("https://github.com/org/repo/.", "https://github.com/org/repo"),
+        ("see https://github.com/org/a, https://github.com/org/b", "https://github.com/org/a"),
+        ("http://git.example.org/Org/Repo/", "http://git.example.org/Org/Repo"),
+        ("repo-name-only", None),
+        ("ext::sh -c evil", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_normalize_repo_url_takes_the_first_url_out_of_report_prose(raw, url):
+    assert rw._normalize_repo_url(raw) == url
