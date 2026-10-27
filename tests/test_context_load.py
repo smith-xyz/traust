@@ -53,5 +53,6 @@ def test_the_context_sees_every_registered_provider(core: Context, provider: str
 
 def test_the_context_is_the_only_loader() -> None:
     loaders = {n for n in vars(context) if n.startswith("load")}
-    # NEED(engine facade): load_engine stays for the grouped ops; load_caller is identity.
-    assert loaders == {"load", "load_engine", "load_caller"}
+    # NEED(engine facade): load_engine stays for the grouped ops; load_caller is identity;
+    # load_spend_core is load() that requires the model registry (exit 2 without it).
+    assert loaders == {"load", "load_engine", "load_caller", "load_spend_core"}
