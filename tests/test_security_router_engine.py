@@ -1,10 +1,14 @@
 """The security pack's router in traust-engine's loop over real traust-core services on SQLite:
-a `repo_state` completion routes the repository once, a lane over budget is withheld and a
-forge host past its quota is deferred."""
+a `repo_state` completion routes the repository once, a lane over budget is withheld, a
+forge host past its quota is deferred, and a threat-model PR stamp reaches the diff scan's
+session."""
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
+import subprocess
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -36,13 +40,16 @@ from traust_core.v1.models.operations import (
     WorkerId,
 )
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
-from traust_core.v1.models.vocabulary import ActorKind, BudgetEnforcement
+from traust_core.v1.models.vocabulary import ActorKind, BudgetEnforcement, RefKind
 from traust_core.v1.providers.base import Acquisition, Readiness, Result
 from traust_core.v1.providers.process import ProcessResult, ProcessRunner
 from traust_core.v1.providers.tools import ToolRequest
 from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
 from traust_engine import EngineLoop, Pack
+from traust_engine.ops.runner import Runner
 
+from tests.test_session_run import ANCHOR, Processes
+from traust.cli import session
 from traust.ops.router import SecurityRouter
 
 PACK = Path(__file__).resolve().parents[1] / "packs" / "security" / "assets.yaml"
@@ -118,6 +125,29 @@ def _audited(context: Context, name: str) -> UUID:
         )
         uow.commit()
     return repo.id
+
+
+def _threat_modelled(context: Context, repository_id: UUID) -> None:
+    """A completed threat model on the repository's default branch, at PINNED."""
+    with SqlTraustUnitOfWork(context.database) as uow:
+        main = RepositoryRef(
+            repository_id=repository_id,
+            name="main",
+            kind=RefKind.BRANCH,
+            is_default=True,
+            sha=PINNED,
+        )
+        uow.assessments.add(
+            Assessment(
+                repository_ref_id=uow.repository_refs.add(main).id,
+                kind=AssessmentKind.THREAT_MODEL,
+                status="completed",
+                assessor="skill:threat-model",
+                assessor_version="1",
+                occurred_at=datetime(2026, 9, 1, tzinfo=UTC),
+            )
+        )
+        uow.commit()
 
 
 def _materialize_repo_state(context: Context, repository_id: UUID) -> None:
@@ -202,6 +232,48 @@ def test_an_iac_change_routes_the_cloud_config_lane_beside_the_tables(
         ("diff_scan_quarterly", "diff-scan-quarterly", "rule-5"),
         ("cloud_config_audit", "iac-baseline", "lever-6"),  # no cloud-config baseline yet
     ]
+
+
+def test_a_threat_model_pr_stamp_reaches_the_diff_scans_session(
+    loop: tuple[Context, Clock, EngineLoop],
+    forge: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    context, clock, engine = loop
+    files = forge[f"repos/org/app/compare/{PINNED}...HEAD"]["files"]
+    files.append({"filename": "api/handlers.py", "changes": 4})  # an interface-bearing path
+    repository_id = _audited(context, "app")
+    _threat_modelled(context, repository_id)
+    _materialize_repo_state(context, repository_id)
+    clock.at += timedelta(minutes=1)
+    engine.run_once()
+    services = context.services()
+    (order,) = _orders(services, "diff_scan_quarterly")
+    assert order.rule == "rule-5+threat-model-pr"
+    services.ops.approve(order.id, OPERATOR)  # type: ignore[arg-type]
+
+    commands: list[list[str]] = []
+
+    def record(command: list[str]) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    runner = Runner(
+        services, Pack.load(PACK), WORKER, timedelta(minutes=5), ("github.com",), record
+    )
+    while runner.claim_once() is not None:
+        pass
+    assert services.ops.get(order.id).state == OrderState.SUCCEEDED  # type: ignore[arg-type]
+    (scan,) = [c for c in commands if "vuln-scan" in c]
+    assert scan[:5] == ["python3", "-m", "traust.cli", "session", "run"]
+
+    processes = Processes()
+    monkeypatch.setattr(session.subprocess, "run", processes)
+    with contextlib.redirect_stdout(io.StringIO()):
+        assert session.run(scan[5:]) == 0
+    prompts = [c[0][-1] for c in processes.agent_calls()]
+    clone = prompts[0].split()[1]
+    assert prompts == [f"/vuln-scan {clone} --diff", f"/threat-model pr {clone} --base {ANCHOR}"]
 
 
 class FakeGitleaks:

@@ -59,8 +59,8 @@ DIFF_LANES = frozenset({"diff-scan", "diff-scan-quarterly"})
 # diff scan, which adjudicates the hit.
 TRIPWIRE_LANES = frozenset({"deps-lane", "diff-scan-quarterly"})
 # The threat-model `pr` stamp rides the diff order's rule (the legacy row's `threat_model_pr`):
-# `/threat-model pr` on the diff scan's clone, report-only. NEED(runner): the diff-scan session
-# doesn't read its order's rule yet, so nothing runs the `pr` pass.
+# the diff assets pass `{rule}` to `traust session run`, which runs `/threat-model pr` on the diff
+# scan's checkout, report-only.
 THREAT_MODEL_PR = "+threat-model-pr"
 
 

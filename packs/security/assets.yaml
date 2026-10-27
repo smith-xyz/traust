@@ -47,9 +47,11 @@ assets:
     admission: {approval: operators, estimate_usd: "29.04"}
     runner: {labels: [llm]}
 
-  diff_scan:  # skill session: /vuln-scan <clone> --diff; rule 3 on P2/P3, outside the drain
+  diff_scan:  # skill session: /vuln-scan <clone> --diff; rule 3 on P2/P3, outside the drain.
+    # A rule carrying the router's `+threat-model-pr` stamp adds a report-only
+    # `/threat-model pr <clone> --base <anchor>` on the same clone (both diff lanes).
     model: {role: vuln-scan}
-    run: [python3, -m, traust.cli, session, run, --skill, vuln-scan, --role, "{role}", --repo, "{repo_url}", --checkout, --run-id, "{run_id}", --, --diff]
+    run: [python3, -m, traust.cli, session, run, --skill, vuln-scan, --role, "{role}", --repo, "{repo_url}", --checkout, --run-id, "{run_id}", --rule, "{rule}", --, --diff]
     partitions: dynamic:repo
     deps: [repo_state]
     trigger: {lanes: [diff-scan]}
@@ -61,7 +63,7 @@ assets:
     # the highest-priority rows (external band first) each tick. Tune per_tick to the tick
     # interval so a week drains what the tranche did.
     model: {role: vuln-scan}
-    run: [python3, -m, traust.cli, session, run, --skill, vuln-scan, --role, "{role}", --repo, "{repo_url}", --checkout, --run-id, "{run_id}", --, --diff]
+    run: [python3, -m, traust.cli, session, run, --skill, vuln-scan, --role, "{role}", --repo, "{repo_url}", --checkout, --run-id, "{run_id}", --rule, "{rule}", --, --diff]
     partitions: dynamic:repo
     deps: [repo_state]
     trigger: {lanes: [diff-scan-quarterly]}
