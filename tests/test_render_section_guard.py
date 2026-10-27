@@ -12,10 +12,10 @@ import json
 from argparse import Namespace
 from pathlib import Path
 
-import pytest
+from traust_core.v1.models.artifacts import RenderFormat, ThreatModelArtifact
 
-from traust.cli.groups import reporting
-from traust.cli.groups.reporting import call_render, lost_sections
+from traust.cli.groups.reporting import call_render
+from traust.context import load
 
 FULL = {
     "system": "example",
@@ -51,26 +51,14 @@ FULL = {
 THIN = {k: FULL[k] for k in ("system", "provenance", "threats")}
 
 
-class _Engine:
-    class reporting:  # mimics the engine facade attribute
-        @staticmethod
-        def render(path):
-            from traust_engine.reporting.render import render_threat_model
-
-            return render_threat_model(json.loads(Path(path).read_text()))
-
-
 def _render(tmp_path: Path, document: dict, existing: str | None, allow: bool = False):
     src = tmp_path / "repo-threat-model.json"
     src.write_text(json.dumps(document))
     out = tmp_path / "repo-threat-model.md"
     if existing is not None:
         out.write_text(existing)
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(reporting, "load_engine", lambda home: _Engine)
-        args = Namespace(config_home=None, report=src, out=out, allow_section_loss=allow)
-        rc = call_render(args)
-    return rc, out.read_text()
+    args = Namespace(config_home=None, report=src, out=out, allow_section_loss=allow)
+    return call_render(args), out.read_text()
 
 
 def _full_markdown(tmp_path: Path) -> str:
@@ -87,9 +75,9 @@ def test_thin_json_does_not_overwrite_a_full_model(tmp_path: Path) -> None:
 
 
 def test_lost_sections_names_what_would_go(tmp_path: Path) -> None:
-    from traust_engine.reporting.render import render_threat_model
-
-    lost = lost_sections(_full_markdown(tmp_path), render_threat_model(THIN))
+    reporting = load().reporting
+    thin = reporting.render(ThreatModelArtifact.from_document(THIN), RenderFormat.MARKDOWN)
+    lost = reporting.lost_sections(_full_markdown(tmp_path), thin)
     assert {"1. System context", "2. Assets", "3. Entry points & trust boundaries"} <= set(lost)
     assert "4. Threats" not in lost
 
