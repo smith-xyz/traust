@@ -196,7 +196,7 @@ Assess a repository's post-quantum TLS readiness. Use when asked whether a repo 
 
 ## secure-code-audit
 
-Use when the user asks to perform a security audit, security review, vulnerability assessment, or code analysis of a GitHub repository, operator, or batch of repositories using OWASP ASVS, OWASP Kubernetes Top 10, CIS Kubernetes Benchmark, DISA STIG, SLSA, OpenSSF Scorecard, SEI CERT coding standards (Java, C/C++), or PEACH tenant-isolation frameworks.
+Use when the user asks to perform a security audit, security review, vulnerability assessment, or code analysis of a GitHub repository, operator, or batch of repositories using OWASP ASVS, OWASP Kubernetes Top 10, CIS Kubernetes Benchmark, DISA STIG, SLSA, OpenSSF Scorecard, SEI CERT coding standards (Java, C/C++), or PEACH tenant-isolation frameworks. Authors canonical remediation sizes or explicit unknowns, independently evidenced blocking, and explicit roadmap priorities for Core-recorded reports.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -206,7 +206,7 @@ Use when the user asks to perform a security audit, security review, vulnerabili
 
 ## secure-container-audit
 
-Use when the user asks to perform a security audit, vulnerability scan, SBOM analysis, or supply-chain assessment of a container image (registry reference, payload image, or batch of images) using skopeo, syft, and grype — covering image configuration, known CVEs in shipped packages, signature/provenance posture, and drift between the image contents and its source repository.
+Use when the user asks to perform a security audit, vulnerability scan, SBOM analysis, or supply-chain assessment of a container image (registry reference, payload image, or batch of images) using skopeo, syft, and grype — covering image configuration, known CVEs in shipped packages, signature/provenance posture, and drift between the image contents and its source repository. Authors canonical remediation sizes or explicit unknowns, independent blocking, and explicit roadmap priorities through Core's report record door.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -215,7 +215,7 @@ Use when the user asks to perform a security audit, vulnerability scan, SBOM ana
 
 ## secure-rpm-audit
 
-Use when the user asks to perform a security audit, security review, or vulnerability assessment of an RPM packaging repository (CentOS Stream / Fedora / RHEL dist-git) — a repo containing a .spec file, downstream patches, and a sources lookaside manifest — using OWASP ASVS, the SEI CERT C/C++ Coding Standards, Fedora Packaging Guidelines, SLSA, and OpenSSF Scorecard.
+Use when the user asks to perform a security audit, security review, or vulnerability assessment of an RPM packaging repository (CentOS Stream / Fedora / RHEL dist-git) — a repo containing a .spec file, downstream patches, and a sources lookaside manifest — using OWASP ASVS, the SEI CERT C/C++ Coding Standards, Fedora Packaging Guidelines, SLSA, and OpenSSF Scorecard. Authors canonical remediation sizes or explicit unknowns, independent blocking, and explicit roadmap priorities through Core's report record door.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -224,7 +224,7 @@ Use when the user asks to perform a security audit, security review, or vulnerab
 
 ## security-audit-phased
 
-Use when a reviewer wants to steer a security code audit between phases — Phase 1 reconnaissance, Phase 2 prior-vuln pattern analysis, Phase 3 systematic CWE-taxonomy weakness hunt (including PEACH tenant isolation), Phase 4 cross-cutting analysis and final report, Phase 6 reproducer generation, plus review/CVSS/follow-up-seed helpers. Each phase is a separate slash command that reads the previous phase's JSON and writes its own.
+Use when a reviewer wants to steer a security code audit between phases — Phase 1 reconnaissance, Phase 2 prior-vuln pattern analysis, Phase 3 systematic CWE-taxonomy weakness hunt (including PEACH tenant isolation), Phase 4 cross-cutting analysis and final report, Phase 6 reproducer generation, plus review/CVSS/follow-up-seed helpers. Each phase is a separate slash command that reads the previous phase's JSON and writes its own; publishing a campaign report uses secure-code-audit's canonical remediation guidance and Core record door.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -504,7 +504,7 @@ Use when the user asks for a portfolio view of RBAC or multi-tenancy findings �
 
 ## recall-benchmark
 
-Use when the user asks to measure the auditor's detection recall, run the recall benchmark, score a harness release against ground truth, bootstrap/admit benchmark targets, or asks "what fraction of real vulnerabilities do we find". Audits pinned pre-fix refs of repos with known-real findings (self-replay from the disposition ledger, CVE replay, seeded) on clean clones, scores detection with the finding_identity match ladder via traust-core (`traust sweep score-benchmark`), and emits benchmark.json — recall overall/per-CWE/per-severity/per-language, held-out split, and run-to-run stability.
+Use when the user asks to measure the auditor's detection recall, run the recall benchmark, score a harness release against ground truth, bootstrap/admit benchmark targets, or asks "what fraction of real vulnerabilities do we find". Audits pinned pre-fix refs of repos with known-real findings (self-replay from the disposition ledger, CVE replay, seeded) on clean clones using the shared canonical remediation-authoring rules, records real-target reports through Core, scores detection with the finding_identity match ladder via traust-core (`traust sweep score-benchmark`), and emits benchmark.json — recall overall/per-CWE/per-severity/per-language, held-out split, and run-to-run stability.
 
 - **Stage:** —
 - **Tier:** `secondary`

@@ -43,4 +43,11 @@ def test_the_checklist_only_names_finding_fields_the_report_schema_has():
     report = json.loads((schema_dir() / "report.schema.json").read_text(encoding="utf-8"))
     fields = set(report["$defs"]["finding"]["properties"])
     named = set(re.findall(r"`(\w+_references|cwes)`", CHECKLIST.read_text(encoding="utf-8")))
-    assert named and named <= fields, named - fields
+    assert "owasp_llm_references" in named
+    assert named <= fields, named - fields
+
+
+def test_the_schema_field_takes_every_category_the_checklist_covers():
+    report = json.loads((schema_dir() / "report.schema.json").read_text(encoding="utf-8"))
+    field = report["$defs"]["finding"]["properties"]["owasp_llm_references"]
+    assert field["items"]["enum"] == [f"LLM{n:02d}" for n in range(1, 11)]

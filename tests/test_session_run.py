@@ -21,6 +21,7 @@ REPO = "https://github.com/example/app"
 HEAD = "b" * 40
 ANCHOR = "a" * 40
 PREPARED = json.dumps({"kind": "vuln-scan", "diff": {"anchor": ANCHOR}})
+CLAUDE_RESULT = (Path(__file__).parent / "fixtures" / "session" / "claude-result.json").read_text()
 
 
 class Processes:
@@ -35,8 +36,9 @@ class Processes:
         prepare: tuple[int, str] = (0, PREPARED),
         pr_agent: int = 0,
         unknown_role: str = "",
+        reply: str = CLAUDE_RESULT,
     ) -> None:
-        self.model, self.agent, self.clone = model, agent, clone
+        self.model, self.agent, self.clone, self.reply = model, agent, clone, reply
         self.prepare, self.pr_agent, self.unknown_role = prepare, pr_agent, unknown_role
         self.calls: list[tuple[list[str], dict[str, Any]]] = []
         self.roles: list[str] = []
@@ -60,7 +62,8 @@ class Processes:
         if argv[0] == "git" and argv[-2:] == ["rev-parse", "HEAD"]:
             return subprocess.CompletedProcess(argv, 0, HEAD + "\n", "")
         pr = argv[-1].startswith("/threat-model pr ")
-        return subprocess.CompletedProcess(argv, self.pr_agent if pr else self.agent)
+        code = self.pr_agent if pr else self.agent
+        return subprocess.CompletedProcess(argv, code, self.reply)
 
     def agent_call(self) -> tuple[list[str], dict[str, Any]]:
         (call,) = self.agent_calls()
@@ -92,7 +95,7 @@ def run(*argv: str) -> tuple[int, dict[str, Any]]:
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
         rc = session.run(list(argv))
-    return rc, json.loads(out.getvalue())
+    return rc, json.loads(out.getvalue().splitlines()[-1])
 
 
 def test_a_session_runs_the_skill_on_the_roles_model_in_the_harness(processes: Processes) -> None:
@@ -268,3 +271,69 @@ def test_the_stamp_needs_a_checkout() -> None:
                 "r+threat-model-pr",
             ]
         )
+
+
+def test_the_session_answers_its_reply_then_a_job_result_carrying_its_usage(
+    processes: Processes, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rc = session.run(["--skill", "vuln-scan", "--role", "vuln-scan", "--repo", REPO])
+    *text, last = capsys.readouterr().out.splitlines()
+    assert rc == 0 and text == ["Scan recorded: 2 findings."]
+    usage = json.loads(last)["usage"]
+    assert [
+        {k: u[k] for k in ("provider", "model", "tokens_in", "tokens_out", "cache_read",
+                           "cache_creation", "skill", "session")}
+        for u in usage
+    ] == [
+        {"provider": "anthropic", "model": "claude-haiku-4-5-20251001", "tokens_in": 20,
+         "tokens_out": 100, "cache_read": 0, "cache_creation": 1000, "skill": "vuln-scan",
+         "session": "00000000-0000-4000-8000-000000000001"},
+        {"provider": "anthropic", "model": "claude-opus-5-5", "tokens_in": 1500,
+         "tokens_out": 24000, "cache_read": 1830000, "cache_creation": 60000,
+         "skill": "vuln-scan", "session": "00000000-0000-4000-8000-000000000001"},
+    ]  # fmt: skip
+    argv, _ = processes.agent_call()
+    assert argv[:4] == ["claude", "-p", "--output-format", "json"]
+
+
+def test_a_stamped_scan_carries_both_sessions_usage(processes: Processes) -> None:
+    _, result = run(*STAMPED_SCAN)
+    assert [(u["skill"], u["model"]) for u in result["usage"]] == [
+        ("vuln-scan", "claude-haiku-4-5-20251001"),
+        ("vuln-scan", "claude-opus-5-5"),
+        ("threat-model", "claude-haiku-4-5-20251001"),
+        ("threat-model", "claude-opus-5-5"),
+    ]
+
+
+def test_a_failed_session_still_carries_what_it_spent(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(session.subprocess, "run", Processes(agent=1))
+    rc, result = run("--skill", "dependency-watch", "--role", "fact-judge")
+    assert (rc, result["outcome"], len(result["usage"])) == (1, "failed", 2)
+
+
+@pytest.mark.parametrize(
+    ("reply", "usage"),
+    [
+        (json.dumps({**json.loads(CLAUDE_RESULT), "is_error": True}), 2),
+        ("Not logged in", 0),
+        ("", 0),
+    ],
+    ids=["an error result", "not json", "nothing"],
+)
+def test_a_session_without_a_good_json_result_fails(
+    monkeypatch: pytest.MonkeyPatch, reply: str, usage: int
+) -> None:
+    monkeypatch.setattr(session.subprocess, "run", Processes(reply=reply))
+    rc, result = run("--skill", "dependency-watch", "--role", "fact-judge")
+    assert (rc, result["outcome"], result["reason"]) == (1, "failed", "runner-crashed")
+    assert len(result["usage"]) == usage
+
+
+def test_a_session_runs_with_the_runners_own_claude_config_dir(
+    processes: Processes, tmp_path: Path
+) -> None:
+    run("--config-home", str(tmp_path), "--skill", "dependency-watch", "--role", "fact-judge")
+    _, kw = processes.agent_call()
+    assert kw["env"]["CLAUDE_CONFIG_DIR"] == str(tmp_path / "claude-runner")
+    assert not Path(kw["env"]["CLAUDE_CONFIG_DIR"]).is_relative_to(Path.home() / ".claude")
