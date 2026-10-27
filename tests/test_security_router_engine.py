@@ -20,7 +20,12 @@ from traust_core.v1.models.artifacts import AdapterResultArtifact
 from traust_core.v1.models.assessment import Assessment, AssessmentKind
 from traust_core.v1.models.common import every_item
 from traust_core.v1.models.identity import Principal
-from traust_core.v1.models.inventory import RepositoryRef
+from traust_core.v1.models.inventory import (
+    ProductSlug,
+    ReleaseCommit,
+    RepositoryRef,
+    VersionLabel,
+)
 from traust_core.v1.models.operations import (
     Budget,
     JobResult,
@@ -30,7 +35,7 @@ from traust_core.v1.models.operations import (
     RunOrder,
     WorkerId,
 )
-from traust_core.v1.models.values import HttpsRepoUrl
+from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import ActorKind, BudgetEnforcement
 from traust_core.v1.providers.base import Acquisition, Readiness, Result
 from traust_core.v1.providers.process import ProcessResult, ProcessRunner
@@ -290,3 +295,50 @@ def test_a_forge_host_past_its_quota_is_deferred(tmp_path: Path, forge: dict[str
     states = sorted(o.state for o in _orders(context.services(), "repo_state"))
     assert report.admission.deferred == 1
     assert states == [OrderState.PLANNED, OrderState.QUEUED]
+
+
+def _release(context: Context, version: str, *names: str) -> None:
+    portfolio = context.services().portfolio
+    product = portfolio.find_product(ProductSlug("platform")) or portfolio.register_product(
+        ProductSlug("platform"), "Platform"
+    )
+    commits = [
+        ReleaseCommit(
+            url=HttpsRepoUrl.parse(f"https://github.com/org/{n}", ["github.com"]),
+            sha=GitSha(PINNED),
+        )
+        for n in names
+    ]
+    portfolio.import_release(product.id, VersionLabel(version), commits)  # type: ignore[arg-type]
+
+
+def test_a_minor_release_routes_a_rating_review_for_each_repository_it_ships(
+    loop: tuple[Context, Clock, EngineLoop],
+) -> None:
+    context, clock, engine = loop
+    app, lib = _audited(context, "app"), _audited(context, "lib")
+    for repository_id in (app, lib):
+        _materialize_repo_state(context, repository_id)
+    _release(context, "4.19", "app", "lib")
+    clock.at += timedelta(minutes=1)
+    engine.run_once()
+    assert _orders(context.services(), "threat_model_review") == []  # nothing to compare yet
+
+    _release(context, "4.19.1", "app", "lib")
+    clock.at += timedelta(minutes=1)
+    assert engine.run_once().tick.routed == 2
+    assert _orders(context.services(), "threat_model_review") == []  # a patch re-models nothing
+
+    _release(context, "4.20", "app")
+    clock.at += timedelta(minutes=1)
+    assert engine.run_once().tick.routed == 1
+    (review,) = _orders(context.services(), "threat_model_review")
+    assert (review.repository_id, review.lane, review.rule) == (
+        app,
+        "threat-model-review",
+        "threat-model-2",
+    )
+    assert review.state == OrderState.AWAITING_APPROVAL
+    clock.at += timedelta(minutes=1)
+    assert engine.run_once().tick.routed == 0
+    assert len(_orders(context.services(), "threat_model_review")) == 1

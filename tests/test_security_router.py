@@ -11,7 +11,15 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from traust_core.v1.models.inventory import ExposureClass, RepoState, RiskTier
+from traust_core.v1.models.inventory import (
+    ExposureClass,
+    RecordedRelease,
+    Release,
+    ReleaseBump,
+    ReleaseChange,
+    RepoState,
+    RiskTier,
+)
 from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import ComparisonStatus
 from traust_core.v1.services.observation import PREROUTE_MIN_FILES
@@ -362,3 +370,40 @@ def test_additive_rows_ride_beside_a_classification_without_a_queue() -> None:
 def test_a_never_audited_repository_gets_no_calendar_backstop() -> None:
     state = _state(status=ComparisonStatus.NEVER_AUDITED, threat_model_age_days=400)
     assert _routes(state) == [("rule-1-bootstrap", "full-audit")]
+
+
+def _release(bump: ReleaseBump | None) -> RecordedRelease:
+    """A recorded release; no bump is the product's first recorded release."""
+    release = Release(id=uuid4(), product_id=uuid4(), version="4.20")
+    change = None
+    if bump is not None:
+        change = ReleaseChange(
+            release_id=release.id,  # type: ignore[arg-type]
+            previous_id=uuid4(),
+            version="4.20",
+            previous_version="4.19",
+            bump=bump,
+        )
+    return RecordedRelease(release=release, repository_ids=(uuid4(),), change=change)
+
+
+@pytest.mark.parametrize("bump", [*ReleaseBump, None])
+def test_a_release_re_models_only_on_a_major_or_minor_bump_as_the_legacy_router(
+    bump: ReleaseBump | None,
+) -> None:
+    legacy = bump is not None and str(bump) in rw.RELEASE_REMODEL_CHANGES
+    routes = [(r.reason, r.lane) for r in SecurityRouter().route(_state(), (_release(bump),), ())]
+    assert (("threat-model-2", "threat-model-review") in routes) == legacy
+    assert routes[0] == ("rule-7", None)
+
+
+def test_a_release_review_rides_beside_the_table_and_additive_rows_once() -> None:
+    state = _state(changed_lines=12, threat_model_age_days=100)
+    events = tuple(map(_release, (ReleaseBump.MINOR, ReleaseBump.MAJOR, ReleaseBump.PATCH)))
+    routes = SecurityRouter().route(state, events, ())
+    assert [(r.reason, r.lane) for r in routes] == [
+        ("rule-5", "diff-scan-quarterly"),
+        ("threat-model-3", "threat-model-quarterly"),
+        ("threat-model-2", "threat-model-review"),
+    ]
+    assert routes[-1].priority == priority("threat-model-review", state)
