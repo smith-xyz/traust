@@ -18,6 +18,7 @@ import yaml
 from traust_core.v1.context import Context
 from traust_core.v1.errors import NotFoundError
 from traust_core.v1.models.artifacts import (
+    FuzzReportArtifact,
     IsolationReviewArtifact,
     PrivProfileArtifact,
     SecurityAuditArtifact,
@@ -379,3 +380,78 @@ def test_record_files_a_threat_model_at_its_provenance_date(doors, home, tmp_pat
         "skill:threat-model",
     )
     assert provenance.occurred_at == datetime(2026, 10, 1, tzinfo=UTC)
+
+
+CRASHER = {
+    "id": "FuzzParseRange-001",
+    "harness": "FuzzParseRange",
+    "title": "parseRange indexes the split result without a length check",
+    "signature": {"crash_class": "index_out_of_range", "stack_hash": "d8f26ecffa44a0c1"},
+    "reproducer": {"sha256": "a" * 64, "path": "api/v1/testdata/fuzz/FuzzParseRange/d8f2"},
+    "sanitizer": None,
+    "cwes": ["CWE-129"],
+    "severity_proposal": "medium",
+    "location": {"path": "api/v1/helper.go", "lines": "550"},
+}
+FUZZ_REPORT = {
+    "artifact": "fuzz-report",
+    "target": {
+        "id": "widget-operator",
+        "language": "go",
+        "harnesses": [
+            {
+                "name": "FuzzParseRange",
+                "engine": "go_native",
+                "path": "api/v1/helper_fuzz_test.go",
+                "duration_seconds": 900,
+                "execs": 4812330,
+                "outcome": "crashed",
+            }
+        ],
+    },
+    "crashers": [CRASHER],
+    "coverage": None,
+    "gaps": [{"surface": "pkg/dns", "reason": "fuzzed_upstream"}],
+}
+
+
+def test_record_files_a_fuzz_report_as_a_new_run_each_time(doors, home, tmp_path):
+    before = datetime.now(UTC)
+    path = document(tmp_path, FUZZ_REPORT)
+    for _ in range(2):
+        assert run(home, str(path), "--kind", "fuzz", "--repo-url", URL, "--sha", SHA)[0] == 0
+    (doc, ref, kind, assessor, _, _provenance) = doors.record.calls[0]
+    assert isinstance(doc, FuzzReportArtifact)
+    assert (ref, kind, assessor) == (REF, AssessmentKind.FUZZ, "skill:create-fuzzing")
+    first, second = (c[-1].occurred_at for c in doors.record.calls)
+    assert before <= first <= second
+
+
+def test_record_refuses_a_fuzz_report_off_its_schema(doors, home, tmp_path):
+    path = document(tmp_path, {**FUZZ_REPORT, "crashers": [{**CRASHER, "cwes": ["129"]}]})
+    rc, err = run(home, str(path), "--kind", "fuzz", "--repo-url", URL, "--sha", SHA)
+    assert rc == 2
+    assert "crashers/0/cwes/0" in err
+    assert doors.record.calls == []
+
+
+def test_record_on_core_takes_a_fuzz_reports_crashers_in(core_home, tmp_path):
+    path = document(tmp_path, FUZZ_REPORT)
+    rc, out = run(core_home, str(path), "--kind", "fuzz", "--repo-url", URL, "--sha", SHA)
+    assert rc == 0, out
+    core = Context.from_file(core_home / "core.yaml")
+    services = core.services()
+    repo = services.portfolio.find_repository(HttpsRepoUrl.parse(URL, core.config.forge_hosts))
+    reported = FingerprintInput(
+        repo=repo.url, cwes=("CWE-129",), locations=({"path": "api/v1/helper.go"},)
+    )
+    assert services.findings.intake.match(repo.id, reported) is not None
+
+
+def test_record_on_core_refuses_a_crasher_of_an_unlisted_harness(core_home, tmp_path):
+    body = {**FUZZ_REPORT, "crashers": [{**CRASHER, "harness": "FuzzMissing"}]}
+    rc, err = run(
+        core_home, str(document(tmp_path, body)), "--kind", "fuzz", "--repo-url", URL, "--sha", SHA
+    )
+    assert rc == 2
+    assert "does not match any target harness" in err
