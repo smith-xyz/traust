@@ -20,6 +20,10 @@ All notable changes to Traust are documented here.
   inventing validity or execution proof. PQC hardening instructions now emit
   `kind: weakness`, not a deprecated hardening validity label; existing findings,
   historical report bytes and replay identities remain unchanged.
+  Duplicate fingerprints within one batch retain an agreed explicit kind in
+  either input order; conflicting explicit kinds refuse the entire batch
+  before insertion, without reclassifying previously stored findings.
+
 - **OWASP LLM categories are structured again.** `llm-application-review.md`
   records a finding's OWASP LLM Top 10 category in `owasp_llm_references`
   (for example `["LLM06"]`) instead of in the description; the check number
