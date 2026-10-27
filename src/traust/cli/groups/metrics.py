@@ -15,7 +15,7 @@ from traust_core.v1.models.operations import (
     UsageRollup,
 )
 
-from traust.cli.groups._registry import OpSpec, load_engine
+from traust.cli.groups._registry import OpSpec, load_engine, passthrough_op
 from traust.context import load_spend_core, workspace_dir
 from traust.paths import skill_dirs
 
@@ -175,7 +175,8 @@ def skill_names() -> set[str]:
 COLLECT_SPEND = OpSpec(
     add_args=add_collect_spend_args,
     call=call_collect_spend,
-    help="Collect session spend from Claude Code transcripts",
+    help="Collect workstation session spend from Claude Code transcripts (~/.claude/projects); "
+    "`traust session run` sessions settle against their order instead",
 )
 
 
@@ -326,4 +327,9 @@ ATTRIBUTE_SPEND = OpSpec(
     add_args=add_attribute_spend_args,
     call=call_attribute_spend,
     help="Attribute session spend to harness lanes from transcripts",
+)
+
+
+LANE_COSTS = passthrough_op(
+    "lane_costs", "Median settled cost per order per lane over the last --days", "main"
 )
