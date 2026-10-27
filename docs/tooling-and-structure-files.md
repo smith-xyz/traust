@@ -80,6 +80,5 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | python3 -m traust.cli portfolio liveness | Census-owned repo liveness on traust-core (`PortfolioService.liveness`) — active/archived/unknown per registered repository from stored observations |
 | python3 -m traust.cli check skill-alignment | Pre-commit cross-skill contract gate (A-series rules) |
 | python3 -m traust.cli check skill-security | Pre-commit security-posture gate (S-series rules incl. S9 repo-config isolation) |
-| python3 -m traust.cli adapters crypto-audit | Unopinionated crypto data collector — source/image/cluster tiers emit `crypto-audit/v1` JSON |
-| python3 -m traust.cli adapters crypto-probe | Source-level crypto provider census (imported by crypto_audit.py) |
+| python3 -m traust.cli adapters crypto-source / crypto-image / crypto-cluster | Unopinionated crypto data collector on traust-core — source/image/cluster census JSON |
 | python3 -m traust.cli util elf | General-purpose ELF binary analyzer (linked libraries, byte scanning) |

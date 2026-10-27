@@ -1,14 +1,23 @@
 """`traust adapters osv`: the OSV API is the default; degraded is exit 3, failed is exit 2."""
 
 import json
+import os
+import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
+from traust_core.v1.providers.tools import osv as osv_mod
+from traust_core.v1.providers.tools import osv_sbom
+
 from traust.cli.groups import adapters
 
+FIXTURE_HOME = Path(__file__).parent / "fixtures" / "config"
+SHIPPED_FEEDS = Path(__file__).resolve().parents[1] / "config" / "feeds.yaml"
 
-def _args(repo: Path, out: Path, source="api", sbom=None, grype=None):
+
+def _args(repo: Path, out: Path, source="api", sbom=None, grype=None, config_home=None):
     return SimpleNamespace(
+        config_home=config_home,
         repo=repo,
         sbom=sbom,
         grype=grype,
@@ -28,9 +37,9 @@ def _body(status, **extra):
 
 
 def test_complete_scan_writes_candidates(tmp_path, monkeypatch):
-    from traust_engine.adapters import osv as osv_mod
-
-    monkeypatch.setattr(osv_mod, "scan_api", lambda repo, client, resolver=None: _body("complete"))
+    monkeypatch.setattr(
+        osv_mod, "scan_api", lambda repo, advisories, clock, resolver=None: _body("complete")
+    )
     out = tmp_path / "o.json"
     assert adapters.call_osv(_args(tmp_path, out)) == 0
     doc = json.loads(out.read_text())
@@ -40,12 +49,10 @@ def test_complete_scan_writes_candidates(tmp_path, monkeypatch):
 
 
 def test_degraded_scan_exits_3_and_warns(tmp_path, monkeypatch, capsys):
-    from traust_engine.adapters import osv as osv_mod
-
     monkeypatch.setattr(
         osv_mod,
         "scan_api",
-        lambda repo, client, resolver=None: _body(
+        lambda repo, advisories, clock, resolver=None: _body(
             "degraded", packages_unanswered=4, lookup_issues={"unreachable": 4}
         ),
     )
@@ -60,12 +67,10 @@ def test_not_a_directory(tmp_path):
 
 
 def test_partial_transitive_coverage_is_noted(tmp_path, monkeypatch, capsys):
-    from traust_engine.adapters import osv as osv_mod
-
     monkeypatch.setattr(
         osv_mod,
         "scan_api",
-        lambda repo, client, resolver=None: _body(
+        lambda repo, advisories, clock, resolver=None: _body(
             "complete",
             transitive_coverage="partial",
             unresolved_manifests=[{"path": "pom.xml", "ecosystem": "Maven", "declarations": 3}],
@@ -76,12 +81,10 @@ def test_partial_transitive_coverage_is_noted(tmp_path, monkeypatch, capsys):
 
 
 def test_an_unusable_api_is_an_error_exit_2(tmp_path, monkeypatch, capsys):
-    from traust_engine.adapters import osv as osv_mod
-
     monkeypatch.setattr(
         osv_mod,
         "scan_api",
-        lambda repo, client, resolver=None: {
+        lambda repo, advisories, clock, resolver=None: {
             "provenance": {
                 "source": "osv-api",
                 "base_url": "https://osv.test/v1",
@@ -106,24 +109,36 @@ def _access(monkeypatch, mode):
 
 
 def test_the_api_is_the_default_access(tmp_path, monkeypatch):
-    from traust_engine.adapters import osv as osv_mod
-
     _access(monkeypatch, "api")
-    monkeypatch.setattr(osv_mod, "scan_api", lambda repo, client, resolver=None: _body("complete"))
+    monkeypatch.setattr(
+        osv_mod, "scan_api", lambda repo, advisories, clock, resolver=None: _body("complete")
+    )
     out = tmp_path / "o.json"
     assert adapters.call_osv(_args(tmp_path, out, source=None)) == 0
     assert json.loads(out.read_text())["metadata"]["source"] == "osv-api"
 
 
-def test_air_gapped_access_runs_osv_scanner_offline(tmp_path, monkeypatch):
-    from traust_engine.adapters import osv as osv_mod
+def _scanner_on_path(tmp_path, monkeypatch):
+    """An osv-scanner on PATH for the offline path's presence check; the tests stub its run."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir(exist_ok=True)
+    (bindir / "osv-scanner").write_text("#!/bin/sh\nexit 1\n")
+    (bindir / "osv-scanner").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
 
+
+def _ran(stdout: str, stderr: str = "", returncode: int = 0):
+    return SimpleNamespace(stdout=stdout.encode(), stderr=stderr.encode(), returncode=returncode)
+
+
+def test_air_gapped_access_runs_osv_scanner_offline(tmp_path, monkeypatch):
     _access(monkeypatch, "air-gapped")
+    _scanner_on_path(tmp_path, monkeypatch)
     seen = {}
 
-    def fake_run(binary, repo, timeout, *, freeze):
+    def fake_run(process, binary, repo, timeout, *, freeze):
         seen["freeze"] = freeze
-        return SimpleNamespace(stdout='{"results": []}', stderr="", returncode=0), "osv-scanner"
+        return _ran('{"results": []}'), "osv-scanner"
 
     monkeypatch.setattr(osv_mod, "run_scanner", fake_run)
     monkeypatch.setattr(
@@ -136,14 +151,8 @@ def test_air_gapped_access_runs_osv_scanner_offline(tmp_path, monkeypatch):
 
 
 def test_air_gapped_without_osv_scanner_is_an_error_exit_2(tmp_path, monkeypatch, capsys):
-    from traust_engine.adapters import osv as osv_mod
-
     _access(monkeypatch, "air-gapped")
-
-    def missing(*a, **k):
-        raise FileNotFoundError("osv-scanner")
-
-    monkeypatch.setattr(osv_mod, "run_scanner", missing)
+    monkeypatch.setenv("PATH", str(tmp_path))
     out = tmp_path / "o.json"
     assert adapters.call_osv(_args(tmp_path, out, source=None)) == 2
     assert json.loads(out.read_text())["metadata"]["status"] == "failed"
@@ -167,9 +176,8 @@ def test_access_must_be_a_known_mode(tmp_path):
 
 def test_air_gapped_with_no_offline_database_is_an_error_not_clean(tmp_path, monkeypatch, capsys):
     """osv-scanner exits 127 with an empty JSON result when its database is missing."""
-    from traust_engine.adapters import osv as osv_mod
-
     _access(monkeypatch, "air-gapped")
+    _scanner_on_path(tmp_path, monkeypatch)
     err = (
         "Scanned go.mod file and found 77 packages\n"
         "could not load db for Go ecosystem: unable to fetch OSV database: "
@@ -178,10 +186,7 @@ def test_air_gapped_with_no_offline_database_is_an_error_not_clean(tmp_path, mon
     monkeypatch.setattr(
         osv_mod,
         "run_scanner",
-        lambda *a, **k: (
-            SimpleNamespace(stdout='{"results": []}', stderr=err, returncode=127),
-            "osv-scanner",
-        ),
+        lambda *a, **k: (_ran('{"results": []}', err, 127), "osv-scanner"),
     )
     out = tmp_path / "o.json"
     assert adapters.call_osv(_args(tmp_path, out, source=None)) == 2
@@ -224,9 +229,7 @@ def _sbom(tmp_path, doc=SYFT):
 
 
 def test_sbom_scan_marks_grype_duplicates(tmp_path, monkeypatch, capsys):
-    from traust_engine.adapters import osv_sbom
-
-    def fake_scan(doc, client):
+    def fake_scan(doc, advisories, clock):
         packages, stats = osv_sbom.collect_sbom_packages(doc)
         assert set(packages) == {("PyPI", "requests", "2.19.0")}  # urllib3 is RPM-installed
         body = {
@@ -248,7 +251,7 @@ def test_sbom_scan_marks_grype_duplicates(tmp_path, monkeypatch, capsys):
                 },
             ],
         }
-        osv_sbom._with_stats(body["provenance"], stats, doc)
+        osv_sbom.with_stats(body["provenance"], stats, doc)
         return body
 
     _access(monkeypatch, "api")
@@ -292,16 +295,14 @@ def test_a_cyclonedx_sbom_is_refused_exit_2(tmp_path, capsys):
 
 
 def test_air_gapped_sbom_scan_runs_osv_scanner_on_the_filtered_packages(tmp_path, monkeypatch):
-    from traust_engine.adapters import osv_sbom
-
     _access(monkeypatch, "air-gapped")
+    _scanner_on_path(tmp_path, monkeypatch)
     seen = {}
 
-    def fake_offline(binary, cdx, timeout):
-        seen["purls"] = [c["purl"] for c in json.loads(Path(cdx).read_text())["components"]]
-        return SimpleNamespace(
-            stdout='{"results": []}', stderr="", returncode=0
-        ), "osv-scanner -L x"
+    def fake_offline(process, binary, packages, timeout):
+        cdx = json.loads(osv_sbom.cyclonedx(packages))
+        seen["purls"] = [c["purl"] for c in cdx["components"]]
+        return _ran('{"results": []}'), "osv-scanner -L x"
 
     monkeypatch.setattr(osv_sbom, "run_offline", fake_offline)
     out = tmp_path / "o.json"
@@ -313,18 +314,12 @@ def test_air_gapped_sbom_scan_runs_osv_scanner_on_the_filtered_packages(tmp_path
 
 
 def test_air_gapped_sbom_scan_without_a_database_fails(tmp_path, monkeypatch):
-    from traust_engine.adapters import osv_sbom
-
     _access(monkeypatch, "air-gapped")
+    _scanner_on_path(tmp_path, monkeypatch)
     monkeypatch.setattr(
         osv_sbom,
         "run_offline",
-        lambda *a: (
-            SimpleNamespace(
-                stdout='{"results": []}', stderr="unable to fetch OSV database", returncode=127
-            ),
-            "osv-scanner",
-        ),
+        lambda *a: (_ran('{"results": []}', "unable to fetch OSV database", 127), "osv-scanner"),
     )
     out = tmp_path / "o.json"
     assert adapters.call_osv(_args(None, out, source=None, sbom=_sbom(tmp_path))) == 2
@@ -341,23 +336,35 @@ def _deps_dev(monkeypatch, settings):
     monkeypatch.setattr(osv_urls, "deps_dev_settings", lambda: settings)
 
 
-def test_deps_dev_is_on_by_default(monkeypatch):
-    from traust_engine.depsdev import DepsDevClient
+def _home_with_deps_dev(tmp_path, access="api"):
+    """The test config home with the shipped feeds.yaml's deps_dev source at `access`."""
+    import yaml
 
-    _deps_dev(monkeypatch, ("https://api.deps.dev/v3/systems/{ident}", "api"))
-    r = adapters._deps_dev_resolver(SimpleNamespace(timeout=5))
-    assert isinstance(r, DepsDevClient)
-    assert r.base_url == "https://api.deps.dev/v3"
+    home = tmp_path / "home"
+    shutil.copytree(FIXTURE_HOME, home)
+    feeds = yaml.safe_load((home / "feeds.yaml").read_text())
+    deps_dev = yaml.safe_load(SHIPPED_FEEDS.read_text())["sources"]["deps_dev"]
+    feeds["sources"]["deps_dev"] = {**deps_dev, "access": access}
+    (home / "feeds.yaml").write_text(yaml.safe_dump(feeds))
+    return home
 
 
-def test_deps_dev_opt_out(monkeypatch):
-    _deps_dev(monkeypatch, ("https://api.deps.dev/v3/systems/{ident}", "disabled"))
-    assert adapters._deps_dev_resolver(SimpleNamespace(timeout=5)) is None
+def test_deps_dev_is_on_by_default(tmp_path):
+    home = _home_with_deps_dev(tmp_path)
+    core, scanner, _ = adapters._osv_core(_args(tmp_path, tmp_path, config_home=home), "api")
+    assert scanner is None
+    assert core.deps_dev is not None
+
+
+def test_deps_dev_opt_out(tmp_path):
+    home = _home_with_deps_dev(tmp_path, access="disabled")
+    core, _, _ = adapters._osv_core(_args(tmp_path, tmp_path, config_home=home), "api")
+    assert core.deps_dev is None
 
 
 def test_a_config_without_deps_dev_says_so(monkeypatch, capsys):
     _deps_dev(monkeypatch, None)
-    assert adapters._deps_dev_resolver(SimpleNamespace(timeout=5)) is None
+    adapters._note_unresolved_manifests()
     assert "no deps_dev source" in capsys.readouterr().err
 
 
@@ -372,11 +379,9 @@ def test_the_shipped_feeds_yaml_enables_deps_dev_with_its_license():
 
 
 def test_resolution_is_reported(tmp_path, monkeypatch, capsys):
-    from traust_engine.adapters import osv as osv_mod
-
     seen = {}
 
-    def fake_scan(repo, client, resolver=None):
+    def fake_scan(repo, advisories, clock, resolver=None):
         seen["resolver"] = resolver
         return _body(
             "complete",
@@ -385,9 +390,9 @@ def test_resolution_is_reported(tmp_path, monkeypatch, capsys):
             resolution={"status": "complete", "manifests_resolved": 3, "packages_added": 40},
         )
 
-    _deps_dev(monkeypatch, ("https://api.deps.dev/v3/systems/{ident}", "api"))
+    home = _home_with_deps_dev(tmp_path)
     monkeypatch.setattr(osv_mod, "scan_api", fake_scan)
-    assert adapters.call_osv(_args(tmp_path, tmp_path / "o.json")) == 0
+    assert adapters.call_osv(_args(tmp_path, tmp_path / "o.json", config_home=home)) == 0
     assert seen["resolver"] is not None
     err = capsys.readouterr().err
     assert "deps.dev resolved 3 manifest(s)" in err

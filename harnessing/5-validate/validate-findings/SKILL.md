@@ -326,9 +326,9 @@ Build the attack graph and emit one `chain_ref` step-group per discovered path:
    `pqc_classification` and a cluster context is bound, run runtime data
    collection:
    ```bash
-   python3 -m traust.cli adapters crypto-audit cluster --context <ctx> --namespaces <ns> [--discover] [--groups "..."]
+   python3 -m traust.cli adapters crypto-cluster --context <ctx> --namespaces <ns> [--discover] [--groups "..."]
    ```
-   This emits `crypto-audit/v1` (`tier: runtime`) with raw TLS negotiation
+   This emits the runtime crypto census with raw TLS negotiation
    data, crypto-policy state, and OpenSSL/Go versions. For source and image
    tier crypto analysis, delegate to the `crypto-analysis` skill.
 

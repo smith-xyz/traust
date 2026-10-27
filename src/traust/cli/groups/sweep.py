@@ -52,7 +52,8 @@ def _analysis_results(engine, arg: str | None) -> Path:
 
 
 def _sweeps_root(engine, args) -> Path:
-    from traust_engine.locations import SWEEPS_REL  # wave 2 lane (d)
+    # PENDING(decision: sweep stages — retire or port)
+    from traust_engine.locations import SWEEPS_REL
 
     if args.sweeps_root is not None:
         return args.sweeps_root
@@ -97,7 +98,7 @@ def add_collect_args(ap) -> None:
 
 
 def call_collect(args) -> int:
-    engine = load_engine(args.config_home)  # wave 2 lane (d)
+    engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
     ops = engine.sweep
     sweeps_root = _sweeps_root(engine, args)
     res = ops.collect(
@@ -125,7 +126,7 @@ def add_draft_args(ap) -> None:
 
 
 def call_draft(args) -> int:
-    engine = load_engine(args.config_home)  # wave 2 lane (d)
+    engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
     ops = engine.sweep
     pack = _resolve_pack(engine, args.pack)
     drafts_dir = _resolve_drafts_dir(args)
@@ -142,7 +143,8 @@ def call_draft(args) -> int:
 
 
 def add_sweep_args(ap) -> None:
-    from traust_engine.sweep.engine import DEFAULT_SWEEP_LIMIT  # wave 2 lane (d)
+    # PENDING(decision: sweep stages — retire or port)
+    from traust_engine.sweep.engine import DEFAULT_SWEEP_LIMIT
 
     _add_common_sweep_args(ap)
     ap.add_argument("--rule", required=True, help="rule id, yaml path, or draft dir/name")
@@ -164,7 +166,7 @@ def add_sweep_args(ap) -> None:
 
 
 def call_sweep(args) -> int:
-    engine = load_engine(args.config_home)  # wave 2 lane (d)
+    engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
     ops = engine.sweep
     pack = _resolve_pack(engine, args.pack)
     drafts_dir = _resolve_drafts_dir(args)
@@ -196,7 +198,7 @@ def add_emit_args(ap) -> None:
 
 
 def call_emit(args) -> int:
-    engine = load_engine(args.config_home)  # wave 2 lane (d)
+    engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
     ops = engine.sweep
     pack = _resolve_pack(engine, args.pack)
     drafts_dir = _resolve_drafts_dir(args)
@@ -241,10 +243,12 @@ def add_benchmark_args(ap) -> None:
 def _benchmark_results_dir(args) -> Path:
     if args.benchmark_dir:
         return args.benchmark_dir
-    return load_engine(args.config_home).sweep._benchmark_dir()  # wave 2 lane (d)
+    # PENDING(decision: sweep stages — retire or port)
+    return load_engine(args.config_home).sweep._benchmark_dir()
 
 
 def call_benchmark(args) -> int:
+    # PENDING(decision: sweep stages — retire or port)
     from traust_engine.sweep import benchmark as bench
 
     if args.benchmark_cmd == "check-trigger":
@@ -288,9 +292,10 @@ def add_rule_lane_args(ap) -> None:
 
 
 def call_rule_lane(args) -> int:
+    # PENDING(decision: sweep stages — retire or port)
     from traust_engine.sweep import rule_lane as lane
 
-    engine = load_engine(args.config_home)  # wave 2 lane (d)
+    engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
 
     return lane.execute_rule_lane(
         workspace=args.workspace,
@@ -502,6 +507,7 @@ def add_verify_draft_args(ap) -> None:
 
 def call_verify_draft(args) -> int:
     """The calibration gate: the candidate rule fires on before/ and is silent on after/."""
+    # NEED(core: an opengrep door that scans with one given rule file)
     from traust_engine.adapters import opengrep
 
     rule = args.rule or args.draft / "rule.skeleton.yaml"
