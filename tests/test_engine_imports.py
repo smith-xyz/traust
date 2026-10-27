@@ -14,9 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TOOLS_MODULE = "src/traust/_tools.py"
 BASELINE = {
     "src/traust/cli/groups/_registry.py": 1,
-    "src/traust/cli/groups/metrics.py": 1,
     "src/traust/cli/groups/portfolio.py": 1,
-    "src/traust/cli/groups/registry.py": 1,
     "src/traust/cli/groups/sweep.py": 5,
 }
 

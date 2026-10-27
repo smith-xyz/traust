@@ -8,9 +8,11 @@ import io
 import json
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from traust_core.v1.errors import NotFoundError
 
 from traust.cli import session
 from traust.paths import HARNESS_ROOT
@@ -23,8 +25,8 @@ CLAUDE_RESULT = (Path(__file__).parent / "fixtures" / "session" / "claude-result
 
 
 class Processes:
-    """Answers `registry models resolve`, `git clone`, `git rev-parse`, `assessments prepare` and
-    the agent; records each call."""
+    """Answers the model registry's `resolve_role`, `git clone`, `git rev-parse`, `assessments
+    prepare` and the agent; records each call."""
 
     def __init__(
         self,
@@ -39,12 +41,16 @@ class Processes:
         self.model, self.agent, self.clone, self.reply = model, agent, clone, reply
         self.prepare, self.pr_agent, self.unknown_role = prepare, pr_agent, unknown_role
         self.calls: list[tuple[list[str], dict[str, Any]]] = []
+        self.roles: list[str] = []
+
+    def resolve_role(self, role: str) -> str:
+        self.roles.append(role)
+        if not self.model or role == self.unknown_role:
+            raise NotFoundError(f"unknown role '{role}'")
+        return self.model
 
     def __call__(self, argv: list[str], **kw: Any) -> subprocess.CompletedProcess[str]:
         self.calls.append((argv, kw))
-        if argv[1:5] == ["-m", "traust.cli", "registry", "models"]:
-            ok = bool(self.model) and argv[-1] != self.unknown_role
-            return subprocess.CompletedProcess(argv, 0 if ok else 1, self.model + "\n", "no role")
         if argv[1:5] == ["-m", "traust.cli", "assessments", "prepare"]:
             code, out = self.prepare
             return subprocess.CompletedProcess(argv, code, out, "not registered")
@@ -70,6 +76,14 @@ class Processes:
         return [c[0] for c in self.calls if c[0][3 : 3 + len(op)] == list(op)]
 
 
+@pytest.fixture(autouse=True)
+def model_registry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The registry is whichever Processes the test installed as `subprocess.run`."""
+    monkeypatch.setattr(
+        session, "load", lambda: SimpleNamespace(model_catalog=session.subprocess.run)
+    )
+
+
 @pytest.fixture
 def processes(monkeypatch: pytest.MonkeyPatch) -> Processes:
     fake = Processes()
@@ -92,8 +106,7 @@ def test_a_session_runs_the_skill_on_the_roles_model_in_the_harness(processes: P
     argv, kw = processes.agent_call()
     assert argv[-3:] == ["--model", "claude-opus-5-5", "/verify-remediation full-sweep"]
     assert kw["cwd"] == HARNESS_ROOT
-    resolve = processes.calls[0][0]
-    assert resolve[-1] == "verification-verdict"
+    assert processes.roles == ["verification-verdict"]
 
 
 def test_a_repository_is_passed_by_url(processes: Processes) -> None:
@@ -196,7 +209,7 @@ def test_a_stamped_diff_scan_runs_threat_model_pr_on_the_same_checkout_at_its_an
     clone = scan[-1].split()[1]
     assert scan[-1] == f"/vuln-scan {clone} --diff"
     assert pr[-1] == f"/threat-model pr {clone} --base {ANCHOR}" and kw["cwd"] == HARNESS_ROOT
-    assert [a[-1] for a in processes.argv_of("registry", "models")] == ["vuln-scan", "threat-model"]
+    assert processes.roles == ["vuln-scan", "threat-model"]
     (prepare,) = processes.argv_of("assessments", "prepare")
     assert prepare[5:] == [
         *("--kind", "vuln-scan", "--repo-url", REPO, "--sha", HEAD, "--diff", clone)
