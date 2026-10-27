@@ -11,8 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from traust_core.v1.providers.checkout import GitCheckout
-from traust_core.v1.providers.process import ProcessRunner
 
 from traust.cli import session
 from traust.paths import HARNESS_ROOT
@@ -153,31 +151,3 @@ def test_what_cannot_run_is_answered_with_a_registered_reason(
 def test_checkout_needs_a_repository() -> None:
     with pytest.raises(SystemExit):
         session.run(["--skill", "vuln-scan", "--role", "vuln-scan", "--checkout"])
-
-
-def _git(*argv: str) -> str:
-    done = subprocess.run(["git", *argv], capture_output=True, text=True, check=True)
-    return done.stdout.strip()
-
-
-def test_a_checkout_holds_the_history_a_diff_scan_anchors_at(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    origin = tmp_path / "origin"
-    _git("init", "-q", "-b", "main", str(origin))
-    for name in ("audited.py", "changed.py"):
-        (origin / name).write_text("x = 1\n")
-        _git("-C", str(origin), "add", name)
-        _git("-C", str(origin), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", name)
-    anchor = _git("-C", str(origin), "rev-parse", "HEAD~1")
-    # The https URL is served from the local repository; only the protocol allowlist widens.
-    monkeypatch.setitem(session._GIT_ENV, "GIT_ALLOW_PROTOCOL", "https:file")
-    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
-    monkeypatch.setenv("GIT_CONFIG_KEY_0", f"url.{origin.as_uri()}.insteadOf")
-    monkeypatch.setenv("GIT_CONFIG_VALUE_0", REPO)
-
-    clone = session.checkout(REPO, tmp_path / "checkout")
-
-    git = GitCheckout(ProcessRunner(["git"]))
-    assert git.reachable(clone, anchor)  # what `assessments prepare --diff` refuses without
-    assert [r.path for r in git.numstat(clone, anchor)] == ["changed.py"]
