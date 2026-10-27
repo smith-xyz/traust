@@ -2,6 +2,10 @@
 role's (`traust registry models resolve`); the session's last line is the JobResult, whose
 outcome is the exit code.
 
+A diff scan whose order carries the router's threat-model PR stamp (`--rule`) then runs
+`/threat-model pr` on the same checkout, at the anchor `traust assessments prepare --diff`
+resolves; report-only.
+
 Repo-config isolation (check-skill-security S9): the agent's working directory is this harness,
 never a checkout. A checkout the session reviews is a separate temporary directory passed as an
 argument; its own agent config (`.claude/`, `CLAUDE.md`, hooks) is data under audit, never loaded
@@ -10,6 +14,7 @@ as configuration.
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -17,28 +22,50 @@ import tempfile
 from pathlib import Path
 
 from traust_core.v1.errors import ServiceError, ValidationError
+from traust_core.v1.models.assessment import DiffRefused
 from traust_core.v1.models.operations import JobResult, OrderReason
 
 from traust.cli._doors import answer, parser
+from traust.cli.assessments import REFUSED
+from traust.ops.router import THREAT_MODEL_PR
 from traust.paths import HARNESS_ROOT, skill_dir
 
 # PENDING(agents): Claude Code is the agent sessions start in; Crush is the other implementation.
 AGENT = ("claude", "-p", "--output-format", "text")
+# PENDING(roles): the pack's threat-model role, as on its threat_model_quarterly asset.
+THREAT_MODEL_ROLE = "threat-model"
 _GIT_ENV = {"GIT_ALLOW_PROTOCOL": "https", "GIT_TERMINAL_PROMPT": "0"}
+
+
+def _traust(*argv: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-m", "traust.cli", *argv], capture_output=True, text=True, check=False
+    )
 
 
 def resolve_model(role: str) -> str:
     """The role's model, from the model registry through its one door."""
-    done = subprocess.run(
-        [sys.executable, "-m", "traust.cli", "registry", "models", "resolve", role],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    done = _traust("registry", "models", "resolve", role)
     model = done.stdout.strip().splitlines()[-1:] if done.returncode == 0 else []
     if not model:
         raise ValidationError(f"role {role!r}: no model in the registry ({done.stderr.strip()})")
     return model[0]
+
+
+def diff_anchor(url: str, clone: Path) -> str:
+    """The commit the diff scan's diff starts from, resolved by the same door the scan asks."""
+    head = subprocess.run(
+        ["git", "-C", str(clone), "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    done = _traust(
+        *("assessments", "prepare", "--kind", "vuln-scan"),
+        *("--repo-url", url, "--sha", head, "--diff", str(clone)),
+    )
+    if done.returncode == REFUSED:
+        raise DiffRefused(json.loads(done.stdout)["reason"])
+    if done.returncode != 0:
+        raise ServiceError(f"assessments prepare exited {done.returncode}: {done.stderr.strip()}")
+    return str(json.loads(done.stdout)["diff"]["anchor"])
 
 
 def checkout(url: str, dest: Path) -> Path:
@@ -80,14 +107,19 @@ def run(argv: list[str] | None = None) -> int:
         "--mode", help="the skill's mode token, before the repository (e.g. threat-model review)"
     )
     ap.add_argument("--run-id", default="manual", help="the run order this session is for")
+    ap.add_argument("--rule", help="the router rule that routed the order")
     argv = sys.argv[1:] if argv is None else argv
     split = argv.index("--") if "--" in argv else len(argv)
     args, extra = ap.parse_args(argv[:split]), argv[split + 1 :]
     if args.checkout and not args.repo:
         ap.error("--checkout needs --repo")
+    stamped = bool(args.rule) and args.rule.endswith(THREAT_MODEL_PR)
+    if stamped and not args.checkout:
+        ap.error(f"{THREAT_MODEL_PR} needs --checkout")
     try:
         skill_dir(args.skill)
         model = resolve_model(args.role)
+        pr_model = resolve_model(THREAT_MODEL_ROLE) if stamped else None
     except (ValidationError, FileNotFoundError, KeyError) as e:
         print(f"run {args.run_id}: {OrderReason.BAD_REQUEST}: {e}", file=sys.stderr)
         return answer(JobResult.failed(OrderReason.BAD_REQUEST))
@@ -107,10 +139,26 @@ def run(argv: list[str] | None = None) -> int:
         command = [*AGENT, "--model", model, prompt(args.skill, [*mode, *target, *extra])]
         try:
             done = subprocess.run(command, cwd=HARNESS_ROOT, check=False)
-        except OSError as e:
+            if done.returncode == 0 and pr_model:
+                done = threat_model_pr(args.run_id, args.repo, Path(target[0]), pr_model) or done
+        except (OSError, ServiceError, subprocess.CalledProcessError) as e:
             print(f"run {args.run_id}: {OrderReason.RUNNER_CRASHED}: {e}", file=sys.stderr)
             return answer(JobResult.failed(OrderReason.RUNNER_CRASHED))
     if done.returncode != 0:
         print(f"run {args.run_id}: session exited {done.returncode}", file=sys.stderr)
         return answer(JobResult.failed(OrderReason.RUNNER_CRASHED))
     return answer(JobResult.succeeded())
+
+
+def threat_model_pr(
+    run_id: str, url: str, clone: Path, model: str
+) -> subprocess.CompletedProcess[str] | None:
+    """The stamp's report-only `/threat-model pr` session on the scan's checkout; None when the
+    diff is refused, said on stderr."""
+    try:
+        anchor = diff_anchor(url, clone)
+    except DiffRefused as e:
+        print(f"run {run_id}: {THREAT_MODEL_PR} skipped: diff refused: {e}", file=sys.stderr)
+        return None
+    pr = prompt("threat-model", ["pr", str(clone), "--base", anchor])
+    return subprocess.run([*AGENT, "--model", model, pr], cwd=HARNESS_ROOT, check=False)

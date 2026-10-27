@@ -16,30 +16,55 @@ from traust.cli import session
 from traust.paths import HARNESS_ROOT
 
 REPO = "https://github.com/example/app"
+HEAD = "b" * 40
+ANCHOR = "a" * 40
+PREPARED = json.dumps({"kind": "vuln-scan", "diff": {"anchor": ANCHOR}})
 
 
 class Processes:
-    """Answers `registry models resolve`, `git clone` and the agent; records each call."""
+    """Answers `registry models resolve`, `git clone`, `git rev-parse`, `assessments prepare` and
+    the agent; records each call."""
 
-    def __init__(self, model: str = "claude-opus-5-5", agent: int = 0, clone: int = 0) -> None:
+    def __init__(
+        self,
+        model: str = "claude-opus-5-5",
+        agent: int = 0,
+        clone: int = 0,
+        prepare: tuple[int, str] = (0, PREPARED),
+        pr_agent: int = 0,
+        unknown_role: str = "",
+    ) -> None:
         self.model, self.agent, self.clone = model, agent, clone
+        self.prepare, self.pr_agent, self.unknown_role = prepare, pr_agent, unknown_role
         self.calls: list[tuple[list[str], dict[str, Any]]] = []
 
     def __call__(self, argv: list[str], **kw: Any) -> subprocess.CompletedProcess[str]:
         self.calls.append((argv, kw))
         if argv[1:5] == ["-m", "traust.cli", "registry", "models"]:
-            ok = bool(self.model)
+            ok = bool(self.model) and argv[-1] != self.unknown_role
             return subprocess.CompletedProcess(argv, 0 if ok else 1, self.model + "\n", "no role")
+        if argv[1:5] == ["-m", "traust.cli", "assessments", "prepare"]:
+            code, out = self.prepare
+            return subprocess.CompletedProcess(argv, code, out, "not registered")
         if argv[:2] == ["git", "clone"]:
             if self.clone:
                 raise subprocess.CalledProcessError(self.clone, argv, stderr=b"not found")
             Path(argv[-1]).mkdir(parents=True)
             return subprocess.CompletedProcess(argv, 0, b"", b"")
-        return subprocess.CompletedProcess(argv, self.agent)
+        if argv[0] == "git" and argv[-2:] == ["rev-parse", "HEAD"]:
+            return subprocess.CompletedProcess(argv, 0, HEAD + "\n", "")
+        pr = argv[-1].startswith("/threat-model pr ")
+        return subprocess.CompletedProcess(argv, self.pr_agent if pr else self.agent)
 
     def agent_call(self) -> tuple[list[str], dict[str, Any]]:
-        (call,) = [c for c in self.calls if c[0][0] == "claude"]
+        (call,) = self.agent_calls()
         return call
+
+    def agent_calls(self) -> list[tuple[list[str], dict[str, Any]]]:
+        return [c for c in self.calls if c[0][0] == "claude"]
+
+    def argv_of(self, *op: str) -> list[list[str]]:
+        return [c[0] for c in self.calls if c[0][3 : 3 + len(op)] == list(op)]
 
 
 @pytest.fixture
@@ -151,3 +176,82 @@ def test_what_cannot_run_is_answered_with_a_registered_reason(
 def test_checkout_needs_a_repository() -> None:
     with pytest.raises(SystemExit):
         session.run(["--skill", "vuln-scan", "--role", "vuln-scan", "--checkout"])
+
+
+STAMPED_SCAN = (
+    *("--skill", "vuln-scan", "--role", "vuln-scan", "--repo", REPO, "--checkout"),
+    *("--rule", "rule-5+threat-model-pr", "--", "--diff"),
+)
+
+
+def test_a_stamped_diff_scan_runs_threat_model_pr_on_the_same_checkout_at_its_anchor(
+    processes: Processes,
+) -> None:
+    rc, result = run(*STAMPED_SCAN)
+    assert (rc, result["outcome"]) == (0, "succeeded")
+    (scan, _), (pr, kw) = processes.agent_calls()
+    clone = scan[-1].split()[1]
+    assert scan[-1] == f"/vuln-scan {clone} --diff"
+    assert pr[-1] == f"/threat-model pr {clone} --base {ANCHOR}" and kw["cwd"] == HARNESS_ROOT
+    assert [a[-1] for a in processes.argv_of("registry", "models")] == ["vuln-scan", "threat-model"]
+    (prepare,) = processes.argv_of("assessments", "prepare")
+    assert prepare[5:] == [
+        *("--kind", "vuln-scan", "--repo-url", REPO, "--sha", HEAD, "--diff", clone)
+    ]
+
+
+@pytest.mark.parametrize("rule", ["rule-5", "rule-3+preroute"])
+def test_an_unstamped_rule_runs_only_the_scan(processes: Processes, rule: str) -> None:
+    rc, _ = run(
+        *("--skill", "vuln-scan", "--role", "vuln-scan", "--repo", REPO, "--checkout"),
+        *("--rule", rule, "--", "--diff"),
+    )
+    assert rc == 0 and len(processes.agent_calls()) == 1
+    assert processes.argv_of("assessments", "prepare") == []
+
+
+def test_a_refused_diff_skips_the_pr_pass_and_says_why(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    refusal = {"refuse": True, "recommend": "full-audit", "reason": "anchor not reachable"}
+    fake = Processes(prepare=(3, json.dumps(refusal)))
+    monkeypatch.setattr(session.subprocess, "run", fake)
+    rc, result = run(*STAMPED_SCAN)
+    assert (rc, result["outcome"]) == (0, "succeeded")
+    assert [c[0][-1].split()[0] for c in fake.agent_calls()] == ["/vuln-scan"]
+    assert "+threat-model-pr skipped: diff refused: anchor not reachable" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("fake", "agents", "reason"),
+    [
+        (Processes(agent=3), ["/vuln-scan"], "runner-crashed"),
+        (Processes(pr_agent=3), ["/vuln-scan", "/threat-model"], "runner-crashed"),
+        (Processes(prepare=(2, "")), ["/vuln-scan"], "runner-crashed"),
+        (Processes(unknown_role="threat-model"), [], "bad_request"),
+    ],
+    ids=["scan fails", "pr session fails", "prepare fails", "no threat-model model"],
+)
+def test_a_stamped_scan_that_cannot_finish_fails(
+    monkeypatch: pytest.MonkeyPatch, fake: Processes, agents: list[str], reason: str
+) -> None:
+    monkeypatch.setattr(session.subprocess, "run", fake)
+    rc, result = run(*STAMPED_SCAN)
+    assert (rc, result["outcome"], result["reason"]) == (1, "failed", reason)
+    assert [c[0][-1].split()[0] for c in fake.agent_calls()] == agents
+
+
+def test_the_stamp_needs_a_checkout() -> None:
+    with pytest.raises(SystemExit):
+        session.run(
+            [
+                "--skill",
+                "vuln-scan",
+                "--role",
+                "vuln-scan",
+                "--repo",
+                REPO,
+                "--rule",
+                "r+threat-model-pr",
+            ]
+        )

@@ -508,14 +508,18 @@ nothing. `traust-engine run` is the loop itself, for after the cutover.
 
 After the cutover, `traust-engine run` plans and admits, and a runner does the
 work. `traust-engine claim $E` leases one queued order of an asset with a `run`
-command, fills its `{run_id}` and `{repo_url}` tokens from the order, renews the
+command, fills its `{run_id}`, `{repo_url}` and `{rule}` (the router rule that
+routed it) tokens from the order, renews the
 lease while the command runs, completes the order with the command's JobResult
 and exits (0 succeeded, 1 failed, 4 degraded, 5 refused; nothing queued is 0).
 It is claim-once, started by an operator or a scheduler, never a daemon.
 A skill session is a command too: its `run` is `traust session run --skill
 <skill> --role {role}`, which resolves the role's model from the registry and
 starts the skill headless in the harness (a repository it reviews is passed by
-URL, or as a temporary checkout outside the harness with `--checkout`). Its
+URL, or as a temporary checkout outside the harness with `--checkout`). A diff
+scan whose `--rule` carries the threat-model `pr` stamp then runs `/threat-model
+pr <checkout> --base <anchor>` on the same checkout, the anchor from `traust
+assessments prepare --diff`; a refused diff skips it, said on stderr. Its
 outcome is the session's exit. Pass `--feeds config/feeds.yaml` to every
 `traust-engine` command so core knows the pack's feeds when a run reports one
 degraded.
