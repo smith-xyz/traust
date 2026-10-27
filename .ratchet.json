@@ -25,7 +25,6 @@
     "engine-internal": 1
   },
   "src/traust/cli/groups/reporting.py": {
-    "contracts": 1,
     "state-file": 1
   },
   "src/traust/cli/groups/sweep.py": {

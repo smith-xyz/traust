@@ -14,8 +14,8 @@ matters more than any single table cell:
    This is where languages differ, and where the tables below apply.
 
 Each cell names the tool that provides the capability, so the table can be
-checked against the tree: the rule pack bundled in traust-engine
-(`traust_engine/data/secure-code-audit/opengrep-rules/`), the impact tiers in
+checked against the tree: the rule pack the security pack ships
+(`packs/security/opengrep-rules/`), the impact tiers in
 traust-core (`providers/impact.py`), the fuzz templates under
 `harnessing/6-fuzz/create-fuzzing/harnesses/_templates/`, and the tool rows in
 [external-dependencies.md](external-dependencies.md).

@@ -1216,7 +1216,7 @@ def rule_pack_copy_failures(repo: Path = REPO) -> list[str]:
 
 CHECKS = [
     ("unresolved conflict markers", conflict_marker_failures),
-    ("single rule pack (rules live only in traust-engine)", rule_pack_copy_failures),
+    ("single rule pack (rules live only in packs/security/)", rule_pack_copy_failures),
     ("generated skills reference (docs/skills.md matches the tree)", skills_reference_failures),
     (
         "config/ hygiene (shipped files + templates only, no estate markers)",

@@ -40,15 +40,15 @@ ships a template for each such file:
 | `corpus-config.example.yaml` | `corpus-config.yaml` | `traust_engine.corpus.resolver`, `/census`, every dashboard |
 | `remediation.example.yaml` | `remediation.yaml` | `/remediate-finding` (private mirror org, naming prefix, self-hosted forge hosts) — no shipped default for the org, and none for the forge hosts |
 | `campaign.example.yaml` | `campaign.yaml` | dashboards that cite a tracking reference (`/validation-fuzz-dashboard`, `/generate-team-report`) |
-| `product-definitions-map.example.yaml` | `product-definitions-map.yaml` | `traust_engine.registry.products`, `/assign-findings-owners`, `/sla-view` |
+| `product-definitions-map.example.yaml` | `product-definitions-map.yaml` | `traust registry products` (traust-core `ctx.product_mappings`), `/assign-findings-owners`, `/sla-view` |
 | `budget-policy.example.yaml` | `budget-policy.yaml` | `traust_engine.metrics.spend`, rescan worklist, drain tranche |
 | `rule-pack-allowlist.example.yaml` | `rule-pack-allowlist.yaml` | `traust_engine.adapters.opengrep`, `/mine-ledger` |
-| `safe-exec-profiles.example.yaml` | `safe-exec-profiles.yaml` | `traust_engine._util.safe_exec` |
+| `safe-exec-profiles.example.yaml` | `safe-exec-profiles.yaml` | traust-core's safe-exec (`traust util safe-exec`) |
 | `hardening-risk-weights.example.json` | `hardening-risk-weights.json` | none (its consumer retired with the traust-core hub; the triage skill port decides) |
 | `export.example.yaml` | `export.yaml` | the one-shot public export (public forge URL, private URLs to rewrite, build plumbing to strip, CHANGELOG cut) |
 | `internal-vocabulary.example.yaml` | `internal-vocabulary.yaml` | `scan_internal_refs` |
 | `ledger-signing-key.example.pub` | `ledger-signing-key.pub` | `traust_engine.reporting.validate`, `/drift-watch` signature check |
-| `sla-policy.example.yaml` | `sla-policy.yaml` | `traust_engine.metrics` (`/sla-view` default policy), `/drift-watch` provenance |
+| `sla-policy.example.yaml` | `sla-policy.yaml` | traust-core's SLA view (`/sla-view` default policy), `/drift-watch` provenance |
 | `org-parameters.example.yaml` | `org-parameters.yaml` | `/compliance-check` (organization-defined parameter values, recorded with `traust compliance policy org-parameters`), `/drift-watch` provenance |
 | `adr-registry.example.yaml` | `adr-registry.yaml` | `traust compliance policy adr-registry`, `/drift-watch` pin check |
 | `benchmark-targets.example.yaml` | `benchmark-targets.yaml` | `/recall-benchmark` (the answer key; canary and seeded sources sit beside it in `recall-benchmark/`) |
@@ -63,7 +63,7 @@ One environment variable: **`TRAUST_CONFIG_HOME`**. Default `~/.traust/config`
 when that directory exists. Nothing else is consulted.
 
 Every consumer resolves a file with `config_path("<name>")`
-(`traust_engine.config`, re-exported by `traust.paths`). A file
+(`traust_core.v1.context`, re-exported by `traust.paths`). A file
 missing from `$TRAUST_CONFIG_HOME` **fails closed** with
 `DeploymentConfigMissing`, naming the template to copy. The harness never runs
 on a template: dashboards computed over placeholder corpus or product data

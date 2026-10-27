@@ -4,7 +4,7 @@
 # docs/requirements.md the per-skill install matrix).
 #
 # Consumers:
-#   - traust-engine's toolchain (`register_tools`) — the `expected` floors
+#   - traust's `load()` (`Context.register_toolchain`) — the `expected` floors
 #     become traust-core's tool floors, so `traust dashboard view freshness`
 #     reports a tool installed below its floor as not ready.
 #   - the platform orchestrator's job-image build — install exactly the
@@ -14,7 +14,7 @@
 #     `provided_by: adopter` are the exception: never installed.
 #
 # Deliberately absent: checkov + bicep (hard-pinned in traust-core's
-# models/cloud_config.py and traust-engine's adapters/cloud_config.py, watched by the
+# models/cloud_config.py, watched by the
 # `checkov-pin` drift row) and pqc-scan (commit-pinned in
 # harnessing/3-audit/pqc-readiness/scripts/pqc_facts.py, watched by `pqc-facts-stamps`).
 #
