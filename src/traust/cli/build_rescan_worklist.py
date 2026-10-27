@@ -155,7 +155,6 @@ from traust_core.v1.models.observation import (
     is_deps_manifest,
     is_first_party,
 )
-from traust_engine.corpus.resolver import normalize_repo_url
 
 from traust.context import add_config_home_arg, analysis_results_dir, load
 from traust.paths import HARNESS_ROOT, optional_config_path
@@ -169,6 +168,29 @@ SHA_RX = re.compile(r"\b([0-9a-f]{7,40})\b")
 # segments become an API path — constrain so a crafted repo_url can't
 # traverse into another endpoint.
 _GH_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+# retires with this script at cutover (plan 18, Live runs); verbatim from traust-engine's
+# corpus resolver, which core's strict HttpsRepoUrl doesn't replace for legacy report prose.
+_URL_IN_TEXT_RX = re.compile(r"https?://[^\s;,()<>\"']+")
+
+
+def _normalize_repo_url(raw: str | None) -> str | None:
+    """Extract a single clean repository URL from `metadata.repository`.
+
+    Legacy reports carry markdown-autolink angle brackets (`<https://…>`),
+    multi-URL prose, or trailing punctuation — all of which break ls-remote
+    based inventories (PQC triage 2026-07-18: 26 of 109 "unreachable" repos
+    were exactly this). Returns the first http(s) URL found, stripped of
+    wrappers and trailing `/`/`.git`; None when no URL is present (bare
+    names stay unresolvable here — classification belongs to the caller).
+    """
+    if not raw:
+        return None
+    m = _URL_IN_TEXT_RX.search(raw)
+    if not m:
+        return None
+    url = m.group(0).rstrip(".").rstrip("/")
+    return url.removesuffix(".git") or None
 
 
 # Forge-host classification. Both kinds are configurable, because both are
@@ -710,7 +732,7 @@ def never_audited_rows(
         con.close()
     rows = []
     for rid in node_ids:
-        url = normalize_repo_url(f"https://{rid[5:]}")
+        url = _normalize_repo_url(f"https://{rid[5:]}")
         if not url or url in baselined:
             continue
         designation = lookup_designation(url, designations)
@@ -1215,7 +1237,7 @@ def cloud_config_baseline_urls(db_path) -> set:
         return set()
     urls = set()
     for (raw,) in rows:
-        norm = normalize_repo_url(raw)
+        norm = _normalize_repo_url(raw)
         if norm:
             urls.add(norm)
     return urls
@@ -1498,7 +1520,7 @@ def load_population(db_path: Path) -> list[dict]:
     by_url: dict[str, dict] = {}
     no_url: list[dict] = []
     for repo_key, repo_url, report_path, audit_date, product, tree, ownership in rows:
-        url = normalize_repo_url(repo_url)
+        url = _normalize_repo_url(repo_url)
         rec = {
             "repo_key": repo_key,
             "repo_url": url,
@@ -2353,7 +2375,7 @@ def main(argv=None) -> int:
     tm_release_seen: dict[str, int] = {}
     for ev in events:
         ref = ev.get("repo") or ""
-        target = by_url.get(normalize_repo_url(ref)) or by_key.get(ref)
+        target = by_url.get(_normalize_repo_url(ref)) or by_key.get(ref)
         tier = None
         if target:
             tier = risk_tier(
