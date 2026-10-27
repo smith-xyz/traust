@@ -11,7 +11,7 @@ import uuid
 from traust_core.v1.errors import NotFoundError
 
 from traust.cli._doors import parser, run
-from traust.context import load_services
+from traust.context import load
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -23,7 +23,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str:
-        services = load_services(args.config_home)
+        services = load(args.config_home).services()
         packs = {p.name: p for p in services.detection_quality.rule_packs()}
         if args.pack not in packs:
             raise NotFoundError(f"rule pack {args.pack!r}: not one of {sorted(packs)}")

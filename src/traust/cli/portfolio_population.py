@@ -14,7 +14,7 @@ from traust_core.v1.models.common import every_item
 from traust_core.v1.models.inventory import RepositoryFilter
 
 from traust.cli._doors import parser, run
-from traust.context import load_core
+from traust.context import load
 
 
 def _as_of(raw: str) -> datetime:
@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> Any:
-        services = load_core(args.config_home).services()
+        services = load(args.config_home).services()
         urls = {
             r.id: r.url
             for r in every_item(

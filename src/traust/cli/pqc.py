@@ -31,7 +31,7 @@ from traust_core.v1.models.vocabulary import (
 
 from traust.cli import _doors
 from traust.cli._doors import parser, run
-from traust.context import load_core
+from traust.context import load
 
 
 def _parser(op: str, about: str, *, commit: bool = True) -> argparse.ArgumentParser:
@@ -71,7 +71,7 @@ def record(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         ref_id = _register(core, args)
         source = Provenance(
             run_id=uuid.uuid4(), source=SourceType.INTERACTIVE, occurred_at=datetime.now(UTC)
@@ -97,7 +97,7 @@ def check(argv: list[str] | None = None) -> int:
     def call() -> dict:
         nonlocal failed
         doc = PqcReadinessArtifact.parse(args.report.read_bytes())
-        violations = load_core(args.config_home).services().pqc.check(doc).violations
+        violations = load(args.config_home).services().pqc.check(doc).violations
         failed = bool(violations)
         return {"ok": not failed, "violations": [v.model_dump(mode="json") for v in violations]}
 
@@ -110,7 +110,7 @@ def prepare(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         ref_id = _find(core, args.repo_url, args.sha)
         return core.services().pqc.prepare(ref_id).model_dump_json(indent=2)
 
@@ -148,7 +148,7 @@ def summary(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list[dict]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         rollups = core.services().pqc.summary(_filter(core, args), PqcDimension(args.by))
         return [r.model_dump(mode="json") for r in rollups]
 
@@ -174,7 +174,7 @@ def blockers(argv: list[str] | None = None) -> int:
     patchable = True if args.patchable else False if args.not_patchable else None
 
     def call() -> list[dict]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         found = core.services().pqc.blockers(
             _filter(
                 core,

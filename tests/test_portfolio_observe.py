@@ -15,13 +15,13 @@ from traust_core.v1.errors import NotFoundError
 from traust_core.v1.models.assessment import Assessment, AssessmentKind
 from traust_core.v1.models.inventory import RepositoryRef
 from traust_core.v1.models.observation import ComparisonStatus
-from traust_core.v1.models.operations import AssetRequest, JobResult
+from traust_core.v1.models.operations import AssetRequest, JobResult, OrderReason
 from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.providers.process import ProcessResult, ProcessRunner
 from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
 
 from traust.cli import portfolio_observe
-from traust.context import load_core
+from traust.context import load
 from traust.ops.materializers import RepoStateMaterializer
 
 REPO = "https://github.com/org/app"
@@ -68,7 +68,7 @@ def observe(home: Path, repo: str) -> tuple[int, dict[str, Any]]:
 
 
 def register(home: Path, *, audited: bool) -> None:
-    core = load_core(home)
+    core = load(home)
     repo = core.services().portfolio.register_repository(HttpsRepoUrl.parse(REPO, HOSTS), False)
     if not audited:
         return
@@ -90,7 +90,7 @@ def register(home: Path, *, audited: bool) -> None:
 def test_an_audited_fork_is_observed_kept_and_its_upstream_inventoried(home: Path) -> None:
     register(home, audited=True)
     assert observe(home, REPO) == (0, JobResult.succeeded().model_dump(mode="json"))
-    core = load_core(home)
+    core = load(home)
     with core.repository_observation() as observation:
         state = observation.query.repo_state(repo_url=REPO)
     assert (state.status, state.ahead_by, state.exposure) == ("ok", 1, "public-internal")
@@ -147,4 +147,4 @@ def test_a_repository_core_doesnt_know_is_refused_with_its_reason() -> None:
     result = RepoStateMaterializer(Services(portfolio), HOSTS).materialize(  # type: ignore[arg-type]
         AssetRequest(asset="repo_state", run_id="t", partition=REPO)
     )
-    assert result == JobResult.refused("repository not in inventory: x")
+    assert result == JobResult.refused(OrderReason.NOT_FOUND)

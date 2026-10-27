@@ -38,7 +38,7 @@ from traust_core.v1.models.values import GitSha, HttpsRepoUrl, ProductSlug, Repo
 
 from traust.cli import _doors
 from traust.cli._doors import parser, run
-from traust.context import load_caller, load_core
+from traust.context import load, load_caller
 
 
 def _json(value: Any) -> Any:
@@ -84,7 +84,7 @@ def plan(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> Any:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         return _json(core.services().onboarding.plan(_request(core, args)))
 
     return run(call)
@@ -96,7 +96,7 @@ def onboard(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> Any:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         request = _request(core, args)
         return _json(core.services().onboarding.onboard(request, load_caller(core)))
 
@@ -109,7 +109,7 @@ def owner_hints(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> Any:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         return [_json(h) for h in core.services().sync.owner_hints(_url(core, args.repo))]
 
     return run(call)
@@ -123,7 +123,7 @@ def file(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> Any:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         url, sha, path = _url(core, args.repo), GitSha.parse(args.sha), RepoPath.parse(args.path)
         text = core.services().sync.find_file(url, path, sha)
         return {"repo": str(url), "sha": str(sha), "path": str(path), "file": text}
@@ -168,7 +168,7 @@ def import_owners(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> Any:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         return _json(core.services().sync.import_owners(_source(core, args.source)))
 
     return run(call)
@@ -206,7 +206,7 @@ def import_release(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> Any:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         commits = _commits(core, args.commits, args.branch)
         [product] = _doors.products(services, [args.product])
@@ -224,7 +224,7 @@ def release_changes(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> Any:
-        services = load_core(args.config_home).services()
+        services = load(args.config_home).services()
         [product] = _doors.products(services, [args.product])
 
         def release(version: str) -> Any:

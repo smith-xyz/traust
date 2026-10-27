@@ -25,7 +25,7 @@ from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import SourceType
 
 from traust.cli._doors import add_branch_arg, parser, register_commit, run, when
-from traust.context import load_core
+from traust.context import load
 
 # The kind of assessment each audit skill records, and its document's contract type.
 RECORDS: dict[AssessmentKind, tuple[str, type[ArtifactDocument]]] = {
@@ -68,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
 
     def call() -> dict:
         doc = artifact.parse(args.document.read_bytes())
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, args.public)

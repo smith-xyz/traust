@@ -24,7 +24,7 @@ from traust_core.v1.models.insight import (
     ViewFilter,
     ViewName,
 )
-from traust_core.v1.models.operations import AssetRequest, JobResult, Outcome
+from traust_core.v1.models.operations import AssetRequest, JobResult, OrderReason, Outcome
 
 from traust.cli import refresh_dashboards
 from traust.ops.materializers import DashboardsMaterializer, write_view
@@ -76,13 +76,16 @@ def test_a_partition_refreshes_that_view_only(tmp_path: Path) -> None:
     assert insight.calls == [([ViewName.FINDINGS_ROLLUP], ViewFilter())]
 
 
-def test_a_view_that_fails_is_degraded_and_the_rest_are_written(tmp_path: Path) -> None:
+def test_a_view_that_fails_is_degraded_and_the_rest_are_written(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     failed = {ViewName.LOC: "ValidationError: no language facts"}
     insight = Insight(RefreshResult(rendered={ViewName.FINDINGS_ROLLUP: ROLLUP}, failed=failed))
     result = materialize(insight, tmp_path)
     assert result.outcome == Outcome.DEGRADED
     assert result.degraded == {"loc": 1}
-    assert result.reason == "loc: ValidationError: no language facts"
+    assert result.reason == OrderReason.SOURCE_UNAVAILABLE
+    assert "loc: ValidationError: no language facts" in caplog.text
     assert len(result.written) == 3
 
 
@@ -98,7 +101,7 @@ def test_a_bad_request_fails_and_writes_nothing(
     tmp_path: Path, partition: str | None, raised: Exception | None
 ) -> None:
     result = materialize(Insight(raised or RefreshResult()), tmp_path, partition)
-    assert result.outcome == Outcome.FAILED and (result.reason or "").startswith("bad request")
+    assert result.outcome == Outcome.FAILED and result.reason == OrderReason.BAD_REQUEST
     assert not any(tmp_path.iterdir())
 
 

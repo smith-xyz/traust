@@ -20,7 +20,7 @@ def asked(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, ...]]:
         return tuple(f"{i}: not in pinned ATT&CK table" for i in ids if i.startswith("T9"))
 
     core = SimpleNamespace(attack_catalog=SimpleNamespace(invalid=invalid))
-    monkeypatch.setattr(attack, "load_insight_core", lambda _home: core)
+    monkeypatch.setattr(attack, "load", lambda _home: core)
     return seen
 
 

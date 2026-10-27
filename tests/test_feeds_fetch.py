@@ -16,12 +16,12 @@ import pytest
 import yaml
 from traust_core.v1.errors import ServiceError
 from traust_core.v1.models.dependencies import FeedName
-from traust_core.v1.models.operations import JobResult, OrderState, RunOrder
+from traust_core.v1.models.operations import JobResult, OrderReason, OrderState, RunOrder
 from traust_core.v1.providers.http import HttpFetcher
 from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
 
 from traust.cli import feeds_fetch
-from traust.context import load_core
+from traust.context import load
 from traust.registry.feeds_config import registry_path
 
 FIXTURES = Path(__file__).parent / "fixtures" / "feeds"
@@ -71,7 +71,7 @@ def fetch(home: Path, *argv: str) -> tuple[int, dict[str, Any]]:
 
 
 def payload(home: Path, feed: str) -> bytes | None:
-    core = load_core(home)
+    core = load(home)
     core.register_feeds(registry_path())
     return core.services().exposure.feed_payload(FeedName(feed))
 
@@ -103,14 +103,15 @@ def test_one_feed_by_name(home: Path, hosts: dict) -> None:
 
 
 def test_a_source_that_fails_after_a_good_run_degrades_and_keeps_its_snapshot(
-    home: Path, hosts: dict
+    home: Path, hosts: dict, caplog: pytest.LogCaptureFixture
 ) -> None:
     fetch(home)
     kept = payload(home, "kev")
     hosts["https://www.cisa.gov/"] = ServiceError("https://www.cisa.gov/...: HTTP 503")
     rc, result = fetch(home)
     assert (rc, result["outcome"], result["degraded"]) == (4, "degraded", {"kev": 1})
-    assert result["reason"] == "kev: https://www.cisa.gov/...: HTTP 503"
+    assert result["reason"] == OrderReason.SOURCE_UNAVAILABLE
+    assert "kev: https://www.cisa.gov/...: HTTP 503" in caplog.text
     assert payload(home, "kev") == kept
 
 
@@ -118,18 +119,18 @@ def test_a_source_with_no_snapshot_at_all_fails_the_run(home: Path, hosts: dict)
     hosts["https://epss.cyentia.com/"] = b"not a gzip payload"
     rc, result = fetch(home)
     assert (rc, result["outcome"]) == (1, "failed")
-    assert result["reason"].startswith("no usable snapshot: epss: ")
+    assert result["reason"] == OrderReason.SNAPSHOT_UNAVAILABLE
     assert payload(home, "kev") is not None
 
 
 def test_an_unknown_feed_is_a_bad_request(home: Path, hosts: dict) -> None:
     rc, result = fetch(home, "--feed", "nvd")
     assert (rc, result["outcome"]) == (1, "failed")
-    assert result["reason"].startswith("bad request")
+    assert result["reason"] == OrderReason.BAD_REQUEST
 
 
 def test_a_run_for_an_order_links_its_snapshots_to_it(home: Path, hosts: dict) -> None:
-    core = load_core(home)
+    core = load(home)
     with SqlTraustUnitOfWork(core.database) as uow:
         order = uow.run_orders.add(
             RunOrder(asset="feeds_cache", state=OrderState.QUEUED, priority=10, requested_by="t")

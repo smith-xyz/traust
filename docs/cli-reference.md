@@ -20,7 +20,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 
 | Group | Description | Operations |
 |---|---|---|
-| `adapters` | Scanner adapters (deterministic pre-scans) | `checkov`, `config-matrix`, `crypto-audit`, `crypto-cluster`, `crypto-image`, `crypto-probe`, `crypto-source`, `fork-lag`, `gitleaks`, `govulncheck`, `image-packages`, `image-sbom`, `joern`, `opengrep`, `osv`, `priv-profile`, `route-guards`, `sanitizers`, `yara` |
+| `adapters` | Scanner adapters (deterministic pre-scans) | `checkov`, `config-matrix`, `crypto-audit`, `crypto-cluster`, `crypto-image`, `crypto-probe`, `crypto-source`, `fork-lag`, `gitleaks`, `govulncheck`, `image-packages`, `image-sbom`, `joern`, `llm-app`, `opengrep`, `osv`, `priv-profile`, `route-guards`, `sanitizers`, `yara` |
 | `admin` | Operator tooling | `attest-target`, `checkpoint`, `doctor`, `query-index`, `scan-internal-refs`, `toolchain` |
 | `assessments` | The audit skills' doors on traust-core | `coverage`, `prepare`, `threats` |
 | `attack` | The pack's pinned MITRE ATT&CK release | `validate` |
@@ -42,9 +42,10 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `registry` | Model/product registry | `models`, `products` |
 | `remediation` | The remediation loop's doors on traust-core (remediate-finding, patch, property-test, fleet-fix, verify-remediation) | `assemble`, `candidates`, `fleet-apply`, `fleet-record`, `fleet-targets`, `fork`, `mutation-evidence`, `next`, `open`, `prepare`, `progress`, `property-evidence`, `record`, `verifications`, `verify-differential`, `verify-prepare`, `verify-record`, `verify-sweep`, `work-items` |
 | `reporting` | Report validation, rendering & recording | `lint`, `rate-threats`, `record`, `render`, `sarif`, `validate` |
+| `session` | A skill session started headless for a continuous-ops order (the pack's skill-session `run`) | `run` |
 | `tools` | One door over traust-core's tool registry: each registered tool's readiness, version and database; one tool over a checkout, SBOM, image or symbols, its typed result as JSON | `list`, `run` |
 | `triage` | The triage skill's doors on traust-core | `check`, `intake`, `prepare`, `record`, `render` |
-| `sweep` | Class-generalization sweep; recall-benchmark answer key | `benchmark`, `benchmark-targets`, `build-canaries`, `cards`, `collect`, `draft`, `emit`, `mine`, `rule-lane`, `screen-injection`, `sweep` |
+| `sweep` | Class-generalization sweep; recall-benchmark answer key | `benchmark`, `benchmark-targets`, `build-canaries`, `cards`, `collect`, `draft`, `emit`, `mine`, `regression-drafts`, `rule-lane`, `screen-injection`, `sweep`, `verify-draft` |
 | `util` | Utility commands | `elf`, `redact`, `safe-exec` |
 | `validation` | Core-backed machine validation evidence | `record` |
 

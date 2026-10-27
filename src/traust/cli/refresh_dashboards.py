@@ -36,8 +36,7 @@ from traust_core.v1.models.operations import AssetRequest
 from traust.cli._doors import EXIT_CODES
 from traust.context import (
     add_config_home_arg,
-    load_engine,
-    load_insight_core,
+    load,
     progress_tracker_dir,
     resolve_results_root,
     workspace_dir,
@@ -122,7 +121,7 @@ def build_stages(
 
 def run_views(args, out: Path) -> int:
     """The `dashboards` asset's materializer: one InsightService.refresh; prints its JobResult."""
-    materializer = DashboardsMaterializer(load_insight_core(args.config_home).services(), out)
+    materializer = DashboardsMaterializer(load(args.config_home).services(), out)
     result = materializer.materialize(
         AssetRequest(asset=materializer.asset, run_id=args.run_id, partition=args.view)
     )
@@ -183,8 +182,8 @@ def main(argv=None):
     )
     args = ap.parse_args(argv)
 
-    engine = load_engine(args.config_home)
-    workspace = (args.workspace_root or workspace_dir(engine)).resolve()
+    core = load(args.config_home)
+    workspace = (args.workspace_root or workspace_dir(core)).resolve()
     results_root = resolve_results_root(args)
     spend_actuals = args.spend_actuals or args.list or "spend-actuals" in (args.only or [])
     stages = build_stages(workspace, results_root, spend_actuals, config_home=args.config_home)
@@ -208,7 +207,7 @@ def main(argv=None):
         if (args.only is None or n in args.only) and n not in args.skip
     ]
 
-    out = args.out or progress_tracker_dir(engine) / "metrics" / "dashboards"
+    out = args.out or progress_tracker_dir(core) / "metrics" / "dashboards"
     results = []
     views_rc = 0
     for name, tier, cmd in selected:

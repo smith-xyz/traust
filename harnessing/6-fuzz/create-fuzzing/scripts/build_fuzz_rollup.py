@@ -39,7 +39,7 @@ from pathlib import Path
 
 from traust.context import (
     add_config_home_arg,
-    load_core,
+    load,
     progress_tracker_dir,
     resolve_results_root,
     workspace_dir,
@@ -623,7 +623,7 @@ def main(argv=None):
     ap.add_argument("--results-root", type=Path, default=None)
     args = ap.parse_args(argv)
 
-    core = load_core(args.config_home)
+    core = load(args.config_home)
     results_root = resolve_results_root(args)
     configure_corpus(
         results_root,

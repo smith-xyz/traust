@@ -30,7 +30,7 @@ from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import Ecosystem
 
 from traust.cli._doors import add_branch_arg, parser, register_commit, run
-from traust.context import load_core
+from traust.context import load
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, False)

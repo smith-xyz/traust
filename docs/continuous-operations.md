@@ -14,6 +14,21 @@ consume its worklist. The deps lane is the exception: its worklist rows are
 coverage classification — the daily `/dependency-watch` run covers that class
 advisory-first without reading the worklist (see rule 3b).
 
+Core owns the new-order classifier gate: order states, registered routing lanes,
+rescan event sources and machine reason codes come from its pinned contracts.
+Asset names such as `feeds_cache` or `dashboards` do not become lanes; an unrouted
+order has no lane. Materializer receipts expose stable reason codes
+(`bad_request`, `not_found`, `snapshot_unavailable`, `source_unavailable`,
+`ledger_unconfigured`); detailed causes are retained in logs with the run id.
+Historical order text and the existing router lane spellings are not rewritten.
+
+New completion coverage keys are checked against the common `DegradedKey` causes
+or current registered feed/view identifiers. A failed feed such as `kev` and an
+unavailable view such as `loc` keep separate counts; they do not become anonymous
+failures. Counts must be positive integers. Unknown causes or invalid counts leave
+the lease and artifact history unchanged. Imported historical keys remain readable
+and are retained when progress updates write a successor manifest.
+
 The thresholds and tier ceilings in this document are the router's shipped
 defaults. A deployment re-derives them from its own router telemetry on a
 quarterly cadence and records the derivation in its own planning documents;
@@ -135,27 +150,26 @@ rows named in the last column are the backstop that makes a dead timer visible.
 | IaC quarterly re-baseline | quarterly — **human-decision, drift-flagged** | rides `checkov-pin` advances (drift row) | `/cloud-config-audit` re-runs against the IaC-bearing targets | pin advances are deliberate toolchain changes — re-verify one known-good target before the sweep |
 | Portfolio-graph heavyweight rebuild | **human-decision, drift-flagged** — after the inputs inventory moves, or when `/impact-analysis` freshness demands it | drift row `portfolio-graph` (build stamp vs inputs HEAD) | `/portfolio-graph` (python3 -m traust.cli portfolio build) | build refuses a stale spine; rebuild timing stays with the operator (clone-sweep cost) |
 | ADR / pin / external-tool advances | **human-decision, drift-flagged** — never automated | drift rows `adr-registry:*`, `checkov-pin`, `external-tools:*` | reviewed commits advancing the pins | no check may auto-advance a pin (drift-watch constraint) |
-| Spend capture (`/financial-tracking capture`) | **weekly** | timer; drift rows `dashboards:spend*` (>4d) | `/financial-tracking capture` — see *Spend capture cadence* below | capture is LOSSY if you are late: transcripts are retained for a rolling window only and there is no backfill. The reconcile step is a hard gate — a non-zero exit means tokens were lost between the collector and the attribution split |
+| Spend capture (`/financial-tracking capture`) | **weekly** | timer; drift rows `dashboards:spend*` (>4d) | `/financial-tracking capture` — see *Spend capture cadence* below | capture is LOSSY if you are late: transcripts are retained for a rolling window only and there is no backfill. The reconcile step is a hard gate — a non-zero exit means recorded spend does not split losslessly by skill |
 | Docs semantic sweep | quarterly | drift row `docs-semantic-sweep` (92d) | reviewer sweep per the check-harness-docs SKILL procedure | report lands in the deployment's gap-assessments tree |
 
 ## Spend capture cadence — capture weekly, report monthly
 
-The capture chain is three deterministic steps, run in order:
+The capture chain is two deterministic steps, run in order:
 
 ```bash
-python3 -m traust.cli metrics collect-spend --append
-python3 -m traust.cli metrics attribute-spend --append
+python3 -m traust.cli metrics collect-spend --append      # traust-core spend, per skill
 python3 -m traust.cli metrics attribute-spend --reconcile
 ```
 
-The third is a **gate, not a formality**: a non-zero exit means tokens were
-dropped between the collector and the per-lane attribution split, and every
+The second is a **gate, not a formality**: a non-zero exit means recorded
+spend does not split losslessly by skill, and every
 downstream figure is untrustworthy. Stop and say so.
 
 **Why weekly and not monthly.** Agent session transcripts are retained for a
 rolling window of about a month, and they are the only source for both token
-counts and the business-unit bridge. A day that ages out is unrecoverable —
-there is no backfill, and the ledger keeps only what was captured. Monthly runs
+counts and the per-skill split. A day that ages out is unrecoverable —
+there is no backfill, and traust-core keeps only what was captured. Monthly runs
 with zero margin: one slipped week and the tail of the previous month is gone
 permanently. The chain is deterministic and runs in seconds, so the cadence is
 set by data-loss risk, not by cost.
@@ -472,7 +486,7 @@ with none unexplained. `traust-engine` is installed with traust; every command
 takes the same three paths:
 
 ```bash
-E="--core $TRAUST_CONFIG_HOME/core.yaml --pack packs/security/assets.yaml --pin config/external-tools.yaml"
+E="--core $TRAUST_CONFIG_HOME/core.yaml --pack packs/security/assets.yaml --pin config/external-tools.yaml --feeds config/feeds.yaml"
 
 # each cron job, wrapped: its run becomes an order the engine counts
 traust-engine record $E feeds_cache -- traust feeds fetch --feed all
@@ -489,6 +503,22 @@ traust-engine diff $E --shadow shadow.jsonl --routes rescan-worklist.json
 `record` takes over the subject's open order if there is one, so there is still
 one open order per asset and repository. `shadow` reaps, plans and admits
 nothing. `traust-engine run` is the loop itself, for after the cutover.
+
+### Running orders: `traust-engine claim`
+
+After the cutover, `traust-engine run` plans and admits, and a runner does the
+work. `traust-engine claim $E` leases one queued order of an asset with a `run`
+command, fills its `{run_id}` and `{repo_url}` tokens from the order, renews the
+lease while the command runs, completes the order with the command's JobResult
+and exits (0 succeeded, 1 failed, 4 degraded, 5 refused; nothing queued is 0).
+It is claim-once, started by an operator or a scheduler, never a daemon.
+A skill session is a command too: its `run` is `traust session run --skill
+<skill> --role {role}`, which resolves the role's model from the registry and
+starts the skill headless in the harness (a repository it reviews is passed by
+URL, or as a temporary checkout outside the harness with `--checkout`). Its
+outcome is the session's exit. Pass `--feeds config/feeds.yaml` to every
+`traust-engine` command so core knows the pack's feeds when a run reports one
+degraded.
 
 ## Standing weekly drain — orchestrator contract
 

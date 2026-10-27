@@ -29,12 +29,12 @@ def wired(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
             raise seen.result
         return seen.result
 
-    def load_engine_core(home: Any, *, canaries: str) -> Any:
+    def load(home: Any, *, canaries: str) -> Any:
         seen.canaries.append(canaries)
         quality = SimpleNamespace(build_canaries=build_canaries)
         return SimpleNamespace(services=lambda: SimpleNamespace(detection_quality=quality))
 
-    monkeypatch.setattr(recall, "load_engine_core", load_engine_core)
+    monkeypatch.setattr(recall, "load", load)
     return seen
 
 

@@ -49,6 +49,7 @@ allowed-tools:
   - Bash(python3 *-m traust.cli adapters fork-lag:*)
   - Bash(python3 *-m traust.cli adapters config-matrix:*)
   - Bash(python3 *-m traust.cli adapters route-guards:*)
+  - Bash(python3 *-m traust.cli adapters llm-app:*)
   - Bash(python3 *-m traust.cli adapters sanitizers:*)
   - Bash(python3 *-m traust.cli adapters priv-profile:*)
   - Bash(python3 *harnessing/3-audit/secure-code-audit/scripts/probe_sanitizers.py:*)
@@ -274,7 +275,7 @@ default for every repository**, not just high-value targets.
    and the other flagged is a finding, not a negative.
 
 Deterministic pre-scans (opengrep, checkov catalog, syft/grype,
-osv-scanner, fork-advisory-lag, gitleaks) run **once** — their facts
+osv-scanner, llm-app, fork-advisory-lag, gitleaks) run **once** — their facts
 seed both passes.
 Single-pass execution remains acceptable only when the invoker
 explicitly requests it (record `"audit_passes": 1` in
@@ -658,6 +659,18 @@ Using the [OWASP Kubernetes Top 10 (2025)](https://owasp.org/www-project-kuberne
 For each K01–K10 finding, reference the specific OWASP Kubernetes Top 10 ID alongside the CWE and CVSS score.
 
 The mechanical rows of this table — K01 workload configs, K02 RBAC grants, K03 secrets-in-env, K05 service exposure, K09 automount/default-SA — are covered by the deterministic pre-scan below (see *Deterministic pre-scan* under the CIS section); cite its `file:line` facts as the evidence for those findings rather than re-reading manifests by hand.
+
+#### Per-technology review checks (framework-checks.md)
+
+The table above reviews what an operator ships; [`framework-checks.md`](framework-checks.md)
+reviews what its code and its gRPC servers do. Select its sections by the
+technology the checkout uses (its *Selecting sections* table: Kubernetes
+operators, gRPC), and answer every check in each selected section. Each
+check names its CWE, its ASVS 5.0 section and, for operator checks, the
+K-ID above, plus the evidence that settles it. Record
+`"framework-checks": "ran: <sections>"` (or `"ran: none"`) in
+`metadata.additional.deterministic_steps`; a check you couldn't answer is a
+`coverage_gaps` entry, never a silent negative.
 
 ### CIS Kubernetes Benchmark & DISA STIG (Configuration Hardening)
 
@@ -1123,6 +1136,36 @@ Judging protocol — the lane may NOT close with unjudged rows:
    (unenumerated frameworks) into `metadata.additional.coverage_gaps`
    as `{tool: "route-guards", system, reason}` for the fleet-wide
    rollup. Accelerator, never a precondition.
+
+#### Deterministic LLM application pre-scan (traust adapters llm-app)
+
+When a local checkout exists, run the LLM, agent and MCP application
+detector (traust-core's `code_facts.llm_app`):
+
+```bash
+python3 -m traust.cli adapters llm-app <local-path> --out /tmp/<repo>-llm-app.json
+```
+
+It reads source imports, direct manifest declarations (never lockfiles)
+and prompt-template files, and reports `llm_application`, the `kinds`
+found (`model-sdk`, `agent-framework`, `mcp-server`, `vector-store`,
+`prompt-template`), the `signals` with their evidence, and the tagged
+`files`. A file that reaches the model through an in-repo wrapper is
+tagged too, with the wrapper in its `via_wrapper`. **It is a fact, never a
+finding.**
+
+- **When `llm_application: true`:** review the tagged files, and the call
+  paths into and out of them, against
+  [`llm-application-review.md`](llm-application-review.md): the sections
+  its `kinds` select, plus those that apply to every LLM application.
+  That file sets the evidence rules, the CWE per check, and how to record
+  the OWASP category, negatives and coverage gaps.
+- **When `llm_application: false`:** the LLM checklist doesn't apply.
+  Say so in `negative_results`, citing the pre-scan.
+- **Record** `"llm-app": "ran: <kinds>"`, or `"ran: none"`, in
+  `metadata.additional.deterministic_steps`. With no local checkout, record
+  `"skipped: no local checkout"`, and a repository that looks like an LLM
+  application is a `coverage_gaps` entry.
 
 #### Sanitizer micro-probes (probe_sanitizers.py — execution-gated)
 
@@ -1649,8 +1692,9 @@ Rules for batch prompts:
 `/add-inputs` (§Input); `<repo>-threat-model.md` from `/threat-model`
 (coverage diff, findings-tree copy); the FP-precedent cache from
 python3 -m traust.cli corpus precedent; deterministic pre-scan outputs
-(opengrep, gitleaks, osv, syft/grype, k8s-hardening) recorded
-under `deterministic_steps`.
+(opengrep, gitleaks, osv, llm-app, syft/grype, k8s-hardening) recorded
+under `deterministic_steps`; `llm-application-review.md` (this skill's
+LLM, agent and MCP checklist, shared with `/vuln-scan`).
 
 **Emits:** `<repo>-security-audit.json` — the campaign's baseline
 report artifact — consumed by `/triage`, `/track-findings`,

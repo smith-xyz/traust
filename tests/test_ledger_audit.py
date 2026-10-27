@@ -14,7 +14,7 @@ from uuid import uuid4
 import pytest
 import yaml
 from traust_core.v1.models.ledger import VerifyResult
-from traust_core.v1.models.operations import AssetRequest, JobResult
+from traust_core.v1.models.operations import AssetRequest, JobResult, OrderReason
 
 from traust.cli import ledger_audit
 from traust.ops.materializers import LedgerAuditMaterializer
@@ -52,7 +52,7 @@ def test_a_layer_that_does_not_verify_is_never_green(
 def test_no_ledger_configured_is_refused() -> None:
     materializer = LedgerAuditMaterializer(SimpleNamespace(ledger=None))  # type: ignore[arg-type]
     result = materializer.materialize(AssetRequest(asset="ledger_audit", run_id="manual"))
-    assert result.outcome == "refused" and "no ledger configured" in (result.reason or "")
+    assert (result.outcome, result.reason) == ("refused", OrderReason.LEDGER_UNCONFIGURED)
 
 
 def run(home: Path) -> tuple[int, dict[str, Any]]:

@@ -21,7 +21,7 @@ from traust_core.v1.repositories.sql import Dialect
 
 from traust.cli import products
 from traust.cli.__main__ import main
-from traust.context import load_services
+from traust.context import load
 
 PG_URL = os.environ.get("TRAUST_TEST_DATABASE_URL")
 
@@ -167,7 +167,7 @@ def test_update_of_an_unknown_name_is_refused(home: Path) -> None:
 
 
 def test_a_product_without_ownership_needs_both_fields(home: Path) -> None:
-    load_services(home).portfolio.register_product(ProductSlug("findings"), "example-platform")
+    load(home).services().portfolio.register_product(ProductSlug("findings"), "example-platform")
     assert listed(home)["findings"]["ownership"] is None
     rc, err = run(products.update, home, "findings", "--ownership", "owned")
     assert rc == 2
@@ -177,7 +177,7 @@ def test_a_product_without_ownership_needs_both_fields(home: Path) -> None:
 
 
 def test_add_completes_a_product_registered_without_ownership(home: Path) -> None:
-    load_services(home).portfolio.register_product(ProductSlug("findings"), "example-platform")
+    load(home).services().portfolio.register_product(ProductSlug("findings"), "example-platform")
     rc, err = add(home, "findings", "ignored", "owned", "Example")
     assert rc == 2
     assert "with update" in err

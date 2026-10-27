@@ -14,7 +14,7 @@ from traust_core.v1.models.common import every_item
 from traust_core.v1.models.inventory import RepositoryFilter
 
 from traust.cli._doors import parser, run
-from traust.context import load_services
+from traust.context import load
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -22,7 +22,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> Any:
-        services = load_services(args.config_home)
+        services = load(args.config_home).services()
         repos = {
             row.url: {
                 "status": "archived" if row.archived else "unknown" if row.unobserved else "active"

@@ -14,11 +14,11 @@ _traust_path() {
 from traust.context import (
     analysis_results_dir,
     findings_tree_dir,
-    load_core,
+    load,
     workspace_dir,
 )
 import sys
-core = load_core()
+core = load()
 m = {
     'workspace': workspace_dir,
     'analysis_results': analysis_results_dir,

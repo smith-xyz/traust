@@ -30,7 +30,7 @@ from traust_core.v1.models.validation import (
 from traust_core.v1.models.values import HttpsRepoUrl
 
 from traust.cli._doors import add_branch_arg, parser, register_commit, run
-from traust.context import load_core, load_services
+from traust.context import load
 
 
 def _parser(op: str, about: str) -> argparse.ArgumentParser:
@@ -60,7 +60,7 @@ def source(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         url = HttpsRepoUrl.parse(args.repo_url, core.config.forge_hosts)
         repo = services.portfolio.register_repository(url, args.public)
@@ -95,7 +95,7 @@ def image(argv: list[str] | None = None) -> int:
         ap.error("pin the image by digest: <name>@sha256:<hex>")
 
     def call() -> dict:
-        services = load_services(args.config_home)
+        services = load(args.config_home).services()
         if args.sbom is not None:
             services.exposure.ingest_image_sbom(args.sbom.read_bytes(), digest)
         try:
@@ -161,8 +161,10 @@ def cluster(argv: list[str] | None = None) -> int:
         ap.error(str(e))
 
     def call() -> dict:
-        census = load_services(args.config_home).code_facts.cluster_crypto(
-            request, engagement_scope(args.targets)
+        census = (
+            load(args.config_home)
+            .services()
+            .code_facts.cluster_crypto(request, engagement_scope(args.targets))
         )
         return _emit(census.model_dump(mode="json", exclude_none=True), args.out)
 
