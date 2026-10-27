@@ -12,16 +12,20 @@ from uuid import uuid4
 
 import pytest
 from traust_core.v1.models.inventory import ExposureClass, RepoState, RiskTier
+from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import ComparisonStatus
+from traust_core.v1.services.observation import PREROUTE_MIN_FILES
 from traust_core.v1.services.portfolio import PortfolioPolicy
 
-from traust.ops.router import LANES, SecurityRouter, decide, priority
+from traust.cli import build_rescan_worklist as rw
+from traust.ops.router import LANES, THREAT_MODEL_PR, SecurityRouter, decide, priority
 
 FIXTURES = Path(__file__).parent / "fixtures" / "routing"
 DECISIONS = json.loads((FIXTURES / "python_decisions.json").read_text(encoding="utf-8"))
 PRIMARY = json.loads((FIXTURES / "python_primary.json").read_text(encoding="utf-8"))
 POLICY = PortfolioPolicy()
 OBSERVED = datetime(2026, 9, 28, tzinfo=UTC)
+REPO = HttpsRepoUrl.parse("https://github.com/example/app", ["github.com"])
 
 
 def _state(**fields: Any) -> RepoState:
@@ -142,7 +146,7 @@ def test_the_corpus_covers_every_status() -> None:
 )
 def test_route_names_the_lane_and_the_rule(fields: dict[str, Any], lane: str) -> None:
     state = _state(**fields)
-    route = SecurityRouter().route(state, (), ())
+    (route,) = SecurityRouter().route(state, (), ())
     rule, _ = decide(state)
     assert (route.lane, route.reason, route.priority) == (lane, rule.id, priority(lane, state))
 
@@ -157,7 +161,7 @@ def test_route_names_the_lane_and_the_rule(fields: dict[str, Any], lane: str) ->
     ],
 )
 def test_classifications_without_a_queue_plan_nothing(fields: dict[str, Any]) -> None:
-    route = SecurityRouter().route(_state(**fields), (), ())
+    (route,) = SecurityRouter().route(_state(**fields), (), ())
     assert route.lane is None and route.reason == decide(_state(**fields))[0].id
 
 
@@ -179,3 +183,124 @@ def test_priority_orders_by_lane_then_exposure_then_tier() -> None:
         (ExposureClass.PUBLIC_EXTERNAL, RiskTier.P0),
         (ExposureClass.PUBLIC_EXTERNAL, RiskTier.P1),
     ]
+
+
+# Router inputs beside the decision table, each case run through the legacy worklist's own pass
+# (`build_rescan_worklist`) and through the router on the `RepoState` traust-core records.
+def _routes(state: RepoState) -> list[tuple[str, str | None]]:
+    return [(r.reason, r.lane) for r in SecurityRouter().route(state, (), ())]
+
+
+QUARTERLY = {"changed_lines": 12}  # rule 5
+SENSITIVE = {"changed_lines": 300, "sensitive_changed": True, "sensitive_lines": 250}  # rule 3
+
+
+@pytest.mark.parametrize(
+    ("fields", "changed", "tree", "truncated"),
+    [
+        (QUARTERLY, 1, None, True),
+        (QUARTERLY, 5, 10, False),
+        (QUARTERLY, 3, 10, False),  # exactly 30%: the resolver refuses only above it
+        (QUARTERLY, 2, 4, False),  # under the floor: no tree is counted
+        (QUARTERLY, 4, 0, False),
+        (SENSITIVE, 4, 10, False),
+        (SENSITIVE, 4, 100, False),
+        ({"changed_lines": 9000}, 1, None, True),  # rule 2: not a diff lane
+    ],
+)
+def test_refusal_preroute_matches_the_legacy_router(
+    fields: dict[str, Any], changed: int, tree: int | None, truncated: bool
+) -> None:
+    state = _state(
+        **fields,
+        compare_truncated=truncated,
+        first_party_files=changed,
+        # traust-core counts the tree only for an untruncated compare over the floor.
+        tree_first_party_files=None if truncated or changed < PREROUTE_MIN_FILES else tree,
+    )
+    rule, lane = decide(state)
+    row = {"repo_key": "k", "lane": lane, "rule": rule.id, "reason": "", "truncated": truncated}
+    by_key = {"k": {"host_kind": "github", "project": "o/r", "fp_files": changed}}
+    count = {"ok": True, "fp_files": tree or 0, "truncated": False}
+    rw.run_preroute([row], by_key, 1, lambda p, r: count, lambda: 100_000)
+    assert _routes(state)[0] == (row["rule"], row["lane"])
+
+
+@pytest.mark.parametrize(
+    ("fields", "sensitive", "tm_files", "model"),
+    [
+        (SENSITIVE, True, 0, True),
+        (QUARTERLY, False, 2, True),
+        (QUARTERLY, False, 0, True),
+        (SENSITIVE, True, 0, False),  # no model to assess the diff against
+        (SENSITIVE | {"risk_tier": RiskTier.P0}, True, 0, True),  # rule 3 on P0: a full audit
+        (SENSITIVE | {"compare_truncated": True}, True, 0, True),  # pre-routed first
+    ],
+)
+def test_threat_model_pr_stamp_matches_the_legacy_router(
+    fields: dict[str, Any], sensitive: bool, tm_files: int, model: bool
+) -> None:
+    state = _state(
+        **fields, threat_model_files=tm_files, threat_model_age_days=10 if model else None
+    )
+    rule, lane = decide(state)
+    truncated = state.compare_truncated
+    row = {"repo_key": "k", "lane": lane, "rule": rule.id, "reason": "", "truncated": truncated}
+    rw.run_preroute([row], {"k": {"fp_files": 0}}, 1, None, lambda: 0)
+    entry = {"S": sensitive, "tm_files": tm_files, "tm_path": "m.md" if model else None}
+    rw.stamp_threat_model_pr([row], {"k": entry})
+    stamped = "threat_model_pr" in row
+    reason, _ = _routes(state)[0]
+    assert reason == row["rule"] + (THREAT_MODEL_PR if stamped else "")
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"iac_files": 2, "has_cloud_config_baseline": True},
+        {"iac_files": 2, "has_cloud_config_baseline": False},
+        {"iac_files": 0, "has_cloud_config_baseline": False},
+        {"status": ComparisonStatus.QUOTA_DEFERRED, "iac_files": 2},
+        {"companion_lanes": ("cloud-config-audit",), "has_cloud_config_baseline": False},
+        {"companion_lanes": ("cloud-config-audit",), "has_cloud_config_baseline": True},
+        {"companion_lanes": ("cloud-config-audit",), "iac_files": 1},
+        {"companion_lanes": ("cloud-config-audit",), "repo": None},
+        {"threat_model_age_days": 92},
+        {"threat_model_age_days": 91},
+        {"threat_model_age_days": 400, "iac_files": 3, "has_cloud_config_baseline": True},
+    ],
+)
+def test_additive_rows_match_the_legacy_router(fields: dict[str, Any]) -> None:
+    state = _state(**({"repo": REPO} | fields))
+    url = str(state.repo) if state.repo else None
+    entry = {
+        "repo_key": "k",
+        "repo_url": url,
+        "status": str(state.status),
+        "iac_files": state.iac_files,
+        "companion_lanes": list(state.companion_lanes),
+        "tm_path": "m.md" if state.threat_model_age_days is not None else None,
+        "tm_age_days": state.threat_model_age_days,
+    }
+    baselines = {url} if state.has_cloud_config_baseline else set()
+    iac = rw.iac_rows([entry], baselines)
+    legacy = [
+        *iac,
+        *rw.companion_rows([entry], baselines, {r["repo_url"] for r in iac}),
+        *rw.threat_model_quarterly_rows([entry], set(), rw.THREAT_MODEL_QUARTERLY_DAYS),
+    ]
+    assert _routes(state)[1:] == [(r["rule"], r["lane"]) for r in legacy]
+
+
+def test_additive_rows_ride_beside_a_classification_without_a_queue() -> None:
+    state = _state(deps_only=True, changed_lines=10, iac_files=1, threat_model_age_days=100)
+    assert _routes(state) == [
+        ("rule-3b", None),
+        ("lever-6", "iac-baseline"),
+        ("threat-model-3", "threat-model-quarterly"),
+    ]
+
+
+def test_a_never_audited_repository_gets_no_calendar_backstop() -> None:
+    state = _state(status=ComparisonStatus.NEVER_AUDITED, threat_model_age_days=400)
+    assert _routes(state) == [("rule-1-bootstrap", "full-audit")]
