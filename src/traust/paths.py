@@ -17,6 +17,10 @@ HARNESS_ROOT = _PKG_ROOT.parents[1]
 SRC_DIR = HARNESS_ROOT / "src"
 CLI_DIR = _PKG_ROOT / "cli"
 HARNESSING_DIR = HARNESS_ROOT / "harnessing"
+SECURITY_PACK_DIR = HARNESS_ROOT / "packs" / "security"
+#: The pack's opengrep rules and gitleaks config: the defaults when ``locations.yaml`` names none.
+OPENGREP_RULES_DIR = SECURITY_PACK_DIR / "opengrep-rules"
+GITLEAKS_CONFIG = SECURITY_PACK_DIR / "gitleaks-rules" / "gitleaks-default.toml"
 #: The repo's ``config/`` holds SOURCE only — shipped defaults + ``*.example.*``
 #: templates + README, never read at runtime. All runtime config (including where
 #: the harness reads/writes data) resolves from the one config home via
