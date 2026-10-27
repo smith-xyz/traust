@@ -1,5 +1,5 @@
-"""`load_engine_core`: traust-core gets traust-engine's providers for its protocols, so the doors
-behind them run instead of raising their NEED(engine) ConfigError."""
+"""`load`: traust-core gets traust-engine's providers for its protocols, so the doors behind them
+run instead of raising their NEED(engine) ConfigError."""
 
 from __future__ import annotations
 
@@ -8,9 +8,8 @@ from pathlib import Path
 
 import pytest
 import yaml
-from traust_core.v1.errors import ConfigError
 
-from traust.context import load_core, load_engine_core
+from traust.context import load
 
 FIXTURE_CONFIG = Path(__file__).parent / "fixtures" / "config"
 
@@ -25,30 +24,25 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_every_engine_provider_is_wired(home: Path) -> None:
-    core = load_engine_core(home)
+    core = load(home)
     assert core.adr_source is not None and core.doc_source is not None
     assert core.rule_packs is not None and core.canaries is not None
     assert core.fleet_fix_applier is not None and core.fleet_fix_goldens is not None
 
 
 def test_services_read_the_rule_packs_through_the_engine(home: Path) -> None:
-    packs = load_engine_core(home).services().detection_quality.rule_packs()
+    packs = load(home).services().detection_quality.rule_packs()
     assert packs and packs[0].rules
 
 
 def test_canary_sources_are_the_named_recall_benchmark_dir(home: Path) -> None:
-    core = load_engine_core(home, canaries="seeded")
+    core = load(home, canaries="seeded")
     assert not core.canaries.check().ready
     assert str(home / "recall-benchmark" / "seeded") in core.canaries.check().detail
 
 
-def test_plain_core_still_raises_the_need(home: Path) -> None:
-    with pytest.raises(ConfigError, match="NEED"):
-        load_core(home).services().detection_quality.rule_packs()
-
-
 def test_the_scanner_tools_and_their_inspector_are_wired(home: Path) -> None:
-    core = load_engine_core(home)
+    core = load(home)
     assert set(core.tools.names()) >= {
         "checkov",
         "gitleaks",
@@ -62,11 +56,12 @@ def test_the_scanner_tools_and_their_inspector_are_wired(home: Path) -> None:
         "yara",
     }
     assert core.tool_inspector is None  # each tool reports its own version and database
+    core.tools.get("gitleaks")  # the pins load with the engine, on first use
     assert core.tool_floors.get("gitleaks")  # external-tools.yaml pins are the floors
 
 
 def test_the_catalog_answers_readiness_for_every_registered_tool(home: Path) -> None:
-    catalog = load_engine_core(home).services().catalog
+    catalog = load(home).services().catalog
     names = {b.capability.name for b in catalog.readiness(None)}
     assert {"gitleaks", "grype", "opengrep", "checkov"} <= names
 
@@ -83,9 +78,5 @@ def test_run_tools_reaches_an_engine_adapter_through_core(
 
     monkeypatch.setattr(AdapterTool, "check", lambda self: Readiness(ready=True))
     monkeypatch.setattr(grype, "scan", lambda t, **_: build_scan_result(str(t), "grype", []))
-    run = load_engine_core(home).services().assessment.run_tools(tmp_path, [ToolName("grype")])
+    run = load(home).services().assessment.run_tools(tmp_path, [ToolName("grype")])
     assert run.data("grype", AdapterResult).metadata.tool == "grype"
-
-
-def test_plain_core_registers_no_engine_tools(home: Path) -> None:
-    assert load_core(home).tools.names() == []

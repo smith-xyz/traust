@@ -1,8 +1,7 @@
-"""The app's single composition root: traust-core's services and traust-engine.
+"""The app's single composition root: traust-core's Context with every provider registered.
 
-Every entry point resolves them here, once, and threads them into its workers.
-Domain state goes through core's services (:func:`load_services`); the engine is
-for executors. Nothing else in the app calls ``Context`` or ``HarnessEngine.load()``.
+Every entry point builds it here, once (:func:`load`), and threads it into its workers. Nothing
+else in the app calls ``Context`` or ``HarnessEngine.load()``.
 """
 
 from __future__ import annotations
@@ -11,20 +10,21 @@ import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import TypeVar
 
 from traust_contracts import DeploymentConfigMissing
-from traust_contracts.config import deployment_config_dir
+from traust_contracts.config import TRAUST_CONFIG_HOME_DEFAULT, TRAUST_CONFIG_HOME_ENV
 from traust_core.v1.context import Config, Context, Locations, Services
 from traust_core.v1.errors import AuthenticationError, ConfigError
 from traust_core.v1.models.identity import Credential, Principal
 from traust_engine import HarnessEngine
-from traust_engine.adapters.compliance_sources import register_compliance_sources
-from traust_engine.adapters.detection_quality import register_detection_quality
-from traust_engine.adapters.fleet_fix import register_fleet_fix
-from traust_engine.adapters.opengrep import load_supplemental_packs
-from traust_engine.adapters.tools import register_tools
 
+from traust._tools import register_providers
 from traust.paths import HARNESSING_DIR
+
+T = TypeVar("T")
+# NEED(engine facade): an engine until the last load_engine caller moves to load.
+LocationSource = Context | HarnessEngine
 
 CORE_CONFIG = "core.yaml"
 SLA_POLICY = "sla-policy.yaml"
@@ -36,10 +36,14 @@ ATTACK_TABLES = (_ATTACK / "attack-techniques.json", _ATTACK / "attack-mapping.j
 # ---------------------------------------------------------------------------
 # Sanctioned environment overrides — read ONLY in this module, never in consumers.
 #
-# ``locations.yaml`` owns estate/campaign paths. These three env vars are
-# deliberate escape hatches for layouts that must not live in checked-in config,
-# plus one secret that must never sit in a file or on argv.
+# ``locations.yaml`` owns estate/campaign paths. These env vars are deliberate
+# escape hatches for layouts that must not live in checked-in config, plus one
+# secret that must never sit in a file or on argv.
 # ---------------------------------------------------------------------------
+#
+# TRAUST_CONFIG_HOME
+#   The config home, when no --config-home is given. Consumed by
+#   :func:`resolve_config_home`.
 #
 # AUDIT_RESULTS_ROOT
 #   Point a one-off run or CI matrix job at an analysis-results tree without
@@ -73,11 +77,24 @@ def _feeds_cache_dir_from_env() -> Path | None:
     return Path(str(raw).strip()).expanduser().resolve()
 
 
-def load_engine(config_home: Path | None = None) -> HarnessEngine:
-    """Resolve the engine, or exit 2 with a one-line message (no traceback).
+def resolve_config_home(config_home: Path | None = None) -> Path | None:
+    """``config_home``, else ``$TRAUST_CONFIG_HOME``, else ``~/.traust/config`` when it exists.
 
-    Pass config_home for tests / explicit overrides; production leaves it None
-    (contracts resolves $TRAUST_CONFIG_HOME).
+    PENDING(core Bindings loader): the same rule as contracts, until core's loader owns it.
+    """
+    if config_home is not None:
+        return config_home
+    if raw := os.environ.get(TRAUST_CONFIG_HOME_ENV):
+        return Path(raw).expanduser()
+    return TRAUST_CONFIG_HOME_DEFAULT if TRAUST_CONFIG_HOME_DEFAULT.is_dir() else None
+
+
+def load_engine(config_home: Path | None = None) -> HarnessEngine:
+    """Resolve the engine facade, or exit 2 with a one-line message (no traceback).
+
+    NEED(engine facade): only the grouped ``traust <group> <op>`` ops still on ``HarnessEngine``
+    namespaces (adapters, metrics, portfolio, registry, reporting, sweep, util) and the callers
+    listed in the plan's step-1 table; everything else goes through :func:`load`.
     """
     try:
         return HarnessEngine.load(config_home=config_home)
@@ -86,59 +103,73 @@ def load_engine(config_home: Path | None = None) -> HarnessEngine:
         raise SystemExit(2) from e
 
 
-def load_core(config_home: Path | None = None) -> Context:
-    """traust-core's context from ``<config home>/core.yaml``, or exit 2 when it is invalid.
-
-    No ``core.yaml``: core's defaults (SQLite and artifacts under ``~/.traust``),
-    the zero-setup laptop install, with the home's ``locations.yaml``.
-    """
-    home = config_home or deployment_config_dir()
-    path = home / CORE_CONFIG if home is not None else None
+def _guarded(what: str, step: Callable[[], T]) -> T:
     try:
-        if path is not None and path.is_file():
-            return Context.from_file(path)
-        return Context(Config(locations=Locations.from_home(home) if home else Locations()))
+        return step()
     except ConfigError as e:
-        print(f"core config not resolvable: {e}", file=sys.stderr)
+        print(f"{what} not resolvable: {e}", file=sys.stderr)
         raise SystemExit(2) from e
 
 
-def load_insight_core(
-    config_home: Path | None = None, sla_policy: Path | None = None, invoices: Path | None = None
+def load(
+    config_home: Path | None = None,
+    *,
+    sla_policy: Path | None = None,
+    invoices: Path | None = None,
+    canaries: str = "canaries",
 ) -> Context:
-    """``load_core`` with the ATT&CK coverage view on the pack's pinned ATT&CK tables, the SLA
-    view built on ``sla_policy``, else on ``<config home>/sla-policy.yaml`` when there is one
-    (template: config/sla-policy.example.yaml), and the spend view on the config home's
-    model registry when there is one, reconciled against ``invoices``; exit 2 when any is
-    unreadable or invalid."""
-    core = load_core(config_home)
-    try:
-        core.register_attack_catalog(*ATTACK_TABLES)
-    except ConfigError as e:
-        print(f"ATT&CK catalog not resolvable: {e}", file=sys.stderr)
-        raise SystemExit(2) from e
-    home = config_home or deployment_config_dir()
-    path = sla_policy or (home / SLA_POLICY if home is not None else None)
-    if path is not None and (sla_policy is not None or path.is_file()):
-        try:
-            core.register_sla_policy(path)
-        except ConfigError as e:
-            print(f"SLA policy not resolvable: {e}", file=sys.stderr)
-            raise SystemExit(2) from e
+    """traust-core's Context from ``<config home>/core.yaml`` with every provider registered once,
+    or exit 2 when the config is invalid.
+
+    No ``core.yaml``: core's defaults (SQLite and artifacts under ``~/.traust``), the zero-setup
+    laptop install, with the home's ``locations.yaml``. The ATT&CK coverage view is built on the
+    pack's pinned tables; the SLA view on ``sla_policy``, else on ``<config home>/sla-policy.yaml``
+    when there is one (template: config/sla-policy.example.yaml); the spend view on the home's
+    model registry when there is one, reconciled against ``invoices``. The engine's providers
+    (``recall-benchmark/<canaries>`` for the canary source) load the engine on first use.
+    """
+    home = resolve_config_home(config_home)
+    path = home / CORE_CONFIG if home is not None else None
+    sla = sla_policy or (home / SLA_POLICY if home is not None else None)
+    core = _guarded(
+        "core config",
+        lambda: (
+            Context.from_file(path)
+            if path is not None and path.is_file()
+            else Context(Config(locations=Locations.from_home(home) if home else Locations()))
+        ),
+    )
+    _guarded("ATT&CK catalog", lambda: core.register_attack_catalog(*ATTACK_TABLES))
+    if sla is not None and (sla_policy is not None or sla.is_file()):
+        _guarded("SLA policy", lambda: core.register_sla_policy(sla))
     if home is not None and (home / MODEL_REGISTRY).is_file():
         _register_spend(core, home / MODEL_REGISTRY, invoices)
     elif invoices is not None:
         print(f"invoices need the spend view: no {MODEL_REGISTRY} in {home}", file=sys.stderr)
         raise SystemExit(2)
+    # NEED(engine Policy): the tools' config still comes from the engine facade, loaded lazily.
+    register_providers(core, lambda: HarnessEngine.load(config_home=home), canaries=canaries)
     return core
+
+
+# Folded into load; the callers move onto it in the next PR of this stack, which deletes these.
+def load_core(config_home: Path | None = None) -> Context:
+    return load(config_home)
+
+
+def load_insight_core(
+    config_home: Path | None = None, sla_policy: Path | None = None, invoices: Path | None = None
+) -> Context:
+    return load(config_home, sla_policy=sla_policy, invoices=invoices)
 
 
 def load_spend_core(config_home: Path | None = None) -> Context:
     """``load_core`` pricing spend on ``<config home>/model-registry.yaml`` (template:
     config/model-registry.yaml); exit 2 when it is missing or invalid."""
-    core = load_core(config_home)
-    home = config_home or deployment_config_dir()
-    _register_spend(core, (home or Path()) / MODEL_REGISTRY, None)
+    core = load(config_home)
+    if core.model_catalog is None:
+        home = resolve_config_home(config_home)
+        _register_spend(core, (home or Path()) / MODEL_REGISTRY, None)
     return core
 
 
@@ -153,51 +184,15 @@ def _register_spend(core: Context, registry: Path, invoices: Path | None) -> Non
 
 
 def load_engine_core(config_home: Path | None = None, *, canaries: str = "canaries") -> Context:
-    """traust-core with traust-engine's providers for its protocols: ADR and docs sources, the
-    rule-pack source and canary materialiser (``canaries``: the ``recall-benchmark/<canaries>``
-    source dir), the fleet-fix applier and golden runner, and the scanner tool providers, each
-    reporting its own version and database (``ProviderCatalog`` stamps and freshness)."""
-    core, engine = load_core(config_home), load_engine(config_home)
-    home = config_home or deployment_config_dir()
-    assert home is not None  # load_engine exits when there is no config home
-    cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "recall-bench"
-    # NEED(config: product -> docs slug/version): no DocsTarget map yet, so every product's
-    # docs lookup is refused by name until one has a home.
-    register_compliance_sources(core, {})
-    try:
-        pack = engine.adapters.rule_pack_dir()
-    except ValueError as e:
-        raise ConfigError(str(e)) from e
-    register_detection_quality(
-        core,
-        pack=pack,
-        supplements=load_supplemental_packs(),
-        canary_sources=home / "recall-benchmark" / canaries,
-        canary_repos=cache / canaries,
-    )
-    register_fleet_fix(core)
-    register_tools(
-        core,
-        loc=engine.ctx.locations,
-        profile_map=engine.adapters.safe_exec_profile_map(),
-        pins=engine.toolchain.pins(),
-        rule_pack=pack,
-        allowlist=engine.adapters.allowlist_for_opengrep(),
-    )
-    return core
-
-
-def load_compliance_services(config_home: Path | None = None) -> Services:
-    """``load_services`` with traust-engine's ADR source, which the citation gate and ``adrs``
-    read the pinned registers through."""
-    core = load_core(config_home)
-    register_compliance_sources(core, {})
-    return core.services()
+    return load(config_home, canaries=canaries)
 
 
 def load_services(config_home: Path | None = None) -> Services:
-    """traust-core's domain services: the one code path for domain state."""
-    return load_core(config_home).services()
+    return load(config_home).services()
+
+
+def load_compliance_services(config_home: Path | None = None) -> Services:
+    return load(config_home).services()
 
 
 def load_caller(core: Context) -> Principal:
@@ -228,7 +223,7 @@ def add_config_home_arg(parser) -> None:
     )
 
 
-def locations(src: Context | HarnessEngine) -> Locations:
+def locations(src: LocationSource) -> Locations:
     """core's ``Config.locations``. An engine (callers still on ``load_engine``) gets the same
     ``locations.yaml`` read by core, so both resolve every path the same way."""
     return (
@@ -246,17 +241,17 @@ def _required(value: Callable[[], Path | None], name: str) -> Path:
         raise DeploymentConfigMissing(str(e)) from e
 
 
-def analysis_results_dir(src: Context | HarnessEngine) -> Path:
+def analysis_results_dir(src: LocationSource) -> Path:
     """Configured local analysis-results root (fail-loud when unset)."""
     return _required(locations(src).analysis_results_dir, "analysis_results")
 
 
-def workspace_dir(src: Context | HarnessEngine) -> Path:
+def workspace_dir(src: LocationSource) -> Path:
     """Configured workspace root (fail-loud when unset)."""
     return _required(locations(src).workspace_dir, "workspace")
 
 
-def inputs_dir(src: Context | HarnessEngine) -> Path:
+def inputs_dir(src: LocationSource) -> Path:
     """The repository-inventory tree: ``locations.inputs``, else ``<workspace>/inputs``."""
     return _required(locations(src).inputs_dir, "inputs")
 
@@ -269,7 +264,7 @@ def _optional_config(name: str) -> dict:
     directly rather than through the contracts manifest, which lists the
     schema-gated files; a schema for these is a contracts follow-up.
     """
-    home = deployment_config_dir()
+    home = resolve_config_home()
     if home is None:
         return {}
     path = home / name
@@ -358,22 +353,22 @@ def campaign_settings() -> dict:
     }
 
 
-def findings_db(src: Context | HarnessEngine) -> Path:
+def findings_db(src: LocationSource) -> Path:
     """``<analysis-results>/graph/findings.db`` (fail-loud when unset)."""
     return _required(locations(src).findings_db, "analysis_results")
 
 
-def progress_tracker_dir(src: Context | HarnessEngine) -> Path:
+def progress_tracker_dir(src: LocationSource) -> Path:
     """Configured progress-tracker root (fail-loud when unset)."""
     return _required(locations(src).progress_tracker_dir, "progress_tracker")
 
 
-def rule_drafts_dir(src: Context | HarnessEngine) -> Path:
+def rule_drafts_dir(src: LocationSource) -> Path:
     """Configured rule-drafts root (fail-loud when unset)."""
     return _required(locations(src).rule_drafts_dir, "rule_drafts")
 
 
-def feeds_cache_dir(src: Context | HarnessEngine) -> Path:
+def feeds_cache_dir(src: LocationSource) -> Path:
     """Feeds pull-through cache: ``FEEDS_CACHE_DIR`` > config > ``progress_tracker/feeds``."""
     override = _feeds_cache_dir_from_env()
     if override is not None:
@@ -381,7 +376,7 @@ def feeds_cache_dir(src: Context | HarnessEngine) -> Path:
     return locations(src).feeds_cache_dir() or progress_tracker_dir(src) / "feeds"
 
 
-def findings_tree_dir(src: Context | HarnessEngine) -> Path:
+def findings_tree_dir(src: LocationSource) -> Path:
     """``<analysis-results>/findings`` (fail-loud when analysis_results unset)."""
     return analysis_results_dir(src) / "findings"
 
@@ -389,8 +384,8 @@ def findings_tree_dir(src: Context | HarnessEngine) -> Path:
 def resolve_results_root(args=None, *, config_home: Path | None = None) -> Path:
     """``--results-root`` > ``$AUDIT_RESULTS_ROOT`` > ``locations.analysis_results``.
 
-    Raises ``SystemExit(2)`` via :func:`load_engine` when config is required
-    but missing. Pass ``args`` from argparse after :func:`add_config_home_arg`.
+    Exits 2 when ``analysis_results`` is unset. Pass ``args`` from argparse after
+    :func:`add_config_home_arg`.
     """
     if args is not None and getattr(args, "results_root", None):
         return Path(args.results_root).expanduser().resolve()
@@ -399,4 +394,8 @@ def resolve_results_root(args=None, *, config_home: Path | None = None) -> Path:
     override = _audit_results_root_from_env()
     if override is not None:
         return override
-    return analysis_results_dir(load_engine(config_home)).resolve()
+    try:
+        return analysis_results_dir(load(config_home)).resolve()
+    except DeploymentConfigMissing as e:
+        print(f"config not resolvable: {e}", file=sys.stderr)
+        raise SystemExit(2) from e
