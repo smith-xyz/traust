@@ -563,7 +563,7 @@ anything uncertain `posture: unknown`.
 ## Two-layer probe model
 
 ```
-Layer 1 (census):   traust adapters crypto-source  → CRYPTO_* facts (traust-core census)
+Layer 1 (census):   python3 -m traust.cli adapters crypto-source   → CRYPTO_* facts (traust-core census)
                      ↓ read by
                     pqc_facts.py                → HP_CHAIN_* PQC facts + pqc_capable flag
 
@@ -575,8 +575,8 @@ Chain reasoning:    crypto-analysis SKILL.md    → governance chains (who owns 
 
 | Tool                    | Location                                         | Purpose                                                                                                                                                                          |
 | ----------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `crypto_probe.py`       | python3 -m traust.cli adapters crypto-probe                        | Provider census: Go, Node, JDK, Python, Rust, .NET, Ruby, C/C++ crypto stacks, base images, RPM locks, GODEBUG, crypto-policies                                                  |
-| `crypto_audit.py`       | python3 -m traust.cli adapters crypto-audit                        | Unopinionated data collector — `cluster` tier with `--groups` provides raw TLS negotiation facts for PQC probing                                                                 |
+| `crypto-source`         | python3 -m traust.cli adapters crypto-source                       | Provider census: Go, Node, JDK, Python, Rust, .NET, Ruby, C/C++ crypto stacks, base images, RPM locks, GODEBUG, crypto-policies                                                  |
+| `crypto-cluster`        | python3 -m traust.cli adapters crypto-cluster                      | Unopinionated data collector — `cluster` tier with `--groups` provides raw TLS negotiation facts for PQC probing                                                                 |
 | `pqc_facts.py`          | `harnessing/3-audit/pqc-readiness/scripts/pqc_facts.py`          | Reads traust-core's crypto census of the commit (checkout + manifest SBOM), maps `CRYPTO*_`→`HP*CHAIN*_`, adds PQC capability assessment via `\_pqc_capable_version()`(reads thresholds from[`notes/reference/pqc-version-matrix.yaml`](notes/reference/pqc-version-matrix.yaml)) |
 | `scan_xcrypto_usage.py` | `harnessing/3-audit/pqc-readiness/scripts/scan_xcrypto_usage.py` | golang.org/x/crypto evidence: first-party import sites, go.mod versions, optional callgraph reachability (somepath witness)                                                      |
 | `traust pqc blockers`   | traust-core `PqcService.blockers`                                | Derives each recorded report's `remediations[]` in the findings vocabulary (severity, classification, `patchable`) for `/patch` and other findings consumers                        |

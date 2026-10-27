@@ -42,8 +42,6 @@ GROUPS: dict[str, dict[str, object]] = {
         "osv": adapters.OSV,
         "yara": adapters.YARA,
         "joern": adapters.JOERN,
-        "crypto-probe": adapters.CRYPTO_PROBE,
-        "crypto-audit": adapters.CRYPTO_AUDIT,
         "crypto-source": adapters.CRYPTO_SOURCE,
         "crypto-image": adapters.CRYPTO_IMAGE,
         "crypto-cluster": adapters.CRYPTO_CLUSTER,
