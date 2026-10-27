@@ -138,8 +138,8 @@ Which model runs which role — and what it costs — is **policy data**, not
 prose: `config/model-registry.yaml` (schema-gated) is the only place
 vendor/model identifiers live, python3 -m traust.cli registry models resolves roles
 with floor enforcement, and spend is tracked from two sources (driver-
-declared + session actuals) into the hash-chained metrics ledger and the
-spend dashboard. Full contract, real-time view command, and escalation
+declared + session actuals) into traust-core's spend events and the
+spend view. Full contract, real-time view command, and escalation
 ladder: [model-routing.md](model-routing.md). Gate: alignment rule A12.
 
 ## SARIF interchange

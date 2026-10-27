@@ -149,7 +149,7 @@ Edit constants at the top of `build_insecure_patterns.py`:
 
 ## Trends
 
-Each run appends `code_findings` / `distinct_cwes` (source
-`insecure-patterns`) to the central metrics ledger (python3 -m traust.cli metrics history,
-no-op when unchanged) and injects a trend-vs-previous banner into
-`insecure-patterns-top25.md` and the dashboard HTML.
+*Retired:* the run no longer appends `code_findings` / `distinct_cwes` (source
+`insecure-patterns`) to the central metrics ledger or injects a trend-vs-previous banner into
+`insecure-patterns-top25.md` and the dashboard HTML (the metrics history is retired; see
+[`traust-metrics`](../traust-metrics/SKILL.md)).

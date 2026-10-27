@@ -151,18 +151,6 @@ def test_reconcile_exits_1_when_the_split_is_not_lossless(spend: Spend) -> None:
     assert rc == 1 and json.loads(out)["lossless"] is False
 
 
-def test_the_legacy_spend_dashboard_says_what_it_no_longer_reads(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    built = SimpleNamespace(build_spend_dashboard=lambda **kw: Path("spend-dashboard.md"))
-    fake = SimpleNamespace(metrics=built, ctx=SimpleNamespace(budget_policy=None))
-    monkeypatch.setattr(metrics, "load_engine", lambda home: fake)
-    err = io.StringIO()
-    with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
-        rc = metrics.call_spend(SimpleNamespace(config_home=None, out_dir=None, budget=None))
-    assert rc == 0 and "traust dashboard view spend" in err.getvalue()
-
-
 @pytest.mark.parametrize("database", ["sqlite", "postgres"])
 def test_capture_on_core_is_idempotent_and_reconciles(
     tmp_path: Path, database: str, monkeypatch: pytest.MonkeyPatch

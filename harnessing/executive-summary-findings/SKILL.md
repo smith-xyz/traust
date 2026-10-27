@@ -85,9 +85,9 @@ What it does (traust-core's `ExecutiveSummaryView`, one `InsightService.publish`
 ### Step 2a — Trends
 
 *Retired:* no metrics-ledger snapshot or "Trend vs" line; nothing is
-stored. An earlier state is the same view with `--as-of`. The leadership
-time-series view is `/traust-metrics` →
-`progress-tracker/metrics/Executive-Trends.{md,html}`.
+stored. An earlier state is the same view with `--as-of`. *Retired:* the leadership
+time-series view `progress-tracker/metrics/Executive-Trends.{md,html}`, with the metrics
+history.
 
 ### Step 3 — Report back
 

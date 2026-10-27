@@ -1,4 +1,4 @@
-"""``traust metrics …`` — metrics journal, spend."""
+"""``traust metrics …`` — spend."""
 
 from __future__ import annotations
 
@@ -15,98 +15,11 @@ from traust_core.v1.models.operations import (
     UsageRollup,
 )
 
-from traust.cli.groups._registry import OpSpec, load_engine, passthrough_op
+from traust.cli.groups._registry import OpSpec, passthrough_op
 from traust.context import load_spend_core, workspace_dir
 from traust.paths import skill_dirs
 
 UNATTRIBUTED = "unattributed"
-
-
-def add_history_args(ap) -> None:
-    ap.add_argument("cmd", choices=["append", "latest", "verify", "render-exec"])
-    ap.add_argument("--source", help="Dashboard slug (append/latest)")
-    ap.add_argument("--metrics-json", help="Path to a JSON object of metrics, or '-' for stdin")
-    ap.add_argument("--note", default="")
-
-
-def call_history(args) -> int:
-    # wave 2 lane (c): PENDING(decision: metrics journal — retire or port to OpsService timeline)
-    metrics = load_engine(args.config_home).metrics
-    if args.cmd == "verify":
-        ok, issues = metrics.verify()
-        for i in issues:
-            print(f"✗ {i}")
-        print("✓ chain verified" if ok else f"✗ {len(issues)} issue(s)")
-        return 0 if ok else 1
-
-    if args.cmd == "latest":
-        if not args.source:
-            print("error: --source required", file=sys.stderr)
-            return 2
-        row = metrics.previous(args.source)
-        print(json.dumps(row, indent=2) if row else "null")
-        return 0
-
-    if args.cmd == "append":
-        if not args.source or not args.metrics_json:
-            print("error: --source and --metrics-json required", file=sys.stderr)
-            return 2
-        raw = (
-            sys.stdin.read()
-            if args.metrics_json == "-"
-            else Path(args.metrics_json).read_text(encoding="utf-8")
-        )
-        row = metrics.append(args.source, json.loads(raw), note=args.note)
-        print(f"appended {row['source']} @ {row['snapshot_at']} (row_sha {row['row_sha'][:12]}…)")
-        return 0
-
-    if args.cmd == "render-exec":
-        mdp, htmlp = metrics.render()
-        print(f"wrote {mdp}\nwrote {htmlp}")
-        return 0
-    return 2
-
-
-HISTORY = OpSpec(
-    add_args=add_history_args,
-    call=call_history,
-    help="Append-only metrics history ledger (append, latest, verify, render-exec)",
-)
-
-
-def add_spend_args(ap) -> None:
-    ap.add_argument("--out-dir", type=Path, default=None)
-    ap.add_argument(
-        "--budget",
-        type=Path,
-        default=None,
-        help="budget-policy.yaml carrying monthly_budget",
-    )
-
-
-def call_spend(args) -> int:
-    # wave 2 lane (c): PENDING(decision: metrics journal — retire or port to OpsService timeline)
-    engine = load_engine(args.config_home)
-    print(
-        "note: session actuals and skill attribution are recorded in traust-core now "
-        "(`metrics collect-spend --append`); this dashboard reads only the metrics ledger "
-        "rows written before that. Current spend: `traust dashboard view spend`.",
-        file=sys.stderr,
-    )
-    out = engine.metrics.build_spend_dashboard(
-        out_dir=args.out_dir,
-        budget_path=args.budget,
-        budget_section=engine.ctx.budget_policy,
-    )
-    print(f"wrote {out}")
-    return 0
-
-
-SPEND = OpSpec(
-    add_args=add_spend_args,
-    call=call_spend,
-    help="Rebuild the model-spend dashboard from ledger rows",
-)
 
 
 def add_collect_spend_args(ap) -> None:

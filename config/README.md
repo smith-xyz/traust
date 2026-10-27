@@ -41,7 +41,7 @@ ships a template for each such file:
 | `remediation.example.yaml` | `remediation.yaml` | `/remediate-finding` (private mirror org, naming prefix, self-hosted forge hosts) — no shipped default for the org, and none for the forge hosts |
 | `campaign.example.yaml` | `campaign.yaml` | dashboards that cite a tracking reference (`/validation-fuzz-dashboard`, `/generate-team-report`) |
 | `product-definitions-map.example.yaml` | `product-definitions-map.yaml` | `traust registry products` (traust-core `ctx.product_mappings`), `/assign-findings-owners`, `/sla-view` |
-| `budget-policy.example.yaml` | `budget-policy.yaml` | `traust_engine.metrics.spend`, rescan worklist, drain tranche |
+| `budget-policy.example.yaml` | `budget-policy.yaml` | rescan worklist, drain tranche |
 | `rule-pack-allowlist.example.yaml` | `rule-pack-allowlist.yaml` | `traust_engine.adapters.opengrep`, `/mine-ledger` |
 | `safe-exec-profiles.example.yaml` | `safe-exec-profiles.yaml` | traust-core's safe-exec (`traust util safe-exec`) |
 | `hardening-risk-weights.example.json` | `hardening-risk-weights.json` | none (its consumer retired with the traust-core hub; the triage skill port decides) |

@@ -5,16 +5,19 @@ from __future__ import annotations
 import json
 import os
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
-from traust_core.v1.errors import NotFoundError, ValidationError
-from traust_core.v1.models.operations import ModelName
+from traust_core.v1.errors import ConfigError, NotFoundError, ValidationError
+from traust_core.v1.models.operations import ModelName, SpendEvent, TokenUsage
 
-from traust.cli.groups._registry import OpSpec, load_engine
-from traust.context import load, load_spend_core
+from traust.cli.groups._registry import OpSpec
+from traust.context import MODEL_REGISTRY, load, load_spend_core
 from traust.paths import optional_config_path
 
 PRODUCT_MAP = "product-definitions-map.yaml"
+# NEED(data-model: spend calibration tuple repo/loc/batch/note)
+UNSTORED = "not stored: spend_event has no column for it"
 
 
 def add_models_args(ap) -> None:
@@ -34,10 +37,14 @@ def add_models_args(ap) -> None:
     p.add_argument("--tokens-out", type=int, default=0, help="best-effort; omit when unknown")
     p.add_argument("--cache-read", type=int, default=0)
     p.add_argument("--cache-creation", type=int, default=0)
-    p.add_argument("--batch", default=None)
-    p.add_argument("--repo", default=None, help="repo slug this spend audited (calibration tuple)")
-    p.add_argument("--loc", type=int, default=None, help="target size in LoC/bytes at audit time")
-    p.add_argument("--note", default=None)
+    p.add_argument("--batch", default=None, help=f"batch id ({UNSTORED})")
+    p.add_argument(
+        "--repo", default=None, help=f"repo slug this spend audited, calibration tuple ({UNSTORED})"
+    )
+    p.add_argument(
+        "--loc", type=int, default=None, help=f"target size in LoC/bytes at audit time ({UNSTORED})"
+    )
+    p.add_argument("--note", default=None, help=f"free text ({UNSTORED})")
 
 
 def call_models(args) -> int:
@@ -69,13 +76,11 @@ def call_models(args) -> int:
 
 
 def _declare_spend(args) -> int:
-    # wave 2 lane (c): PENDING(decision: metrics journal — retire or port to OpsService timeline)
-    engine = load_engine(args.config_home)
-    try:
-        engine.metrics._progress_tracker()
-    except FileNotFoundError:  # contracts' DeploymentConfigMissing
+    # PENDING(plan 11-consumer-adoption/09 fail-loud preflight: the registry becomes required)
+    core = load(args.config_home)
+    if core.model_catalog is None:
         msg = (
-            "spend: progress-tracker not configured — declaration skipped; "
+            f"spend: no {MODEL_REGISTRY} in the config home — declaration skipped; "
             "the embedding platform records usage itself"
         )
         if os.environ.get("HARNESS_REQUIRE_SPEND_LEDGER") == "1":
@@ -83,18 +88,37 @@ def _declare_spend(args) -> int:
             return 1
         print(msg, file=sys.stderr)
         return 0
-    row = engine.models.spend_row(
-        args.model,
-        args.tokens_in,
-        args.tokens_out,
-        args.cache_read,
-        args.cache_creation,
-        repo=args.repo,
-        loc=args.loc,
+    for flag in ("repo", "loc", "batch", "note"):
+        if getattr(args, flag) is not None:
+            print(f"spend: --{flag} {UNSTORED}", file=sys.stderr)
+    model = ModelName(args.model)
+    try:
+        provider = core.model_catalog.resolve(model).provider
+        cost = core.model_catalog.cost(
+            model,
+            TokenUsage(
+                tokens_in=args.tokens_in,
+                tokens_out=args.tokens_out,
+                cache_read=args.cache_read,
+                cache_creation=args.cache_creation,
+            ),
+        )
+    except (NotFoundError, ConfigError) as e:
+        print(f"spend: {e}", file=sys.stderr)
+        return 1
+    # NEED(spend: declared vs measured): a declaration adds to the totals `metrics collect-spend
+    # --append` records from transcripts, so non-zero declared tokens count twice.
+    core.services().spend.record(
+        SpendEvent(
+            provider=provider,
+            model=model,
+            skill=args.skill,
+            tokens_in=args.tokens_in,
+            tokens_out=args.tokens_out,
+            cost_usd=cost,
+            occurred_at=datetime.now(UTC),
+        )
     )
-    if args.batch:
-        row["batch"] = args.batch
-    engine.metrics.append(f"model-spend:{args.skill}", row, note=args.note or "")
     return 0
 
 
