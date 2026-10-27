@@ -17,7 +17,7 @@ from traust_contracts import DeploymentConfigMissing
 from traust_engine import locations as engine_locations
 
 from traust import context
-from traust.context import load_core, load_engine
+from traust.context import load, load_engine
 from traust.paths import HARNESS_ROOT
 
 FIXTURE = Path(__file__).parent / "fixtures" / "config"
@@ -110,7 +110,7 @@ def test_core_locations_resolve_the_paths_the_engine_did(tmp_path, monkeypatch, 
         monkeypatch.setenv("FEEDS_CACHE_DIR", feeds_env)
     else:
         monkeypatch.delenv("FEEDS_CACHE_DIR", raising=False)
-    engine, core = load_engine(home), load_core(home)
+    engine, core = load_engine(home), load(home)
     for name in HELPERS:
         helper = getattr(context, name)
         expected = _outcome(lambda name=name: _before(engine, name))
@@ -123,7 +123,7 @@ def test_a_remote_inputs_location_is_refused(tmp_path, monkeypatch):
     home = _home(tmp_path, {"workspace": "/w", "inputs": "s3://b/inv"})
     monkeypatch.setenv("TRAUST_CONFIG_HOME", str(home))
     with pytest.raises(DeploymentConfigMissing, match="inputs"):
-        context.inputs_dir(load_core(home))
+        context.inputs_dir(load(home))
 
 
 @pytest.mark.parametrize("key", ["workspace", "analysis_results", "findings"])

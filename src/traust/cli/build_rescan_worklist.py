@@ -157,7 +157,7 @@ from traust_core.v1.models.observation import (
 )
 from traust_engine.corpus.resolver import normalize_repo_url
 
-from traust.context import add_config_home_arg, analysis_results_dir, load_engine
+from traust.context import add_config_home_arg, analysis_results_dir, load
 from traust.paths import HARNESS_ROOT, optional_config_path
 
 # Copied from harnessing/8-verify/verify-remediation/scripts/build_verify_sweep.py
@@ -2244,8 +2244,7 @@ def main(argv=None) -> int:
     )
     args = ap.parse_args(argv)
 
-    engine = load_engine(args.config_home)
-    results_root = analysis_results_dir(engine)
+    results_root = analysis_results_dir(load(args.config_home))
     manifest = results_root / "findings" / "_manifest"
     args.db = args.db or results_root / "graph" / "findings.db"
     args.events = args.events or manifest / "rescan-events.jsonl"

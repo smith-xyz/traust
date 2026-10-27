@@ -21,7 +21,7 @@ from traust_core.v1.providers.process import ProcessResult, ProcessRunner
 from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
 
 from traust.cli import portfolio_observe
-from traust.context import load_core
+from traust.context import load
 from traust.ops.materializers import RepoStateMaterializer
 
 REPO = "https://github.com/org/app"
@@ -68,7 +68,7 @@ def observe(home: Path, repo: str) -> tuple[int, dict[str, Any]]:
 
 
 def register(home: Path, *, audited: bool) -> None:
-    core = load_core(home)
+    core = load(home)
     repo = core.services().portfolio.register_repository(HttpsRepoUrl.parse(REPO, HOSTS), False)
     if not audited:
         return
@@ -90,7 +90,7 @@ def register(home: Path, *, audited: bool) -> None:
 def test_an_audited_fork_is_observed_kept_and_its_upstream_inventoried(home: Path) -> None:
     register(home, audited=True)
     assert observe(home, REPO) == (0, JobResult.succeeded().model_dump(mode="json"))
-    core = load_core(home)
+    core = load(home)
     with core.repository_observation() as observation:
         state = observation.query.repo_state(repo_url=REPO)
     assert (state.status, state.ahead_by, state.exposure) == ("ok", 1, "public-internal")

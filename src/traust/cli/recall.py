@@ -23,7 +23,7 @@ from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.vocabulary import SourceType
 
 from traust.cli._doors import parser, run
-from traust.context import load_engine_core, load_services
+from traust.context import load
 
 
 def targets(argv: list[str] | None = None) -> int:
@@ -35,7 +35,7 @@ def targets(argv: list[str] | None = None) -> int:
         # YAML dates load as date objects; the schema wants their ISO strings
         raw = json.loads(json.dumps(yaml.safe_load(args.manifest.read_text()), default=str))
         doc = BenchmarkTargetArtifact.from_document(raw)
-        result = load_services(args.config_home).detection_quality.record(doc, _provenance())
+        result = load(args.config_home).services().detection_quality.record(doc, _provenance())
         return {"artifact_id": result.artifact_id, "version": raw.get("version")}
 
     return run(call)
@@ -51,7 +51,7 @@ def canaries(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list[dict]:
-        core = load_engine_core(args.config_home, canaries="seeded" if args.seeded else "canaries")
+        core = load(args.config_home, canaries="seeded" if args.seeded else "canaries")
         built = core.services().detection_quality.build_canaries(_provenance())
         return [
             {"target_id": c.target_id, "repo_url": c.repo.repo_url, "sha": c.repo.sha}
@@ -69,7 +69,7 @@ def screen(argv: list[str] | None = None) -> int:
 
     def call() -> dict:
         nonlocal flagged
-        quality = load_services(args.config_home).detection_quality
+        quality = load(args.config_home).services().detection_quality
         screens = [quality.screen_injection(a) for a in args.artifact]
         flagged = any(s.flagged for s in screens)
         return {

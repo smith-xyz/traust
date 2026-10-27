@@ -28,7 +28,7 @@ import sys
 from traust_core.v1.errors import TraustError
 from traust_core.v1.models.common import PageRequest
 
-from traust.context import add_config_home_arg, load_core
+from traust.context import add_config_home_arg, load
 from traust.paths import HARNESS_ROOT, skill_dir
 
 HARNESS = HARNESS_ROOT
@@ -85,7 +85,7 @@ def check_core(results, config_home, network=True):
     """traust-core in-process: the store answers a read, and each registered provider's readiness
     (ProviderCatalog.readiness; without `network`, the feed sources' probes are skipped)."""
     try:
-        services = load_core(config_home).services()
+        services = load(config_home).services()
         services.portfolio.list_products(PageRequest(limit=1))
     except (SystemExit, TraustError, OSError) as e:
         results.append((FAIL, f"traust-core store not reachable — {e or 'core.yaml invalid'}"))

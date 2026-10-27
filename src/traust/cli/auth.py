@@ -29,7 +29,7 @@ from traust_core.v1.models.identity import LOCAL_ISSUER, Login, TokenGrant
 from traust_core.v1.providers.identity import LOCAL_TOKEN_LIFETIME
 
 from traust.cli._doors import parser, run
-from traust.context import load_caller, load_core, oidc_client_secret
+from traust.context import load, load_caller, oidc_client_secret
 
 
 def _provider(core: Context):
@@ -67,7 +67,7 @@ def local(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         credential = core.local_issuer.mint(args.identity, machine=args.machine)
         grant = TokenGrant(
             access_token=credential.token,
@@ -85,7 +85,7 @@ def login(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         if args.token_file is not None:
             token = args.token_file.read_text(encoding="utf-8").strip()
             issuer = _peek(token).get("iss") or (core.login.issuer if core.login else "imported")
@@ -114,7 +114,7 @@ def service_account(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         provider = _provider(core)
         if args.client_secret_file is not None:
             secret = args.client_secret_file.read_text(encoding="utf-8").strip()
@@ -153,7 +153,7 @@ def status(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         stored = core.credentials.load()
         if stored is None:
             return {"logged_in": False}
@@ -179,7 +179,7 @@ def refresh(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, Any]:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         stored = core.credentials.load()
         if stored is None or stored.grant.refresh_token is None:
             raise ConfigError("nothing to refresh: run `traust auth login`")
@@ -196,7 +196,7 @@ def token(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str:
-        stored = load_core(args.config_home).credentials.load()
+        stored = load(args.config_home).credentials.load()
         if stored is None:
             raise ConfigError("not logged in: run `traust auth login` or `traust auth local`")
         return stored.grant.access_token.get_secret_value()
@@ -209,7 +209,7 @@ def logout(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict[str, bool]:
-        load_core(args.config_home).credentials.clear()
+        load(args.config_home).credentials.clear()
         return {"logged_in": False}
 
     return run(call)

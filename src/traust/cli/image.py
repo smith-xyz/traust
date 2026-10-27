@@ -13,7 +13,7 @@ from pathlib import Path
 from traust_core.v1.models.values import HttpsRepoUrl
 
 from traust.cli._doors import add_branch_arg, parser, register_commit, run
-from traust.context import load_core, load_services
+from traust.context import load
 
 
 def _digest(ap: argparse.ArgumentParser, image: str) -> str:
@@ -40,7 +40,7 @@ def sbom(argv: list[str] | None = None) -> int:
         ap.error("--branch names the declared source's branch: give --repo-url and --sha")
 
     def call() -> dict:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         services = core.services()
         ref_id = None
         if args.repo_url is not None:
@@ -63,7 +63,7 @@ def packages(argv: list[str] | None = None) -> int:
     digest = _digest(ap, args.image)
 
     def call() -> dict:
-        rows = load_services(args.config_home).exposure.image_dependencies(digest)
+        rows = load(args.config_home).services().exposure.image_dependencies(digest)
         out: dict = {
             "digest": digest,
             "total": len(rows),

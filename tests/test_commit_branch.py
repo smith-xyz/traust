@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import shutil
 from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
@@ -161,6 +162,7 @@ def test_every_recording_door_passes_its_branch_or_none(
     home = tmp_path / "config"
     home.mkdir()
     (home / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    shutil.copy(Path(__file__).parent / "fixtures" / "config" / "feeds.yaml", home)
     named = ["--branch", branch] if branch else []
     for door, argv in doors(tmp_path):
         rc, out = run(door, home, *argv, *named)

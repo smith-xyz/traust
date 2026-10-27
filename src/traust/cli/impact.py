@@ -49,7 +49,7 @@ from traust_core.v1.models.vocabulary import (
 )
 
 from traust.cli._doors import add_branch_arg, answer, parser, register_commit, run
-from traust.context import load_core
+from traust.context import load
 from traust.ops.materializers import MANUAL, BelowRangePacketsMaterializer
 from traust.paths import HARNESS_ROOT
 from traust.registry.feeds_config import registry_path
@@ -66,8 +66,8 @@ def _parser(op: str, about: str) -> argparse.ArgumentParser:
 
 def _core(config_home: Path | None) -> Context:
     """Core with the feeds registry's sources, so advisories come from `osv`, never from memory."""
-    core = load_core(config_home)
-    core.register_feeds(registry_path())
+    core = load(config_home)
+    core.register_feeds(registry_path(config_home))  # NEED(core: feeds registered lazily)
     return core
 
 

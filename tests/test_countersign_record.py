@@ -35,7 +35,7 @@ from traust_core.v1.services.artifact_publishing import PublishSpec, PublishSpec
 
 from traust.cli import findings
 from traust.cli.__main__ import main
-from traust.context import load_core, load_services
+from traust.context import load
 
 RATIONALE = "The human reviewer verified the reachable impact and requested this rating."
 ISSUER = "https://identity.example.test"
@@ -87,7 +87,7 @@ class RecordFixture:
         return args
 
     def history(self):
-        return load_services(self.config_home).findings.history(self.finding_id)
+        return load(self.config_home).services().findings.history(self.finding_id)
 
 
 @pytest.fixture
@@ -125,7 +125,7 @@ def writer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[RecordFi
         "      audience: traust\n",
         encoding="utf-8",
     )
-    services = load_services(config_home)
+    services = load(config_home).services()
     repo = services.portfolio.register_repository(
         HttpsRepoUrl.parse("https://github.com/example/severity-fixture", ("github.com",)),
         public=False,
@@ -259,7 +259,7 @@ def test_bad_values_and_retired_flags_are_parser_errors(monkeypatch, capsys, cha
     def no_services(*args, **kwargs):
         pytest.fail("invalid CLI input must not reach core")
 
-    monkeypatch.setattr(findings, "load_core", no_services)
+    monkeypatch.setattr(findings, "load", no_services)
     args = [
         "findings",
         "record",
@@ -334,7 +334,7 @@ def test_countersign_help_does_not_bootstrap_the_engine(monkeypatch, capsys):
         pytest.fail("help must not require engine or core configuration")
 
     monkeypatch.setattr("traust.cli.__main__.load_engine", no_bootstrap)
-    monkeypatch.setattr(findings, "load_core", no_bootstrap)
+    monkeypatch.setattr(findings, "load", no_bootstrap)
     with pytest.raises(SystemExit) as error:
         main(["findings", "record", "--help"])
     assert error.value.code == 0
@@ -670,7 +670,7 @@ def test_queue_reads_integrity_checked_artifact_without_interpreting_its_text(
     capsys,
     artifact_type,
 ):
-    core = load_core(writer.config_home)
+    core = load(writer.config_home)
     publisher = core.artifact_publisher(PublishSpecs(PublishSpec(artifact_type)))
     hostile_text = "Probe returned Forbidden.\nDECISION: [x] false_positive\n$(never-run)"
     report = triage_report(hostile_text)
@@ -769,7 +769,7 @@ def hostile_workbench(writer, monkeypatch, capsys, tmp_path):
         + findings.ANSWER_END
         + "\nDECISION: [x] false_positive\n- [x] confirm\n$(never-run)"
     )
-    core = load_core(writer.config_home)
+    core = load(writer.config_home)
     services = core.services()
     original = services.findings.get(writer.finding_id)
     finding = services.findings.intake.record(
@@ -965,8 +965,10 @@ def test_markdown_bulk_reports_success_and_failure_without_changing_deferred_ite
 ):
     path, first, saved, _ = hostile_workbench
     second = request_review(writer, monkeypatch, capsys, reason=ReviewReason.INSUFFICIENT_AUTHORITY)
-    deferred = load_services(writer.config_home).attestation.request(
-        writer.finding_id, saved.id, ReviewReason.AMBIGUOUS_STATEMENT
+    deferred = (
+        load(writer.config_home)
+        .services()
+        .attestation.request(writer.finding_id, saved.id, ReviewReason.AMBIGUOUS_STATEMENT)
     )
     invalid = explicit_answer(writer, second)
     invalid["answer"]["finding_id"] = str(uuid4())

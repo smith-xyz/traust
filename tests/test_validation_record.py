@@ -23,7 +23,7 @@ from traust_core.v1.services.artifact_publishing import PublishSpec, PublishSpec
 
 from tests.test_validate_report import _valid_report as security_audit
 from traust.cli.__main__ import main
-from traust.context import load_core, load_services
+from traust.context import load
 
 
 def record_source(core, repo, ref, source, checkout):
@@ -82,7 +82,7 @@ def recording(tmp_path):
     config = tmp_path / "config"
     config.mkdir()
     (config / "core.yaml").write_text(f"home: {tmp_path / 'store'}\n")
-    core = load_core(config)
+    core = load(config)
     services = core.services()
     url = "https://github.com/example/validation-fixture"
     repo = services.portfolio.register_repository(HttpsRepoUrl.parse(url, ("github.com",)), False)
@@ -243,7 +243,7 @@ def test_record_is_bound_persistent_and_idempotent(recording, capsys):
     (row,) = receipt["findings"]
     assert row["finding_id"] == str(recording["finding_id"])
     assert row["decision_id"]
-    services = load_services(recording["config"])
+    services = load(recording["config"]).services()
     (saved,) = services.findings.history(recording["finding_id"])
     assert saved.actor is None
     assert saved.evidence_grade == "E1"
@@ -271,10 +271,10 @@ def test_current_invalid_environment_retains_review_without_decision(
     assert row["decision_id"] is None
     assert row["soundness_flag"] == flag
     assert row["review_item_ids"]
-    services = load_services(recording["config"])
+    services = load(recording["config"]).services()
     assert services.findings.history(recording["finding_id"]) == []
     assert receipt["evidence_artifact_ids"]
-    core = load_core(recording["config"])
+    core = load(recording["config"])
     # Report bytes remain available through the core artifact publisher, not a caller sidecar.
     publisher = core.artifact_publisher(PublishSpecs(PublishSpec(ValidationArtifact)))
     retained = publisher.get(UUID(receipt["artifact_ids"][0]))
@@ -291,7 +291,7 @@ def test_voided_validation_full_review_card_retains_report_and_recording_compani
     }
     code, receipt, error = invoke(recording, capsys, report=report)
     assert code == 0, error
-    services = load_services(recording["config"])
+    services = load(recording["config"]).services()
     assert services.findings.history(recording["finding_id"]) == []
     assert (
         main(
@@ -335,7 +335,7 @@ def test_unsafe_binding_or_observation_refuses_without_decisions(recording, caps
     code, receipt, _ = invoke(recording, capsys, report=report, bindings=bindings)
     assert code == 2
     assert receipt is None
-    assert load_services(recording["config"]).findings.history(recording["finding_id"]) == []
+    assert load(recording["config"]).services().findings.history(recording["finding_id"]) == []
 
 
 def test_missing_grade_current_reviews_historical_stays_null(recording, capsys):
@@ -349,7 +349,7 @@ def test_missing_grade_current_reviews_historical_stays_null(recording, capsys):
     recording["provenance"]["run_id"] = str(uuid4())
     code, receipt, error = invoke(recording, capsys, report=report, bindings=bindings)
     assert code == 0, error
-    (saved,) = load_services(recording["config"]).findings.history(recording["finding_id"])
+    (saved,) = load(recording["config"]).services().findings.history(recording["finding_id"])
     assert saved.evidence_grade is None
 
 
@@ -380,7 +380,7 @@ def test_refutation_controls_and_transcripts_reach_core(
     code, receipt, error = invoke(recording, capsys, report=report)
     assert code == 0, error
     (result,) = receipt["findings"]
-    services = load_services(recording["config"])
+    services = load(recording["config"]).services()
     history = services.findings.history(recording["finding_id"])
     if flag is None:
         (saved,) = history
@@ -415,8 +415,12 @@ def test_explicit_failed_attestation_and_install_evidence_are_consumed(recording
     (row,) = receipt["findings"]
     assert row["decision_id"] is None
     assert row["soundness_flag"] == "environment_invalid"
-    evidence = load_services(recording["config"]).validation.evidence(
-        UUID(receipt["evidence_artifact_ids"][0]), finding_id=recording["finding_id"]
+    evidence = (
+        load(recording["config"])
+        .services()
+        .validation.evidence(
+            UUID(receipt["evidence_artifact_ids"][0]), finding_id=recording["finding_id"]
+        )
     )
     assert evidence.bindings.install_failure == failure.read_text()
     assert evidence.bindings.target_attestation.attested is False
@@ -432,7 +436,7 @@ def test_different_target_and_run_do_not_collapse(recording, capsys):
     code, second, error = invoke(recording, capsys, report=report)
     assert code == 0, error
     assert first["findings"][0]["decision_id"] != second["findings"][0]["decision_id"]
-    assert len(load_services(recording["config"]).findings.history(recording["finding_id"])) == 2
+    assert len(load(recording["config"]).services().findings.history(recording["finding_id"])) == 2
 
 
 def test_actual_report_producer_hands_attestation_to_registered_record(recording, capsys):
@@ -511,14 +515,14 @@ def test_actual_report_producer_hands_attestation_to_registered_record(recording
     assert receipt["findings"][0]["soundness_flag"] == "environment_invalid"
     assert receipt["findings"][0]["decision_id"] is None
     assert receipt["findings"][0]["source_id"] == "f001"
-    assert load_services(recording["config"]).findings.history(recording["finding_id"]) == []
+    assert load(recording["config"]).services().findings.history(recording["finding_id"]) == []
 
 
 @pytest.mark.parametrize("cross_repository", [False, True])
 def test_multisource_original_labels_are_bound_without_path_aliases(
     recording, capsys, cross_repository
 ):
-    core = load_core(recording["config"])
+    core = load(recording["config"])
     services = core.services()
     publisher = core.artifact_publisher(PublishSpecs(PublishSpec(TriageArtifact)))
     first_binding = recording["bindings"]["sources"][0]
@@ -591,7 +595,7 @@ def test_machine_severity_proposal_is_review_only(recording, capsys):
     }
     code, receipt, error = invoke(recording, capsys, report=report)
     assert code == 0, error
-    (saved,) = load_services(recording["config"]).findings.history(recording["finding_id"])
+    (saved,) = load(recording["config"]).services().findings.history(recording["finding_id"])
     assert saved.severity is None
     assert receipt["findings"][0]["review_item_ids"]
 
@@ -605,5 +609,5 @@ def test_receipt_does_not_repeat_untrusted_observations(recording, capsys):
     assert code == 0, error
     assert secret not in json.dumps(receipt)
     assert "rationale" not in receipt["findings"][0]
-    (saved,) = load_services(recording["config"]).findings.history(recording["finding_id"])
+    (saved,) = load(recording["config"]).services().findings.history(recording["finding_id"])
     assert secret in saved.rationale

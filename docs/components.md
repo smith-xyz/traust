@@ -45,8 +45,9 @@ authenticated principals and persistence belong there. Engine provides executors
 security workflow policy remains in `traust`.
 
 The app's composition root is `src/traust/context.py`. It loads core's
-`Context.services()` in process through `load_services(config_home)` for domain
-work, and loads the engine separately for executors. A Python caller does not
+`Context` once, in process, through `load(config_home)`, with every provider
+registered (the engine's executors load on first use); domain work goes through
+`load(config_home).services()`. A Python caller does not
 need a REST service or a legacy ledger client/login to record a decision.
 
 Ownership does **not** imply every door or skill port is implemented. Countersign

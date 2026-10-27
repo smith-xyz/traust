@@ -325,13 +325,13 @@ def test_freshness_reads_the_engines_tools_and_the_feeds_registry(
 ) -> None:
     feeds: list[Path] = []
 
-    def engine_core(config_home: Path | None) -> Context:
+    def engine_core(config_home: Path | None, **kw: Any) -> Context:
         core = Context.from_file(config_home / "core.yaml")  # type: ignore[operator]
         monkeypatch.setattr(core, "register_feeds", feeds.append)
         return core
 
-    monkeypatch.setattr(dashboard_view, "load_engine_core", engine_core)
-    monkeypatch.setattr(dashboard_view, "registry_path", lambda: tmp_path / "feeds.yaml")
+    monkeypatch.setattr(dashboard_view, "load", engine_core)
+    monkeypatch.setattr(dashboard_view, "registry_path", lambda home: tmp_path / "feeds.yaml")
     publish.result = RENDERED.model_copy(update={"view": ViewName.FRESHNESS, "stem": "freshness"})
     rc, answer = run(home, "freshness", "--out", str(tmp_path / "fresh"))
     assert rc == 0, answer

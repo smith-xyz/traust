@@ -66,7 +66,7 @@ def registered(monkeypatch: pytest.MonkeyPatch) -> dict[str, FakeTool]:
         registry.register(name, lambda fake=fake: fake)
     catalog = ProviderCatalog(registry, ProviderRegistry[FeedProvider]("feed"))
     ctx = SimpleNamespace(tools=registry, services=lambda: SimpleNamespace(catalog=catalog))
-    monkeypatch.setattr(tools, "load_engine_core", lambda home: ctx)
+    monkeypatch.setattr(tools, "load", lambda home: ctx)
     return fakes
 
 

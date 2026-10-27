@@ -26,7 +26,7 @@ from traust_core.v1.repositories.sql import Dialect
 
 from traust.cli import cloud_config
 from traust.cli.__main__ import main
-from traust.context import load_core
+from traust.context import load
 
 FIXTURES = Path(__file__).parent / "fixtures" / "cloud_config"
 REPORT = json.loads((FIXTURES / "myrepo-cloud-config-audit.json").read_text())
@@ -292,7 +292,7 @@ def test_record_stamps_the_audit_run_time(home: Path, tmp_path: Path) -> None:
     )
 
     assert rc == 0, err
-    got = load_core(home).services().assessment.get(uuid.UUID(json.loads(out)["assessment_id"]))
+    got = load(home).services().assessment.get(uuid.UUID(json.loads(out)["assessment_id"]))
     assert got.occurred_at == datetime(2026, 10, 20, 9, tzinfo=UTC)
 
 

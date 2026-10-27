@@ -121,7 +121,7 @@ def test_argus_pack_is_not_the_default_rules_source():
 
 def test_main_prints_every_row(home, tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(pc, "compliance_data_dir", lambda: tmp_path)
-    monkeypatch.setattr(pc, "load_core", lambda: None)
+    monkeypatch.setattr(pc, "load", lambda: None)
     monkeypatch.setattr(pc, "inputs_dir", lambda core: tmp_path / "inputs")
     monkeypatch.setattr(pc.subprocess, "run", _unreachable)
     assert pc.main([]) == 0

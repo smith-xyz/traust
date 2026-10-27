@@ -136,6 +136,8 @@ GROUPS: dict[str, dict[str, object]] = {
         "screen-injection": sweep.SCREEN_INJECTION,
         "rule-lane": sweep.RULE_LANE,
         "mine": sweep.MINE,
+        "regression-drafts": sweep.REGRESSION_DRAFTS,
+        "verify-draft": sweep.VERIFY_DRAFT,
         "cards": sweep.CARDS,
     },
     "tools": dict(tools.TOOLS),

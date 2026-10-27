@@ -60,7 +60,7 @@ from traust_core.v1.models.vocabulary import (
 
 from traust.cli import _doors
 from traust.cli._doors import parser, run
-from traust.context import load_caller, load_compliance_services, load_core, load_services
+from traust.context import load, load_caller
 
 T = TypeVar("T")
 BUILT = {  # collectors traust-core builds itself
@@ -82,7 +82,7 @@ def declare(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str:
-        core = load_core(args.config_home)
+        core = load(args.config_home)
         doc = ComplianceScopeArtifact.from_document(yaml.safe_load(args.scope.read_text()))
         scope = core.services().compliance.set_scope(doc, load_caller(core), replace=args.replace)
         return scope.model_dump_json(indent=2)
@@ -103,9 +103,13 @@ def scopes(argv: list[str] | None = None) -> int:
     draft = True if args.draft else False if args.signed else None
 
     def call() -> str:
-        page = load_services(args.config_home).compliance.scopes(
-            ScopeFilter(framework=args.framework, product=args.product, draft=draft),
-            PageRequest(limit=args.limit, cursor=args.cursor),
+        page = (
+            load(args.config_home)
+            .services()
+            .compliance.scopes(
+                ScopeFilter(framework=args.framework, product=args.product, draft=draft),
+                PageRequest(limit=args.limit, cursor=args.cursor),
+            )
         )
         return page.model_dump_json(indent=2)
 
@@ -133,7 +137,7 @@ def resolve(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str:
-        services = load_services(args.config_home)
+        services = load(args.config_home).services()
         scope = current(services, args.boundary)
         assert scope.scope_id is not None
         return services.compliance.resolve(scope.scope_id).model_dump_json(indent=2)
@@ -169,7 +173,7 @@ def policy(argv: list[str] | None = None) -> int:
 
     def call() -> dict:
         doc = POLICY[args.kind].from_document(yaml.safe_load(args.document.read_text()))
-        published = load_services(args.config_home).compliance.record(doc, _provenance())
+        published = load(args.config_home).services().compliance.record(doc, _provenance())
         return {"artifact_id": published.artifact_id}
 
     return run(call)
@@ -241,7 +245,7 @@ def evaluate(argv: list[str] | None = None) -> int:
     found: dict = {}
 
     def call() -> None:
-        services = load_compliance_services(args.config_home)
+        services = load(args.config_home).services()
         evaluated = services.compliance.evaluate(_request(services, args))
         prepared = services.compliance.prepare(evaluated)
         args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -266,8 +270,12 @@ def evidence(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str:
-        added = load_services(args.config_home).compliance.add_evidence(
-            ComplianceEvidenceKind(args.kind), args.locator, _load(args.artifact)
+        added = (
+            load(args.config_home)
+            .services()
+            .compliance.add_evidence(
+                ComplianceEvidenceKind(args.kind), args.locator, _load(args.artifact)
+            )
         )
         return added.model_dump_json(indent=2, exclude_none=True)
 
@@ -285,9 +293,7 @@ def check(argv: list[str] | None = None) -> int:
     found: dict = {}
 
     def call() -> None:
-        report = load_compliance_services(args.config_home).compliance.check(
-            _assessment(args.assessment)
-        )
+        report = load(args.config_home).services().compliance.check(_assessment(args.assessment))
         found["violations"] = [v.model_dump(mode="json") for v in report.violations]
 
     return run(call) or _answer(found, not found["violations"])
@@ -299,7 +305,7 @@ def record(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> str:
-        services = load_compliance_services(args.config_home)
+        services = load(args.config_home).services()
         recorded = services.compliance.record(_assessment(args.assessment), _provenance())
         return recorded.model_dump_json(indent=2)
 
@@ -313,7 +319,7 @@ def latest(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> dict | None:
-        services = load_services(args.config_home)
+        services = load(args.config_home).services()
         scope = current(services, args.boundary)
         assert scope.scope_id is not None
         found = services.compliance.latest(scope.scope_id, ComplianceFramework(args.framework))
@@ -333,7 +339,7 @@ def adrs(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     def call() -> list:
-        services = load_compliance_services(args.config_home)
+        services = load(args.config_home).services()
         (product,) = _doors.products(services, [args.product])
         return [a.model_dump(mode="json") for a in services.compliance.adrs(product.id)]
 
@@ -348,7 +354,7 @@ def calibrate(argv: list[str] | None = None) -> int:
     found: dict = {}
 
     def call() -> None:
-        services = load_compliance_services(args.config_home)
+        services = load(args.config_home).services()
         key = args.key and _load(args.key, EfficacyKey.model_validate)
         result = services.compliance.calibrate(_request(services, args), key)
         found.update(result.model_dump(mode="json"), passed=result.passed)

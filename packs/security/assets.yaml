@@ -66,6 +66,32 @@ assets:
     admission: {approval: operators, estimate_usd: "6.24", pacing: {per_tick: 5}}
     runner: {labels: [llm]}
 
+  cloud_config_audit:  # skill session: /cloud-config-audit <clone>; lever 6, additive to the
+    # table's lane: iac-lane re-runs against the repository's cloud-config baseline, iac-baseline
+    # creates one (both from an IaC change, iac-baseline also from the audit's companion_lanes).
+    # PENDING(roles): no registry role is cloud-config's own; deep-audit is the closest.
+    model: {role: deep-audit}
+    run: [python3, -m, traust.cli, session, run, --skill, cloud-config-audit, --role, "{role}", --repo, "{repo_url}", --checkout, --run-id, "{run_id}"]
+    partitions: dynamic:repo
+    deps: [repo_state]
+    trigger: {lanes: [iac-lane, iac-baseline]}
+    admission: {approval: operators, estimate_usd: "10.00"}
+    runner: {labels: [llm]}
+
+  threat_model_quarterly:  # skill session: /threat-model review <clone> --auto --apply-ratings;
+    # the calendar backstop for a HEAD model older than 92 days. It writes OWASP ratings (the
+    # 2026-10-01 decision); every other threat-model lane stays report-only. Drained over a
+    # quarter on the legacy tranche: pacing takes the highest-priority rows each tick.
+    # PENDING(estimate): the legacy budget shadow never measured this lane, so its budget can't
+    # bind until it has an estimate_usd.
+    model: {role: threat-model}
+    run: [python3, -m, traust.cli, session, run, --skill, threat-model, --mode, review, --role, "{role}", --repo, "{repo_url}", --checkout, --run-id, "{run_id}", --, --auto, --apply-ratings]
+    partitions: dynamic:repo
+    deps: [repo_state]
+    trigger: {lanes: [threat-model-quarterly]}
+    admission: {approval: operators, pacing: {per_tick: 5}}
+    runner: {labels: [llm]}
+
   # A skill session is `model: {role}` plus a `run` that starts it (`traust session run`);
   # `traust-engine claim` fills `{role}`. PENDING(roles): each role is the registry role closest
   # to the session's work, until the pack owner confirms.

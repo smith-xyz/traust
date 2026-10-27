@@ -32,8 +32,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from traust_contracts import config_path
-from traust_engine import HarnessEngine
+from traust.context import DeploymentConfigMissing, LocationSource, resolve_config_home
 
 try:
     import yaml
@@ -41,13 +40,19 @@ except ImportError:  # pragma: no cover - yaml is a hard dependency
     yaml = None
 
 
-def registry_path() -> Path:
-    """The required feeds.yaml, resolved from the one config home.
+def registry_path(config_home: Path | None = None) -> Path:
+    """The required feeds.yaml in the config home (``--config-home`` or the one config home).
 
     Lazy (not a module constant): feeds.yaml is a shipped default seeded into
     $TRAUST_CONFIG_HOME by install_traust, never read from the code tree.
     """
-    return config_path("feeds.yaml")
+    home = resolve_config_home(config_home)
+    if home is None or not (home / "feeds.yaml").is_file():
+        raise DeploymentConfigMissing(
+            f"required config file 'feeds.yaml' not found in {home}. Copy config/feeds.yaml "
+            "there, or run scripts/install_traust."
+        )
+    return home / "feeds.yaml"
 
 
 #: Cadence -> hours, for entries that name a cadence but no explicit age.
@@ -65,7 +70,7 @@ class FeedsConfigError(RuntimeError):
     """
 
 
-def feeds_cache_dir(*, engine: HarnessEngine) -> Path:
+def feeds_cache_dir(*, engine: LocationSource) -> Path:
     """Where cached feed data lives. Resolution lives in ``traust.context``."""
     from traust.context import feeds_cache_dir as resolve_feeds_cache_dir
 
