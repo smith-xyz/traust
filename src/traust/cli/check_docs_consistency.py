@@ -44,9 +44,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from traust_contracts.paths import schema_dir
-
-from traust.paths import HARNESS_ROOT, skill_dirs, skill_scripts
+from traust.paths import HARNESS_ROOT, schema_dir, skill_dirs, skill_scripts
 from traust.paths import optional_config_path as _cfg_path
 
 REPO = HARNESS_ROOT

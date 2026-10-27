@@ -13,6 +13,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import ClassVar
 
+from traust.context import load
+
 
 @dataclass
 class Fingerprint:
@@ -156,7 +158,7 @@ class AdapterBase:
 
     # Step text originates in finding prose — hostile per the threat
     # model. Validation and execution of string-form (PoC-derived)
-    # steps delegate to traust_engine._util.safe_exec under the
+    # steps delegate to traust-core's safe-exec under the
     # "validation-step" profile ($TRAUST_CONFIG_HOME/safe-exec-profiles.yaml):
     # substitution/operator denies, per-segment binary allowlist, and
     # native pipeline execution with a scrubbed environment — no shell
@@ -184,15 +186,13 @@ class AdapterBase:
         }
     )
 
-    _safe_exec_mod = None
+    _safe_exec_policy = None
 
     @classmethod
     def _safe_exec(cls):
-        if cls._safe_exec_mod is None:
-            import importlib
-
-            cls._safe_exec_mod = importlib.import_module("traust_engine._util.safe_exec")
-        return cls._safe_exec_mod
+        if cls._safe_exec_policy is None:
+            cls._safe_exec_policy = load().safe_exec
+        return cls._safe_exec_policy
 
     @classmethod
     def _vet_shell_string(cls, cmd: str) -> tuple[list[str] | None, str]:
@@ -200,7 +200,7 @@ class AdapterBase:
         (argv, "") for a pipeless command, (None, "") for an approved
         pipeline, or (None, reason) when rejected."""
         se = cls._safe_exec()
-        v = se.vet_command_string(cmd, se.get_profile(cls._SAFE_EXEC_PROFILE))
+        v = se.vet_command_string(cmd, se.profile(cls._SAFE_EXEC_PROFILE))
         if not v.ok:
             return None, v.reason
         if len(v.segments) == 1:
@@ -213,7 +213,7 @@ class AdapterBase:
     ) -> tuple[int, str, str]:
         if isinstance(cmd, str):
             se = cls._safe_exec()
-            profile = se.get_profile(cls._SAFE_EXEC_PROFILE)
+            profile = se.profile(cls._SAFE_EXEC_PROFILE)
             v = se.vet_command_string(cmd, profile)
             if not v.ok:
                 return 126, "", f"[step blocked: {v.reason}]"
