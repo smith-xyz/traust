@@ -55,14 +55,6 @@ def _config_home_arg(config_home: Path | None) -> list[str]:
     return ["--config-home", str(config_home)]
 
 
-def _results_root_arg(results_root: Path) -> list[str]:
-    return ["--results-root", str(results_root)]
-
-
-def _engine_path_args(config_home: Path | None, results_root: Path) -> list[str]:
-    return _config_home_arg(config_home) + _results_root_arg(results_root)
-
-
 def build_stages(
     workspace: Path,
     results_root: Path,
@@ -70,26 +62,11 @@ def build_stages(
     *,
     config_home: Path | None = None,
 ):
-    """Ordered (name, tier, argv) stage list, each continue-on-error. Each builder below waits
-    on its traust-core view (a stub today) and goes when that view lands."""
-    h = HARNESS_ROOT
-    path_args = _engine_path_args(config_home, results_root)
+    """Ordered (name, tier, argv) stage list, each continue-on-error. The VIEWS stage renders
+    every built traust-core insight view in-process; the remaining stages are spend capture."""
     cfg = _config_home_arg(config_home)
     stages = [
-        (VIEWS, "core", []),  # InsightService.refresh, in-process (run_views)
-        # no door: ValidationFuzzView (ValidationService.summary)
-        (
-            "validation-fuzz",
-            "consumer",
-            [
-                PYTHON,
-                str(
-                    h / "harnessing/validation-fuzz-dashboard/scripts/"
-                    "build_validation_fuzz_dashboard.py"
-                ),
-                *path_args,
-            ],
-        ),
+        (VIEWS, "core", []),  # InsightService.refresh renders every built view, in-process
     ]
     if spend_actuals:
         stages.append(
