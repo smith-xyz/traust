@@ -60,14 +60,18 @@ def _sweeps_root(engine, args) -> Path:
     return _analysis_results(engine, args.analysis_results) / SWEEPS_REL
 
 
-def _resolve_pack(engine, pack: Path | None) -> Path:
+def _resolve_pack(args, pack: Path | None) -> Path:
+    """``pack``, else the one rule pack every default run loads (``load().rule_pack``)."""
     if pack is not None:
         return pack
-    try:
-        return engine.adapters.rule_pack_dir()
-    except ValueError as e:
-        print(str(e), file=sys.stderr)
-        raise SystemExit(2) from e
+    path = load(args.config_home).rule_pack
+    if not path.is_dir():
+        print(
+            "opengrep rule pack required (rule_pack, locations.opengrep_rules, or bundled default)",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
+    return path
 
 
 def _resolve_drafts_dir(args) -> Path:
@@ -128,7 +132,7 @@ def add_draft_args(ap) -> None:
 def call_draft(args) -> int:
     engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
     ops = engine.sweep
-    pack = _resolve_pack(engine, args.pack)
+    pack = _resolve_pack(args, args.pack)
     drafts_dir = _resolve_drafts_dir(args)
     sweeps_root = _sweeps_root(engine, args)
     res = ops.draft(pack, drafts_dir, sweeps_root=sweeps_root)
@@ -168,7 +172,7 @@ def add_sweep_args(ap) -> None:
 def call_sweep(args) -> int:
     engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
     ops = engine.sweep
-    pack = _resolve_pack(engine, args.pack)
+    pack = _resolve_pack(args, args.pack)
     drafts_dir = _resolve_drafts_dir(args)
     sweeps_root = _sweeps_root(engine, args)
     res = ops.sweep(
@@ -200,7 +204,7 @@ def add_emit_args(ap) -> None:
 def call_emit(args) -> int:
     engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
     ops = engine.sweep
-    pack = _resolve_pack(engine, args.pack)
+    pack = _resolve_pack(args, args.pack)
     drafts_dir = _resolve_drafts_dir(args)
     sweeps_root = _sweeps_root(engine, args)
     res = ops.emit(args.rule, pack, drafts_dir, sweeps_root=sweeps_root, force=args.force)
@@ -487,9 +491,9 @@ def _stage(draft: Path, pair: RegressionPair) -> None:
 **Authoring contract:** write `patterns:` in `rule.skeleton.yaml` so that
 `traust sweep verify-draft {draft}` fires on every file in `before/` and on
 nothing in `after/`. Then move the rule into the pack category file in
-traust-engine (`src/traust_engine/data/secure-code-audit/opengrep-rules/`, a
-traust-engine PR; not a `regression.yaml` dump, match the pack's category
-layout) with `ruleid:`-annotated fixture lines, and delete this draft dir.
+the security pack (`packs/security/detection/opengrep-rules/`; not a `regression.yaml`
+dump, match the pack's category layout) with `ruleid:`-annotated fixture
+lines, and delete this draft dir.
 """,
         encoding="utf-8",
     )

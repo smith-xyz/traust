@@ -3,9 +3,7 @@
 import json
 import re
 
-from traust_contracts.paths import schema_dir
-
-from traust.paths import HARNESS_ROOT
+from traust.paths import HARNESS_ROOT, schema_dir
 
 CHECKLIST = (
     HARNESS_ROOT / "harnessing" / "3-audit" / "secure-code-audit" / "llm-application-review.md"

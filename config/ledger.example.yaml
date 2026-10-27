@@ -5,7 +5,7 @@
 #
 # Never put secrets here. The keypair password (COSIGN_PASSWORD), an ambient
 # keyless signing token and your ledger token (`ledger auth login`) stay with
-# the runner. Schema: traust-contracts config/v1/ledger.schema.json.
+# the runner. Schema: contracts config/v1/ledger.schema.json (through traust-core).
 
 # Ledger database. Set: the database is the authority, layer files become
 # read-only snapshots, and every ledger CLI needs --ledger-layer or

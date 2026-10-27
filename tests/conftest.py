@@ -9,14 +9,10 @@ from pathlib import Path
 
 import pytest
 import yaml
-from traust_contracts.config import (
-    TRAUST_CONFIG_HOME_DEFAULT,
-    deployment_config_dir,
-    load_section,
-)
+from traust_core.v1.context import TRAUST_CONFIG_HOME_DEFAULT, Locations, resolve_config_home
 
 # Capture the operator config home before the suite replaces TRAUST_CONFIG_HOME.
-_OPERATOR_CONFIG_HOME = deployment_config_dir()
+_OPERATOR_CONFIG_HOME = resolve_config_home()
 if _OPERATOR_CONFIG_HOME is not None:
     os.environ["TRAUST_OPERATOR_CONFIG_HOME"] = str(_OPERATOR_CONFIG_HOME)
 
@@ -35,12 +31,8 @@ _ISO = Path(tempfile.mkdtemp(prefix="traust-app-test-data-"))
 def _progress_tracker_from_operator_config() -> Path | None:
     if _OPERATOR_CONFIG_HOME is None:
         return None
-    locs = load_section(
-        "locations.yaml",
-        config_home=_OPERATOR_CONFIG_HOME,
-        required=False,
-    )
-    if locs is None or not locs.progress_tracker:
+    locs = Locations.from_home(_OPERATOR_CONFIG_HOME)
+    if not locs.progress_tracker:
         return None
     return Path(locs.progress_tracker)
 
@@ -77,8 +69,7 @@ assert _TEST_HOME.resolve() != TRAUST_CONFIG_HOME_DEFAULT.resolve(), (
 
 from traust.paths import skill_dir
 
-# Tier 0: traust-core (contracts and ledger through it) and traust-engine.
-# Tier 2: skill scripts import traust_engine.* directly (no flat aliases).
+# Tier 0: traust-core (contracts and ledger through it).
 
 # Resolved by skill NAME, not by a hardcoded depth: a workflow skill sits at
 # harnessing/<N>-<stage>/<skill>/ and the rest at harnessing/<skill>/, and

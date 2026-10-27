@@ -24,6 +24,8 @@ from traust_core.v1.models.detection_quality import (
     RegressionPairs,
     SkippedPair,
 )
+
+# PENDING(decision: sweep stages — retire or port)
 from traust_engine.adapters import opengrep
 
 from traust.cli.groups import sweep

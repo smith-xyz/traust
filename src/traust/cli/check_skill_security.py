@@ -61,7 +61,7 @@ Rules (S-series; A-series lives in check_skill_alignment.py):
   S10 target-build   A skill/script that executes an audited checkout's
       sandbox        own build machinery (make/mvn/gradle/go build/npm/
                      cargo in an execution context) must route it
-                     through traust_engine._util.safe_exec — enforced command
+                     through traust-core's safe-exec (`traust util safe-exec`) — enforced command
                      validation with profile allowlists, git -c/network
                      hardening, and shell-free pipeline execution.
                      (sandbox-adoption WS1,
@@ -144,7 +144,7 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
     "shells out (P0-2 kubeargv classification + scope gate)",
     # --- S4 shell-exec ---
     # (base.py entry REMOVED 2026-07-31: P2.13 closed — PoC-string steps
-    #  now validate and execute via traust_engine._util.safe_exec, no shell.)
+    #  now validate and execute via traust-core's safe-exec, no shell.)
     # --- S5 token-argv ---
     (
         "S5",
@@ -581,7 +581,7 @@ def security_failures(repo: Path = REPO) -> tuple[list[str], list[str]]:
                 f"S10 {rel}: target-build invocation in an execution "
                 "block without safe_exec routing — build systems of "
                 "audited checkouts are hostile code; run them "
-                "through traust_engine._util.safe_exec "
+                "through traust-core's safe-exec (`traust util safe-exec`) "
                 "(sandbox-adoption WS1)"
             )
 
@@ -632,7 +632,7 @@ def security_failures(repo: Path = REPO) -> tuple[list[str], list[str]]:
                 f"S10 {rel}: target-build invocation without "
                 "safe_exec routing — build systems of audited "
                 "checkouts are hostile code; run them through "
-                "traust_engine._util.safe_exec (sandbox-adoption WS1)"
+                "traust-core's safe-exec (`traust util safe-exec`) (sandbox-adoption WS1)"
             )
 
         if CURL_AUTH_RX.search(text) and not _exempt("S5", rel, used):

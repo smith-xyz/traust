@@ -5,7 +5,7 @@
 # real file in a private config repository: an audit agent must never read
 # it (contamination rule). `traust sweep build-canaries` adds canary and seeded rows from
 # $TRAUST_CONFIG_HOME/recall-benchmark/{canaries,seeded}/; match_benchmark.py
-# scores runs against it. Schema: traust-contracts benchmark-target.
+# scores runs against it. Schema: contracts benchmark-target (through traust-core).
 
 version: 1
 updated: "2026-01-01"

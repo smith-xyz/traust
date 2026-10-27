@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import sys
 from collections.abc import Callable
+from importlib.metadata import version
 from pathlib import Path
 from typing import TypeVar
 
@@ -22,7 +23,7 @@ from traust_core.v1.context import (
 from traust_core.v1.errors import AuthenticationError, ConfigError, DeploymentConfigMissing
 from traust_core.v1.models.identity import Credential, Principal
 
-from traust.paths import HARNESSING_DIR
+from traust.paths import GITLEAKS_CONFIG, HARNESSING_DIR, OPENGREP_RULES_DIR
 
 T = TypeVar("T")
 
@@ -145,26 +146,19 @@ def load(
 
 
 def _with_bundled_rules(config: Config) -> Config:
-    """``config`` with the bundled gitleaks rules when ``locations.gitleaks_config`` is unset."""
+    """``config`` with the pack's gitleaks config when ``locations.gitleaks_config`` is unset."""
     if config.locations.gitleaks_config:
         return config
-    # PENDING(pack: gitleaks rules): the engine-bundled rules until the security pack ships them.
-    from traust._tools import resolve_gitleaks_config
-
-    gitleaks = str(resolve_gitleaks_config())
-    locations = config.locations.model_copy(update={"gitleaks_config": gitleaks})
+    locations = config.locations.model_copy(update={"gitleaks_config": str(GITLEAKS_CONFIG)})
     return config.model_copy(update={"locations": locations})
 
 
 def _rule_pack(locations: Locations) -> tuple[Path, str]:
-    """The opengrep rule pack and its version: ``locations.opengrep_rules``, else the bundled."""
+    """The opengrep rule pack and its version: ``locations.opengrep_rules``, else the pack's."""
     if raw := locations.opengrep_rules:
         pack = Path(raw.removeprefix("file://"))
         return pack, f"local:{pack}"
-    # PENDING(pack: opengrep rules): the engine-bundled pack until the security pack ships one.
-    from traust._tools import default_rule_pack_dir, harness_version
-
-    return default_rule_pack_dir(), harness_version()
+    return OPENGREP_RULES_DIR, version("traust")
 
 
 def load_spend_core(config_home: Path | None = None) -> Context:

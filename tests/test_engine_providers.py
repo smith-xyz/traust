@@ -4,12 +4,14 @@ run instead of raising their "not registered" ConfigError."""
 from __future__ import annotations
 
 import shutil
+from importlib.metadata import version
 from pathlib import Path
 
 import pytest
 import yaml
 
 from traust.context import load
+from traust.paths import GITLEAKS_CONFIG, OPENGREP_RULES_DIR
 
 FIXTURE_CONFIG = Path(__file__).parent / "fixtures" / "config"
 
@@ -87,11 +89,9 @@ def test_run_tools_reaches_a_core_tool_through_load(
     assert run.data("grype", AdapterResultArtifact).metadata.tool == "grype"
 
 
-def test_unset_gitleaks_rules_resolve_to_the_bundled_file(home: Path) -> None:
-    from traust._tools import resolve_gitleaks_config
-
+def test_unset_gitleaks_rules_resolve_to_the_packs_file(home: Path) -> None:
     path = load(home).config.locations.gitleaks_config_path()
-    assert path == resolve_gitleaks_config() and path.is_file()
+    assert path == GITLEAKS_CONFIG and path.is_file()
 
 
 def test_an_explicit_gitleaks_location_wins(home: Path, tmp_path: Path) -> None:
@@ -101,13 +101,11 @@ def test_an_explicit_gitleaks_location_wins(home: Path, tmp_path: Path) -> None:
     assert load(home).config.locations.gitleaks_config_path() == rules
 
 
-def test_the_rule_pack_defaults_to_the_bundled_pack_at_the_engine_version(home: Path) -> None:
-    from traust._tools import default_rule_pack_dir, harness_version
-
+def test_the_rule_pack_defaults_to_the_packs_rules_at_the_traust_version(home: Path) -> None:
     core = load(home)
-    assert core.rule_pack == default_rule_pack_dir()
+    assert core.rule_pack == OPENGREP_RULES_DIR
     assert {p.version for p in core.services().detection_quality.rule_packs()} == {
-        harness_version()
+        version("traust")
     }
 
 

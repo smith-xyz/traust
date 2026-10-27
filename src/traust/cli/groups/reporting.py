@@ -211,10 +211,10 @@ def call_rate_threats(args) -> int:
 
     The author scores the factors (and optionally the basis and one reason
     per factor); the means, levels and severity are arithmetic, so this
-    computes them with traust_contracts.v1.risk_rating rather than leaving
+    computes them with traust-core's risk_rating rather than leaving
     them to the author. Threats without a risk_rating are left alone.
     """
-    from traust_contracts.v1 import risk_rating
+    from traust_core.v1.models.values import risk_rating
 
     document = json.loads(args.model.read_text(encoding="utf-8"))
     changed, failed = [], []

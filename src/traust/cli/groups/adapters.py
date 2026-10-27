@@ -6,6 +6,7 @@ import argparse
 import json
 import shutil
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 from traust_core.v1.context import Context
@@ -136,8 +137,6 @@ def add_govulncheck_args(ap) -> None:
 
 
 def call_govulncheck(args) -> int:
-    from traust._tools import harness_version
-
     repo = args.repo.resolve()
     if not (repo / "go.mod").exists() and not list(repo.glob("*/go.mod")):
         print(
@@ -153,7 +152,7 @@ def call_govulncheck(args) -> int:
             repo,
             timeout=args.timeout,
             binary=args.govulncheck,
-            harness_version=harness_version(),
+            harness_version=version("traust"),
         )
     except ConfigError as e:
         print(f"config not resolvable: {e}", file=sys.stderr)
@@ -327,7 +326,6 @@ def _note_unresolved_manifests() -> None:
 
 
 def call_osv(args) -> int:
-    from traust._tools import harness_version
     from traust.registry.osv_urls import osv_access
 
     source = args.source or ("osv-scanner" if osv_access() == "air-gapped" else "api")
@@ -349,7 +347,7 @@ def call_osv(args) -> int:
         "metadata": {
             "artifact": "osv-dependency-candidates",
             "repository": str(repo),
-            "harness_version": harness_version(),
+            "harness_version": version("traust"),
             **prov,
         },
         "candidates": body["candidates"],
@@ -359,8 +357,6 @@ def call_osv(args) -> int:
 
 
 def _call_osv_sbom(args, source: str) -> int:
-    from traust._tools import harness_version
-
     sbom = args.sbom.resolve()
     if not sbom.is_file():
         print(f"not a file: {sbom}", file=sys.stderr)
@@ -384,7 +380,7 @@ def _call_osv_sbom(args, source: str) -> int:
         "metadata": {
             "artifact": "osv-dependency-candidates",
             "sbom": str(sbom),
-            "harness_version": harness_version(),
+            "harness_version": version("traust"),
             **prov,
         },
         "candidates": body["candidates"],

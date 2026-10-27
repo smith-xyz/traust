@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Build the pinned Traust Python dependencies as wheels, at the commits uv.lock resolved.
 
-traust pins traust-core and traust-engine; traust-contracts and traust-ledger come
-through traust-core's pins, so every revision is read from the lock.
+The image installs these with --no-deps: traust-core, the traust-contracts and traust-ledger it
+imports (through its pins), and traust-engine while traust's sweep, portfolio-graph and
+metrics-journal ops still run on it. Every revision is read from the lock.
 """
 
 from __future__ import annotations

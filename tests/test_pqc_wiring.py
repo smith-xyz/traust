@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _load_schema(name):
-    from traust_contracts.paths import schema_path as _sp
+    from traust.paths import schema_path as _sp
 
     return json.loads(_sp(name).read_text(encoding="utf-8"))
 

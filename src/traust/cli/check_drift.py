@@ -25,7 +25,7 @@ from typing import Any
 import yaml
 
 from traust.context import inputs_dir, load
-from traust.paths import HARNESS_ROOT, optional_config_path
+from traust.paths import SECURITY_PACK_DIR, optional_config_path
 
 PROVENANCE_REVIEW_DAYS = 180
 DOCS_MAP_STALE_DAYS = 30
@@ -337,7 +337,7 @@ def check_docs_product_map(inputs: Path) -> list[dict]:
 
 def compliance_data_dir() -> Path:
     """The security pack's vendored framework data (NIST spine, baselines, catalogs)."""
-    return HARNESS_ROOT / "packs" / "security" / "compliance"
+    return SECURITY_PACK_DIR / "compliance"
 
 
 def main(argv: list[str] | None = None) -> int:

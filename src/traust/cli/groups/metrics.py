@@ -132,7 +132,6 @@ def call_collect_spend(args) -> int:
         return 1
 
     today = datetime.date.today().isoformat()
-    spend = core.services().spend
 
     if args.append:
         source = transcripts.source(ws, skill_names())
@@ -144,13 +143,13 @@ def call_collect_spend(args) -> int:
             start=start.replace(hour=0, minute=0, second=0, microsecond=0),
             end=datetime.datetime.now(datetime.UTC),
         )
-        recorded = spend.collect(source, window)
+        recorded = core.services().spend.collect(source, window)
         print(f"recorded {recorded} day×model×skill spend event(s)")
         return 0
 
     day = args.date or today
     source = transcripts.source(ws, ())
-    rows = spend.usage_summary(source, _window(day, None), (UsageDimension.MODEL,))
+    rows = core.spend_views.usage_summary(source, _window(day, None), (UsageDimension.MODEL,))
     print(
         f"session spend — {day} ({'live' if day == today else 'final'}) "
         f"across {len(dirs)} project dir(s)"
@@ -209,7 +208,7 @@ def call_attribute_spend(args) -> int:
 
     source = transcripts.source(ws, skill_names())
     window = _window(args.date, month)
-    spend = core.services().spend
+    spend = core.spend_views
     if args.json:
         by = (UsageDimension.DAY, UsageDimension.SKILL, UsageDimension.MODEL)
         print(

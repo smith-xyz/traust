@@ -17,6 +17,8 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+
+# delete with the engine (final-drop follow-up)
 from traust_contracts.config import load_section
 from traust_core.v1.context import Context
 from traust_core.v1.providers.transcripts import SessionTranscripts

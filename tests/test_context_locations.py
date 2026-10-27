@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pytest
 import yaml
+
+# delete with the engine (final-drop follow-up)
 from traust_contracts import DeploymentConfigMissing as EngineConfigMissing
 from traust_core.v1.errors import DeploymentConfigMissing
 from traust_engine import HarnessEngine

@@ -41,7 +41,7 @@ DEFAULT_HOME="${TRAUST_CONFIG_HOME:-$HOME/.traust/config}"
 # Required ESTATE files the operator must fill in — these have no sensible
 # shipped default (they describe THIS deployment's corpus and its command
 # allowlists). The authoritative required-set is the contracts MANIFEST; the
-# --doctor `load_context()` smoke is what actually gates. This list only drives
+# --doctor `load()` smoke and completeness audit are what actually gate. This list only drives
 # the copy step + a friendly presence check, in review order.
 REQUIRED_FILES="corpus-config.yaml safe-exec-profiles.yaml"
 # Optional files (feature-gated in the MANIFEST): a template is seeded as a
@@ -56,7 +56,7 @@ COPYABLE="execution-boundaries.yaml corpus-config.yaml safe-exec-profiles.yaml p
 # Shipped as-is with the harness and ALSO copied into TRAUST_CONFIG_HOME, so a
 # deployment is complete in one directory even where only traust-engine is
 # installed. These are the MANIFEST-required shipped defaults (model router +
-# spend need model-registry; load_context() requires feeds + external-tools).
+# spend need model-registry; the feeds and tools need feeds + external-tools).
 # The copy in TRAUST_CONFIG_HOME wins; refresh with --force when the harness
 # updates the shipped one.
 SHIPPED_COPY="model-registry.yaml feeds.yaml external-tools.yaml"
@@ -304,7 +304,7 @@ for n in names:
     p = optional_config_path(n)
     if p is None:
         # Absent is not a resolver failure — required files are caught by the
-        # engine-load step, optional ones (e.g. ledger-signing-key.pub when
+        # config-load and completeness steps, optional ones (e.g. ledger-signing-key.pub when
         # signing is off) are reported by the completeness audit as warnings.
         print(f"  {n}: absent (optional — see completeness check)")
     elif p.resolve().parent != home:
@@ -316,30 +316,30 @@ PYEOF
   then fail "resolver does not point at $home for every file"; failures=$((failures+1))
   else ok "every operational file resolves under $home"; fi
 
-  info "4. Engine load (authoritative — exactly what HarnessEngine.load() requires)"
+  info "4. Config load (authoritative — exactly what traust.context.load() requires)"
   if [[ -z "$py" ]]; then
     warn "skipped (no python)"
   elif TRAUST_CONFIG_HOME="$home" "$py" - <<'PYEOF'
 import sys
 try:
-    from traust_contracts import load_context, DeploymentConfigMissing
+    from traust.context import load
 except ImportError:
-    print("  contracts not importable — run `uv sync`"); sys.exit(1)
+    print("  traust not importable — run `uv sync`"); sys.exit(1)
 try:
-    ctx = load_context()
-except DeploymentConfigMissing as e:
-    print(f"  load_context() failed: {e}"); sys.exit(1)
-print("  load_context() OK — the engine will start with this config")
-if ctx.signing_pubkey:
+    ctx = load()
+except SystemExit:
+    sys.exit(1)
+print("  load() OK — traust will start with this config")
+if ctx.config.ledger is not None and ctx.config.ledger.public_key_path is not None:
     print("  signing: key present (ledger signatures verified)")
 else:
-    print("  signing: DISABLED — no ledger-signing-key.pub; the ledger records "
-          "unsigned layers and verification is skipped. Provide a key (or "
-          "keyless/OIDC) + ledger.yaml signing.required to enforce integrity.")
+    print("  signing: DISABLED — no ledger public key in core.yaml; the ledger records "
+          "unsigned layers and verification is skipped. Provide a key "
+          "(ledger.public_key_path) + ledger.required to enforce integrity.")
 sys.exit(0)
 PYEOF
-  then ok "engine configuration loads"
-  else fail "the engine will NOT start with this config (fill the file named above)"; failures=$((failures+1)); fi
+  then ok "traust configuration loads"
+  else fail "traust will NOT start with this config (fill the file named above)"; failures=$((failures+1)); fi
 
   info "5. Completeness (estate readiness)"
   if [[ -z "$py" ]]; then

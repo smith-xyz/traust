@@ -1,7 +1,7 @@
-"""A default traust run uses the rule packs bundled in traust-engine.
+"""A default traust run uses the rule packs the security pack ships.
 
-The opengrep rule pack and gitleaks config live only in traust-engine
-(traust_engine/data/secure-code-audit/). Nothing in a deployment configures
+The opengrep rule pack and gitleaks config live only in packs/security/.
+Nothing in a deployment configures
 them: the adopter-style fixture config home below sets no rule-pack location,
 and a plain `traust adapters …` run must still report recent rules. If the
 default ever resolves somewhere stale, these fail. Not marked `integration`,
@@ -52,7 +52,11 @@ def test_default_opengrep_run_reports_a_current_rule(tmp_path):
     assert "traust-python-authentication-jwt-signature-unverified" in {
         f["rule_id"] for f in report["facts"]
     }
-    assert any("traust_engine" in p for r in report["rules"] for p in r.get("config_paths", []))
+    assert any(
+        "packs/security/detection/opengrep-rules" in p
+        for r in report["rules"]
+        for p in r.get("config_paths", [])
+    )
 
 
 @pytest.mark.skipif(not shutil.which("gitleaks"), reason="gitleaks not on PATH")

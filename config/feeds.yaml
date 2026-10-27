@@ -202,7 +202,7 @@ sources:
       - traust.cli adapters fork-lag (traust-core CodeFactsService.fork_lag)
       - traust.cli.impact
       - traust.ops.cve_replay_monitor
-      - traust.cli adapters osv (traust_engine.adapters.osv, the dependency pre-scan)
+      - traust.cli adapters osv (traust-core providers.tools.osv, the dependency pre-scan)
     license:
       id: pass-through
       terms: >-
@@ -236,7 +236,7 @@ sources:
       ident: npm/packages/express/versions/4.17.1:dependencies
       expect_status: 200
     consumers:
-      - traust.cli adapters osv (traust_engine.adapters.osv resolve_transitive)
+      - traust.cli adapters osv (traust-core providers.tools.osv resolve_transitive)
       - traust impact below-range (dependency source in packets, traust-core BelowRangeService)
     license:
       id: CC-BY-4.0

@@ -138,7 +138,7 @@ def call_products(args) -> int:
             )
         else:
             unresolved = f"{packages_dir} not found — --all resolved no packages"
-    resolution = core.services().portfolio.resolve_products(
+    resolution = core.product_lookup.resolve_products(
         snapshot, mappings, packages, args.repo_url, args.product
     )
     out = resolution.model_dump(mode="json", exclude_unset=True)

@@ -3,9 +3,9 @@
 import json
 
 import pytest
-from traust_engine.registry import feeds as pd_feeds
 
 from traust.cli import fetch_feeds as ff
+from traust.context import load
 
 
 @pytest.fixture(autouse=True)
@@ -110,31 +110,29 @@ def _write_pd(cache, doc):
     (cache / "product_definitions.json").write_text(json.dumps(doc))
 
 
+def _read_pd(cache):
+    return load().product_definitions(cache).read()
+
+
 def test_load_product_definitions_happy(tmp_path):
     cache = tmp_path / "feeds"
     _write_pd(cache, {"ps_products": {"a": {}}, "ps_modules": {"a-1": {}}, "ps_update_streams": {}})
-    doc = pd_feeds.load_product_definitions(cache)
+    doc = _read_pd(cache).document
     assert doc["ps_products"] == {"a": {}}
 
 
-def test_load_product_definitions_raises_on_missing_key(tmp_path):
+def test_load_product_definitions_is_unavailable_on_missing_key(tmp_path):
     """A silent upstream shape change must not read as 'no contacts'."""
     cache = tmp_path / "feeds"
     _write_pd(cache, {"ps_products": {}, "ps_update_streams": {}})
-    try:
-        pd_feeds.load_product_definitions(cache)
-    except ValueError as e:
-        assert "ps_modules" in str(e)
-    else:
-        raise AssertionError("missing ps_modules must raise")
+    snapshot = _read_pd(cache)
+    assert snapshot.document is None and snapshot.status == "unavailable"
+    assert "ps_modules" in snapshot.source.detail
 
 
-def test_load_product_definitions_raises_on_wrong_type(tmp_path):
+def test_load_product_definitions_is_unavailable_on_wrong_type(tmp_path):
     cache = tmp_path / "feeds"
     _write_pd(cache, {"ps_products": {}, "ps_modules": [], "ps_update_streams": {}})
-    try:
-        pd_feeds.load_product_definitions(cache)
-    except ValueError as e:
-        assert "ps_modules" in str(e)
-    else:
-        raise AssertionError("a list where a map belongs must raise")
+    snapshot = _read_pd(cache)
+    assert snapshot.document is None and snapshot.status == "unavailable"
+    assert "ps_modules" in snapshot.source.detail

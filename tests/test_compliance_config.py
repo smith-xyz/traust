@@ -13,7 +13,7 @@ yaml = pytest.importorskip("yaml")
 
 
 def _schema(name):
-    from traust_contracts.paths import schema_path as _sp
+    from traust.paths import schema_path as _sp
 
     return json.loads(_sp(name.removesuffix(".schema.json")).read_text())
 

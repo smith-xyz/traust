@@ -47,7 +47,7 @@ Rules:
                       gemini-*, …) may appear ONLY in
                       config/model-registry.yaml — skills and scripts name
                       tier classes and resolve via
-                      `traust_engine.registry.models` (lock-in and spend
+                      traust-core's `ctx.model_catalog` (lock-in and spend
                       policy live in data, not prose).
   A10 integrations    A skill emitting non-terminal artifacts must carry
                       an Integrations/Downstream section documenting who
@@ -1179,7 +1179,7 @@ def alignment_failures(repo: Path = REPO, exemptions_used: list | None = None) -
                     f"A12 {rel}:{i}: hardcoded model id '{m.group(0)}' — "
                     f"name a tier class and resolve via "
                     f"config/model-registry.yaml "
-                    f"(traust_engine.registry.models)"
+                    f"(traust-core's ctx.model_catalog)"
                 )
 
         # A11 — no broad interpreter grants in allowed-tools

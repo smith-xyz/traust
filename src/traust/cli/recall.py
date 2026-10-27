@@ -5,7 +5,7 @@ benchmark-targets  record the benchmark-targets manifest (YAML or JSON) as a new
                    version; the newest is the one scored. Duplicate target ids and held-out seeded
                    targets are refused
 build-canaries     commit every canary (or seeded-fixture) source into a deterministic local repo
-                   (traust-engine's materialiser) and record them as targets of a new version
+                   (traust-core's canary materialiser) and record them as targets of a new version
 score-benchmark    score a runs dir of audit reports (``<id>/``, rerun ``<id>__rerun/``) against the
                    newest answer key, derived on demand and stored nowhere; without --runs-dir, the
                    scorecard per auditor version over the recorded benchmark audits
