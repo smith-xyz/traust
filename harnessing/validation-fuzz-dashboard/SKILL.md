@@ -107,15 +107,15 @@ If `summary` was requested, also print the verdict-by-severity table.
 | `Live-validation-fuzz-dashboard.html` | Self-contained dashboard: hero (confirmed-exploitable), KPI tiles, verdict-by-severity stacked bars, coverage meter, top-targets bars, fuzz pattern hit-rates, confirmed fuzz-bug and confirmed-Critical tables. |
 | `Live-validation-fuzz-dashboard.md` | Markdown one-pager with the same numbers — headline, verdict×severity table, top targets, fuzz hit-rates/bugs, confirmed-Critical list. Paste-ready for docs or Slack. |
 
-Both outputs embed the standard population block (python3 -m traust.cli corpus) for
-cross-dashboard reconciliation.
+*Retired:* the standard population block. It read the corpus config, which the
+engine no longer loads, so it was always omitted.
 
 The script is idempotent and read-only over its inputs — re-run it whenever new
 validation reports land or the fuzz summary changes.
 
 ## Trends
 
-Each run appends `confirmed_exploitable` / `refuted` / `checks_attempted` /
+*Retired:* the run no longer appends `confirmed_exploitable` / `refuted` / `checks_attempted` /
 `chains_confirmed` / `fuzz_bugs` (source `validation-fuzz`) to the central
-metrics ledger (python3 -m traust.cli metrics history, no-op when unchanged) and injects
-a trend-vs-previous banner into both outputs.
+metrics ledger or injects a trend-vs-previous banner (the metrics history is retired; see
+[`traust-metrics`](../traust-metrics/SKILL.md)).
