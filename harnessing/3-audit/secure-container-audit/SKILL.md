@@ -1,6 +1,6 @@
 ---
 name: secure-container-audit
-description: Use when the user asks to perform a security audit, vulnerability scan, SBOM analysis, or supply-chain assessment of a container image (registry reference, payload image, or batch of images) using skopeo, syft, and grype — covering image configuration, known CVEs in shipped packages, signature/provenance posture, and drift between the image contents and its source repository.
+description: Use when the user asks to perform a security audit, vulnerability scan, SBOM analysis, or supply-chain assessment of a container image (registry reference, payload image, or batch of images) using skopeo, syft, and grype — covering image configuration, known CVEs in shipped packages, signature/provenance posture, and drift between the image contents and its source repository. Authors canonical remediation sizes or explicit unknowns, independent blocking, and explicit roadmap priorities through Core's report record door.
 metadata:
   harness.tier: "primary"
 allowed-tools:
@@ -564,6 +564,13 @@ Example: `CONSOLE_RHEL9-3a7f9c1-004`. This satisfies the existing schema regex `
 
 **The structure tables live in one place: [`docs/report-structure.md`](../../../docs/report-structure.md).** Read it before writing the report; this skill's profile deltas are the `container` section there. Do not restate the tables here.
 
+Follow the shared
+[Remediation authoring](../../../docs/report-structure.md#remediation-authoring)
+rules for findings and roadmap items. Scanner/advisory severity, fixed-in
+versions, source drift, or an upstream dependency do not establish a size
+or roadmap priority. Preserve unknown size and omit unknown blocking;
+author each required roadmap priority explicitly.
+
 Key profile obligations for this skill:
 
 - `metadata.audit_profile: "container"`.
@@ -589,7 +596,10 @@ python3 -m traust.cli reporting record <path-to-report.json> --kind container \
   --repo-url <vcs-url> --sha <vcs-ref>   # when Phase 1's labels declare the source
 ```
 
-Do not begin the next image until the current report passes.
+Do not begin the next image until the current report passes validation
+and Core accepts its record, including the new-report remediation fields.
+Compatibility validation and rendering alone are not publication; do not
+rewrite historical reports or stored runs to satisfy new-authorship rules.
 
 ### Disposition Flow (after the audit)
 

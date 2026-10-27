@@ -1,6 +1,6 @@
 ---
 name: secure-code-audit
-description: Use when the user asks to perform a security audit, security review, vulnerability assessment, or code analysis of a GitHub repository, operator, or batch of repositories using OWASP ASVS, OWASP Kubernetes Top 10, CIS Kubernetes Benchmark, DISA STIG, SLSA, OpenSSF Scorecard, SEI CERT coding standards (Java, C/C++), or PEACH tenant-isolation frameworks.
+description: Use when the user asks to perform a security audit, security review, vulnerability assessment, or code analysis of a GitHub repository, operator, or batch of repositories using OWASP ASVS, OWASP Kubernetes Top 10, CIS Kubernetes Benchmark, DISA STIG, SLSA, OpenSSF Scorecard, SEI CERT coding standards (Java, C/C++), or PEACH tenant-isolation frameworks. Authors canonical remediation sizes or explicit unknowns, independently evidenced blocking, and explicit roadmap priorities for Core-recorded reports.
 metadata:
   harness.tier: "primary"
 allowed-tools:
@@ -1505,6 +1505,13 @@ top-level keys, the finding object fields (including the script-computed
 (`contracts/schemas/report.schema.json`) remains the authoritative source for types
 and constraints. Do not restate the tables here — duplicated copies drift.
 
+For every finding and roadmap item, follow the shared
+[Remediation authoring](../../../docs/report-structure.md#remediation-authoring)
+rules, not just the PQC tagging pass. Unknown size stays unknown; roadmap
+priority requires an explicit authoring decision, and unknown external
+blocking stays absent. Reference tables and earlier reports do not supply
+missing size or priority semantics.
+
 Key profile obligations for this skill:
 - Set `metadata.audit_profile: "code"`.
 - Always emit `peach_isolation_review` (`applicable: false` + rationale for single-tenant).
@@ -1660,6 +1667,10 @@ python3 -m traust.cli reporting record <path-to-report.json> --kind secure_code 
 It records a secure-code assessment of that commit with the report as its
 artifact (schema-checked; the same report again is the same run, by
 `metadata.date`); `traust assessments coverage` reads the gaps it states.
+New-report remediation fields must also pass Core's scoped admission
+checks at this door; compatibility validation and rendering are not a
+substitute. Preserve historical reports and stored-run replay rather than
+rewriting them to satisfy new-authorship rules.
 (Legacy gap: traust-core doesn't yet enter the report's findings as
 findings.)
 

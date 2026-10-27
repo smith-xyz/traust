@@ -486,7 +486,7 @@ with none unexplained. `traust-engine` is installed with traust; every command
 takes the same three paths:
 
 ```bash
-E="--core $TRAUST_CONFIG_HOME/core.yaml --pack packs/security/assets.yaml --pin config/external-tools.yaml --feeds config/feeds.yaml"
+E="--core $TRAUST_CONFIG_HOME/core.yaml --pack packs/security/assets.yaml --pin config/external-tools.yaml --feeds config/feeds.yaml --models $TRAUST_CONFIG_HOME/model-registry.yaml"
 
 # each cron job, wrapped: its run becomes an order the engine counts
 traust-engine record $E feeds_cache -- traust feeds fetch --feed all
@@ -523,6 +523,18 @@ assessments prepare --diff`; a refused diff skips it, said on stderr. Its
 outcome is the session's exit. Pass `--feeds config/feeds.yaml` to every
 `traust-engine` command so core knows the pack's feeds when a run reports one
 degraded.
+
+The session's measured usage (Claude Code's JSON result, per model) rides on its
+JobResult, and completing the order records it as the order's spend in the same
+transaction, in the order's lane, priced by the registry `--models` names; usage it
+can't price (no `--models`, or a model the registry doesn't list) still completes
+the order and is counted under `spend-unpriced` in its run manifest. Sessions run
+with their own Claude config dir, `<config home>/claude-runner` (log in there once
+with `CLAUDE_CONFIG_DIR=<it> claude`, or set `ANTHROPIC_API_KEY`), so their
+transcripts stay out of `~/.claude/projects` and `traust metrics collect-spend`
+(workstation sessions) never counts them twice. `traust metrics lane-costs --days N`
+prints each lane's median settled cost per order: the measure for its
+`estimate_usd`.
 
 ## Standing weekly drain — orchestrator contract
 
