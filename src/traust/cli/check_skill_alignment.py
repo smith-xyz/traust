@@ -500,10 +500,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
     ): "P1-W4 anchor queue — verify invocation shapes, then anchor",
     (
         "A14",
-        "harnessing/fleet-fix/SKILL.md",
-    ): "P1-W4 anchor queue — verify invocation shapes, then anchor",
-    (
-        "A14",
         "harnessing/impact-analysis/SKILL.md",
     ): "P1-W4 anchor queue — verify invocation shapes, then anchor",
     (

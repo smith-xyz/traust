@@ -294,7 +294,7 @@ Use when the user asks to write, scaffold, run, or extend a fuzz harness for a p
 
 ## fleet-fix
 
-Use when the user wants to remediate a SYSTEMIC pattern (one weakness class × N repos — an insecure-patterns CWE entry or a PROGRESS.md rollup like the Konflux mutable-pipelineRef) as one campaign instead of per-finding fixes — "fix this pattern everywhere", "fleet fix", "pin pipelineRefs across the fleet", "batch-remediate CWE-X". Authors one reviewed transform spec with golden tests, applies it across every affected repo via apply_fleet_fix.py (diffs only), and only after human batch approval opens MRs/PRs through the remediate-finding fork flow; merge events flow back through track-findings for pattern burndown.
+Use when the user wants to remediate a SYSTEMIC pattern (one weakness class × N repos — an insecure-patterns CWE entry or a PROGRESS.md rollup like the Konflux mutable-pipelineRef) as one campaign instead of per-finding fixes — "fix this pattern everywhere", "fleet fix", "pin pipelineRefs across the fleet", "batch-remediate CWE-X". Authors one reviewed transform spec with golden tests, applies it across every affected repo via approved fleet-fix run orders (diffs only), and only after human batch approval opens MRs/PRs through the remediate-finding fork flow; merge events flow back through track-findings for pattern burndown.
 
 - **Stage:** ⑦ Remediation
 - **Tier:** `primary`

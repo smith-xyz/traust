@@ -26,8 +26,14 @@ REMEDIATION: dict[str, object] = {
         "property_evidence_",
     ),
     "record": passthrough_op("remediation", "Record a validated remediation report.", "record"),
-    "fleet-apply": passthrough_op(
-        "remediation", "Apply a recorded fleet-fix spec to one repository.", "fleet_apply"
+    "fleet-submit": passthrough_op(
+        "remediation", "A fleet fix's run orders, held for approval.", "fleet_submit"
+    ),
+    "fleet-approve": passthrough_op(
+        "remediation", "Approve fleet-fix run orders (a verified person).", "fleet_approve"
+    ),
+    "fleet-claim": passthrough_op(
+        "remediation", "Apply the next approved fleet-fix order (diff only).", "fleet_claim"
     ),
     "fleet-record": passthrough_op(
         "remediation", "Record a fleet-fix spec once its goldens pass.", "fleet_record"
