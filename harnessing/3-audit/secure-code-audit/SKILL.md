@@ -1,6 +1,6 @@
 ---
 name: secure-code-audit
-description: Use when the user asks to perform a security audit, security review, vulnerability assessment, or code analysis of a GitHub repository, operator, or batch of repositories using OWASP ASVS, OWASP Kubernetes Top 10, CIS Kubernetes Benchmark, DISA STIG, SLSA, OpenSSF Scorecard, SEI CERT coding standards (Java, C/C++), or PEACH tenant-isolation frameworks. Authors canonical remediation sizes or explicit unknowns, independently evidenced blocking, and explicit roadmap priorities for Core-recorded reports.
+description: Use when the user asks to perform a security audit, security review, vulnerability assessment, or code analysis of a GitHub repository, operator, or batch of repositories using OWASP ASVS, OWASP Kubernetes Top 10, CIS Kubernetes Benchmark, DISA STIG, SLSA, OpenSSF Scorecard, SEI CERT coding standards (Java, C/C++), or PEACH tenant-isolation frameworks. Authors canonical remediation sizes or explicit unknowns, independently evidenced blocking, and explicit roadmap priorities for Core-recorded reports. Keeps authored finding kind separate from validity and execution proof.
 metadata:
   harness.tier: "primary"
 allowed-tools:
@@ -1388,8 +1388,9 @@ Rules of the pass:
   signatures, DES/RC4) are ordinary findings today — severity per CVSS as
   usual, plus the `classically-broken` tag. Everything else PQC-tagged is
   **not a vulnerability**: a 2035-clock RSA key exchange is `severity:
-  informational`, `validation_status: hardening` unless some *other*
-  defect applies. Never inflate severity because of the quantum timeline.
+  informational`, `kind: weakness` unless some *other* defect applies.
+  Kind does not establish validity or execution evidence. Never emit
+  `validation_status: hardening` or inflate severity because of the quantum timeline.
 - A TLS config pinning groups without an ML-KEM option is
   `pqc-blocker-config` + `insecure-workload-config` or `cryptography`
   category — file it; these are the cheapest fleet-wide fixes.

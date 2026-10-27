@@ -15,6 +15,11 @@ All notable changes to Traust are documented here.
   `docs/external-dependencies.md`); an install without it reports Express as
   a coverage gap instead of listing its routes. Pins traust-core development
   `92a2655`.
+
+- Preserve explicitly authored finding kind through Core's report intake, without
+  inventing validity or execution proof. PQC hardening instructions now emit
+  `kind: weakness`, not a deprecated hardening validity label; existing findings,
+  historical report bytes and replay identities remain unchanged.
 - **OWASP LLM categories are structured again.** `llm-application-review.md`
   records a finding's OWASP LLM Top 10 category in `owasp_llm_references`
   (for example `["LLM06"]`) instead of in the description; the check number

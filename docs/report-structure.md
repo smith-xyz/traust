@@ -40,6 +40,7 @@ projections.
 | `id` | Yes | Globally-unique **scan-scoped** ID `{REPO_SLUG}-{SHORTSHA}-{NNN}`. Provenance to an exact commit; unique across the corpus. Never reuse across scans. |
 | `fingerprint` | No (script-set) | **Cross-scan identity**: `sha256(canonical repo URL \| sorted lineless location paths \| primary CWE)`. Computed by python3 -m traust.cli corpus finding-identity (`fingerprint`/`backfill`) — never authored by the model, and the only implementation: consumers read this stamp and fail closed when it is absent. Correlates the same vulnerability across re-scans; the `rebaseline` command maps a superseded report's IDs to their successors via layer `metadata.finding_aliases`. A change to the recipe is a change to `ALGO_VERSION` paired with a re-stamp migration, never a silent regeneration. |
 | `title` | Yes | Short description (≥5 chars). |
+| `kind` | No | Explicit finding classification from the installed [finding-kind vocabulary](https://github.com/traust-security/traust-contracts/blob/development/enums/v1/finding-kind.json). Use it to distinguish a vulnerability from a defense-in-depth weakness; omission remains unknown. Kind is not a validity answer or evidence grade. Core intake preserves it for a new finding without reclassifying an existing one. |
 | `severity` | Yes | `critical` \| `high` \| `medium` \| `low` \| `informational`. |
 | `cwes` | Yes | ≥1 `CWE-NNN` identifiers; the first is the primary (feeds the fingerprint). |
 | `locations` | Yes | ≥1 objects with required `path`, optional `lines`, `description`. |
