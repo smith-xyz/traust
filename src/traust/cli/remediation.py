@@ -11,7 +11,9 @@ assemble             a work item's remediation report from its worktree (not rec
 property-evidence    a property test's base-versus-patched exit codes as one evidence item
 record               a validated remediation report on its work item
 candidates           a product's confirmed, open findings no work item covers, by repository
-fleet-apply          a recorded fleet-fix spec on one repository under its leased run order (diff)
+fleet-submit         a recorded fleet-fix spec's run orders, one per target, held for approval
+fleet-approve        fleet-fix run orders, by a verified person (your `traust auth` login)
+fleet-claim          the next approved fleet-fix order: its spec applied to the target (diff only)
 fleet-record         a fleet-fix transform spec, once its golden tests pass
 fleet-targets        the repositories a fleet fix targets, widest product reach first, with owners
 verify-sweep         which repositories are worth re-verifying, by tier, and why the rest are not
@@ -25,9 +27,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import socket
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +45,7 @@ from traust_core.v1.models.artifacts import (
 )
 from traust_core.v1.models.common import Provenance, every_item
 from traust_core.v1.models.inventory import Repository, RepositoryFilter
+from traust_core.v1.models.operations import WorkerId
 from traust_core.v1.models.remediation import (
     Check,
     EvidenceItem,
@@ -58,7 +63,7 @@ from traust.cli._doors import add_branch_arg, parser, products, register_commit,
 from traust.cli._doors import package_id as find_package_id
 from traust.cli.findings import _repository
 from traust.cli.impact import harness_version
-from traust.context import load
+from traust.context import load, load_caller
 
 
 def _parser(op: str, about: str) -> argparse.ArgumentParser:
@@ -301,19 +306,60 @@ def fleet_record(argv: list[str] | None = None) -> int:
     return run(call)
 
 
-def fleet_apply(argv: list[str] | None = None) -> int:
-    ap = _parser("fleet-apply", "Apply a recorded fleet-fix spec to one repository (diff only).")
+def fleet_submit(argv: list[str] | None = None) -> int:
+    ap = _parser("fleet-submit", "Submit a fleet fix's run orders, held for a person's approval.")
     ap.add_argument("fleet_fix_id", type=uuid.UUID, help="the id fleet-record printed")
-    ap.add_argument("--repo-url", required=True, help="the target repository")
-    ap.add_argument("--order", type=uuid.UUID, required=True, help="its leased run order")
-    ap.add_argument("-o", "--out", type=Path, help="write the JSON here instead of stdout")
+    targets = ap.add_mutually_exclusive_group(required=True)
+    targets.add_argument("--fleet", type=Path, help="fleet-targets' JSON")
+    targets.add_argument("--repo-url", action="append", help="a target repository, repeatable")
     args = ap.parse_args(argv)
 
-    def call() -> str | None:
+    def call() -> list:
         core = load(args.config_home)
-        repo = _repository(core, args.repo_url)
-        found = core.services().remediation.apply_fleet_fix(args.fleet_fix_id, repo.id, args.order)  # type: ignore[arg-type]
-        return _emit(found.model_dump_json(indent=2), args.out)
+        if args.fleet is not None:
+            try:
+                ids = [uuid.UUID(t["repository_id"]) for t in json.loads(args.fleet.read_bytes())]
+            except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+                raise ValidationError(f"{args.fleet}: not fleet-targets JSON: {e}") from e
+        else:
+            ids = [_repository(core, u).id for u in args.repo_url]
+        orders = core.services().remediation.submit_fleet_fix(
+            args.fleet_fix_id, ids, load_caller(core)
+        )
+        return [o.model_dump(mode="json") for o in orders]
+
+    return run(call)
+
+
+def fleet_approve(argv: list[str] | None = None) -> int:
+    ap = _parser("fleet-approve", "Approve fleet-fix run orders as yourself (a verified person).")
+    ap.add_argument("order", type=uuid.UUID, nargs="+", help="fleet-submit's order ids")
+    args = ap.parse_args(argv)
+
+    def call() -> list:
+        core = load(args.config_home)
+        principal = load_caller(core)
+        remediation_ = core.services().remediation
+        return [
+            remediation_.approve_fleet_fix(o, principal).model_dump(mode="json") for o in args.order
+        ]
+
+    return run(call)
+
+
+def fleet_claim(argv: list[str] | None = None) -> int:
+    ap = _parser("fleet-claim", "Apply the next approved fleet-fix order's spec (diff only).")
+    ap.add_argument("--worker", help="this runner's id (default: host:pid)")
+    ap.add_argument("--lease-minutes", type=int, default=30, help="how long the order is held")
+    ap.add_argument("-o", "--out", type=Path, help="write the JSON here instead of stdout")
+    args = ap.parse_args(argv)
+    worker = WorkerId(args.worker or f"{socket.gethostname()}:{os.getpid()}")
+
+    def call() -> str | None:
+        remediation_ = load(args.config_home).services().remediation
+        found = remediation_.claim_fleet_fix(worker, timedelta(minutes=args.lease_minutes))
+        doc = {"claimed": None} if found is None else found.model_dump(mode="json")
+        return _emit(json.dumps(doc, indent=2), args.out)
 
     return run(call)
 

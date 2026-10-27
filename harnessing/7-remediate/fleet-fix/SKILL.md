@@ -1,6 +1,6 @@
 ---
 name: fleet-fix
-description: Use when the user wants to remediate a SYSTEMIC pattern (one weakness class × N repos — an insecure-patterns CWE entry or a PROGRESS.md rollup like the Konflux mutable-pipelineRef) as one campaign instead of per-finding fixes — "fix this pattern everywhere", "fleet fix", "pin pipelineRefs across the fleet", "batch-remediate CWE-X". Authors one reviewed transform spec with golden tests, applies it across every affected repo via apply_fleet_fix.py (diffs only), and only after human batch approval opens MRs/PRs through the remediate-finding fork flow; merge events flow back through track-findings for pattern burndown.
+description: Use when the user wants to remediate a SYSTEMIC pattern (one weakness class × N repos — an insecure-patterns CWE entry or a PROGRESS.md rollup like the Konflux mutable-pipelineRef) as one campaign instead of per-finding fixes — "fix this pattern everywhere", "fleet fix", "pin pipelineRefs across the fleet", "batch-remediate CWE-X". Authors one reviewed transform spec with golden tests, applies it across every affected repo via approved fleet-fix run orders (diffs only), and only after human batch approval opens MRs/PRs through the remediate-finding fork flow; merge events flow back through track-findings for pattern burndown.
 argument-hint: "[<spec-id>|<pattern>] [apply|review|open-mrs] [--repos ...]"
 metadata:
   harness.tier: "primary"
@@ -8,12 +8,13 @@ allowed-tools:
   # per-script grants only — this skill clones and mutates N target
   # repos; an unscoped interpreter under injected content is fleet-wide
   # code execution (audit D5, plan P2.11; A11 un-grandfathered)
-  - Bash(python3 *harnessing/7-remediate/fleet-fix/scripts/apply_fleet_fix.py:*)
   - Bash(python3 -m traust.cli remediation fleet-targets:*)
-  - Bash(python3 -m traust.cli remediation fleet-apply:*)
+  - Bash(python3 -m traust.cli remediation fleet-submit:*)
+  - Bash(python3 -m traust.cli remediation fleet-claim:*)
   - Bash(python3 -m traust.cli remediation fleet-record:*)
   - Bash(bash *run_checks.sh:*)
   - Bash(git clone:*)
+  - Bash(git -C /tmp/fleet-fix/* apply:*)
   - Bash(git ls-remote:*)
   - Bash(ls:*)
   - Bash(jq:*)
@@ -39,13 +40,12 @@ count drops fastest per engineering hour here.
 
 1. **The spec is the change.** Every transform lives as a schema-validated
    spec (`contracts/schemas/fleet-fix.schema.json`) in `specs/`, carrying its own
-   golden tests. `apply_fleet_fix.py` refuses to touch any repo while a
-   golden test fails (and `traust remediation fleet-record` refuses to
-   record the spec).
+   golden tests. `traust remediation fleet-record` refuses to record the
+   spec while a golden test fails, and only a recorded spec is applied.
 2. **Diffs before forks, forks before MRs, humans before both.** The
-   applier only modifies working clones and emits `<repo>-<id>.diff` +
-   result JSON. Opening MRs is a separate stage that requires the user's
-   explicit batch approval of the reviewed diffs — never auto-merge, never
+   applier only modifies a throwaway clone and emits the diff in its
+   result JSON, and only under a run order a person approved. Opening MRs
+   is a separate stage that requires the user's explicit batch approval of the reviewed diffs — never auto-merge, never
    MR-on-apply.
 3. **Allowlist scope.** The matcher touches only its `file_glob`; guards
    (`max_files_changed`, clean-tree) revert anything that oversteps.
@@ -108,25 +108,29 @@ spec with `python3 -m traust.cli remediation fleet-record specs/<id>.yaml`
 
 ### 3. Apply across the fleet (diffs only)
 
-For each repo (workflow batch for large fleets):
+Submit one run order per repo of the fleet; each waits for a person:
 
 ```bash
-GIT_ALLOW_PROTOCOL=https git clone -- <repo> /tmp/fleet-fix/<id>/<repo> && \
-python3 harnessing/7-remediate/fleet-fix/scripts/apply_fleet_fix.py \
-    --spec harnessing/7-remediate/fleet-fix/specs/<id>.yaml \
-    --repo /tmp/fleet-fix/<id>/<repo> \
-    --out-dir /tmp/fleet-fix/<id>/out
+python3 -m traust.cli remediation fleet-submit <fleet-fix-id> \
+    --fleet /tmp/fleet-fix/<id>/fleet.json
 ```
 
-Interactive apply stays here until traust has an ops CLI to
-submit/approve/claim a fleet-fix run order — NEED(ops CLI). Under a
-leased fleet-fix run order, apply the recorded spec through the door
-instead (a fresh clone of the repo's default-branch head, diff only):
-`python3 -m traust.cli remediation fleet-apply <fleet-fix-id> --repo-url <repo> --order <order-id> -o /tmp/fleet-fix/<id>/out/<repo>.json`.
+The user approves the orders in their own terminal, as themselves
+(`traust remediation fleet-approve <order-id>...`, their `traust auth`
+login; a verified person, never the agent). Then for each repo (workflow
+batch for large fleets), until it prints `{"claimed": null}` (a fresh
+clone of the repo's default-branch head, diff only):
+
+```bash
+python3 -m traust.cli remediation fleet-claim -o /tmp/fleet-fix/<id>/out/<n>.json
+```
+
 Collect the per-repo results: applied / no-match / unresolved / guard
 refusals. Where the target repo has usable checks, run
-`harnessing/7-remediate/remediate-finding/run_checks.sh` against the modified clone
-and record outcomes.
+`harnessing/7-remediate/remediate-finding/run_checks.sh` against a fresh
+clone with the result's `patch.diff` applied
+(`GIT_ALLOW_PROTOCOL=https git clone -- <repo> /tmp/fleet-fix/<id>/<repo>`,
+then `git -C /tmp/fleet-fix/<id>/<repo> apply`) and record outcomes.
 
 ### 4. Human review of the batch
 
@@ -153,14 +157,14 @@ cadence: no-match on every repo = pattern extinct.
 | Artifact | Purpose |
 |---|---|
 | `specs/<id>.yaml` | The reviewed transform (goldens included) |
-| `<repo>-<id>.diff` / `-result.json` per repo | Reviewable change + application record |
+| `fleet-claim` result JSON per repo (its `patch.diff`) | Reviewable change + application record |
 | Campaign summary (applied / no-match / unresolved / MRs) | The batch-approval packet and burndown record |
 
 ## Failure modes
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `GOLDEN TEST FAILED` | spec drifted from its own expectations | fix the spec, never the applier |
-| exit 2 `working tree is not clean` | reused clone | fresh clone per application |
+| `golden test failed` (fleet-record) | spec drifted from its own expectations | fix the spec, never the applier |
+| exit 2 `no human approval` / `verified human` | the order was not approved by a person | the user runs `fleet-approve` themselves |
 | `unresolved: no URL in window` | file shape differs from matcher assumptions | extend the spec (with a new golden) — don't hand-edit the repo |
 | many no-match results | pattern already remediated there | that's burndown, record it |
