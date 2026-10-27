@@ -1,5 +1,5 @@
 """``traust session run``: a skill session for a pack order, started headless. The model is the
-role's (`traust registry models resolve`); the session's last line is the JobResult, whose
+role's (the model registry's `resolve_role`); the session's last line is the JobResult, whose
 outcome is the exit code.
 
 A diff scan whose order carries the router's threat-model PR stamp (`--rule`) then runs
@@ -21,12 +21,13 @@ import sys
 import tempfile
 from pathlib import Path
 
-from traust_core.v1.errors import ServiceError, ValidationError
+from traust_core.v1.errors import NotFoundError, ServiceError, ValidationError
 from traust_core.v1.models.assessment import DiffRefused
 from traust_core.v1.models.operations import JobResult, OrderReason
 
 from traust.cli._doors import answer, parser
 from traust.cli.assessments import REFUSED
+from traust.context import MODEL_REGISTRY, load
 from traust.ops.router import THREAT_MODEL_PR
 from traust.paths import HARNESS_ROOT, skill_dir
 
@@ -44,12 +45,11 @@ def _traust(*argv: str) -> subprocess.CompletedProcess[str]:
 
 
 def resolve_model(role: str) -> str:
-    """The role's model, from the model registry through its one door."""
-    done = _traust("registry", "models", "resolve", role)
-    model = done.stdout.strip().splitlines()[-1:] if done.returncode == 0 else []
-    if not model:
-        raise ValidationError(f"role {role!r}: no model in the registry ({done.stderr.strip()})")
-    return model[0]
+    """The role's model, from the model registry."""
+    catalog = load().model_catalog
+    if catalog is None:
+        raise ValidationError(f"role {role!r}: no model registry ({MODEL_REGISTRY})")
+    return catalog.resolve_role(role)
 
 
 def diff_anchor(url: str, clone: Path) -> str:
@@ -121,7 +121,7 @@ def run(argv: list[str] | None = None) -> int:
         skill_dir(args.skill)
         model = resolve_model(args.role)
         pr_model = resolve_model(THREAT_MODEL_ROLE) if stamped else None
-    except (ValidationError, FileNotFoundError, KeyError) as e:
+    except (ValidationError, NotFoundError, FileNotFoundError, KeyError) as e:
         print(f"run {args.run_id}: {OrderReason.BAD_REQUEST}: {e}", file=sys.stderr)
         return answer(JobResult.failed(OrderReason.BAD_REQUEST))
     mode = [args.mode] if args.mode else []

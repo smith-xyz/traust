@@ -35,13 +35,7 @@
   "src/traust/cli/groups/adapters.py": {
     "engine-internal": 3
   },
-  "src/traust/cli/groups/metrics.py": {
-    "engine-internal": 1
-  },
   "src/traust/cli/groups/portfolio.py": {
-    "engine-internal": 1
-  },
-  "src/traust/cli/groups/registry.py": {
     "engine-internal": 1
   },
   "src/traust/cli/groups/reporting.py": {

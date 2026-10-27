@@ -13,6 +13,7 @@ from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
@@ -271,6 +272,7 @@ def test_a_threat_model_pr_stamp_reaches_the_diff_scans_session(
 
     processes = Processes()
     monkeypatch.setattr(session.subprocess, "run", processes)
+    monkeypatch.setattr(session, "load", lambda: SimpleNamespace(model_catalog=processes))
     with contextlib.redirect_stdout(io.StringIO()):
         assert session.run(scan[5:]) == 0
     prompts = [c[0][-1] for c in processes.agent_calls()]
