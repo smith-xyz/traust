@@ -103,9 +103,14 @@ repository, the critical and high findings).
 
 ### Step 3a — Extract the Hardening Backlog
 
-Split hardening findings out of the vulnerability counts (harness ≥ 0.27.0
-taxonomy — see `docs/disposition-ledger.md` §7). (`traust dashboard team-report`
-does: findings whose recorded validity is hardening.)
+Split confirmed weakness findings out of the vulnerability counts
+(see `docs/disposition-ledger.md` §7). The recorded shape is
+`validity: confirmed, kind: weakness`, not a new hardening validity.
+Historical hardening decisions remain readable as backlog. Unknown kind
+stays unknown; it is not a vulnerability default, and a kind alone never
+confirms an undetermined or manual-review item. Consume the door's
+disjoint backlog and vulnerability totals, not all confirmed findings as
+exploitable exposure.
 
 Collect per component: count, categories, titles + locations, and the
 owner hint. These are **accurate defense-in-depth/benchmark gaps with no
