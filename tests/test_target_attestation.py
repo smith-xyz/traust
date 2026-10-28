@@ -108,11 +108,17 @@ class TestValidationBenchmark(unittest.TestCase):
     """P7: scorer semantics — flags count as misses; floors bite."""
 
     def _score(self, verdict, flag=None, est=None, variant="vuln"):
-        # PENDING(decision: sweep stages — retire or port)
-        from traust_engine.sweep.benchmark import _score_variant, load_expected
+        import json
+
+        from traust_core.v1.models.validation_benchmark import (
+            BenchmarkScore,
+            BenchmarkVariant,
+            ValidationBenchmark,
+            ValidationRun,
+        )
 
         bench = skill_dir("validate-findings") / "benchmark"
-        exp = load_expected(bench)
+        exp = json.loads((bench / "expected.json").read_text(encoding="utf-8"))
         vfs = []
         for fx in exp["fixtures"]:
             vf = {"source_id": f"bench/{fx['id']}", "verdict": verdict}
@@ -124,7 +130,12 @@ class TestValidationBenchmark(unittest.TestCase):
                     "demonstrated_score_estimate": fx["claim"]["cvss"] + est,
                 }
             vfs.append(vf)
-        return _score_variant(exp, {"validated_findings": vfs}, variant)
+        score = BenchmarkScore.of(
+            ValidationBenchmark.model_validate(exp),
+            ValidationRun.model_validate({"validated_findings": vfs}),
+            BenchmarkVariant(variant),
+        )
+        return score.model_dump(mode="json")
 
     def test_all_confirmed_full_recall(self):
         r = self._score("confirmed")

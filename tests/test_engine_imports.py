@@ -15,7 +15,6 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("traust_engine", "traust_contracts", "traust_ledger")
 BASELINE = {
     "src/traust/cli/groups/_registry.py": 1,  # load_engine, for the decision below
-    "src/traust/cli/groups/sweep.py": 5,  # PENDING(decision: sweep stages — retire or port)
 }
 
 

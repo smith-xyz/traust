@@ -139,7 +139,7 @@ Every executed step is logged with the scope-check outcome. A `blocked_by_scope`
 (from python3 -m traust.cli sweep benchmark plan) is a first-class input:
 validate its claims against the deployed fixtures exactly like campaign
 findings, then score the report with
-`run_validation_benchmark.py score --variant vuln|safe`. Benchmark runs
+`python3 -m traust.cli sweep benchmark score --variant vuln|safe`. Benchmark runs
 live in the harness-QA tree and never touch campaign metrics.
 
 ## Phase 0b — Target attestation (fail-closed, P2)
@@ -500,7 +500,7 @@ python harnessing/5-validate/validate-findings/credential_liveness.py \
 The [benchmark expectations](benchmark/expected.json) pair the safe and
 vulnerable manifests in [benchmark/fixtures/](benchmark/fixtures/).
 `tests/test_target_attestation.py` loads these expectations through
-`traust_engine.sweep.benchmark.load_expected` to verify scorer semantics.
+traust-core's `models.validation_benchmark` scorer to verify scorer semantics.
 Consult the benchmark assets when maintaining the scorer; live execution
 still requires the scope and review gates below.
 

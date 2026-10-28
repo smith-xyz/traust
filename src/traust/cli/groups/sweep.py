@@ -2,37 +2,58 @@
 
 from __future__ import annotations
 
-import shutil
+import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
-import yaml
+from traust_core.v1.context import Context, resolve_config_home
+from traust_core.v1.context.tool_reports import opengrep_report
+from traust_core.v1.context.tools import load_rule_allowlist
 from traust_core.v1.errors import (
     DeploymentConfigMissing,
     NotFoundError,
-    ServiceError,
+    TraustError,
     ValidationError,
 )
-from traust_core.v1.models.detection_quality import RegressionPair, RegressionPairFilter
+from traust_core.v1.models.common import ToolRequest
+from traust_core.v1.models.detection_quality import RegressionPairFilter
+from traust_core.v1.models.rule_mining import (
+    DEFAULT_DRAFT_LIMIT,
+    DEFAULT_SWEEP_LIMIT,
+    Allowlist,
+    RuleLane,
+    RuleLaneRequest,
+    RuleSweepRequest,
+    StageStatus,
+    SweepRepo,
+)
+from traust_core.v1.models.validation_benchmark import (
+    BenchmarkVariant,
+    ValidationBenchmark,
+    ValidationRun,
+)
 
 from traust.cli._doors import run
-from traust.cli.groups._registry import OpSpec, load_engine, passthrough_op
-from traust.context import load, rule_drafts_dir
+from traust.cli.groups._registry import OpSpec, passthrough_op
+from traust.context import (
+    analysis_results_dir,
+    load,
+    progress_tracker_dir,
+    rule_drafts_dir,
+)
+
+SWEEPS_REL = Path("scan-testing") / "sweeps"
+VALIDATION_BENCHMARK_REL = Path("scan-testing") / "validation-benchmark"
+RULE_PACK_ALLOWLIST = "rule-pack-allowlist.yaml"
 
 
-def _add_common_sweep_args(ap) -> None:
-    ap.add_argument(
-        "--sweeps-root",
-        type=Path,
-        default=None,
-        help="default <analysis-results>/scan-testing/sweeps",
-    )
-    ap.add_argument("--analysis-results", default=None)
+def _add_rule_args(ap) -> None:
     ap.add_argument(
         "--pack",
         type=Path,
         default=None,
-        help="rule pack dir (default: locations.opengrep_rules, env, bundled)",
+        help="rule pack dir (default: locations.opengrep_rules, else the security pack's)",
     )
     ap.add_argument(
         "--drafts-dir",
@@ -45,119 +66,85 @@ def _add_common_sweep_args(ap) -> None:
     )
 
 
-def _analysis_results(engine, arg: str | None) -> Path:
-    if arg:
-        return Path(arg)
-    return engine.sweep._analysis_results()
+def _core(args, *, drafts: bool = False) -> Context:
+    """traust-core on the rule pack and drafts dir the flags name; exit 2 when a stage that
+    stages or resolves drafts has no drafts dir."""
+    core = load(
+        args.config_home,
+        rule_pack=getattr(args, "pack", None),
+        rule_drafts=getattr(args, "drafts_dir", None),
+    )
+    if drafts and core.rule_drafts is None:
+        _required(lambda: rule_drafts_dir(core))
+    return core
 
 
-def _sweeps_root(engine, args) -> Path:
-    # PENDING(decision: sweep stages — retire or port)
-    from traust_engine.locations import SWEEPS_REL
-
-    if args.sweeps_root is not None:
-        return args.sweeps_root
-    return _analysis_results(engine, args.analysis_results) / SWEEPS_REL
-
-
-def _resolve_pack(args, pack: Path | None) -> Path:
-    """``pack``, else the one rule pack every default run loads (``load().rule_pack``)."""
-    if pack is not None:
-        return pack
-    path = load(args.config_home).rule_pack
-    if not path.is_dir():
-        print(
-            "opengrep rule pack required (rule_pack, locations.opengrep_rules, or bundled default)",
-            file=sys.stderr,
-        )
-        raise SystemExit(2)
-    return path
-
-
-def _resolve_drafts_dir(args) -> Path:
-    if args.drafts_dir is not None:
-        return args.drafts_dir
+def _required(location: Callable[[], Path]) -> Path:
+    """A configured location, or exit 2 naming what is unset."""
     try:
-        return rule_drafts_dir(load(args.config_home))
+        return location()
     except DeploymentConfigMissing as e:
         print(str(e), file=sys.stderr)
         raise SystemExit(2) from e
 
 
+def _door(call) -> int:
+    """Run one door; a refusal is one ERROR line and exit 2."""
+    try:
+        return call()
+    except (OSError, ValueError, TraustError) as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 2
+
+
 def add_collect_args(ap) -> None:
-    _add_common_sweep_args(ap)
-    ap.add_argument(
-        "--results-root",
-        type=Path,
-        default=None,
-        help="findings tree (default <analysis-results>/findings)",
-    )
-    ap.add_argument(
-        "--phase0-root",
-        type=Path,
-        default=None,
-        help="Phase-0 artifacts (default <analysis-results>/scan-testing/phase-0)",
-    )
+    _add_rule_args(ap)
     ap.add_argument("--force", action="store_true")
 
 
 def call_collect(args) -> int:
-    engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
-    ops = engine.sweep
-    sweeps_root = _sweeps_root(engine, args)
-    res = ops.collect(
-        results_root=args.results_root,
-        phase0_root=args.phase0_root,
-        sweeps_root=sweeps_root,
-        force=args.force,
-    )
-    if res["skipped"]:
-        print(f"collect: state exists, skipping ({res['state']}) — use --force to re-collect")
-    else:
+    def call() -> int:
+        res = _core(args).services().detection_quality.sweep_collect(force=args.force)
+        if res.skipped or res.stats is None:
+            print(f"collect: state exists, skipping ({res.state}) — use --force to re-collect")
+            return 0
+        st = res.stats
         print(
-            f"collect: {res['confirmed_findings']} confirmed "
-            f"finding(s) ({res['by_source']}); "
-            f"{res['rule_expressible']} rule-expressible across "
-            f"{res['classes']} class(es); "
-            f"{res['not_expressible']} not expressible (reasons "
-            f"recorded) -> {res['state']}"
+            f"collect: {st.confirmed_findings} confirmed finding(s) ({st.by_source}); "
+            f"{st.rule_expressible} rule-expressible across {st.classes} class(es); "
+            f"{st.not_expressible} not expressible (reasons recorded) -> {res.state}"
         )
-    return 0
+        return 0
+
+    return _door(call)
 
 
 def add_draft_args(ap) -> None:
-    _add_common_sweep_args(ap)
+    _add_rule_args(ap)
 
 
 def call_draft(args) -> int:
-    engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
-    ops = engine.sweep
-    pack = _resolve_pack(args, args.pack)
-    drafts_dir = _resolve_drafts_dir(args)
-    sweeps_root = _sweeps_root(engine, args)
-    res = ops.draft(pack, drafts_dir, sweeps_root=sweeps_root)
-    print(
-        f"draft: {len(res['emitted'])} draft(s) staged "
-        f"({', '.join(res['emitted']) or 'none'}); "
-        f"{len(res['skipped'])} class(es) skipped — author "
-        "patterns, calibrate via mine-ledger, then `sweep` runs "
-        "by default"
-    )
-    return 0
+    def call() -> int:
+        res = _core(args, drafts=True).services().detection_quality.sweep_drafts()
+        print(
+            f"draft: {len(res.emitted)} draft(s) staged ({', '.join(res.emitted) or 'none'}); "
+            f"{len(res.skipped)} class(es) skipped — author patterns, calibrate via mine-ledger, "
+            "then `sweep` runs by default"
+        )
+        return 0
+
+    return _door(call)
 
 
 def add_sweep_args(ap) -> None:
-    # PENDING(decision: sweep stages — retire or port)
-    from traust_engine.sweep.engine import DEFAULT_SWEEP_LIMIT
-
-    _add_common_sweep_args(ap)
+    _add_rule_args(ap)
     ap.add_argument("--rule", required=True, help="rule id, yaml path, or draft dir/name")
     ap.add_argument("--limit", type=int, default=DEFAULT_SWEEP_LIMIT)
     ap.add_argument(
         "--repos",
         type=Path,
         default=None,
-        help="JSON [{slug,url}] override for the corpus resolver (url may be a local dir)",
+        help="JSON [{slug,url}] instead of the audited repositories (url may be dir:<path>)",
     )
     ap.add_argument(
         "--work-dir",
@@ -170,54 +157,65 @@ def add_sweep_args(ap) -> None:
 
 
 def call_sweep(args) -> int:
-    engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
-    ops = engine.sweep
-    pack = _resolve_pack(args, args.pack)
-    drafts_dir = _resolve_drafts_dir(args)
-    sweeps_root = _sweeps_root(engine, args)
-    res = ops.sweep(
-        args.rule,
-        pack,
-        drafts_dir,
-        sweeps_root=sweeps_root,
-        repos=args.repos,
-        limit=args.limit,
-        work_dir=args.work_dir,
-        opengrep=args.opengrep,
-        timeout=args.timeout,
-    )
-    print(
-        f"sweep [{res['rule_id']}]: {res['swept']} repo(s) swept, "
-        f"{res['skipped']} resumed/skipped, "
-        f"{res['repo_errors']} errored, {res['hits']} raw hit(s) "
-        f"-> {res['repo_results']}"
-    )
-    return 0
+    def call() -> int:
+        repos = None
+        if args.repos is not None:
+            raw = json.loads(args.repos.read_text(encoding="utf-8"))
+            repos = tuple(SweepRepo.model_validate(r) for r in raw)
+        request = RuleSweepRequest(
+            rule=args.rule,
+            limit=args.limit,
+            repos=repos,
+            work_dir=args.work_dir,
+            binary=args.opengrep,
+            timeout=args.timeout,
+        )
+        res = _core(args, drafts=True).services().detection_quality.sweep_rule(request)
+        print(
+            f"sweep [{res.rule_id}]: {res.swept} repo(s) swept, {res.skipped} resumed/skipped, "
+            f"{res.repo_errors} errored, {res.hits} raw hit(s) -> {res.repo_results}"
+        )
+        return 0
+
+    return _door(call)
 
 
 def add_emit_args(ap) -> None:
-    _add_common_sweep_args(ap)
+    _add_rule_args(ap)
+    ap.add_argument(
+        "--sweeps-root",
+        type=Path,
+        default=None,
+        help="where sweep-candidates.json lands (default <analysis-results>/scan-testing/sweeps)",
+    )
+    ap.add_argument("--analysis-results", type=Path, default=None)
     ap.add_argument("--rule", required=True)
     ap.add_argument("--force", action="store_true")
 
 
 def call_emit(args) -> int:
-    engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
-    ops = engine.sweep
-    pack = _resolve_pack(args, args.pack)
-    drafts_dir = _resolve_drafts_dir(args)
-    sweeps_root = _sweeps_root(engine, args)
-    res = ops.emit(args.rule, pack, drafts_dir, sweeps_root=sweeps_root, force=args.force)
-    if res["skipped"]:
-        print(f"emit: candidates exist, skipping ({res['out']}) — use --force to re-emit")
-    else:
-        print(
-            f"emit: {res['candidates']} candidate(s) from "
-            f"{res['repos_swept']} repo(s) "
-            f"({res['repos_with_hits']} with hits) -> {res['out']} "
-            "(+ sweep-summary.md). Results enter the triage workflow."
+    def call() -> int:
+        core = _core(args, drafts=True)
+        root = args.sweeps_root or (
+            (args.analysis_results or _required(lambda: analysis_results_dir(core))) / SWEEPS_REL
         )
-    return 0
+        res = core.services().detection_quality.emit_sweep(args.rule, force=args.force)
+        out = root / res.rule_id / "sweep-candidates.json"
+        if res.skipped or res.candidates is None or res.summary is None:
+            print(f"emit: candidates exist, skipping ({res.out}) — use --force to re-emit")
+            return 0
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(res.candidates.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        (out.parent / "sweep-summary.md").write_text(res.summary, encoding="utf-8")
+        c = res.candidates
+        print(
+            f"emit: {len(c.candidates)} candidate(s) from {c.repos_swept} repo(s) "
+            f"({c.repos_with_hits} with hits) -> {out} (+ sweep-summary.md). Results enter the "
+            "triage workflow."
+        )
+        return 0
+
+    return _door(call)
 
 
 def add_benchmark_args(ap) -> None:
@@ -225,53 +223,110 @@ def add_benchmark_args(ap) -> None:
         "--benchmark-dir",
         type=Path,
         default=None,
-        help="validate-findings benchmark dir "
-        "(default: locations.analysis_results/.../validation-benchmark)",
+        help="validate-findings benchmark dir: expected.json + fixtures/, and the plan's output "
+        "(default: <analysis_results>/scan-testing/validation-benchmark)",
     )
     sub = ap.add_subparsers(dest="benchmark_cmd", required=True)
     sub.add_parser("plan", help="emit benchmark worklist and deploy commands")
     p = sub.add_parser("check-trigger", help="exit 10 if validation-lane paths changed since ref")
     p.add_argument("--since", required=True, help="git ref of the last benchmarked release")
-    p.add_argument(
-        "--repo-root",
-        type=Path,
-        default=None,
-        help="git repo to diff (default: BENCHMARK_REPO_ROOT or locations.workspace/traust)",
-    )
+    p.add_argument("--repo-root", type=Path, default=None, help="the mono checkout to diff")
     p = sub.add_parser("score", help="score one lane run against expectations")
     p.add_argument("--report", required=True)
-    p.add_argument("--variant", required=True, choices=["vuln", "safe"])
+    p.add_argument("--variant", required=True, choices=[v.value for v in BenchmarkVariant])
     sub.add_parser("scorecard", help="print the current scorecard state")
 
 
-def _benchmark_results_dir(args) -> Path:
-    if args.benchmark_dir:
-        return args.benchmark_dir
-    # PENDING(decision: sweep stages — retire or port)
-    return load_engine(args.config_home).sweep._benchmark_dir()
+def _benchmark(bench: Path) -> ValidationBenchmark:
+    return ValidationBenchmark.model_validate_json(
+        (bench / "expected.json").read_text(encoding="utf-8")
+    )
 
 
 def call_benchmark(args) -> int:
-    # PENDING(decision: sweep stages — retire or port)
-    from traust_engine.sweep import benchmark as bench
-
+    core = load(args.config_home)
+    quality = core.services().detection_quality
     if args.benchmark_cmd == "check-trigger":
-        return bench.cmd_check_trigger(args)
-    results_dir = _benchmark_results_dir(args)
-    return {
-        "plan": bench.cmd_plan,
-        "score": bench.cmd_score,
-        "scorecard": bench.cmd_scorecard,
-    }[args.benchmark_cmd](args, results_dir=results_dir)
+        if args.repo_root is None:
+            raise SystemExit("--repo-root required")
+        return _door(lambda: _check_trigger(quality, args))
+    if args.benchmark_cmd == "scorecard":
+        return _door(lambda: _scorecard(quality))
+    bench = args.benchmark_dir or (
+        _required(lambda: analysis_results_dir(core)) / VALIDATION_BENCHMARK_REL
+    )
+    if args.benchmark_cmd == "plan":
+        return _door(lambda: _plan(quality, bench))
+    return _door(lambda: _score(quality, bench, args))
+
+
+def _plan(quality, bench: Path) -> int:
+    expected = _benchmark(bench)
+    worklist = quality.benchmark_worklist(expected)
+    bench.mkdir(parents=True, exist_ok=True)
+    out = bench / "benchmark-findings.json"
+    out.write_text(worklist.model_dump_json(indent=1) + "\n", encoding="utf-8")
+    print(f"benchmark worklist: {len(worklist.findings)} claims → {out}")
+    print("\nDeploy (vuln variant):")
+    print(f"  oc new-project {expected.namespace} 2>/dev/null || true")
+    for fx in expected.fixtures:
+        print(f"  oc apply -f {bench}/fixtures/{fx.vuln_manifest}")
+    print(f"\nThen: /validate-findings {out} --namespace {expected.namespace}")
+    print("Then: traust sweep benchmark score --report <report> --variant vuln")
+    print("Swap each fixture to its .safe.yaml twin and repeat with --variant safe.")
+    return 0
+
+
+def _check_trigger(quality, args) -> int:
+    trigger = quality.benchmark_trigger(ToolRequest(workspace=args.repo_root), args.since)
+    if trigger.paths:
+        print(
+            f"validation-lane paths changed since {args.since} — benchmark REQUIRED before release:"
+        )
+        for path in trigger.paths:
+            print(f"  {path}")
+        return 10
+    print(f"no validation-lane changes since {args.since} — benchmark not required")
+    return 0
+
+
+def _score(quality, bench: Path, args) -> int:
+    expected = _benchmark(bench)
+    report = ValidationRun.model_validate_json(Path(args.report).read_text(encoding="utf-8"))
+    variant = BenchmarkVariant(args.variant)
+    score = quality.score_benchmark(expected, report, variant, str(args.report))
+    floor = expected.required_floors().floor(variant)
+    print(json.dumps(score.model_dump(mode="json")["rows"], indent=1))
+    severity = (
+        f" · severity_accuracy: {score.severity_accuracy}"
+        if score.severity_accuracy is not None
+        else ""
+    )
+    print(f"{variant.metric}: {score.value} (floor {floor}){severity}")
+    if score.value is not None and score.value < floor:
+        print(
+            f"BELOW FLOOR — a lane change that drops {variant.metric} under {floor} must not ship",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
+def _scorecard(quality) -> int:
+    card = quality.benchmark_scorecard()
+    if not card.runs:
+        print("no benchmark runs recorded yet (plan → deploy → validate → score)")
+        return 0
+    for r in card.runs[-10:]:
+        scored = r.scored_at.strftime("%Y-%m-%dT%H:%M:%SZ") if r.scored_at else "?"
+        print(
+            f"{scored}  {r.variant.value:4s}  {r.variant.metric}={r.value}  "
+            f"severity={r.severity_accuracy}  n={r.n}"
+        )
+    return 0
 
 
 def add_rule_lane_args(ap) -> None:
-    ap.add_argument(
-        "--workspace",
-        type=Path,
-        default=None,
-        help="campaign workspace holding analysis-results/ and metrics output",
-    )
     ap.add_argument(
         "--out",
         type=Path,
@@ -281,34 +336,75 @@ def add_rule_lane_args(ap) -> None:
     ap.add_argument(
         "--draft-limit",
         type=int,
-        default=6,
+        default=DEFAULT_DRAFT_LIMIT,
         help="max regression drafts staged per run (0 skips the stage; default 6)",
     )
-    ap.add_argument(
-        "--skip-sweep", action="store_true", help="skip the sweep-engine collect/draft stages"
-    )
-    ap.add_argument(
-        "--emit-drafts-script",
-        type=Path,
-        default=None,
-        help="optional emit_rule_drafts.py path (env: EMIT_RULE_DRAFTS_SCRIPT)",
-    )
+    ap.add_argument("--skip-sweep", action="store_true", help="skip the sweep collect/draft stages")
+
+
+def _allowlist(config_home: Path | None) -> Allowlist | None:
+    """The rules ``<config home>/rule-pack-allowlist.yaml`` enables; None when there is none."""
+    home = resolve_config_home(config_home)
+    path = home / RULE_PACK_ALLOWLIST if home is not None else None
+    if path is None or not path.is_file():
+        return None
+    try:
+        allow = load_rule_allowlist(f"@{path}")
+    except ValidationError as e:
+        return Allowlist(unreadable=str(e))
+    return Allowlist(rules=allow.rules if allow else frozenset())
 
 
 def call_rule_lane(args) -> int:
-    # PENDING(decision: sweep stages — retire or port)
-    from traust_engine.sweep import rule_lane as lane
-
-    engine = load_engine(args.config_home)  # PENDING(decision: sweep stages — retire or port)
-
-    return lane.execute_rule_lane(
-        workspace=args.workspace,
-        out=args.out,
-        draft_limit=args.draft_limit,
-        skip_sweep=args.skip_sweep,
-        emit_drafts_script=args.emit_drafts_script,
-        engine=engine,
+    core = load(args.config_home)
+    out = args.out or _required(lambda: progress_tracker_dir(core)) / "metrics" / "rule-mining"
+    try:
+        lane = core.services().detection_quality.rule_lane(
+            RuleLaneRequest(
+                draft_limit=args.draft_limit,
+                skip_sweep=args.skip_sweep,
+                allowlist=_allowlist(args.config_home),
+            )
+        )
+    except TraustError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return 2
+    out = out.resolve()
+    for stage in lane.stages:
+        if stage.status == StageStatus.FAILED:
+            print(
+                f"[{stage.stage}] FAILED (rc {stage.returncode}): {stage.summary[:400]}",
+                file=sys.stderr,
+            )
+        else:
+            print(f"[{stage.stage}] {stage.summary}")
+    if lane.mining is not None:
+        _write_mining(out, lane)
+    if lane.delta is None or lane.delta_report is None:
+        return lane.exit_code
+    (out / "lane-delta.json").write_text(
+        lane.delta.model_dump_json(indent=2) + "\n", encoding="utf-8"
     )
+    (out / "lane-delta.md").write_text(lane.delta_report, encoding="utf-8")
+    d = lane.delta
+    growth = f" ({d.tp_corpus.growth:+d})" if d.tp_corpus.growth is not None else ""
+    attention = "; ".join(d.attention.reasons) if d.attention.needed else "none"
+    print(
+        f"rule-mining lane: TPs {d.tp_corpus.confirmed_tps}{growth}; uncovered clusters "
+        f"+{len(d.new_uncovered_clusters)} new / {len(d.resolved_uncovered_clusters)} resolved"
+        f" / {len(d.changed_uncovered_clusters)} changed; gate crossings "
+        f"{len(d.precision_gate_crossings)}; attention: {attention} -> {out}/lane-delta.{{json,md}}"
+    )
+    return lane.exit_code
+
+
+def _write_mining(out: Path, lane: RuleLane) -> None:
+    assert lane.mining is not None and lane.mining_report is not None
+    out.mkdir(parents=True, exist_ok=True)
+    corpus = [tp.model_dump_json() for tp in lane.mining.corpus]
+    (out / "tp-corpus.jsonl").write_text("".join(f"{line}\n" for line in corpus), encoding="utf-8")
+    (out / "rule-mining.json").write_text(lane.mining.model_dump_json(indent=2), encoding="utf-8")
+    (out / "rule-mining.md").write_text(lane.mining_report, encoding="utf-8")
 
 
 COLLECT = OpSpec(
@@ -419,18 +515,14 @@ def add_regression_drafts_args(ap) -> None:
 
 def call_regression_drafts(args) -> int:
     """Stage one draft dir per confirmed fix from `DetectionQualityService.regression_pairs`."""
-    drafts_dir = _resolve_drafts_dir(args)
+    core = _core(args, drafts=True)
 
     def call() -> dict:
-        quality = load(args.config_home).services().detection_quality
-        staged = {d.name for d in drafts_dir.glob("*/")} if args.skip_existing else set()
-        found = quality.regression_pairs(
-            RegressionPairFilter(cwe=args.cwe, limit=args.limit, staged=frozenset(staged))
+        found = core.services().detection_quality.stage_regression_drafts(
+            RegressionPairFilter(cwe=args.cwe, limit=args.limit), skip_existing=args.skip_existing
         )
-        for pair in found.pairs:
-            _stage(drafts_dir / pair.id, pair)
         return {
-            "drafts_dir": str(drafts_dir),
+            "drafts_dir": str(core.rule_drafts.root if core.rule_drafts else None),
             "drafted": [
                 {"draft": p.id, "language": p.language, "cwe": p.cwes[0], "files": len(p.files)}
                 for p in found.pairs
@@ -440,63 +532,6 @@ def call_regression_drafts(args) -> int:
         }
 
     return run(call)
-
-
-def _stage(draft: Path, pair: RegressionPair) -> None:
-    if draft.exists():
-        shutil.rmtree(draft)
-    for side in ("before", "after"):
-        (draft / side).mkdir(parents=True)
-    for f in pair.files:
-        for side, text in (("before", f.before), ("after", f.after)):
-            if text is not None:
-                target = draft / side / f.path  # a RepoPath: relative, no `..`
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(text, encoding="utf-8")
-    rule = {
-        "id": pair.rule_id,
-        "languages": [pair.language],
-        "severity": pair.rule_severity,
-        "message": f"TODO: one sentence on the vulnerable shape and the fix. {pair.cwes[0]}.",
-        "metadata": {
-            "cwe": list(pair.cwes),
-            "category": "regression",
-            "confidence": "HIGH",
-            "regression_of": {
-                "fingerprint": pair.fingerprint,
-                "source_finding": str(pair.finding_id),
-                "repo": pair.repository_url,
-                "fix_commit": pair.fix_sha,
-            },
-        },
-        "patterns": [{"pattern": "TODO: author from before/ (must fire) vs after/ (must not)"}],
-    }
-    (draft / "rule.skeleton.yaml").write_text(
-        yaml.safe_dump({"rules": [rule]}, sort_keys=False, width=100), encoding="utf-8"
-    )
-    excerpt = " ".join((pair.rationale or "").split())[:500]
-    (draft / "DRAFT.md").write_text(
-        f"""# Rule draft: {pair.rule_id}
-
-**Regression guard for:** {pair.title or "(untitled finding)"}
-**CWE:** {", ".join(pair.cwes)} · **severity:** {pair.severity}
-**Repo:** {pair.repository_url}
-**Pre-fix commit:** `{pair.pre_fix_sha}` · **fix commit:** `{pair.fix_sha}`
-**Fingerprint:** `{pair.fingerprint}` · **finding:** `{pair.finding_id}`
-
-**Fix rationale (verification evidence):**
-
-> {excerpt}
-
-**Authoring contract:** write `patterns:` in `rule.skeleton.yaml` so that
-`traust sweep verify-draft {draft}` fires on every file in `before/` and on
-nothing in `after/`. Then move the rule into the pack category file in
-the security pack (`packs/security/detection/opengrep-rules/`; not a `regression.yaml`
-dump, match the pack's category layout) with `ruleid:`-annotated fixture
-lines, and delete this draft dir.
-""",
-        encoding="utf-8",
-    )
 
 
 def add_verify_draft_args(ap) -> None:
@@ -511,18 +546,19 @@ def add_verify_draft_args(ap) -> None:
 
 def call_verify_draft(args) -> int:
     """The calibration gate: the candidate rule fires on before/ and is silent on after/."""
-    # NEED(core: an opengrep door that scans with one given rule file)
-    from traust_engine.adapters import opengrep
-
     rule = args.rule or args.draft / "rule.skeleton.yaml"
+    if not rule.is_file():
+        print(
+            f"ERROR: opengrep over {args.draft / 'before'}: no rule file at {rule}", file=sys.stderr
+        )
+        return 2
+    core = load(args.config_home)
     counts = {}
     for side in ("before", "after"):
         target = args.draft / side
         try:
-            if not rule.is_file():
-                raise ValidationError(f"no rule file at {rule}")
-            counts[side] = len(opengrep.scan(target, rules=[str(rule)]).findings)
-        except (ValueError, OSError, RuntimeError, ServiceError) as e:
+            counts[side] = len(opengrep_report(core, target, [str(rule)])["facts"])
+        except (ValueError, OSError, RuntimeError, TraustError) as e:
             print(f"ERROR: opengrep over {target}: {e}", file=sys.stderr)
             return 2
     ok = counts["before"] > 0 and counts["after"] == 0

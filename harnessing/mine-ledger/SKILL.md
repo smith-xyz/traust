@@ -8,7 +8,6 @@ allowed-tools:
   - Glob
   - Grep
   - Write
-  - Bash(python3 *traust* -m traust_engine.sweep.mining:*)
   - Bash(python3 *traust* -m traust.cli sweep:*)
   - Bash(python3 *traust* -m traust.cli sweep rule-lane:*)
   # Confinement added 2026-07-31 (P1 gate rework — the
@@ -155,9 +154,8 @@ a full loop: **backlog item → draft → calibrate → SWEEP → triage**.
 Four resumable stages:
 
 ```bash
-# 1. gather + classify confirmed findings (ledger validity=confirmed
-#    plus the Phase-0 confirmation artifacts: fast-track criticals,
-#    matrix stage-2 votes, 0d fresh-only triage); rule-expressible vs
+# 1. gather + classify confirmed findings (validity=confirmed, as
+#    recorded in traust-core); rule-expressible vs
 #    not is decided deterministically and every "not" carries a reason
 python3 -m traust.cli sweep collect
 # 2. stage candidate rules for expressible classes with no pack
@@ -190,7 +188,7 @@ Sweep output lands at
 `analysis-results/scan-testing/sweeps/<rule-id>/sweep-candidates.json`
 (schema: repo, file:line, matched excerpt, rule id, source-finding
 provenance) plus a `sweep-summary.md`, and is consumed as /triage input
-material. Stage state lives under the sweeps root's `_state/` dir;
+material. Stage state lives in traust-core (its object store);
 every stage skips work already done (re-run to resume).
 
 ## Scheduled lane (python3 -m traust.cli sweep rule-lane)
@@ -199,10 +197,10 @@ The deterministic half of this skill runs as a standing lane
 (docs/continuous-operations.md, "Lane cadences") — orchestrator-neutral in
 the dependency-watch pattern: identical behavior from an operator
 session, cron, or any enterprise scheduler. One entry point chains the
-miner, `sweep_engine.py collect` + `draft`, bounded regression-draft
+miner, `sweep collect` + `draft`, bounded regression-draft
 staging (`sweep regression-drafts --skip-existing --limit N` — existing
-draft dirs are never clobbered; the lane skips this stage until it moves
-to the security pack's continuous-ops lanes), and a **delta report** against the
+draft dirs are never clobbered; the lane skips this stage when no forge
+reads are configured), and a **delta report** against the
 previous `rule-mining.json` (new/resolved/changed uncovered clusters,
 precision movements crossing the ~50% gate, TP-corpus growth) written to
 `progress-tracker/metrics/rule-mining/lane-delta.{json,md}`. Exit 0 =
@@ -219,7 +217,7 @@ before it starts and would return a table of structural zeros. Measured
 cpp **0** — all blocked on ground truth, not tooling. The lane raises
 attention only when a gate **opens**; a steady blocked state is silent,
 because a weekly complaint about a known-blocked language is noise.
-Watched set: `WATCHED_LANGS` / `WATCHED_PACKS` in the runner.
+Watched set: `WATCHED_LANGS` / `WATCHED_PACKS` in traust-core's `models.rule_mining`.
 
 **Enabled external-pack rules are re-checked against the precision
 gate.** An external pack is enabled per-rule via
@@ -241,9 +239,9 @@ any audit are listed separately — silence is not a pass.
 **Standing delegation (user, 2026-07-29):** scheduled agent runs of this
 skill proceed from the lane's delta report through rule authoring **and
 the full test-and-calibrate gate** — fixture `ruleid:`/`ok:` lines
-firing/silent, the whole-pack regression suite (in traust-engine:
-`uv run pytest tests/test_bundled_rule_packs.py`, which runs `opengrep test`
-for every language and a default-scan canary), TP-rediscovery
+firing/silent, the whole-pack regression suite (`opengrep test
+packs/security/detection/opengrep-rules/<lang>` for every language, and
+`uv run pytest tests/test_default_rule_packs.py`, a default-scan canary), TP-rediscovery
 calibration against the corpus repos — WITHOUT asking for per-run
 approval. The mechanical gate is the promotion criterion: a rule that
 passes all three legs is promoted into the pack; one that does not is
@@ -269,10 +267,10 @@ never writes to ledgers, and never touches Jira.
 
 - **Inputs:** cumulative `*-findings-current.json` ledgers and the
   `scanner_correlation` judge decisions audits record by default
-  (`sweep mine` reads them from traust-core; the lane still reads the files).
-- **Inputs (sweeps):** any prior confirmation artifacts under
+  (`sweep mine` and the lane read them from traust-core).
+- **Inputs (sweeps):** *retired:* the prior confirmation artifacts under
   `analysis-results/scan-testing/` (fast-track critical confirmations,
-  matrix votes, fresh-only triage) alongside the ledgers.
+  matrix votes, fresh-only triage); confirmations are traust-core's recorded findings.
 - **Outputs:** `rule-mining.{json,md}` inform the opengrep-pack backlog
   (plan doc) and are freshness-gated by `/drift-watch`'s `rule-mining`
   row; `tp-corpus.jsonl` is the rule-authoring specification

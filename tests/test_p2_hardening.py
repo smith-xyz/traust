@@ -137,20 +137,6 @@ def test_p3_endpoint_host_gate():
     assert "refusing to send recovered secrets" in s
 
 
-def test_p3_sweep_engine_dir_prefix():
-    # PENDING(decision: sweep stages — retire or port)
-    # traust_engine is a pip-installed sibling package (pyproject.toml
-    # [tool.uv.sources]). Read it through the import system — a relative
-    # ../traust-engine path only resolves in a workspace that happens to
-    # have the source checked out next to this repo.
-    import traust_engine.sweep.engine as engine
-
-    s = Path(engine.__file__).read_text()
-    assert 'url.startswith("dir:")' in s
-    assert "unsupported url" in s
-    assert "GIT_ALLOW_PROTOCOL" in s
-
-
 def test_p3_agents_md_curl_rule():
     s = _src("AGENTS.md")
     assert "curl --config -" in s and "lab-target-only" in s

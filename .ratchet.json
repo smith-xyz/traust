@@ -24,9 +24,6 @@
   "src/traust/cli/groups/reporting.py": {
     "state-file": 1
   },
-  "src/traust/cli/groups/sweep.py": {
-    "engine-internal": 4
-  },
   "src/traust/cli/query_index.py": {
     "database": 1
   }

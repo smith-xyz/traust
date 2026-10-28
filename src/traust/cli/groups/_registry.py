@@ -48,7 +48,6 @@ def passthrough_op(module: str, help: str, entry: str = "main") -> OpSpec:
     return OpSpec(add_args=add_args, call=call, help=help, passthrough_argv=True)
 
 
-# PENDING(decision: sweep stages — retire or port)
 def load_engine(config_home: Path | None = None) -> Any:
     """The engine facade (``HarnessEngine``) for the ops still on it, or exit 2 with a one-line
     message."""
