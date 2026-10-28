@@ -425,7 +425,8 @@ exactly as it does to files read from the checkout.
    kinds select. Findings follow that checklist's rules: the check's CWE,
    the OWASP category and check number in the description, and evidence
    for every finding. Record `"llm-app": "ran: <kinds>"`, or `"ran: none"`
-   when nothing is detected (no LLM focus area then).
+   when nothing is detected (no LLM focus area then, and `llm-integration`
+   is `not_applicable` in `review_surface_coverage`, citing the pre-scan).
 
 Tell the user the focus areas you'll scan, the source-file count, and
 whether a baseline audit was found (assessment id + finding count) before fanning
@@ -522,7 +523,7 @@ WHAT TO LOOK FOR:
   - hardcoded secrets, weak crypto, broken cert validation
   - sensitive data (secrets, PII) in logs or error responses
 
-  REVIEW SURFACES — HIGH VALUE (the six surfaces audits most often miss;
+  REVIEW SURFACES — HIGH VALUE (the seven surfaces audits most often miss;
   check each one your focus area touches):
   - credential-acceptance: a verifier that accepts a credential issued for
     another purpose (another audience, a short-lived or refresh token), or
@@ -542,6 +543,10 @@ WHAT TO LOOK FOR:
     deduplicated store
   - scope-enforcement: a route or credential type that skips the scope or
     role check its siblings apply
+  - llm-integration: in the LLM pre-scan's tagged files, untrusted text in a
+    prompt that can call tools, model output reaching a sink, a tool broader
+    than its task, or an agent loop with no cap (the LLM focus area's
+    checklist)
 
   LOW VALUE — note briefly, keep looking:
   - null-pointer deref at small fixed offsets with no attacker control
@@ -584,14 +589,14 @@ OUTPUT — one block per finding, nothing else:
 <description>{root cause, attacker control, trigger condition, data flow from entry to sink. Cite line numbers.}</description>
 <exploit_scenario>{concrete attack: what input, from where, causing what outcome}</exploit_scenario>
 <recommendation>{specific fix: parameterize the query, bounds-check before memcpy, etc.}</recommendation>
-<review_surface>{the review surface the defect sits on, from the six ids below, or none}</review_surface>
+<review_surface>{the review surface the defect sits on, from the seven ids below, or none}</review_surface>
 </finding>
 
 Then one block per review surface you examined, whether or not it gave a
-finding, so the report can record what was checked. Use only these six ids;
+finding, so the report can record what was checked. Use only these seven ids;
 anything else is a finding or nothing:
 
-<surface id="{credential-acceptance | ownership-resolution | security-flags | outbound-fetch | stored-content-integrity | scope-enforcement}">{what you examined: files, call sites or the exact search pattern, and the result}</surface>
+<surface id="{credential-acceptance | ownership-resolution | security-flags | outbound-fetch | stored-content-integrity | scope-enforcement | llm-integration}">{what you examined: files, call sites or the exact search pattern, and the result}</surface>
 
 SEVERITY — use the harness's shared five-level scale (same enum as
 secure-code-audit and triage):
@@ -858,10 +863,10 @@ the scan deduped against, and `baseline_findings` counts the packet's
 `findings.baseline`.
 
 **Review-surface coverage (required from traust 0.21.0).** Add a top-level
-`review_surface_coverage` recording how this scan answered each of the six
+`review_surface_coverage` recording how this scan answered each of the seven
 review surfaces in [review-surfaces.md](../secure-code-audit/review-surfaces.md).
-Every surface needs an entry, and every status except `finding` needs a
-`note`. This report has no `negative_results`, so a `negative` note says
+Every surface needs an entry (`llm-integration` for scans dated from
+2026-11-02), and every status except `finding` needs a `note`. This report has no `negative_results`, so a `negative` note says
 what was examined. Build the record from the review subagents' output:
 - `finding`: `finding_ids` lists every reported finding whose
   `<review_surface>` is this surface. A finding sits on the surface where the
@@ -897,7 +902,8 @@ what was examined. Build the record from the review subagents' output:
   "security-flags": {"status": "negative", "note": "settings.py: new DEBUG_SIGNUP flag read in 2 places, neither disables a control"},
   "outbound-fetch": {"status": "finding", "finding_ids": ["EXAMPLE_REPO-abc1234-001"]},
   "stored-content-integrity": {"status": "not_applicable", "note": "no content-addressed store"},
-  "scope-enforcement": {"status": "out_of_scope", "note": "no route or guard changes"}
+  "scope-enforcement": {"status": "out_of_scope", "note": "no route or guard changes"},
+  "llm-integration": {"status": "not_applicable", "note": "llm-app: ran: none"}
 }
 ```
 

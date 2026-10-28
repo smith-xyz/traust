@@ -234,7 +234,7 @@ are executed, not what is reported.
    <subsystem>") over the highest-value subsystem (enforcement layer,
    execution boundary, or credential custody). Merge its output
    through the same triage bar as every other lane.
-5. **Review surfaces.** Check the six surfaces in this skill's companion
+5. **Review surfaces.** Check the seven surfaces in this skill's companion
    [`review-surfaces.md`](review-surfaces.md) on every audit, using the
    check that file defines for each:
    `credential-acceptance` (what else passes each verifier),
@@ -243,8 +243,10 @@ are executed, not what is reported.
    severity; controls that fail open when unconfigured),
    `outbound-fetch` (every outbound call site, including identity-provider
    discovery and key fetches), `stored-content-integrity` (the verified
-   bytes are the stored bytes) and `scope-enforcement` (scope and step-up
-   rules hold for every credential type and route). The file maps each
+   bytes are the stored bytes), `scope-enforcement` (scope and step-up
+   rules hold for every credential type and route) and `llm-integration`
+   (the LLM pre-scan's tagged files against `llm-application-review.md`;
+   `not_applicable` citing the pre-scan when it finds no LLM use). The file maps each
    surface to its `category` and CWEs; it is the single definition, so do
    not restate it in prompts. The surface IDs come from the
    `review_surface` enum in traust-contracts, and every report records its
@@ -1206,11 +1208,12 @@ finding.**
   That file sets the evidence rules, the CWE per check, and how to record
   the OWASP category, negatives and coverage gaps.
 - **When `llm_application: false`:** the LLM checklist doesn't apply.
-  Say so in `negative_results`, citing the pre-scan.
+  Record `llm-integration` as `not_applicable` in `review_surface_coverage`,
+  citing the pre-scan.
 - **Record** `"llm-app": "ran: <kinds>"`, or `"ran: none"`, in
   `metadata.additional.deterministic_steps`. With no local checkout, record
-  `"skipped: no local checkout"`, and a repository that looks like an LLM
-  application is a `coverage_gaps` entry.
+  `"skipped: no local checkout"`; `llm-integration` is then `not_assessed`,
+  with its `coverage_gaps` entry.
 
 #### Sanitizer micro-probes (probe_sanitizers.py — execution-gated)
 
@@ -1608,7 +1611,7 @@ These fields (passed to `reporting record` as `--branch <metadata.ref>`) are how
 After writing the JSON report, **you must validate it** before considering the report complete. **Do not move on to the next repository until the current report passes validation with 0 errors.**
 
 **Step 0 — Check review-surface coverage before validating.** For each of
-the six review surfaces, confirm `review_surface_coverage` has its entry
+the seven review surfaces, confirm `review_surface_coverage` has its entry
 and that the entry's evidence is in the report (the findings it names, the
 `negative_results` entry whose `area` starts with the surface ID, or the
 `coverage_gaps` entry). Write any surface you judged but did not record:

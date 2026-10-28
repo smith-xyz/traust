@@ -685,11 +685,15 @@ Review every file in the chosen scope for:
 - New RBAC grants, new container capabilities, new network exposure
 - Newly added dependencies without pinning
 
-Check the six review surfaces in
+Check the seven review surfaces in
 [review-surfaces.md](../../3-audit/secure-code-audit/review-surfaces.md)
 against the same scope, and record the outcome for each in the report's
 `review_surface_coverage` (6b). A surface the scoped files don't touch is
-`out_of_scope`.
+`out_of_scope`. For `llm-integration`, the original audit's answer says
+whether the target uses LLMs: when it is `not_applicable`, so is this one;
+otherwise check the scoped files that call a model, agent framework, MCP
+SDK or vector store against
+[llm-application-review.md](../../3-audit/secure-code-audit/llm-application-review.md).
 
 #### 5c. Classify regressions
 
@@ -870,13 +874,15 @@ The report must validate against `contracts/schemas/verification.schema.json`
     "security-flags": {"status": "out_of_scope", "note": "no settings or flags changed"},
     "outbound-fetch": {"status": "finding", "finding_ids": ["<REG-id>"]},
     "stored-content-integrity": {"status": "not_applicable", "note": "no content-addressed store"},
-    "scope-enforcement": {"status": "out_of_scope", "note": "no route or guard changes"}
+    "scope-enforcement": {"status": "out_of_scope", "note": "no route or guard changes"},
+    "llm-integration": {"status": "out_of_scope", "note": "no model or agent calls in the regression-scan scope"}
   }
 }
 ```
 
 **`review_surface_coverage` (required from traust 0.21.0).** One entry for
-each of the six review surfaces, covering the Phase 5 regression-scan scope.
+each of the seven review surfaces (`llm-integration` for verifications dated
+from 2026-11-02), covering the Phase 5 regression-scan scope.
 Every status except `finding` needs a `note`, and a `negative` note says
 what was examined, because this report has no `negative_results`.
 - `finding`: `finding_ids` names a `regressions[].id` on the surface, or
