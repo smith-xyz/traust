@@ -171,6 +171,13 @@ multi-tenant services that carry a section 10:
 | id | threat | actor | surface | asset | impact | likelihood | status | controls | evidence | attack_refs | isolation_dimensions |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 
+Two more optional trailing columns, `owasp_llm_references` and then
+`atlas_refs`, come last (after `review_surfaces` when present), either or
+both, and only when a threat against an LLM, agent or MCP component has
+values: OWASP Top 10 for LLM Applications category IDs (`LLM01`…) and MITRE
+ATLAS technique IDs (`AML.T0051`), the latter validated against the pinned
+ATLAS table.
+
 - `id`: `T1`, `T2`, … Stable across edits; do not renumber when rows are
   removed. In `update`/`review` passes a removed threat's id is **retired,
   never reused**: the row moves to section 5 with the removal reason and
