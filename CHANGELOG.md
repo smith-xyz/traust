@@ -4,6 +4,17 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- **Route x guard matrix: FastAPI, aiohttp and Express** (Vercel comparison
+  gap plan, step 5). `traust adapters route-guards` now lists FastAPI and
+  aiohttp routes (traust-core#249) and Express routes (traust-core#250) with
+  their guards, so audits of those repositories get the same judged worklist
+  as go-http, django-drf and flask. Backstage plugins mounted through the
+  `httpRouter` service carry the framework's default authentication, and
+  paths an auth policy opens are judged. traust now depends on
+  `traust-core[js]` (tree-sitter, already recorded in
+  `docs/external-dependencies.md`); an install without it reports Express as
+  a coverage gap instead of listing its routes. Pins traust-core development
+  `92a2655`.
 - **OWASP LLM categories are structured again.** `llm-application-review.md`
   records a finding's OWASP LLM Top 10 category in `owasp_llm_references`
   (for example `["LLM06"]`) instead of in the description; the check number

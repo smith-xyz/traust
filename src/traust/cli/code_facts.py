@@ -2,7 +2,8 @@
 priv-profile``: the deterministic pre-scans on traust-core's code facts. Each reads a checkout
 and records nothing; every result is a candidate worklist the audit judges, never a finding.
 
-route-guards    the route x guard matrix (go-http, django-drf, flask), asymmetry groups first
+route-guards    the route x guard matrix (go-http, django-drf, flask, fastapi, aiohttp,
+                express), asymmetry groups first
 grpc-guards     the gRPC service x interceptor matrix (Go): servers, services, diagnostic services
 llm-app         whether the checkout is an LLM, agent or MCP application, and the files that use it
 config-matrix   effective deployed defaults as (key, default, sink) triples
