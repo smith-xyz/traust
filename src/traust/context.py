@@ -35,6 +35,7 @@ SAFE_EXEC_PROFILES = "safe-exec-profiles.yaml"
 # Security-pack content (home: traust-pack-security): the pinned ATT&CK release and its mapping.
 _ATTACK = HARNESSING_DIR / "attack-coverage" / "tables"
 ATTACK_TABLES = (_ATTACK / "attack-techniques.json", _ATTACK / "attack-mapping.json")
+ATLAS_TABLE = _ATTACK / "atlas-techniques.json"  # the pinned MITRE ATLAS release
 
 # ---------------------------------------------------------------------------
 # Sanctioned environment overrides — read ONLY in this module, never in consumers.
@@ -128,6 +129,7 @@ def load(
         ),
     )
     _guarded("ATT&CK catalog", lambda: core.register_attack_catalog(*ATTACK_TABLES))
+    _guarded("ATLAS catalog", lambda: core.register_atlas_catalog(ATLAS_TABLE))
     if sla is not None and (sla_policy is not None or sla.is_file()):
         _guarded("SLA policy", lambda: core.register_sla_policy(sla))
     if home is not None and (home / MODEL_REGISTRY).is_file():

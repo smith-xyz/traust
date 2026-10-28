@@ -401,6 +401,18 @@ example `grpc-api` for a gRPC service and
 entry point to the deterministic pre-scan for its kind, so an entry point
 without one is reported as unexplained. Use `other` only when no kind fits.
 
+**LLM components.** When the target is an LLM, agent or MCP application
+(`traust adapters llm-app` reports `llm_application: true`), map its LLM
+components as entry points and assets: the model endpoint, the agent or
+orchestrator, its tools (including MCP tools), retrieval and the vector
+store, and training or fine-tuning data. A threat against one of them
+carries its OWASP Top 10 for LLM Applications category IDs in
+`owasp_llm_references` (for example `["LLM01"]`) and its MITRE ATLAS
+technique IDs in `atlas_refs` (for example `["AML.T0051"]`), next to any
+`attack_refs`. Leave either out when none fits; never guess. ATLAS IDs are
+validated against the harness's pinned ATLAS table, and both render as
+optional trailing threats-table columns.
+
 **Findings-tree placement (wiring contract, 2026-07-31).** The checkout
 copy alone is invisible to every downstream consumer — `/secure-code-audit`
 (coverage diff), `/vuln-scan`, `/triage`, and `/threat-register` all resolve threat models from the campaign findings
@@ -455,6 +467,8 @@ Then print to the user:
 - Downstream consumers: `/triage` (threat-model answers shape verifier
   environment/threat context) and the secure-code-audit reports whose
   findings feed threat likelihood as evidence.
+- MITRE, *MITRE ATLAS*, <https://atlas.mitre.org/>: technique IDs only, from
+  the pinned table (licence terms: `docs/external-dependencies.md`).
 - OWASP Foundation, *OWASP Risk Rating Methodology*,
   <https://owasp.org/www-community/OWASP_Risk_Rating_Methodology>.
   Reimplemented in original wording; no text adapted (licence terms:
