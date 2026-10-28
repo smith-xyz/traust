@@ -482,8 +482,10 @@ rate adds an MD warning and each row carries its API `error` message.
 Before traust-engine takes over a standing job, it runs next to cron without
 dispatching, and a daily diff shows where the two disagree. Every difference is
 fixed or written down; a group of jobs moves to the engine only after two weeks
-with none unexplained. `traust-engine` is installed with traust; every command
-takes the same three paths:
+with none unexplained. `traust-engine` is installed separately from traust (the
+runtime image includes it); locally, `uv tool install "traust-engine @
+git+https://github.com/traust-security/traust-engine@<sha>"`. Every command takes
+the same three paths:
 
 ```bash
 E="--core $TRAUST_CONFIG_HOME/core.yaml --pack packs/security/assets.yaml --pin config/external-tools.yaml --feeds config/feeds.yaml --models $TRAUST_CONFIG_HOME/model-registry.yaml"

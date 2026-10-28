@@ -1,5 +1,6 @@
-# Containerfile.runtime — traust-core + traust-engine + traust (pinned Git SHAs via uv.lock) on
-# top of the pinned-tools image (Containerfile.tools). No scanner installs here — everything
+# Containerfile.runtime — traust-core + traust (pinned Git SHAs via uv.lock), plus the
+# traust-engine service as its own tool install, on top of the pinned-tools image
+# (Containerfile.tools). No scanner installs here — everything
 # scanner-related comes from the tools base, at the digest the wrapper resolves. Labeled with
 # both the commit this was built from and the toolchain hash it was built on, so a runner's
 # label and a report's provenance can both be traced back to an exact pair of images.
@@ -13,6 +14,8 @@
 ARG TOOLS_IMAGE
 ARG TOOLCHAIN_HASH=unknown
 ARG VCS_REF=unknown
+# The continuous-ops service (`traust-engine run|claim`), installed beside traust, not into it.
+ARG TRAUST_ENGINE_SHA=27435936f37b444296a627055a5ca5b975dd36ea
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:c4c285d42941ebb2bd4da878479008e1e4536bb599aad1dbe568f89de9053661 AS app-builder
 RUN microdnf install -y --setopt=install_weak_deps=0 git tar gzip python3.11 python3.11-pip \
@@ -21,7 +24,7 @@ RUN python3.11 -m pip install --no-cache-dir uv==0.13.4
 
 WORKDIR /opt/traust
 # Only what `uv sync` needs to resolve and install the pinned dependency graph (traust-contracts,
-# traust-ledger, traust-engine, traust-core — through traust's [tool.uv.sources] — plus traust's
+# traust-ledger, traust-core — through traust's [tool.uv.sources] — plus traust's
 # own runtime deps) and build traust itself as a wheel. The harness payload (harnessing/, config/,
 # docs/, bin/) is copied straight into the runtime stage below: it's data, not a dependency.
 COPY pyproject.toml uv.lock VERSION requirements.txt ./
@@ -36,6 +39,11 @@ COPY LICENSES/ ./LICENSES/
 # cache-to-checkout step, which clones over the local `file://` transport.
 RUN uv sync --frozen --no-dev --no-editable --python /usr/bin/python3.11
 
+ARG TRAUST_ENGINE_SHA
+RUN UV_TOOL_DIR=/opt/traust-engine/tools UV_TOOL_BIN_DIR=/opt/traust-engine/bin \
+    uv tool install --python /usr/bin/python3.11 \
+    "traust-engine @ git+https://github.com/traust-security/traust-engine@${TRAUST_ENGINE_SHA}"
+
 # --- Runtime: the pinned tools image, extended with the traust Python stack ---
 FROM ${TOOLS_IMAGE} AS runtime
 ARG TOOLCHAIN_HASH
@@ -43,7 +51,8 @@ ARG VCS_REF
 
 LABEL name="traust-runtime" \
       summary="Traust runtime on toolchain ${TOOLCHAIN_HASH}" \
-      description="traust-core, traust-engine and traust (pinned Git SHAs) on the \
+      description="traust-core and traust (pinned Git SHAs), plus traust-engine as a separate \
+tool install, on the \
 traust-toolchain image at pin-set hash ${TOOLCHAIN_HASH}. Pull, mount a target, run a profile. \
 For local, non-air-gapped use only; an air-gapped deployment mirrors this image and the \
 traust-toolchain image it was built on, plus the feeds cache, separately." \
@@ -53,7 +62,8 @@ traust-toolchain image it was built on, plus the feeds cache, separately." \
 
 USER 0
 COPY --from=app-builder /opt/traust /opt/traust
-RUN chown -R 1001:1001 /opt/traust
+COPY --from=app-builder /opt/traust-engine /opt/traust-engine
+RUN chown -R 1001:1001 /opt/traust /opt/traust-engine
 
 # Harness skill data — the same payload the pre-split image shipped, now layered on top of the
 # tools base instead of installed alongside ad hoc scanner commands.
@@ -66,14 +76,15 @@ RUN chown -R 1001:1001 /harness
 # Deployment config (corpus-config, product map, …) is mounted, never baked in.
 ENV TRAUST_CONFIG_HOME=/harness/deploy-config
 ENV HARNESS_ROOT=/harness
-ENV PATH="/opt/traust/.venv/bin:${PATH}"
+ENV PATH="/opt/traust/.venv/bin:/opt/traust-engine/bin:${PATH}"
 
 # --- Smoke test: the pinned Python stack imports and reports itself, as the runtime user ---
 USER 1001
 RUN python3.11 -c "from importlib.metadata import version as v; \
-print({n: v(n) for n in ('traust', 'traust-engine', 'traust-ledger', 'traust-contracts', 'traust-core')})" \
+print({n: v(n) for n in ('traust', 'traust-ledger', 'traust-contracts', 'traust-core')})" \
     && python3.11 -m traust.cli --help >/dev/null \
-    && echo "runtime image verified: traust stack importable, CLI runs"
+    && traust-engine --help >/dev/null \
+    && echo "runtime image verified: traust stack importable, CLIs run"
 
 WORKDIR /workspace
 ENTRYPOINT ["python3.11", "-m", "traust.cli"]

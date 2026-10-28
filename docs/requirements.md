@@ -18,7 +18,7 @@ companion references are:
 | Python | 3.11+ |
 | Git | Any recent version; most audit skills clone their targets |
 | An AI coding agent | Claude Code or Crush — the harness is prompt-and-skill tooling driven by an agent, not a standalone scanner. Skills are auto-discovered via the `.claude/skills/` and `.crush/skills/` symlink trees |
-| Python dependencies | `uv sync` in the harness repo (installs `traust-engine`, `traust-ledger`, and `traust-contracts` from the commit SHAs in `pyproject.toml` via `[tool.uv.sources]`); optional extras via `uv sync --extra signing` |
+| Python dependencies | `uv sync` in the harness repo (installs `traust-core`, and through it `traust-ledger` and `traust-contracts`, from the commit SHAs in `pyproject.toml` via `[tool.uv.sources]`); optional extras via `uv sync --extra signing`. The continuous-ops service `traust-engine` is installed separately (the runtime image includes it): `uv tool install "traust-engine @ git+https://github.com/traust-security/traust-engine@<sha>"` |
 | **Operational configuration** | A directory named by `TRAUST_CONFIG_HOME` (default `~/.traust/config`) holding the nine operational config files — corpus registry, product map, budget policy, safe-exec profiles, rule-pack allowlist, hardening weights, dist-git watch list, internal vocabulary, ledger signing public key. `scripts/install_traust` creates it from the templates in `config/`; `install_traust --doctor` verifies it. **Nothing runs without it** — a missing file fails closed. See [config/README.md](../config/README.md) |
 | Disk | A few GB free — audit skills clone target repositories into the workspace |
 

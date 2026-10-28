@@ -13,9 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("traust_engine", "traust_contracts", "traust_ledger")
-BASELINE = {
-    "src/traust/cli/groups/_registry.py": 1,  # load_engine, for the decision below
-}
+BASELINE: dict[str, int] = {}
 
 
 def _named(name: str) -> bool:

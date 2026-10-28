@@ -1,4 +1,4 @@
-"""Composition root — load_engine and config-home resolution."""
+"""Composition root — config-home resolution."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-from traust.cli.groups._registry import load_engine
 from traust.context import (
     add_config_home_arg,
     analysis_results_dir,
@@ -35,38 +34,6 @@ def _minimal_home(tmp_path: Path) -> Path:
         if name.is_file():
             shutil.copy2(name, home / name.name)
     return home
-
-
-def test_load_engine_happy_path(tmp_path, monkeypatch):
-    home = _minimal_home(tmp_path)
-    monkeypatch.setenv("TRAUST_CONFIG_HOME", str(home))
-    engine = load_engine()
-    assert engine.ctx.config_home == home
-
-
-def test_load_engine_explicit_config_home(tmp_path, monkeypatch):
-    home = _minimal_home(tmp_path)
-    monkeypatch.delenv("TRAUST_CONFIG_HOME", raising=False)
-    engine = load_engine(config_home=home)
-    assert engine.ctx.config_home == home
-
-
-def test_load_engine_missing_config_exits_2(tmp_path, monkeypatch):
-    monkeypatch.delenv("TRAUST_CONFIG_HOME", raising=False)
-    with pytest.raises(SystemExit) as exc:
-        load_engine(config_home=tmp_path / "missing")
-    assert exc.value.code == 2
-
-
-def test_load_engine_names_the_missing_file_on_one_line(tmp_path, monkeypatch, capsys):
-    home = _minimal_home(tmp_path)
-    (home / "safe-exec-profiles.yaml").unlink()
-    with pytest.raises(SystemExit) as exc:
-        load_engine(config_home=home)
-    err = capsys.readouterr().err
-    assert exc.value.code == 2
-    assert err.startswith("config not resolvable: ") and "safe-exec-profiles.yaml" in err
-    assert err.count("\n") == 1
 
 
 def test_add_config_home_arg():

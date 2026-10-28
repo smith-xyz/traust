@@ -76,9 +76,11 @@ cd traust && uv sync
 
 No `uv`? `pip install --require-hashes -r requirements.lock`.
 
-`uv sync` installs `traust-core` and `traust-engine` at the commits selected in
-`pyproject.toml` and resolved in `uv.lock`. Contracts and ledger come through
-core's pins, rather than direct imports into the harness.
+`uv sync` installs `traust-core` at the commit selected in `pyproject.toml` and
+resolved in `uv.lock`. Contracts and ledger come through core's pins, rather than
+direct imports into the harness. The continuous-ops service, `traust-engine`, is
+installed separately (the runtime image includes it); locally,
+`uv tool install "traust-engine @ git+https://github.com/traust-security/traust-engine@<sha>"`.
 
 Local domain operations call core's services through the app composition root.
 `core.yaml` in `TRAUST_CONFIG_HOME` selects core's database, identity and optional
@@ -240,7 +242,7 @@ most) never forces a rebuild of the Python layer, and vice versa:
 | Image | Contains | Tag |
 |---|---|---|
 | `traust-toolchain` | Pinned scanner binaries only (`config/external-tools.yaml`): opengrep, gitleaks, syft, grype, cosign, govulncheck, skopeo, yara, pip-audit (in its own isolated Python environment). No traust Python stack, no vulnerability databases. | `toolchain-<pin-set hash>` (`scripts/containerfile-build-args.py --pin-hash`) |
-| `traust-runtime` | `FROM traust-toolchain` by digest, plus traust-core/traust-engine/traust at the Git SHAs pinned in `pyproject.toml`/`uv.lock`, and the harness skill data (`harnessing/`, `config/`, `docs/`). | the commit, plus the toolchain hash it was built on (labels `traust.commit`, `traust.toolchain-hash`) |
+| `traust-runtime` | `FROM traust-toolchain` by digest, plus traust-core/traust at the Git SHAs pinned in `pyproject.toml`/`uv.lock` and traust-engine as a separate tool install (`TRAUST_ENGINE_SHA` in `Containerfile.runtime`), and the harness skill data (`harnessing/`, `config/`, `docs/`). | the commit, plus the toolchain hash it was built on (labels `traust.commit`, `traust.toolchain-hash`) |
 
 **No vulnerability database ships in either image.** For offline scans, mount
 databases kept current by the deployment, for example under

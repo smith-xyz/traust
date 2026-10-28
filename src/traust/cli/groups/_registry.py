@@ -8,11 +8,9 @@ from __future__ import annotations
 
 import argparse
 import importlib
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 
 
 class OpHandler(Protocol):
@@ -46,15 +44,3 @@ def passthrough_op(module: str, help: str, entry: str = "main") -> OpSpec:
         return getattr(mod, entry)(argv)
 
     return OpSpec(add_args=add_args, call=call, help=help, passthrough_argv=True)
-
-
-def load_engine(config_home: Path | None = None) -> Any:
-    """The engine facade (``HarnessEngine``) for the ops still on it, or exit 2 with a one-line
-    message."""
-    from traust_engine import HarnessEngine
-
-    try:
-        return HarnessEngine.load(config_home=config_home)
-    except FileNotFoundError as e:  # contracts' DeploymentConfigMissing
-        print(f"config not resolvable: {e}", file=sys.stderr)
-        raise SystemExit(2) from e

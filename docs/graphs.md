@@ -187,6 +187,9 @@ there is no stored graph to open.
 
 ## Freshness
 
+*Retired*: nothing builds repo-graph or portfolio-graph any more (traust#303), so
+neither file can go stale.
+
 `/drift-watch` watches repo-graph and portfolio-graph, reporting `stale` when
 a graph predates the inputs inventory's HEAD, because inventory or ownership
 may have changed underneath it. Neither is rebuilt automatically — drift
