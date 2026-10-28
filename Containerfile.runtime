@@ -15,7 +15,7 @@ ARG TOOLS_IMAGE
 ARG TOOLCHAIN_HASH=unknown
 ARG VCS_REF=unknown
 # The continuous-ops service (`traust-engine run|claim`), installed beside traust, not into it.
-ARG TRAUST_ENGINE_SHA=27435936f37b444296a627055a5ca5b975dd36ea
+ARG TRAUST_ENGINE_SHA=fe9e9129e2e4682fc8b7d0040efe4fee7c748073
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:c4c285d42941ebb2bd4da878479008e1e4536bb599aad1dbe568f89de9053661 AS app-builder
 RUN microdnf install -y --setopt=install_weak_deps=0 git tar gzip python3.11 python3.11-pip \
