@@ -10,7 +10,7 @@ and `portfolio-graph-summary.json` report yours after a build.
 | Graph | Artifact | Question it answers | Built by |
 |---|---|---|---|
 | **repo-graph** | `repo-graph.{json,dot,gexf,html}` + `repo-graph-stats.md` | which repos exist, who owns them, what has been audited | *retired*: traust-core's portfolio (`repository`, `product`, `release`, `component`, `ownership`) and assessment coverage answer it; nothing builds the file |
-| **portfolio-graph** | `portfolio-graph.db` (SQLite) + `portfolio-graph-summary.json` | what the code depends on, and what a change reaches | [`/portfolio-graph`](../harnessing/portfolio-graph/SKILL.md) |
+| **portfolio-graph** | `portfolio-graph.db` (SQLite) + `portfolio-graph-summary.json` | what the code depends on, and what a change reaches | *retired*: traust-core records each commit's and image's SBOM ([`/portfolio-graph`](../harnessing/portfolio-graph/SKILL.md)); nothing builds the file |
 | **ATT&CK coverage layer** | `attack-coverage.json` `navigator_layer` (Navigator format 4.5) | which adversary techniques the portfolio's findings and validated chains cover | [`/attack-coverage`](../harnessing/attack-coverage/SKILL.md) |
 | **attack chains** | `attack_chains[]` inside validation reports | how a confirmed finding chains from entry point to terminal asset | [`/validate-findings`](../harnessing/5-validate/validate-findings/SKILL.md) |
 | **Joern Code Property Graph** | transient (temp dir, discarded with the run) | does an advisory's vulnerable symbol actually get called in this repo — the evidence that promotes a finding to `affected` | `adapters joern` (Java, C/C++) |
@@ -61,6 +61,12 @@ Four outputs for four audiences: `.json` is canonical and machine-readable,
 `migrations/resolve_docs_version_refs` (doc-version resolution).
 
 ## portfolio-graph — the code-level layers
+
+*Retired*: nothing builds `portfolio-graph.db`. traust-core records each commit's
+manifest SBOM (`impact sbom`) and each image's SBOM (`adapters image-sbom`);
+`portfolio dependencies` / `dependents` and the `dependency-reach` view read
+them, and `adapters checkov` reads a checkout's Kubernetes interfaces. The
+readers below still name `portfolio-graph.db` until their own ports.
 
 | Layer | Holds |
 |---|---|

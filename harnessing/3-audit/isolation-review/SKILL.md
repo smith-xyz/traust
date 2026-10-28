@@ -1,6 +1,6 @@
 ---
 name: isolation-review
-description: Use when the user asks to review, assess, or score the tenant isolation of a multi-tenant service — resolving the service's repo set via the portfolio graph, building a customer-facing interface inventory from graph data and existing audit/threat-model findings, rating per-interface complexity, scoring five isolation-hardening dimensions (privilege, encryption, authentication, connectivity, operational hygiene) with cited evidence, emitting a schema-validated isolation report under analysis-results/isolation/<service-slug>/, and recording canonical isolation_review assessments on every covered commit through traust-core.
+description: Use when the user asks to review, assess, or score the tenant isolation of a multi-tenant service — resolving the service's repo set via traust-core, building a customer-facing interface inventory from interface signals and existing audit/threat-model findings, rating per-interface complexity, scoring five isolation-hardening dimensions (privilege, encryption, authentication, connectivity, operational hygiene) with cited evidence, emitting a schema-validated isolation report under analysis-results/isolation/<service-slug>/, and recording canonical isolation_review assessments on every covered commit through traust-core.
 user-invocable: true
 metadata:
   harness.tier: "primary"
@@ -79,8 +79,11 @@ Sources, in order of authority:
    `peach_isolation_review.interfaces[]` block (when present), the threat
    model's entry-point/trust-boundary tables, and triage/validation reports.
    These seed the inventory and supply finding IDs as evidence.
-2. **Graph structure.** `rbac_grants`, `owns_crd`, `consumes_group`, and
-   `intercepts` edges on the service's repos surface CRDs, aggregated APIs,
+2. **Interface signals.** `rbac_grants`, `crds_defined` / `csv_owned_crds`,
+   `api_group_literals`, and `webhooks` in `tenancy_signals` in the
+   Kubernetes hardening pre-scan output (`<repo>-k8s-hardening.json`) that
+   secure-code-audit and vuln-scan write for each of the service's repos
+   surface CRDs, aggregated APIs,
    and webhook interception points that the per-repo artifacts may have
    missed.
 3. **Code, last.** Only read source to fill inventory holes (route tables,

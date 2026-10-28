@@ -24,7 +24,7 @@ These skills are specific to the scanning campaign. They consume the full `*-res
 | `findings-trends` | — | Up/down trend dashboard by ledger replay: burndown, headline risk signals (`owasp_high_plus_pct`, `mean_cvss_open`), velocity, MTTR, accepted-risk register | haiku-class (`render-narrate` floor) |
 | `validation-fuzz-dashboard` | — | Combined live-validation + fuzzing results dashboard | opus-class |
 | `threat-register` | — | Fleet-wide threat roll-up from every threat-model file: open-threat exposure by product, stable `<slug>:<Tn>` keys, class-closing quick wins | opus-class |
-| `isolation-review` | — | Service-level tenant-isolation review (PEACH cited by reference only): interface inventory from the portfolio graph + existing findings, per-interface complexity, five hardening dimensions with cited evidence, posture + prioritized gaps | mythos-class |
+| `isolation-review` | — | Service-level tenant-isolation review (PEACH cited by reference only): interface inventory from interface signals + existing findings, per-interface complexity, five hardening dimensions with cited evidence, posture + prioritized gaps | mythos-class |
 | `traust-metrics` | — | Campaign metrics scoreboard under `progress-tracker/metrics/` | opus-class |
 | `rbac-tenancy-rollup` | — | RBAC + multi-tenancy misconfiguration rollup: executive one-pager, top-misconfigurations detail, HTML dashboard, MITRE ATT&CK candidate inference | opus-class |
 | `attack-coverage` | — | Fleet-wide MITRE ATT&CK coverage rollup joining observed (live-validation), modeled (threat-model), and derived (category-mapped) technique IDs into a Navigator layer | opus-class |
