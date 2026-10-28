@@ -189,8 +189,9 @@ language/framework the target actually uses.
 | Security config flags (`security-flags`) | settings defaults and environment fallbacks that switch a control (e.g., `DEBUG`, `verify=`, `insecure`/`skip_*` options); keys or secrets in shipped config |
 | Outbound fetch (`outbound-fetch`) | server-side HTTP client calls whose destination someone other than the operator can influence: request input, config a lower-privileged role can edit, a value read from an unverified token (e.g., `requests.get(`); identity-provider discovery and key-set URLs; redirects the server follows. A destination only the operator sets, and links a user's browser follows, are not outbound fetches. |
 | Shared content stores (`stored-content-integrity`) | digest-keyed or deduplicated blob storage; multipart or chunk assembly; server-side copy |
+| LLM components (`llm-integration`) | the files `traust adapters llm-app` tags: model and agent-framework calls, MCP tool handlers, vector-store reads and writes, prompt templates |
 
-The last five rows are review surfaces from
+The last six rows are review surfaces from
 [review-surfaces.md](../../3-audit/secure-code-audit/review-surfaces.md);
 the tag each one produces is in brackets. Tag every entry point those rows
 produce with `review_surfaces`. The sixth surface, `scope-enforcement`, has no
@@ -429,6 +430,10 @@ misses the classic defects, so also walk each tagged surface's check in
   deduplication?
 - **scope-enforcement:** does every route and credential type apply the
   scope check its siblings do?
+- **llm-integration:** can untrusted text reach a prompt that can call
+  tools, does model output reach a sink, and is each tool no broader than
+  its task (the checks in
+  [llm-application-review.md](../../3-audit/secure-code-audit/llm-application-review.md))?
 
 Each plausible answer is a section 4 row tagged with only the surfaces
 that threat exercises: a subset of the tags of the entry points its

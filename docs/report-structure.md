@@ -74,7 +74,7 @@ projections.
 | `dependency_audit` | `prose` + `entries[]` (`package`, `version`, `status`, `notes`). |
 | `negative_results` | Areas verified clean: `area`, `result`, optional `files`. |
 | `asvs_coverage` | ASVS chapter coverage entries. |
-| `review_surface_coverage` | One entry per review surface (the `review_surface` enum in traust-contracts), each with a status from `review_surface_status`; required on `code`-profile audits from traust 0.20.0 and `rpm`-profile audits from 0.21.0 — see deltas. In a `*-findings-current.json` it is the audit's record merged with later scans' records ([review-surfaces.md](../harnessing/3-audit/secure-code-audit/review-surfaces.md#scans-that-follow-an-audit)). |
+| `review_surface_coverage` | One entry per review surface (the `review_surface` enum in traust-contracts), each with a status from `review_surface_status`; required on `code`-profile audits from traust 0.20.0 and `rpm`-profile audits from 0.21.0, and its `llm-integration` entry on audits dated from 2026-11-02 — see deltas. In a `*-findings-current.json` it is the audit's record merged with later scans' records ([review-surfaces.md](../harnessing/3-audit/secure-code-audit/review-surfaces.md#scans-that-follow-an-audit)). |
 | `scanner_correlation` | Scanner tool results, including the judge decisions the rule-mining lane consumes. |
 | `peach_isolation_review` | Always emitted on `code` and `container` profiles — see deltas. |
 | `disposition_summary` | Cumulative reports only: counts per validity and resolution state, derived from the ledger. |
@@ -191,7 +191,9 @@ apply unrelated classifier policies, or recreate retired report writers.
   findings in `finding_ids`, `negative` entries have a `negative_results`
   entry whose `area` starts with the surface ID, and `not_assessed` entries
   have a `coverage_gaps` entry with `tool: "review-surfaces"`. The
-  validator checks each against the report.
+  validator checks each against the report. `llm-integration` is required
+  for audits dated from 2026-11-02: `not_applicable` citing the LLM
+  pre-scan when it finds no LLM use.
 - `peach_isolation_review` is **always emitted**: `{"applicable": false,
   "rationale": …}` for single-tenant components; full `interfaces[]` when
   multi-tenant. `peach_references` on findings only when applicable.

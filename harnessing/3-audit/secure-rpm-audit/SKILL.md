@@ -386,12 +386,13 @@ evidence.
 
 ### Review surfaces
 
-Check the six surfaces in
+Check the seven surfaces in
 [`review-surfaces.md`](../secure-code-audit/review-surfaces.md) against the
 prepared source tree, weighting the downstream delta: patches carried in
 dist-git are first-party code, and the spec's shipped config files and
 `%configure` flags set the defaults that `security-flags` asks about.
-Record each answer in `review_surface_coverage`
+For `llm-integration`, run `python3 -m traust.cli adapters llm-app` on the
+prepared source tree. Record each answer in `review_surface_coverage`
 ([Recording coverage](../secure-code-audit/review-surfaces.md#recording-coverage)),
 with the same evidence rules as code audits: a `negative` needs a matching
 `negative_results` entry, and a `not_assessed` needs a `coverage_gaps` entry.
