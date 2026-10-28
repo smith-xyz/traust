@@ -66,10 +66,7 @@ def test_traust_impact_analyze_help():
 
 
 def test_traust_portfolio_and_sweep_help():
-    for group, op, flag in (
-        ("portfolio", "build", "--spine"),
-        ("sweep", "collect", "--force"),
-    ):
+    for group, op, flag in (("sweep", "collect", "--force"),):
         proc = subprocess.run(
             [sys.executable, "-m", "traust.cli", group, op, "--help"],
             capture_output=True,

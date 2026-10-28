@@ -40,11 +40,11 @@ only. File-level co-occurrence constraints (`pattern-inside: pattern-regex:`
 with an anchored lookahead) scan comments too; fixtures must not name the
 lexicon words they test.
 
-traust-engine's pytest suite also exercises the pack end-to-end when opengrep
+traust's pytest suite also exercises the pack end-to-end when opengrep
 is available:
 
 ```bash
-pytest tests/test_run_opengrep.py -q
+pytest tests/test_default_rule_packs.py -q
 ```
 
 ## Rule conventions

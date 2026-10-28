@@ -8,13 +8,15 @@ analysis_results: ""     # e.g. /srv/traust/analysis-results, or s3://example-bu
 progress_tracker: ""     # e.g. /srv/traust/progress-tracker
 inputs: ""               # e.g. /srv/traust/workspace/inputs (default: <workspace>/inputs)
 feeds_cache: ""          # e.g. /srv/traust/feeds-cache
-portfolio_graph: ""      # e.g. /srv/traust/portfolio-graph.db (default: <analysis_results>/graph/portfolio-graph.db)
 rule_drafts: ""          # e.g. /srv/traust/rule-drafts (default: <progress_tracker>/metrics/rule-mining/rule-drafts)
 gitleaks_config: ""      # e.g. /srv/traust/config/gitleaks.toml (default: bundled)
 opengrep_rules: ""       # e.g. /srv/traust/config/opengrep-rules (default: bundled)
 product_definitions: ""  # e.g. https://products.example.com/products.json
 sarif_tool_uri: ""       # e.g. https://harness.example.com
 
+# Retired: the engine's remote materialiser (traust-engine[s3], HARNESS_S3_*)
+# went with the portfolio graph; traust reads through traust-core, and object
+# storage is traust-core's ObjectStore (core.yaml -> artifacts). Was:
 # Object storage: set analysis_results to an s3:// URI and install
 # traust-engine[s3] (gs:// or az://: traust-engine[remote] plus gcsfs or adlfs).
 # The bucket MUST enforce encryption at rest by its own policy (for example

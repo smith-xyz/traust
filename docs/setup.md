@@ -76,9 +76,11 @@ cd traust && uv sync
 
 No `uv`? `pip install --require-hashes -r requirements.lock`.
 
-`uv sync` installs `traust-core` and `traust-engine` at the commits selected in
-`pyproject.toml` and resolved in `uv.lock`. Contracts and ledger come through
-core's pins, rather than direct imports into the harness.
+`uv sync` installs `traust-core` at the commit selected in `pyproject.toml` and
+resolved in `uv.lock`. Contracts and ledger come through core's pins, rather than
+direct imports into the harness. The continuous-ops service, `traust-engine`, is
+installed separately (the runtime image includes it); locally,
+`uv tool install "traust-engine @ git+https://github.com/traust-security/traust-engine@<sha>"`.
 
 Local domain operations call core's services through the app composition root.
 `core.yaml` in `TRAUST_CONFIG_HOME` selects core's database, identity and optional
@@ -240,7 +242,7 @@ most) never forces a rebuild of the Python layer, and vice versa:
 | Image | Contains | Tag |
 |---|---|---|
 | `traust-toolchain` | Pinned scanner binaries only (`config/external-tools.yaml`): opengrep, gitleaks, syft, grype, cosign, govulncheck, skopeo, yara, pip-audit (in its own isolated Python environment). No traust Python stack, no vulnerability databases. | `toolchain-<pin-set hash>` (`scripts/containerfile-build-args.py --pin-hash`) |
-| `traust-runtime` | `FROM traust-toolchain` by digest, plus traust-core/traust-engine/traust at the Git SHAs pinned in `pyproject.toml`/`uv.lock`, and the harness skill data (`harnessing/`, `config/`, `docs/`). | the commit, plus the toolchain hash it was built on (labels `traust.commit`, `traust.toolchain-hash`) |
+| `traust-runtime` | `FROM traust-toolchain` by digest, plus traust-core/traust at the Git SHAs pinned in `pyproject.toml`/`uv.lock` and traust-engine as a separate tool install (`TRAUST_ENGINE_SHA` in `Containerfile.runtime`), and the harness skill data (`harnessing/`, `config/`, `docs/`). | the commit, plus the toolchain hash it was built on (labels `traust.commit`, `traust.toolchain-hash`) |
 
 **No vulnerability database ships in either image.** For offline scans, mount
 databases kept current by the deployment, for example under
@@ -371,15 +373,19 @@ Unset, `locations.inputs` defaults to
 
 ### Remote results and graph
 
-Findings and the portfolio graph do not have to be local. Set
-`locations.yaml` → `analysis_results` (and optionally `portfolio_graph`) to a
+*Retired:* the engine's remote materialiser (`traust-engine[s3]`,
+`HARNESS_REMOTE_CACHE`, `HARNESS_S3_*`, `HARNESS_STORAGE_OPTIONS`) went with the
+portfolio graph it served. traust reads through traust-core, and object storage
+is traust-core's `ObjectStore` (`core.yaml` → `artifacts`). Was:
+
+Findings do not have to be local. Set
+`locations.yaml` → `analysis_results` to a
 bare path, a `file://` URI, or an object-store URI, which is how a scheduled
 orchestrator run reaches them.
 
 | Variable / field | Purpose |
 |---|---|
 | `locations.yaml` → `analysis_results` | findings-side artifacts (SBOMs, extracted images, graphs) |
-| `locations.yaml` → `portfolio_graph` | the graph; defaults to `<analysis_results>/graph/portfolio-graph.db` when unset |
 | `HARNESS_REMOTE_CACHE` | where remote artifacts materialise (default `~/.cache/traust-engine/remote`) |
 
 A bare path or `file://` imports no backend and copies no file, so a

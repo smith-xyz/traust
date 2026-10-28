@@ -18,17 +18,8 @@
   "src/traust/cli/findings.py": {
     "core-internal": 2
   },
-  "src/traust/cli/groups/_registry.py": {
-    "engine-internal": 1
-  },
-  "src/traust/cli/groups/portfolio.py": {
-    "engine-internal": 1
-  },
   "src/traust/cli/groups/reporting.py": {
     "state-file": 1
-  },
-  "src/traust/cli/groups/sweep.py": {
-    "engine-internal": 4
   },
   "src/traust/cli/query_index.py": {
     "database": 1

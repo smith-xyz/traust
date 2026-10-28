@@ -1,7 +1,8 @@
 """traust's location helpers read core's ``Config.locations`` and resolve every path the engine did.
 
-``_before`` is the helper code as it was on ``traust_engine.locations``; each row loads one
-``locations.yaml`` both ways and the paths must match.
+``ENGINE`` holds the paths ``traust_engine.locations`` resolved for each ``locations.yaml`` row
+(captured before the engine was dropped); a helper absent from a row raised
+``DeploymentConfigMissing``.
 """
 
 from __future__ import annotations
@@ -13,12 +14,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-
-# delete with the engine (final-drop follow-up)
-from traust_contracts import DeploymentConfigMissing as EngineConfigMissing
 from traust_core.v1.errors import DeploymentConfigMissing
-from traust_engine import HarnessEngine
-from traust_engine import locations as engine_locations
 
 from traust import context
 from traust.context import load
@@ -35,36 +31,6 @@ HELPERS = (
     "rule_drafts_dir",
     "feeds_cache_dir",
 )
-
-
-def _before(engine, name: str) -> Path:
-    loc, req = engine.ctx.locations, engine_locations.require
-    match name:
-        case "analysis_results_dir":
-            return req(engine_locations.analysis_results_dir(loc), "analysis_results")
-        case "workspace_dir":
-            return engine_locations.workspace_dir(loc)
-        case "inputs_dir":
-            val = getattr(loc, "inputs", None) if loc is not None else None
-            if val and (p := engine_locations.local_path(val)) is not None:
-                return (
-                    p if p.is_absolute() else (Path(os.environ["TRAUST_CONFIG_HOME"]) / p).resolve()
-                )
-            return engine_locations.workspace_dir(loc) / "inputs"
-        case "findings_db":
-            return req(engine_locations.findings_db(loc), "analysis_results")
-        case "findings_tree_dir":
-            return _before(engine, "analysis_results_dir") / "findings"
-        case "progress_tracker_dir":
-            return req(engine_locations.progress_tracker_dir(loc), "progress_tracker")
-        case "rule_drafts_dir":
-            return req(engine_locations.rule_drafts_dir(loc), "rule_drafts")
-        case "feeds_cache_dir":
-            if raw := os.environ.get("FEEDS_CACHE_DIR", "").strip():
-                return Path(raw).expanduser().resolve()
-            cache = engine_locations.feeds_cache_dir(loc)
-            return cache or _before(engine, "progress_tracker_dir") / "feeds"
-    raise AssertionError(name)
 
 
 def _home(tmp_path: Path, locations: dict | None) -> Path:
@@ -98,10 +64,65 @@ ROWS = {
 }
 
 
+ENGINE = {
+    "absolute": {
+        "analysis_results_dir": "/ar",
+        "workspace_dir": "/w",
+        "inputs_dir": "/w/inputs",
+        "findings_db": "/ar/graph/findings.db",
+        "findings_tree_dir": "/ar/findings",
+        "progress_tracker_dir": "/pt",
+        "rule_drafts_dir": "/pt/metrics/rule-mining/rule-drafts",
+        "feeds_cache_dir": "/pt/feeds",
+    },
+    "relative": {
+        "analysis_results_dir": "{home}/../ar",
+        "workspace_dir": "{home}/ws",
+        "inputs_dir": "{home}/ws/inputs",
+        "findings_db": "{home}/../ar/graph/findings.db",
+        "findings_tree_dir": "{home}/../ar/findings",
+        "progress_tracker_dir": "{home}/pt",
+        "rule_drafts_dir": "{home}/pt/metrics/rule-mining/rule-drafts",
+        "feeds_cache_dir": "{home}/pt/feeds",
+    },
+    "file uri": {
+        "analysis_results_dir": "/ar",
+        "workspace_dir": "/w",
+        "inputs_dir": "/w/inputs",
+        "findings_db": "/ar/graph/findings.db",
+        "findings_tree_dir": "/ar/findings",
+    },
+    "remote": {},
+    "explicit": {
+        "analysis_results_dir": "/ar",
+        "workspace_dir": "/w",
+        "inputs_dir": "/w/inputs",
+        "findings_db": "/ar/graph/findings.db",
+        "findings_tree_dir": "/ar/findings",
+        "progress_tracker_dir": "/pt",
+        "rule_drafts_dir": "{home}/drafts",
+        "feeds_cache_dir": "/fc",
+    },
+    "inputs relative": {"workspace_dir": "/w", "inputs_dir": "{home}/inv"},
+    "inputs absolute": {"workspace_dir": "/w", "inputs_dir": "/inv"},
+    "inputs file uri": {"workspace_dir": "/w", "inputs_dir": "/inv"},
+    "empty strings": {},
+    "no file": {},
+}
+
+
+def _before(row: str, name: str, home: Path, feeds_env: str | None) -> Path | type:
+    if name == "feeds_cache_dir" and feeds_env:
+        return Path(feeds_env).expanduser().resolve()
+    if (path := ENGINE[row].get(name)) is None:
+        return DeploymentConfigMissing
+    return Path(os.path.normpath(path.format(home=home)))
+
+
 def _outcome(fn):
     try:
         return fn()
-    except (DeploymentConfigMissing, EngineConfigMissing):
+    except DeploymentConfigMissing:
         return DeploymentConfigMissing
 
 
@@ -114,10 +135,10 @@ def test_core_locations_resolve_the_paths_the_engine_did(tmp_path, monkeypatch, 
         monkeypatch.setenv("FEEDS_CACHE_DIR", feeds_env)
     else:
         monkeypatch.delenv("FEEDS_CACHE_DIR", raising=False)
-    engine, core = HarnessEngine.load(config_home=home), load(home)
+    core = load(home)
     for name in HELPERS:
         helper = getattr(context, name)
-        expected = _outcome(lambda name=name: _before(engine, name))
+        expected = _before(row, name, home.resolve(), feeds_env)
         assert _outcome(lambda helper=helper: helper(core)) == expected, name
 
 

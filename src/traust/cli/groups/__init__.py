@@ -93,13 +93,6 @@ GROUPS: dict[str, dict[str, object]] = {
         "products": registry.PRODUCTS,
     },
     "portfolio": {
-        "build": portfolio.BUILD,
-        "freshness": portfolio.FRESHNESS,
-        "interfaces": portfolio.INTERFACES,
-        "symbols": portfolio.SYMBOLS,
-        "artifacts": portfolio.ARTIFACTS,
-        "stats": portfolio.STATS,
-        "query": portfolio.QUERY,
         "dependencies": portfolio.DEPENDENCIES,
         "dependents": portfolio.DEPENDENTS,
         "observe": portfolio.OBSERVE,

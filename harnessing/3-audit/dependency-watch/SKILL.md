@@ -65,7 +65,7 @@ executive summaries, SCI) already read.
    skill port (traust-core finding intake).
 
    **Bootstrap / full-baseline mode (`bootstrap` argument, first run,
-   quarterly re-baseline, or after portfolio-graph rebuilds):** run
+   quarterly re-baseline, or after `impact sbom` records new commits' SBOMs):** run
    `python3 -m traust.cli impact sweep --out analysis-results/impact/fleet-osv-worklist-<date>.json`
    — clone-free fleet inventory (every package version in the recorded
    SBOMs × the OSV batch API, deduped by advisory display id — CVE alias when present,
