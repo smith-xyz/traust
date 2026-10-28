@@ -13,6 +13,9 @@ All notable changes to Traust are documented here.
   New contradictory weakness severity/rule-13 claims fail before recording;
   exact historical replay preserves bytes and identity without reclassifying
   later findings.
+- Persist explicit finding kinds atomically with triage admission so interrupted
+  decision recording can resume without losing kinds or overwriting later
+  judgments on replay.
 
 ## [Unreleased]
 
