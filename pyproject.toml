@@ -23,13 +23,6 @@ dependencies = [
 
 [project.optional-dependencies]
 postgres = ["traust-core[postgres]"]
-graph = [
-    "tree-sitter",
-    "tree-sitter-go",
-    "tree-sitter-python",
-    "tree-sitter-typescript",
-    "tree-sitter-javascript",
-]
 signing = ["sigstore>=4.0,<5.0"]
 
 [project.scripts]

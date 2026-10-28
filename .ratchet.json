@@ -21,9 +21,6 @@
   "src/traust/cli/groups/_registry.py": {
     "engine-internal": 1
   },
-  "src/traust/cli/groups/portfolio.py": {
-    "engine-internal": 1
-  },
   "src/traust/cli/groups/reporting.py": {
     "state-file": 1
   },
