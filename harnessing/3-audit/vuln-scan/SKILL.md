@@ -446,7 +446,8 @@ sink (launch/bulk/schedule/copy; REST/websocket/callback), and
 focus area touches, reporting what it examined, and (e) when the target
 selects a section of
 [framework-checks.md](../secure-code-audit/framework-checks.md)
-(Kubernetes operators, gRPC), answer each of that section's checks in the
+(Kubernetes operators, gRPC, FastAPI and aiohttp, Express), answer each of
+that section's checks in the
 focus areas they belong to, citing the check ID in findings and negatives.
 Record `"framework-checks": "ran: <sections>"` in
 `metadata.additional.deterministic_steps`. On

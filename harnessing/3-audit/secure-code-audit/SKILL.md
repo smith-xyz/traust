@@ -665,9 +665,10 @@ The mechanical rows of this table — K01 workload configs, K02 RBAC grants, K03
 #### Per-technology review checks (framework-checks.md)
 
 The table above reviews what an operator ships; [`framework-checks.md`](framework-checks.md)
-reviews what its code and its gRPC servers do. Select its sections by the
-technology the checkout uses (its *Selecting sections* table: Kubernetes
-operators, gRPC), and answer every check in each selected section. Each
+reviews what its code, its gRPC servers and its web routes do. Select its
+sections by the technology the checkout uses (its *Selecting sections*
+table: Kubernetes operators, gRPC, FastAPI and aiohttp, Express), and answer
+every check in each selected section. Each
 check names its CWE, its ASVS 5.0 section and, for operator checks, the
 K-ID above, plus the evidence that settles it. Record
 `"framework-checks": "ran: <sections>"` (or `"ran: none"`) in
