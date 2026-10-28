@@ -2,6 +2,21 @@
 
 All notable changes to Traust are documented here.
 
+## [0.39.2]
+
+- Separate triage finding kind from verdict: verified defense-in-depth gaps
+  emit `true_positive` plus `kind: weakness`, never a new `hardening` verdict.
+  Preserve unknown kind and review-only outcomes without inventing proof.
+- Keep weakness backlog, vulnerability ranking, patch selection and rule mining
+  separate while retaining verifier votes and historical triage reads.
+- Adopt the coordinated Core record-door gate, citation routing and rendering.
+  New contradictory weakness severity/rule-13 claims fail before recording;
+  exact historical replay preserves bytes and identity without reclassifying
+  later findings.
+- Persist explicit finding kinds atomically with triage admission so interrupted
+  decision recording can resume without losing kinds or overwriting later
+  judgments on replay.
+
 ## [Unreleased]
 
 - **Route x guard matrix: FastAPI, aiohttp and Express** (Vercel comparison

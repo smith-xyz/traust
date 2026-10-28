@@ -84,13 +84,15 @@ Invoke with `/patch <findings-path | work-item-id> [--repo PATH] [--top N] [--id
 - `--repo PATH`: target codebase (default cwd). Required for
   static mode; the skill stops if cited files don't resolve under it.
   The repo itself is never modified — edits go into disposable worktrees.
-- `--top N`: patch only the N highest-severity true positives (static
-  mode), ranked on the shared enum: critical > high > medium > low >
+- `--top N`: patch only the N highest-severity non-weakness true positives
+  (static mode), ranked on the shared enum: critical > high > medium > low >
   informational (match case-insensitively; legacy inputs may use
-  HIGH/MEDIUM/LOW). `hardening`-verdict findings are excluded from `--top` (they are
-  posture backlog, not vulnerabilities) but MAY be patched explicitly via
-  `--id` — fixing a hardening gap also de-amplifies co-located confirmed
-  findings in the trends blast-radius view.
+  HIGH/MEDIUM/LOW). Explicit `kind: weakness` and historical
+  `verdict: hardening` findings are excluded from automatic selection
+  (posture backlog, not vulnerabilities), but MAY be patched explicitly via
+  `--id`. Omitted kind keeps existing TP eligibility; never default it to
+  vulnerability. Fixing a hardening gap also de-amplifies co-located
+  confirmed findings in the trends blast-radius view.
 - `--id fNNN`: patch only the finding with this id.
 - `--model M`: passed through to `vuln-pipeline patch` in execution-verified
   mode. Ignored in static mode (subagents inherit the orchestrator's model).
@@ -193,10 +195,16 @@ flat `findings[]` of dicts. Pull what's present; never guess what's absent.
    → `file`/`line`), every decision on it (the triage rationale among
    them) and `strategy`, the preferred fix for its class. A work item
    opens only on confirmed, open findings, so no filter applies.
-1. **`<repo>-triage.json`** (or legacy `TRIAGE.json`) — read `.findings[]`. **Filter to `verdict ==
-   "true_positive"`.** This is the canonical input: already verified,
-   deduped, ranked, owner-tagged, and (since harness 0.37.0) carrying the
-   input's `recommendation` through verbatim.
+1. **`<repo>-triage.json`** (or legacy `TRIAGE.json`) — read `.findings[]`.
+   **Default eligibility: `verdict == "true_positive"` and
+   `kind != "weakness"` (omitted kind remains eligible).** An explicit
+   `--id` may instead select a TP+weakness or historical
+   `verdict: hardening` backlog item; do not drop those before applying
+   that selection. Keep its kind, null severity and source rationale;
+   patching a weakness does not prove exploitability. This is the canonical
+   input: already deduped, ranked where applicable, owner-tagged, and
+   carrying the input's `recommendation` through verbatim. Never infer
+   vulnerability kind when absent.
 2. **`<repo>-security-audit.json`** (a `contracts/schemas/report.schema.json`
    document) — read `.findings[]`; the alias table below maps its
    `remediation` guidance to `recommendation` and `locations[0]` to
@@ -276,10 +284,11 @@ of the file it came from). The `--id` filter accepts either form.
 ### 1c. Filter and order
 
 - If `--id fNNN`: keep only that finding.
-- If `--top N` (static mode): sort by `severity` (critical > high >
-  medium > low > informational, case-insensitive; legacy HIGH/MEDIUM/LOW
-  map to their lowercase equivalents) then `confidence` desc, keep the
-  first N.
+- If `--top N` (static mode): exclude explicit `kind: weakness` and
+  historical `verdict: hardening`, sort the remaining eligible findings by
+  `severity` (critical > high > medium > low > informational,
+  case-insensitive; legacy HIGH/MEDIUM/LOW map to lowercase), then
+  `confidence` desc, and keep the first N.
 - Drop findings with no `file` (cannot patch what cannot be located). Record
   them as `skipped` with reason `"no source location"`.
 

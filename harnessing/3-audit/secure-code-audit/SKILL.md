@@ -1561,6 +1561,11 @@ rebuild are retired; never hand-write their outputs. Do not mark findings
 `confirmed` because the analysis felt certain; all-`confirmed` audit
 reports still warrant the validator's over-claiming warning.
 
+New triage represents a verified gap as `verdict: true_positive, kind: weakness`
+(rule 13, null severity); Core records `validity: confirmed, kind: weakness`.
+Never emit historical `hardening` as a new triage verdict. This does not rewrite
+the audit report's `validation_status`; cumulative-file rebuilds are retired.
+
 **CVSS** — required on every `critical`/`high`/`medium`/`low` finding. **Omit** for `informational` findings (posture and hygiene observations are not scored — the validator errors on an informational finding carrying CVSS ≥ 7.0 and warns below that). **Severity may sit below the CVSS band only with a stated reason**: when the score is an upstream advisory's base score and the audit judges contextual severity lower (unreachable in deployment, restricted SCC, requires prior compromise), the `description` MUST name the downgrade and its rationale — e.g. *"CVSS base 7.0, but rated low in this deployment context: exploitation requires write access to a directory on $PATH inside a restricted-SCC container."* The validator warns on a ≥2-band gap with no such rationale. Never encode the downgrade only in the severity field.
 
 **Severity floor (verification-disable and credential-transport classes)** — findings in these two classes are rated `high` at minimum, regardless of exploitation-chain completeness (2026-07 error-correction measurement: these classes were systematically under-rated and under-reported; they are exempt from the Precision Gate's chain-completion demand):
