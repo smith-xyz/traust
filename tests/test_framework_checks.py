@@ -18,14 +18,21 @@ def _rows() -> list[re.Match[str]]:
     return [m for ln in CHECKS.read_text(encoding="utf-8").splitlines() if (m := ROW.match(ln))]
 
 
-def test_both_sections_are_present_and_ids_unique():
+def test_every_section_is_present_and_ids_unique():
     rows = _rows()
     ids = [m["id"] for m in rows]
     assert len(ids) == len(set(ids))
-    assert {i.split(".")[0] for i in ids} == {"OP", "GR"}
-    assert (
-        sum(i.startswith("OP.") for i in ids) >= 10 and sum(i.startswith("GR.") for i in ids) >= 8
-    )
+    assert {i.split(".")[0] for i in ids} == {"OP", "GR", "FA", "EX"}
+    for prefix, floor in (("OP", 10), ("GR", 8), ("FA", 10), ("EX", 12)):
+        assert sum(i.startswith(f"{prefix}.") for i in ids) >= floor, prefix
+
+
+def test_web_sections_name_their_deterministic_evidence():
+    text = CHECKS.read_text(encoding="utf-8")
+    assert "traust adapters route-guards" in text
+    for rule in ("traust-ts-xss-", "traust-ts-open-redirect-", "traust-ts-path-traversal-fs-taint"):
+        assert rule in text, rule
+    assert "backstage:httpRouter" in text and "traust-core[js]" in text
 
 
 def test_every_check_names_a_cwe_and_its_standard_requirement():
