@@ -40,7 +40,9 @@ projections.
 | `id` | Yes | Globally-unique **scan-scoped** ID `{REPO_SLUG}-{SHORTSHA}-{NNN}`. Provenance to an exact commit; unique across the corpus. Never reuse across scans. |
 | `fingerprint` | No (script-set) | **Cross-scan identity**: `sha256(canonical repo URL \| sorted lineless location paths \| primary CWE)`. Computed by python3 -m traust.cli corpus finding-identity (`fingerprint`/`backfill`) — never authored by the model, and the only implementation: consumers read this stamp and fail closed when it is absent. Correlates the same vulnerability across re-scans; the `rebaseline` command maps a superseded report's IDs to their successors via layer `metadata.finding_aliases`. A change to the recipe is a change to `ALGO_VERSION` paired with a re-stamp migration, never a silent regeneration. |
 | `title` | Yes | Short description (≥5 chars). |
+| `kind` | No | Explicit finding classification from the installed [finding-kind vocabulary](https://github.com/traust-security/traust-contracts/blob/development/enums/v1/finding-kind.json). Use it to distinguish a vulnerability from a defense-in-depth weakness; omission remains unknown. Kind is not a validity answer or evidence grade. Core intake preserves it for a new finding without reclassifying an existing one. |
 | `severity` | Yes | `critical` \| `high` \| `medium` \| `low` \| `informational`. |
+| `kind` | No | Finding classification, independent of validity or proof. Use `weakness` for an explicitly established hardening classification; do not infer a validity answer from it. |
 | `cwes` | Yes | ≥1 `CWE-NNN` identifiers; the first is the primary (feeds the fingerprint). |
 | `locations` | Yes | ≥1 objects with required `path`, optional `lines`, `description`. |
 | `description` | Yes | Detailed vulnerability description (≥50 chars). |
@@ -59,7 +61,7 @@ projections.
 | `pqc_classification` | No | PQC relevance, assigned by table lookup against the PQC reference tables — never free-authored: `shor-key-establishment` \| `shor-signature` \| `clock-2030-parameter` \| `classically-broken` \| `hndl-exposure` \| `pqc-blocker-config` \| `pqc-adoption`. |
 | `remediation_effort` | No | New findings: `xs` \| `s` \| `m` \| `l` \| `xl`, or `null` for unknown size, from traust-contracts `enums/v1/effort.json`. Omission also leaves size unknown. Historical effort labels remain readable, not valid choices for new authorship; see [Remediation authoring](#remediation-authoring). |
 | `blocked_external` | No | Independent boolean: an external dependency blocks remediation (`true`) or is affirmatively known not to (`false`). Omit when unknown; absence is not `false`, and neither value establishes size or priority. |
-| `validation_status` | No | Historical-compatible finding validity; accepted values follow core's installed [contracts validity vocabulary](https://github.com/traust-security/traust-contracts/blob/development/enums/v1/validity.json). New state is recorded through core decisions, never authored in a baseline. |
+| `validation_status` | No | Optional, non-null validity assertion. Omit when no validity answer has been authored; explicit new values must pass Core's installed [contracts validity registry](https://github.com/traust-security/traust-contracts/blob/development/enums/v1/validity.json). Historical reads retain compatibility; see [Validity authoring](#validity-authoring). |
 | `disposition` | No | Present only on cumulative reports (`*-findings-current.json`): both disposition axes, conflict and awaiting-signoff flags, and event history, derived from the ledger. Never authored in a baseline. |
 | `effective_severity` | No | Present only on cumulative reports: equals a human severity override from the ledger when one exists, else the original severity. The original `severity` is never rewritten. |
 | `source_findings` | No | Source scanner finding IDs / provenance refs (for routed findings: the producer's own id — e.g. a `REG-*` regression id — plus the producing report's path). |
@@ -77,6 +79,42 @@ projections.
 | `peach_isolation_review` | Always emitted on `code` and `container` profiles — see deltas. |
 | `disposition_summary` | Cumulative reports only: counts per validity and resolution state, derived from the ledger. |
 | `footer` | Free-text footer. |
+
+## Validity authoring
+
+These rules apply to new findings in the ordinary audit/report schema,
+which exposes optional, non-null `validation_status`. **An unjudged
+finding omits that field** — do not emit `null`, a legacy unknown marker,
+or a blanket confirmation. Static evidence, scanner matches, confidence
+scores, and report inclusion alone do not author a validity answer.
+
+The installed traust-contracts validity registry owns the accepted vocabulary;
+Core's report record service enforces it for explicit new assertions. Only carry an
+explicit canonical assertion when its supporting execution evidence or
+attributed reviewer determination actually exists and is referenced in the
+finding's existing evidence/provenance fields. Do not create a local enum
+mirror or infer a judgment from a tool/source label. Later judgments belong
+to Core's existing authenticated decision doors, not baseline-file edits.
+
+`corrected` describes a revision, not a validity answer. Preserve correction
+rationale, evidence, and revision context in existing description, notes, and
+provenance fields where the artifact supports them; do not turn them into a
+status. Already stored claims use the existing authenticated restatement
+workflow rather than an in-place rewrite. An explicitly known hardening
+classification uses `kind: weakness`, independent of validity; when no
+validity answer exists, still omit `validation_status`.
+
+The base report schema remains historical-compatible, and historical reads,
+cumulative projections, and exact stored-run replay keep their existing
+semantics. Acceptance by that schema or a compatibility reader is not
+permission to emit deprecated validity in a new report. Do not rewrite old
+reports to satisfy new-authoring rules. The separate `vuln-findings`
+finding schema and verification schema's `$defs/regression` have **no
+`validation_status` property** and reject undeclared fields. Never add
+that field to either source artifact, even for a supported canonical
+judgment; subsequent judgments use Core's existing decision doors.
+Triage artifact verdicts are a separate contract and are unchanged by
+these rules.
 
 ## Remediation authoring
 

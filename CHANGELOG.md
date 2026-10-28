@@ -30,6 +30,26 @@ All notable changes to Traust are documented here.
   `docs/external-dependencies.md`); an install without it reports Express as
   a coverage gap instead of listing its routes. Pins traust-core development
   `92a2655`.
+
+- Preserve explicitly authored finding kind through Core's report intake, without
+  inventing validity or execution proof. PQC hardening instructions now emit
+  `kind: weakness`, not a deprecated hardening validity label; existing findings,
+  historical report bytes and replay identities remain unchanged.
+  Duplicate fingerprints within one batch retain an agreed explicit kind in
+  either input order; conflicting explicit kinds refuse the entire batch
+  before insertion, without reclassifying previously stored findings.
+
+- Keep unjudged benchmark and cluster-drift worklists free of deprecated
+  `not_verified` validity labels. Their existing validation consumer retains the
+  same claims without inventing a verdict or evidence grade; audit/triage source
+  representation prerequisites remain separate.
+
+- Align new audit validity with the existing canonical registry: omit an
+  unanswered assertion rather than emitting deprecated unknown/revision labels.
+  Source instructions retain evidence and correction context without inventing
+  confirmation or execution proof; historical report reads and exact stored-run
+  replay remain compatible through Core's existing record owner.
+
 - **OWASP LLM categories are structured again.** `llm-application-review.md`
   records a finding's OWASP LLM Top 10 category in `owasp_llm_references`
   (for example `["LLM06"]`) instead of in the description; the check number

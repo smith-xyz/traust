@@ -1,6 +1,6 @@
 ---
 name: secure-container-audit
-description: Use when the user asks to perform a security audit, vulnerability scan, SBOM analysis, or supply-chain assessment of a container image (registry reference, payload image, or batch of images) using skopeo, syft, and grype — covering image configuration, known CVEs in shipped packages, signature/provenance posture, and drift between the image contents and its source repository. Authors canonical remediation sizes or explicit unknowns, independent blocking, and explicit roadmap priorities through Core's report record door.
+description: Use when the user asks to perform a security audit, vulnerability scan, SBOM analysis, or supply-chain assessment of a container image (registry reference, payload image, or batch of images) using skopeo, syft, and grype — covering image configuration, known CVEs in shipped packages, signature/provenance posture, and drift between the image contents and its source repository. Omits unauthored validity answers; authors canonical remediation sizes or explicit unknowns, independent blocking, and explicit roadmap priorities through Core's report record door.
 metadata:
   harness.tier: "primary"
 allowed-tools:
@@ -278,7 +278,7 @@ Each candidate it shares with grype is tagged `also_in_grype: true`.
   filtered packages.
 
 - **Every match** becomes a `dependency_audit` entry: `package`, `version`, `status` (`vulnerable`/`fix-available`/`wont-fix` per upstream data), `notes` with the CVE/GHSA ID and fixed-in version. Negligible-severity or no-fix matches may be summarized in `dependency_audit.prose`.
-- **Promote to a finding** only matches that are plausibly exploitable in this image's role: the vulnerable binary/library actually ships and is executed or network-reachable (a CVE in an unused `dnf` plugin in a distroless-adjacent image is `dependency_audit`-only). **Every promotion to critical/high must additionally pass the Precision Gate below** — its dependency and advisory gate is this skill's measured FP path. Category `supply-chain`, cite K07 for operator images, carry the CVE's CVSS vector, and set `validation_status: not_verified` — a version match is not execution evidence.
+- **Promote to a finding** only matches that are plausibly exploitable in this image's role: the vulnerable binary/library actually ships and is executed or network-reachable (a CVE in an unused `dnf` plugin in a distroless-adjacent image is `dependency_audit`-only). **Every promotion to critical/high must additionally pass the Precision Gate below** — its dependency and advisory gate is this skill's measured FP path. Category `supply-chain`, cite K07 for operator images, carry the CVE's CVSS vector, and omit unauthored `validation_status` — a version match is not execution evidence.
 - **Respect Red Hat security data**: for RPM packages grype consumes RHSA data — report the RHSA severity/fix state rather than second-guessing NVD when they disagree, and say so in `notes`. The same holds for a language package an RPM installed: its fixes arrive in the RPM, so an upstream GHSA/CVE match against it is not evidence; check the owning RPM's RHSA state instead.
 - **Consult portfolio impact artifacts**: when `analysis-results/impact/<cve>-impact-analysis.json` exists (from `/impact-analysis`) and covers this image's source repo, cite its classification as promotion/dismissal context — `affected` at symbol level strengthens promotion; `not_observed` at symbol level is documented dismissal evidence; manifest-level classifications inform but never decide. Record the artifact path in the finding's evidence.
 - Never mark CVE matches `confirmed` from scanner output alone; the fuzzing/validation stages own that transition.
@@ -471,7 +471,7 @@ must pass all of:
    checked/reviewed" rationales are audit leads, not findings. A
    finding requires concrete evidence in THIS artifact (a config
    value, a shipped package, a signature absence). Plausible but
-   unestablished exposure → medium, `validation_status: not_verified`,
+   unestablished exposure → medium, omit `validation_status`,
    with the unestablished step named.
 
 **Severity floors (identical to `/secure-code-audit`'s)** —
@@ -563,6 +563,13 @@ Example: `CONSOLE_RHEL9-3a7f9c1-004`. This satisfies the existing schema regex `
 ### Report Structure Reference
 
 **The structure tables live in one place: [`docs/report-structure.md`](../../../docs/report-structure.md).** Read it before writing the report; this skill's profile deltas are the `container` section there. Do not restate the tables here.
+
+Follow the shared
+[Validity authoring](../../../docs/report-structure.md#validity-authoring)
+rules: unjudged findings omit `validation_status`, not `null` or a default
+confirmation. Core's installed contracts registry owns explicit new
+assertions; scanner confidence does not supply one. Preserve evidence and
+correction context in existing fields, not as a validity status.
 
 Follow the shared
 [Remediation authoring](../../../docs/report-structure.md#remediation-authoring)

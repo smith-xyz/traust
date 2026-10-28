@@ -1,6 +1,6 @@
 ---
 name: verify-remediation
-description: Use when the user provides a previous secure-code-audit report and a patched version of the scanned repository, and asks to verify that findings have been resolved. Performs a targeted re-audit of each original finding against the patched code using the same frameworks, criteria, and evidence standards as the original secure-code-audit, then emits a structured verification report.
+description: Use when the user provides a previous secure-code-audit report and a patched version of the scanned repository, and asks to verify that findings have been resolved. Performs a targeted re-audit of each original finding against the patched code using the same frameworks, criteria, and evidence standards as the original secure-code-audit, then emits a structured verification report. Regression artifacts have no validity field; Core owns subsequent validity judgments.
 user-invocable: true
 metadata:
   harness.tier: "primary"
@@ -708,10 +708,15 @@ The REG id is report-scoped provenance, not the finding's campaign
 identity — regressions do **not** stop at the verification report.
 Phase 7a2 routes every regression into the repo's disposition ledger as a
 first-class campaign finding, carried on its event and never written to the
-baseline (gate A15)
-(`{REPO_SLUG}-{PATCHED_SHA7}-{NNN}`, `validation_status: not_verified`,
-no /triage precondition — user directive 2026-07-27), so it enters the
-cumulative outputs and dashboards like any scanning-skill finding.
+baseline (gate A15), using `{REPO_SLUG}-{PATCHED_SHA7}-{NNN}` with no
+/triage precondition, so it enters the cumulative outputs and dashboards
+like any scanning-skill finding. The verification schema's
+`$defs/regression` has **no `validation_status` property** and rejects
+undeclared fields. Never add that field — not a legacy marker, `null`,
+or even a canonical assertion. Preserve regression evidence and
+correction context in existing fields. Core owns subsequent validity
+judgments independently of the original finding's remediation verdict;
+see [Validity authoring](../../../docs/report-structure.md#validity-authoring).
 
 #### 5d. PQC don't-regress checks
 
@@ -997,16 +1002,16 @@ A few checks the validator cannot perform — verify them manually:
 #### 7a2. Route regressions into the findings ledger (mandatory when `regressions[]` is non-empty)
 
 Regressions are audit-grade new findings and become **first-class ledger
-findings directly** — no `/triage` precondition (user directive
-2026-07-27; parity with the scanning skills, whose findings enter
-reports/ledger at birth as `not_verified` with triage adjudicating
-downstream). (`traust remediation verify-record`, 7b, takes every
-`regressions[]` entry in as a finding of the patched commit (sourced from the
-verification), not yet validated, with the verification as its
-evidence; re-recording the same report changes nothing.) It records — it
-never authors a verdict; the routed findings await triage/validation
-adjudication like any other claimed finding
-(docs/findings-routing.md).
+findings directly** — no `/triage` precondition, in parity with the
+scanning skills. The verification regression artifact cannot carry
+`validation_status`; triage adjudicates downstream.
+`traust remediation verify-record` (7b) takes every `regressions[]` entry
+in as a finding of the patched commit (sourced from the verification),
+with the verification as its evidence; re-recording the same report
+changes nothing. Recording does not author a validity verdict. Never
+infer one from successful fix verification or report inclusion, or add a
+validity field to the regression. Later judgments use Core's existing
+authenticated decision doors, not edits to the stored report.
 
 #### 7b. Present results
 
