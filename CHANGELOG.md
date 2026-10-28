@@ -29,6 +29,12 @@ All notable changes to Traust are documented here.
   same claims without inventing a verdict or evidence grade; audit/triage source
   representation prerequisites remain separate.
 
+- Align new audit validity with the existing canonical registry: omit an
+  unanswered assertion rather than emitting deprecated unknown/revision labels.
+  Source instructions retain evidence and correction context without inventing
+  confirmation or execution proof; historical report reads and exact stored-run
+  replay remain compatible through Core's existing record owner.
+
 - **OWASP LLM categories are structured again.** `llm-application-review.md`
   records a finding's OWASP LLM Top 10 category in `owasp_llm_references`
   (for example `["LLM06"]`) instead of in the description; the check number

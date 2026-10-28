@@ -147,7 +147,7 @@ Use when you need to understand a crypto decision point — probe what crypto is
 
 ## dependency-watch
 
-Use on the daily continuous-operations cadence, or when the user asks to "check for new dependency CVEs", "run the deps lane", "watch dependencies", or "file dependency vulnerabilities" — runs the advisory-driven dependency chain end to end: refresh the vulnerability feeds, sweep new advisories against the audited fleet, run /impact-analysis reachability on hits, and route affected repos' findings into their disposition ledgers as event-carried findings (gate A15 — the baseline is never written), so a newly disclosed dependency CVE becomes an owned, SLA-clocked finding the same day. Orchestrator-neutral — invocable identically from an operator session, cron, Source Code Intelligence, or any enterprise scheduler.
+Use on the daily continuous-operations cadence, or when the user asks to "check for new dependency CVEs", "run the deps lane", "watch dependencies", or "file dependency vulnerabilities" — runs the advisory-driven dependency chain end to end: refresh the vulnerability feeds, sweep new advisories against the audited fleet, run /impact-analysis reachability on hits, and file affected repos' findings through Core intake with no default validity answer (gate A15 — the baseline is never written), so a newly disclosed dependency CVE becomes an owned, SLA-clocked finding the same day. Orchestrator-neutral — invocable identically from an operator session, cron, Source Code Intelligence, or any enterprise scheduler.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -157,7 +157,7 @@ Use on the daily continuous-operations cadence, or when the user asks to "check 
 
 ## impact-analysis
 
-Use when determining which portfolio repositories are affected by an advisory (CVE, GHSA, MAL-/malicious-package, or another OSV-native id). Walks the commits' recorded SBOMs for blast radius, then runs language-specific analysis (govulncheck reachability for Go, the strongest tier; manifest-level analyzers for npm, PyPI, Maven, Cargo, RubyGems, and NuGet; manifest-level evidence for the universal Docker/GitHub Actions/Helm surfaces) to classify every importing repo. Records a schema-validated artifact per commit in traust-core, consumed by /triage and /verify-remediation.
+Use when determining which portfolio repositories are affected by an advisory (CVE, GHSA, MAL-/malicious-package, or another OSV-native id). Walks the commits' recorded SBOMs for blast radius, then runs language-specific analysis (govulncheck reachability for Go, the strongest tier; manifest-level analyzers for npm, PyPI, Maven, Cargo, RubyGems, and NuGet; manifest-level evidence for the universal Docker/GitHub Actions/Helm surfaces) to classify every importing repo. Records a schema-validated artifact per commit in traust-core, consumed by /triage and /verify-remediation. New unjudged findings omit validity assertions; affectedness evidence does not author a Core validity judgment.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -206,7 +206,7 @@ Use when the user asks to perform a security audit, security review, vulnerabili
 
 ## secure-container-audit
 
-Use when the user asks to perform a security audit, vulnerability scan, SBOM analysis, or supply-chain assessment of a container image (registry reference, payload image, or batch of images) using skopeo, syft, and grype — covering image configuration, known CVEs in shipped packages, signature/provenance posture, and drift between the image contents and its source repository. Authors canonical remediation sizes or explicit unknowns, independent blocking, and explicit roadmap priorities through Core's report record door.
+Use when the user asks to perform a security audit, vulnerability scan, SBOM analysis, or supply-chain assessment of a container image (registry reference, payload image, or batch of images) using skopeo, syft, and grype — covering image configuration, known CVEs in shipped packages, signature/provenance posture, and drift between the image contents and its source repository. Omits unauthored validity answers; authors canonical remediation sizes or explicit unknowns, independent blocking, and explicit roadmap priorities through Core's report record door.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -215,7 +215,7 @@ Use when the user asks to perform a security audit, vulnerability scan, SBOM ana
 
 ## secure-rpm-audit
 
-Use when the user asks to perform a security audit, security review, or vulnerability assessment of an RPM packaging repository (CentOS Stream / Fedora / RHEL dist-git) — a repo containing a .spec file, downstream patches, and a sources lookaside manifest — using OWASP ASVS, the SEI CERT C/C++ Coding Standards, Fedora Packaging Guidelines, SLSA, and OpenSSF Scorecard. Authors canonical remediation sizes or explicit unknowns, independent blocking, and explicit roadmap priorities through Core's report record door.
+Use when the user asks to perform a security audit, security review, or vulnerability assessment of an RPM packaging repository (CentOS Stream / Fedora / RHEL dist-git) — a repo containing a .spec file, downstream patches, and a sources lookaside manifest — using OWASP ASVS, the SEI CERT C/C++ Coding Standards, Fedora Packaging Guidelines, SLSA, and OpenSSF Scorecard. Omits unauthored validity answers; authors canonical remediation sizes or explicit unknowns, independent blocking, and explicit roadmap priorities through Core's report record door.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -234,7 +234,7 @@ Use when a reviewer wants to steer a security code audit between phases — Phas
 
 ## vuln-scan
 
-Static source-code vulnerability scan. Reads a target directory (and its threat model recorded in traust-core, if present), spawns parallel review subagents per focus area, and writes <repo>-vuln-findings.{json,md} with campaign finding IDs ({REPO_SLUG}-{SHORTSHA}-{NNN}) and the shared severity enum, for /triage to consume. When traust-core holds a baseline for the repository, the scan supplements it: known findings are deduped against the baseline and new verified findings enter traust-core directly (as findings of the scan's assessment; the baseline is never written — gate A15) at not_verified (no triage precondition; triage adjudicates downstream) — /secure-code-audit remains the preferred baseline and /verify-remediation the way to update it after fixes. Read-only — no building, running, or network. Use when asked to "scan for vulns", "review this code for security issues", "find bugs in <dir>", "re-sweep an audited repo", or as the step between /threat-model and /triage.
+Static source-code vulnerability scan. Reads a target directory (and its threat model recorded in traust-core, if present), spawns parallel review subagents per focus area, and writes <repo>-vuln-findings.{json,md} with campaign finding IDs ({REPO_SLUG}-{SHORTSHA}-{NNN}) and the shared severity enum, for /triage to consume. When traust-core holds a baseline for the repository, the scan supplements it: known findings are deduped against the baseline and new reviewed findings enter traust-core directly (as findings of the scan's assessment; the baseline is never written — gate A15) with no authored validity answer (no triage precondition; triage adjudicates downstream) — /secure-code-audit remains the preferred baseline and /verify-remediation the way to update it after fixes. Read-only — no building, running, or network. Use when asked to "scan for vulns", "review this code for security issues", "find bugs in <dir>", "re-sweep an audited repo", or as the step between /threat-model and /triage.
 
 - **Stage:** ③ Audit
 - **Tier:** `primary`
@@ -333,7 +333,7 @@ Use when the user asks to remediate, patch, fix, or produce a code fix for a sec
 
 ## verify-remediation
 
-Use when the user provides a previous secure-code-audit report and a patched version of the scanned repository, and asks to verify that findings have been resolved. Performs a targeted re-audit of each original finding against the patched code using the same frameworks, criteria, and evidence standards as the original secure-code-audit, then emits a structured verification report.
+Use when the user provides a previous secure-code-audit report and a patched version of the scanned repository, and asks to verify that findings have been resolved. Performs a targeted re-audit of each original finding against the patched code using the same frameworks, criteria, and evidence standards as the original secure-code-audit, then emits a structured verification report. Regression artifacts have no validity field; Core owns subsequent validity judgments.
 
 - **Stage:** ⑧ Verification
 - **Tier:** `primary`

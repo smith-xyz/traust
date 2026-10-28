@@ -1,7 +1,7 @@
 ---
 name: dependency-watch
 description: >-
-  Use on the daily continuous-operations cadence, or when the user asks to "check for new dependency CVEs", "run the deps lane", "watch dependencies", or "file dependency vulnerabilities" — runs the advisory-driven dependency chain end to end: refresh the vulnerability feeds, sweep new advisories against the audited fleet, run /impact-analysis reachability on hits, and route affected repos' findings into their disposition ledgers as event-carried findings (gate A15 — the baseline is never written), so a newly disclosed dependency CVE becomes an owned, SLA-clocked finding the same day. Orchestrator-neutral — invocable identically from an operator session, cron, Source Code Intelligence, or any enterprise scheduler.
+  Use on the daily continuous-operations cadence, or when the user asks to "check for new dependency CVEs", "run the deps lane", "watch dependencies", or "file dependency vulnerabilities" — runs the advisory-driven dependency chain end to end: refresh the vulnerability feeds, sweep new advisories against the audited fleet, run /impact-analysis reachability on hits, and file affected repos' findings through Core intake with no default validity answer (gate A15 — the baseline is never written), so a newly disclosed dependency CVE becomes an owned, SLA-clocked finding the same day. Orchestrator-neutral — invocable identically from an operator session, cron, Source Code Intelligence, or any enterprise scheduler.
 argument-hint: "[CVE-ID | --since <date> | below-range <repo>] [--include-likely] [--dry-run]"
 user-invocable: true
 metadata:
@@ -135,9 +135,12 @@ executive summaries, SCI) already read.
    (*was* `route impact-findings`, retired) — for every `affected` commit:
    a dependency finding through traust-core's intake (the baseline is
    never written — gate A15) (`origin: impact-analysis`,
-   `category: supply-chain`, `validation_status: not_verified`), keyed by
-   repository + advisory + package so a re-run adds nothing
-   (`source.type: impact_report`, machine-static class 3).
+   `category: supply-chain`), keyed by repository + advisory + package so
+   a re-run adds nothing (`source.type: impact_report`, machine-static
+   class 3). Omit unauthored `validation_status`: affectedness and
+   reachability evidence do not supply a default validity answer.
+   Core's decision services and installed contracts registry own validity;
+   see [Validity authoring](../../../docs/report-structure.md#validity-authoring).
    `--include-likely` is retired: only `affected` is filed. (*Now:* every
    affected commit is filed; there is no baseline precondition.)
 
