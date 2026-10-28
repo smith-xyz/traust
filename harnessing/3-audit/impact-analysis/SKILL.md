@@ -8,7 +8,8 @@ description: Use when determining which portfolio repositories are affected by
   manifest-level evidence for the universal Docker/GitHub
   Actions/Helm surfaces) to classify every importing repo. Records a
   schema-validated artifact per commit in traust-core, consumed by /triage
-  and /verify-remediation.
+  and /verify-remediation. New unjudged findings omit validity assertions;
+  affectedness evidence does not author a Core validity judgment.
 argument-hint: "<advisory-id> [--repo-url <url> --sha <commit>] [--symbols <s1,s2>] [--feature-desc '...'] [--scan]"
 user-invocable: true
 metadata:
@@ -321,10 +322,13 @@ written.
 
 - **`/dependency-watch` → python3 -m traust.cli impact analyze** — the
   filing leg (harness ≥ 0.197.0): every `affected` repo's dependency
-  finding is filed through traust-core's intake — never written to the baseline (gate A15) — at
-  `validation_status: not_verified` (direct-entry convention,
-  `source.type: impact_report`, class-3 machine-static), making the
+  finding is filed through traust-core's intake — never written to the
+  baseline (gate A15) — with unauthored `validation_status` omitted
+  (`source.type: impact_report`, class-3 machine-static), making the
   classification an owned, SLA-clocked finding — not just analysis.
+  Preserve the affectedness/reachability rationale as evidence; validity
+  judgments belong to Core's decision services and installed contracts
+  registry, per [Validity authoring](../../../docs/report-structure.md#validity-authoring).
 - **`/triage` Phase 2f** — triage reads the impact-analysis artifact to
   give verifiers portfolio-wide context.
 - **`/verify-remediation` full-sweep** — accepts `--impact-filter` to

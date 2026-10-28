@@ -472,7 +472,7 @@ Every critical/high candidate must pass all of:
    checked/reviewed" rationales and hypothetical-caller misuse are audit
    leads. A finding requires a traced untrusted flow to the sink in THIS
    repo. High-value sink with plausible-but-untraced input → medium,
-   `not_verified`, with the untraced hop named.
+   omit `validation_status`, with the untraced hop named.
 
 ### Shipped-artifact and mechanism checks
 
@@ -580,7 +580,7 @@ The wrapper runs the opengrep engine against an **explicitly pinned ruleset** �
 **The model is the judge.** Each fact is a true statement about the code's *shape* (rule id, `file:line`, CWE, taint trace) — not a vulnerability. For every fact in an application-security class:
 
 1. **Judge it in repository context**: is the source actually attacker-controlled here? Is there sanitization or parameterization the rule cannot see? Is the sink reachable from any tenant/user-facing entry point? Facts with `taint: true` include a dataflow trace worth following in the code; facts with `test_path: true` are usually noise.
-2. **Promote or dismiss — and record every decision as calibration data.** Promoted facts become findings citing the fact's `file:line` in `locations` and its CWE in `cwes`, with `validation_status: not_verified` (a pattern match is not execution evidence). **Every judged fact** — promoted *and* dismissed — gets a structured `scanner_correlation` entry:
+2. **Promote or dismiss — and record every decision as calibration data.** Promoted facts become findings citing the fact's `file:line` in `locations` and its CWE in `cwes`, omitting `validation_status` when no validity answer exists (a pattern match is not execution evidence). **Every judged fact** — promoted *and* dismissed — gets a structured `scanner_correlation` entry:
 
    ```json
    {"tool": "opengrep", "rule_id": "<traust-* rule id>", "location": "<file>:<line>",
@@ -607,7 +607,7 @@ review for that language — switch the manual lanes covering it into the
 1. **Report the plausible, not just the proven.** For thin-coverage
    languages, findings that a well-seeded review might hold back for
    lack of corroborating facts are reported rather than dropped —
-   honestly framed: `validation_status: not_verified` as always,
+   honestly framed: omit unauthored `validation_status`,
    severity per CVSS with no inflation, and the description names what
    evidence would confirm or refute. The asymmetry that justifies
    this: an audit-stage omission is unrecoverable, while an extra
@@ -877,7 +877,7 @@ grype db status
 Use the output as follows:
 
 - **`dependency_audit`** — one entry per grype match: `package`, `version`, `status` (`vulnerable` / `fix-available` / `wont-fix` per upstream data), and `notes` naming the CVE/GHSA ID and the fixed-in version. Matches with no fix or negligible severity may be summarized in `prose` rather than enumerated.
-- **Findings** — promote a grype match to a finding **only** when the vulnerable code is plausibly reachable from this repository's usage (check the import/call actually exists — a match in an unused transitive module is `dependency_audit`-only), and only after the promotion passes the **Precision Gate → Dependency and advisory gate** (artifact reachability, vendor applicability, manifest-only lint). Categorize as `supply-chain`, cite OWASP K07 for operator repos, and keep `validation_status: not_verified` — a version match is not execution evidence. When a portfolio impact artifact covers the CVE (`analysis-results/impact/<cve>-impact-analysis.json`, from `/impact-analysis`), cite this repo's classification and evidence block: `affected` (symbol-reachable) strengthens promotion, `not_observed` at symbol level is documented dismissal evidence, and manifest-level classifications are context only — record the artifact path in the finding's `evidence`.
+- **Findings** — promote a grype match to a finding **only** when the vulnerable code is plausibly reachable from this repository's usage (check the import/call actually exists — a match in an unused transitive module is `dependency_audit`-only), and only after the promotion passes the **Precision Gate → Dependency and advisory gate** (artifact reachability, vendor applicability, manifest-only lint). Categorize as `supply-chain`, cite OWASP K07 for operator repos, and omit unauthored `validation_status` — a version match is not execution evidence. When a portfolio impact artifact covers the CVE (`analysis-results/impact/<cve>-impact-analysis.json`, from `/impact-analysis`), cite this repo's classification and evidence block: `affected` (symbol-reachable) strengthens promotion, `not_observed` at symbol level is documented dismissal evidence, and manifest-level classifications are context only — record the artifact path in the finding's `evidence`.
 - **`metadata.tools`** — append `syft <version>` and `grype <version> (db <built-date>)` so the scan is reproducible against a stated DB state. The SBOM and grype JSON are intermediates; do not place them in `findings/`.
 
 #### Deterministic dependency pre-scan (OSV API)
@@ -1002,8 +1002,8 @@ Contract — this pre-scan is deliberately NOT like the dependency ones:
    (grep the fixing commit's function or CVE id, check the changed lines
    at the pinned ref). A confirmed backport is a `negative_results`
    entry naming the advisory and the backport evidence; an absent or
-   unverifiable backport files the finding with `validation_status:
-   not_verified` and the backport check recorded in the finding.
+   unverifiable backport files the finding with `validation_status`
+   omitted and the backport check recorded in the finding.
 4. **Record the run**: set `"fork-advisory-lag": "ran"` (or
    `"skipped: <reason>"`) in
    `metadata.additional.deterministic_steps`, and log promote/dismiss
@@ -1308,8 +1308,8 @@ Contract (identical in spirit to the opengrep stage):
    entropy? referenced by live config?) and record every promote/dismiss
    decision as a `scanner_correlation` entry (tool `gitleaks`, `rule_id`,
    `result: promoted|dismissed`) exactly like the opengrep pre-scan.
-2. Findings promoted from candidates keep `validation_status:
-   not_verified`; a candidate with a non-null `liveness_class` should name
+2. Findings promoted from candidates omit unauthored `validation_status`;
+   a candidate with a non-null `liveness_class` should name
    the validate-findings **credential-liveness** verifier as its
    validation path (a read-only, scope-guarded probe can upgrade it to
    CONFIRMED_LIVE — see `harnessing/5-validate/validate-findings/`). Detection is
@@ -1389,8 +1389,8 @@ Rules of the pass:
   usual, plus the `classically-broken` tag. Everything else PQC-tagged is
   **not a vulnerability**: a 2035-clock RSA key exchange is `severity:
   informational`, `kind: weakness` unless some *other* defect applies.
-  Kind does not establish validity or execution evidence. Never emit
-  `validation_status: hardening` or inflate severity because of the quantum timeline.
+  Kind does not establish validity or execution evidence; omit unauthored
+  `validation_status`. Never inflate severity because of the quantum timeline.
 - A TLS config pinning groups without an ML-KEM option is
   `pqc-blocker-config` + `insecure-workload-config` or `cryptography`
   category — file it; these are the cheapest fleet-wide fixes.
@@ -1537,17 +1537,34 @@ Key profile obligations for this skill:
 
 A drift audit across the portfolio's reports (2026-07-08) showed that every field this section did not pin oscillated from batch to batch. These conventions are normative; the validator enforces or warns on each (harness ≥ 0.15.0).
 
-**`validation_status`** — set on **every** finding, with these semantics:
+**`validation_status`** — follow the shared
+[Validity authoring](../../../docs/report-structure.md#validity-authoring)
+contract and Core's installed contracts registry, not a skill-local enum.
+New unjudged findings **omit the field**; neither `null` nor `confirmed`
+is an unknown/default. Carry an explicit canonical assertion only when
+the execution evidence or attributed reviewer determination actually
+exists and is referenced in existing evidence/provenance fields.
+`corrected` is not a validity answer: keep revision rationale and
+correction context in existing fields, and use the authenticated
+restatement workflow for already stored claims. An explicitly known
+hardening classification is `kind: weakness`, independent of validity.
 
-| Value | Meaning | When to use |
-|---|---|---|
-| `not_verified` | Static review only; no execution evidence | **Default for every finding this skill produces.** An audit report fresh out of this skill should be predominantly `not_verified`. |
-| `confirmed` | Verified by **execution evidence** — a fuzz crash, proof-of-concept, failing test, or a validations-pipeline report (`validation.schema.json` under `analysis-results/validations/`) — or by a **human reviewer** performing triage of the finding | Only when that evidence or human determination exists and is referenced in the finding (e.g. via `source_findings`, an evidence block, or a reviewer attribution). |
-| `corrected` | Finding was revised after initial write-up (wrong location, severity, or scope fixed) | During report revision. |
-| `false_positive` | Refuted by the same execution-evidence classes or a human reviewer; retained for the audit trail | After execution-based or human verification refutes it. |
-| `hardening` | Accurate defense-in-depth/benchmark gap with no concrete exploit path (triage exclusion rule 13) | **Never set at audit time.** This value is written into cumulative reports by the disposition ledger when triage renders a hardening verdict (see `docs/disposition-ledger.md`). |
+Automated static-review votes — including `/triage` LLM adversarial
+verification — do **not** change the audit report's validity fields.
+`traust triage record` records verdicts through Core finding decisions;
+`/track-findings` reads the derived state under evidence-class precedence
+and countersign rules. Human judgments use the existing authenticated
+`traust findings` doors with the reviewer's own determination and
+rationale. Never hand-edit existing baselines or rewrite historical
+reports for this cutover. The old layer emitter and cumulative-file
+rebuild are retired; never hand-write their outputs. Do not mark findings
+`confirmed` because the analysis felt certain; all-`confirmed` audit
+reports still warrant the validator's over-claiming warning.
 
-Automated static-review votes — including `/triage` LLM adversarial verification — do **not** change `validation_status` in the audit report itself. `traust triage record` records those verdicts through core finding decisions; `/track-findings` reads the derived state under evidence-class precedence and countersign rules. The old layer emitter and cumulative-file rebuild are retired; never hand-write their outputs. A **human reviewer** performing triage of a finding may state `confirmed` or `false_positive` through the authenticated `traust findings` doors with their own judgement and rationale. Do not mark findings `confirmed` because the analysis felt certain; the validator flags all-`confirmed` audit reports as over-claiming.
+New triage represents a verified gap as `verdict: true_positive, kind: weakness`
+(rule 13, null severity); Core records `validity: confirmed, kind: weakness`.
+Never emit historical `hardening` as a new triage verdict. This does not rewrite
+the audit report's `validation_status`; cumulative-file rebuilds are retired.
 
 **CVSS** — required on every `critical`/`high`/`medium`/`low` finding. **Omit** for `informational` findings (posture and hygiene observations are not scored — the validator errors on an informational finding carrying CVSS ≥ 7.0 and warns below that). **Severity may sit below the CVSS band only with a stated reason**: when the score is an upstream advisory's base score and the audit judges contextual severity lower (unreachable in deployment, restricted SCC, requires prior compromise), the `description` MUST name the downgrade and its rationale — e.g. *"CVSS base 7.0, but rated low in this deployment context: exploitation requires write access to a directory on $PATH inside a restricted-SCC container."* The validator warns on a ≥2-band gap with no such rationale. Never encode the downgrade only in the severity field.
 

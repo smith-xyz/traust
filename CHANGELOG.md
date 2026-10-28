@@ -2,6 +2,21 @@
 
 All notable changes to Traust are documented here.
 
+## [0.39.2]
+
+- Separate triage finding kind from verdict: verified defense-in-depth gaps
+  emit `true_positive` plus `kind: weakness`, never a new `hardening` verdict.
+  Preserve unknown kind and review-only outcomes without inventing proof.
+- Keep weakness backlog, vulnerability ranking, patch selection and rule mining
+  separate while retaining verifier votes and historical triage reads.
+- Adopt the coordinated Core record-door gate, citation routing and rendering.
+  New contradictory weakness severity/rule-13 claims fail before recording;
+  exact historical replay preserves bytes and identity without reclassifying
+  later findings.
+- Persist explicit finding kinds atomically with triage admission so interrupted
+  decision recording can resume without losing kinds or overwriting later
+  judgments on replay.
+
 ## [Unreleased]
 
 - **Route x guard matrix: FastAPI, aiohttp and Express** (Vercel comparison
@@ -28,6 +43,12 @@ All notable changes to Traust are documented here.
   `not_verified` validity labels. Their existing validation consumer retains the
   same claims without inventing a verdict or evidence grade; audit/triage source
   representation prerequisites remain separate.
+
+- Align new audit validity with the existing canonical registry: omit an
+  unanswered assertion rather than emitting deprecated unknown/revision labels.
+  Source instructions retain evidence and correction context without inventing
+  confirmation or execution proof; historical report reads and exact stored-run
+  replay remain compatible through Core's existing record owner.
 
 - **OWASP LLM categories are structured again.** `llm-application-review.md`
   records a finding's OWASP LLM Top 10 category in `owasp_llm_references`
@@ -231,8 +252,8 @@ All notable changes to Traust are documented here.
 - **Pins traust-engine 0.37.1 (88c8065): `go.mod` `replace` directives
   are honoured** in the dependency pre-scan.
   - Requires replaced with a directory in the checkout are the project's
-    own modules and are no longer reported. On etcd that removes 3 false
-    positives.
+    own modules and are no longer reported. On one real Go checkout that
+    removes 3 false positives.
   - Requires replaced with another module or version query what actually
     builds.
 
@@ -246,7 +267,8 @@ All notable changes to Traust are documented here.
   - `/secure-code-audit` and `/vuln-scan` treat them as build- and
     test-environment exposure, not shipped code. No tag means runtime or
     unknown.
-  - On keycloak, 117 of 355 candidates are `test` and 13 are `dev`.
+  - On one real Java checkout, 117 of 355 candidates are `test` and 13 are
+    `dev`.
 - This change was meant to ship in 0.34.0 (traust#101). It was pushed a
   minute after that PR merged, so it lands here.
 
