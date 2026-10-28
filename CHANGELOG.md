@@ -24,6 +24,11 @@ All notable changes to Traust are documented here.
   either input order; conflicting explicit kinds refuse the entire batch
   before insertion, without reclassifying previously stored findings.
 
+- Keep unjudged benchmark and cluster-drift worklists free of deprecated
+  `not_verified` validity labels. Their existing validation consumer retains the
+  same claims without inventing a verdict or evidence grade; audit/triage source
+  representation prerequisites remain separate.
+
 - **OWASP LLM categories are structured again.** `llm-application-review.md`
   records a finding's OWASP LLM Top 10 category in `owasp_llm_references`
   (for example `["LLM06"]`) instead of in the description; the check number
