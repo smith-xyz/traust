@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [manifest]
-overrides = [{ name = "traust-core", git = "https://github.com/traust-security/traust-core.git?rev=75ad1e7ee7eb5245bafa9cff2709ad3cd53a1005" }]
+overrides = [{ name = "traust-core", git = "https://github.com/traust-security/traust-core.git?rev=b5f7e740002ca74069fa73a329dabcd416be1e40" }]
 
 [[package]]
 name = "annotated-types"
@@ -1531,8 +1531,8 @@ requires-dist = [
     { name = "pyyaml" },
     { name = "referencing" },
     { name = "sigstore", marker = "extra == 'signing'", specifier = ">=4.0,<5.0" },
-    { name = "traust-core", extras = ["js"], git = "https://github.com/traust-security/traust-core.git?rev=75ad1e7ee7eb5245bafa9cff2709ad3cd53a1005" },
-    { name = "traust-core", extras = ["postgres"], marker = "extra == 'postgres'", git = "https://github.com/traust-security/traust-core.git?rev=75ad1e7ee7eb5245bafa9cff2709ad3cd53a1005" },
+    { name = "traust-core", extras = ["js"], git = "https://github.com/traust-security/traust-core.git?rev=b5f7e740002ca74069fa73a329dabcd416be1e40" },
+    { name = "traust-core", extras = ["postgres"], marker = "extra == 'postgres'", git = "https://github.com/traust-security/traust-core.git?rev=b5f7e740002ca74069fa73a329dabcd416be1e40" },
     { name = "traust-engine", git = "https://github.com/traust-security/traust-engine.git?rev=5bd3ae9b8604d72852e20014b648c388552a6159" },
     { name = "tree-sitter", marker = "extra == 'graph'" },
     { name = "tree-sitter-go", marker = "extra == 'graph'" },
@@ -1562,7 +1562,7 @@ dependencies = [
 [[package]]
 name = "traust-core"
 version = "0.1.0"
-source = { git = "https://github.com/traust-security/traust-core.git?rev=75ad1e7ee7eb5245bafa9cff2709ad3cd53a1005#75ad1e7ee7eb5245bafa9cff2709ad3cd53a1005" }
+source = { git = "https://github.com/traust-security/traust-core.git?rev=b5f7e740002ca74069fa73a329dabcd416be1e40#b5f7e740002ca74069fa73a329dabcd416be1e40" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "pydantic" },

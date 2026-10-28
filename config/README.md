@@ -42,7 +42,7 @@ ships a template for each such file:
 | `campaign.example.yaml` | `campaign.yaml` | dashboards that cite a tracking reference (`/validation-fuzz-dashboard`, `/generate-team-report`) |
 | `product-definitions-map.example.yaml` | `product-definitions-map.yaml` | `traust registry products` (traust-core `ctx.product_mappings`), `/assign-findings-owners`, `/sla-view` |
 | `budget-policy.example.yaml` | `budget-policy.yaml` | rescan worklist, drain tranche |
-| `rule-pack-allowlist.example.yaml` | `rule-pack-allowlist.yaml` | `traust_engine.adapters.opengrep`, `/mine-ledger` |
+| `rule-pack-allowlist.example.yaml` | `rule-pack-allowlist.yaml` | `traust sweep rule-lane` (the allowlisted-rule precision re-check), `/mine-ledger` |
 | `safe-exec-profiles.example.yaml` | `safe-exec-profiles.yaml` | traust-core's safe-exec (`traust util safe-exec`) |
 | `hardening-risk-weights.example.json` | `hardening-risk-weights.json` | none (its consumer retired with the traust-core hub; the triage skill port decides) |
 | `export.example.yaml` | `export.yaml` | the one-shot public export (public forge URL, private URLs to rewrite, build plumbing to strip, CHANGELOG cut) |

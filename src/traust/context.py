@@ -98,6 +98,8 @@ def load(
     sla_policy: Path | None = None,
     invoices: Path | None = None,
     canaries: str = "canaries",
+    rule_pack: Path | None = None,
+    rule_drafts: Path | None = None,
 ) -> Context:
     """traust-core's Context from ``<config home>/core.yaml`` with every provider registered once,
     or exit 2 when the config is invalid.
@@ -108,7 +110,9 @@ def load(
     when there is one (template: config/sla-policy.example.yaml); the spend view on the home's
     model registry when there is one, reconciled against ``invoices``. The tools read the home's
     ``external-tools.yaml`` and ``safe-exec-profiles.yaml`` on first use; detection quality scores
-    the rule pack (:func:`_rule_pack`) against canaries from ``recall-benchmark/<canaries>``.
+    the rule pack (``rule_pack``, else :func:`_rule_pack`) against canaries from
+    ``recall-benchmark/<canaries>`` and stages rule drafts in ``rule_drafts``, else
+    ``locations.rule_drafts`` when one resolves.
     """
     home = resolve_config_home(config_home)
     path = home / CORE_CONFIG if home is not None else None
@@ -134,12 +138,16 @@ def load(
     # No home: the default home's paths, so the first tool use names the file it needs.
     files = home or TRAUST_CONFIG_HOME_DEFAULT
     core.register_toolchain(files / EXTERNAL_TOOLS, files / SAFE_EXEC_PROFILES)
-    pack, pack_version = _rule_pack(core.config.locations)
+    pack, pack_version = (
+        (rule_pack, f"local:{rule_pack}") if rule_pack else _rule_pack(core.config.locations)
+    )
     core.register_rule_pack(pack)
     cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
     core.register_detection_quality(
         pack_version, files / "recall-benchmark" / canaries, cache / "recall-bench" / canaries
     )
+    if drafts := rule_drafts or core.config.locations.rule_drafts_dir():
+        core.register_rule_drafts(drafts)
     core.register_fleet_fix()
     core.register_compliance_sources()
     return core
