@@ -1,5 +1,6 @@
 .PHONY: help install test doctor setup update-vuln-dbs build-image build-tools-image lint lint-fix hooks sync status bump $(BUMP_PARTS)
 .PHONY: skillsaw-lint skillsaw-fix skillsaw-badge
+.PHONY: ops-up ops-down ops-reset ops-run ops-claim ops-sh ops-scan ops-smoke ops-doctor
 
 PROFILE    ?= secure-code-audit
 CLI        := uv run python -m traust.cli.toolchain
@@ -43,6 +44,25 @@ lint: ## ruff check + format --check
 lint-fix: ## ruff --fix + format
 	uv run ruff check --fix .
 	uv run ruff format .
+
+ops-up: ## Local continuous-ops rig: Postgres + config home + compressed pack
+	bash scripts/local_ops.sh up
+ops-down: ## Stop the rig's Postgres (data kept)
+	bash scripts/local_ops.sh down
+ops-reset: ## Fresh rig: drop the volume, regenerate config and overlay pack
+	bash scripts/local_ops.sh reset
+ops-run: ## Engine tick loop, pane 1 (make ops-run OPS_EVERY=5m)
+	bash scripts/local_ops.sh run
+ops-claim: ## Claim loop, pane 2
+	bash scripts/local_ops.sh claim
+ops-sh: ## Shell with the rig's environment (TRAUST_CONFIG_HOME, .local-ops/env)
+	bash scripts/local_ops.sh sh
+ops-scan: ## Walk the workflow by hand: onboard + observe + one scan (REPO=https://...)
+	bash scripts/local_ops.sh scan $(REPO)
+ops-smoke: ## One bounded engine cycle with asserts (the CI entry)
+	bash scripts/local_ops.sh smoke
+ops-doctor: ## Check the rig: container, engine, config home, tokens
+	bash scripts/local_ops.sh doctor
 
 skillsaw-badge: ## Regenerate the committed skillsaw grade badge (Podman)
 	podman run --rm -v "$(CURDIR):/workspace:Z" ghcr.io/stbenjam/skillsaw:v$(SKILLSAW_VERSION) badge

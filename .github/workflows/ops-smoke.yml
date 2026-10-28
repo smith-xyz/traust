@@ -1,0 +1,27 @@
+name: ops-smoke
+
+# The local continuous-ops rig, end to end: make ops-smoke stands up an
+# ephemeral Postgres, onboards one repository, runs one engine pass, claims
+# until the queue drains and asserts the orders completed (see
+# docs/continuous-operations.md, "The local rig"). Manual only: routed lanes
+# queue for approval and are never claimed here, so the run spends nothing.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: traust-security/traust-engine
+          ref: fe9e9129e2e4682fc8b7d0040efe4fee7c748073
+          path: traust-engine
+      - uses: astral-sh/setup-uv@v5
+      - run: make ops-smoke
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPS_ENGINE_SRC: ${{ github.workspace }}/traust-engine
+          OPS_TEARDOWN: "1"
