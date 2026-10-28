@@ -371,6 +371,11 @@ Unset, `locations.inputs` defaults to
 
 ### Remote results and graph
 
+*Retired:* the engine's remote materialiser (`traust-engine[s3]`,
+`HARNESS_REMOTE_CACHE`, `HARNESS_S3_*`, `HARNESS_STORAGE_OPTIONS`) went with the
+portfolio graph it served. traust reads through traust-core, and object storage
+is traust-core's `ObjectStore` (`core.yaml` → `artifacts`). Was:
+
 Findings do not have to be local. Set
 `locations.yaml` → `analysis_results` to a
 bare path, a `file://` URI, or an object-store URI, which is how a scheduled
