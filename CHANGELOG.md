@@ -19,6 +19,14 @@ All notable changes to Traust are documented here.
 
 ## [Unreleased]
 
+- **Review checks for FastAPI, aiohttp and Express** (Vercel comparison gap
+  plan, step 5). `framework-checks.md` gains FA.1–FA.15 (FastAPI and
+  aiohttp) and EX.1–EX.18 (Express, with Backstage's `httpRouter` default and
+  `addAuthPolicy` openings), each with its CWE, ASVS 5.0 section and the
+  route-guards rows or opengrep facts that settle it. The intro now says a
+  tool reporting nothing is not a negative, and routes from a family no
+  section covers are recorded as coverage gaps. Wording was checked by two
+  blind reviewers applying the sections to real FastAPI and Express code.
 - **Route x guard matrix: FastAPI, aiohttp and Express** (Vercel comparison
   gap plan, step 5). `traust adapters route-guards` now lists FastAPI and
   aiohttp routes (traust-core#249) and Express routes (traust-core#250) with
