@@ -54,6 +54,10 @@ pytest tests/test_default_rule_packs.py -q
 - **metadata:** `cwe` (primary CWE first — feeds finding fingerprints),
   `category`, `asvs` chapter ref, `confidence`, and optional `references`
   naming the vulnerability pattern cluster (CWE-oriented, no repo slugs).
+  A rule that detects a hardening or defense-in-depth gap rather than a
+  vulnerability declares `kind: weakness`. Its hits enter audits as
+  weakness-kind candidates, and it covers rule-mining classes of confirmed
+  weaknesses only. A rule without `kind` is a vulnerability rule.
 - **taint mode:** prefer `mode: taint` for data-flow rules; pattern-only
   rules should carry an honest `confidence` tier.
 - **messages:** original wording; framework and standard citations by ID only
