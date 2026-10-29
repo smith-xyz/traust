@@ -4,6 +4,7 @@ description: Triage a batch of raw security findings. Verify each is real,
   keep finding kind separate from verdict, collapse duplicates, re-rank
   vulnerabilities by derived exploitability, and tag with an owner.
   Gates the final new report with the shared canonical-write contract.
+  Keep the hardening finding category distinct from CWE software-weakness taxonomy.
   Takes scanner output or a read-only Core-prepared input and writes <repo>-triage.json
   + <repo>-triage.md sorted by what actually needs engineering attention. Use when
   asked to "triage findings", "validate scanner output", "prioritize vulns",
@@ -775,6 +776,14 @@ into `verdict: true_positive` with separate `kind: weakness`, never a new
 Kind is optional and non-null: omit it when unknown; never default it to
 vulnerability or infer confirmation from a kind alone.
 
+**Hardening is a workflow category, not the CWE taxonomy.** In this workflow,
+`kind: weakness` is the internal value for a verified hardening finding; its
+user-facing label is Hardening. CWE identifiers describe software weakness types
+and do not decide finding kind or verdict. A confirmed exploitable SQL injection
+may be CWE-89 with `kind: vulnerability`; a hardening finding may also carry a
+CWE independently. Apply the existing evidence and rule-13 criteria, never a
+CWE's presence, absence, or use of the word "weakness", to choose the category.
+
 ### 3a. Verifier prompt (assemble once, reuse for every spawn)
 
 ```
@@ -906,6 +915,10 @@ VERDICT: your response MUST end with EXACTLY this block:
   FIRST_LINK: <file:line of the first call site you read, or "none found">
   RATIONALE: <2-5 sentences citing specific file:line evidence for
     reachability, protections found/absent, and why each held or didn't>
+
+CWE identifiers name software weakness types, not verifier votes or finding
+categories. Never downgrade a proven vulnerability to HARDENING merely because
+its CWE is called a weakness; use the evidence criteria below.
 
 TRUE_POSITIVE requires ALL of: path is reachable from untrusted input per
 the ENVIRONMENT; protections are insufficient or bypassable; real-world

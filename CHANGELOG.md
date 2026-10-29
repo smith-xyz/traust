@@ -15,6 +15,9 @@ All notable changes to Traust are documented here.
   and recording to the trusted SDK caller.
 - Exclude explicit weakness kinds from live vulnerability risk totals while
   retaining pre-kind snapshot reads and historical hardening exclusions.
+- Clarify Hardening as the user-facing category for `kind: weakness`, distinct
+  from CWE software-weakness taxonomy; CWE tags never choose kind or verdict.
+  Keep existing evidence rules, serialized values and historical reads unchanged.
 
 ## [0.39.2]
 

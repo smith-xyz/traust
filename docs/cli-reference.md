@@ -114,6 +114,12 @@ including generic scanner inputs that have no recording step. Read-only citation
 checking/rendering and exact stored record replay remain separate; do not use
 the new-output gate to reject historical artifacts.
 
+Hardening is the user-facing category for `kind: weakness`, not a synonym for
+every CWE-described software weakness. CWE tags describe issue types and do
+not choose finding kind or verdict: a confirmed exploitable CWE-tagged issue
+remains a vulnerability. This terminology does not change the write contract,
+severity handling, or historical report bytes.
+
 For a trusted caller's already prepared Core `TriageInput`, the executable
 skill supports `traust session run --skill triage --role triage-verifier --
 /staged/input.json --prepared-input --auto --votes 1 --repo /staged/checkout
