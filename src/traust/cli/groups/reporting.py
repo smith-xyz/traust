@@ -6,8 +6,7 @@ import json
 import sys
 from pathlib import Path
 
-from traust_core.v1 import contracts
-from traust_core.v1.errors import DocumentError, TraustError, ValidationError
+from traust_core.v1.errors import TraustError, ValidationError
 from traust_core.v1.models.artifacts import (
     CloudConfigAuditArtifact,
     RenderFormat,
@@ -58,25 +57,12 @@ def call_validate(args) -> int:
     # `--schema` names a contract schema by its file name (`triage.schema.json`) or bare name.
     schema = None if args.schema is None else Path(args.schema).name.removesuffix(".schema.json")
     try:
-        if args.canonical_write and schema is None:
-            raise ValidationError("--canonical-write requires --schema")
-        if args.canonical_write and "canonical_write" not in contracts.schema(schema).get(
-            "$defs", {}
-        ):
-            raise ValidationError(f"{schema}: no shared canonical_write contract")
         results = load(args.config_home).reporting.validate_reports(
-            Path(args.path), strict=args.strict, schema=schema
+            Path(args.path),
+            strict=args.strict,
+            schema=schema,
+            canonical_write=args.canonical_write,
         )
-        if args.canonical_write:
-            for result in results:
-                try:
-                    contracts.validate_json(
-                        f"{schema}#/$defs/canonical_write", Path(result.file_path).read_bytes()
-                    )
-                except DocumentError as e:
-                    result.error(str(e))
-                except OSError as e:
-                    result.error(f"Cannot read file for canonical-write validation: {e}")
     except TraustError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
