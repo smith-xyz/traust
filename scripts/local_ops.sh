@@ -126,9 +126,12 @@ cmd_up() {
             --yes --no-toolchain --no-profile-write >/dev/null
     fi
     # The rig's database, in core.yaml (storage.yaml stays absent: that feature is off).
+    # `home` keeps core's credential store and local-issuer key inside the rig: without
+    # it they land in ~/.traust, over a real install's login there.
     if [ ! -f "$CONFIG_HOME/core.yaml" ]; then
         cat > "$CONFIG_HOME/core.yaml" <<EOF
 # Written by scripts/local_ops.sh (make ops-up); the local rig's core.
+home: $RUN_DIR/home
 database:
   url: $OPS_DSN
 artifacts:
@@ -137,7 +140,7 @@ identity:
   trust_local: true
 EOF
     fi
-    mkdir -p "$RUN_DIR/workspace" "$RUN_DIR/analysis-results" "$RUN_DIR/progress-tracker" "$OPS_DIR/pack"
+    mkdir -p "$RUN_DIR/home" "$RUN_DIR/workspace" "$RUN_DIR/analysis-results" "$RUN_DIR/progress-tracker" "$OPS_DIR/pack"
     sed -i.bak -e "s|^workspace: *\"\"|workspace: $RUN_DIR/workspace|" \
         -e "s|^analysis_results: *\"\"|analysis_results: $RUN_DIR/analysis-results|" \
         -e "s|^progress_tracker: *\"\"|progress_tracker: $RUN_DIR/progress-tracker|" \
@@ -184,8 +187,18 @@ cmd_down() {
 cmd_reset() {
     "$CT" rm -f "$OPS_CONTAINER" >/dev/null 2>&1 || true
     "$CT" volume rm "$OPS_VOLUME" >/dev/null 2>&1 || true
-    rm -rf "$OPS_DIR"
-    echo "rig reset: fresh Postgres volume, config home and overlay pack on next make ops-up"
+    # Keep the user's tokens (.local-ops/env); everything else regenerates.
+    if [ -f "$REPO_ROOT/$OPS_DIR/env" ]; then
+        mv "$REPO_ROOT/$OPS_DIR/env" "${TMPDIR:-/tmp}/local-ops-env.$$"
+        rm -rf "$OPS_DIR"
+        mkdir -p "$OPS_DIR"
+        mv "${TMPDIR:-/tmp}/local-ops-env.$$" "$REPO_ROOT/$OPS_DIR/env"
+    else
+        rm -rf "$OPS_DIR"
+    fi
+    uv pip uninstall -q traust-engine >/dev/null 2>&1 || true
+    echo "rig reset: volume, config home, overlay pack, credentials and the venv's"
+    echo "traust-engine install are gone (.local-ops/env kept); nothing outside the repo touched"
 }
 
 cmd_run() {
