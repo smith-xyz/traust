@@ -30,6 +30,12 @@ def add_validate_args(ap) -> None:
         default=None,
         help="Schema file to validate against (default: filename-based auto-detection)",
     )
+    ap.add_argument(
+        "--canonical-write",
+        action="store_true",
+        help="Also enforce the named schema's canonical_write contract for new output "
+        "(requires --schema; omit for historical reads)",
+    )
 
 
 def _print_result(result) -> None:
@@ -52,7 +58,10 @@ def call_validate(args) -> int:
     schema = None if args.schema is None else Path(args.schema).name.removesuffix(".schema.json")
     try:
         results = load(args.config_home).reporting.validate_reports(
-            Path(args.path), strict=args.strict, schema=schema
+            Path(args.path),
+            strict=args.strict,
+            schema=schema,
+            canonical_write=args.canonical_write,
         )
     except TraustError as e:
         print(f"ERROR: {e}", file=sys.stderr)

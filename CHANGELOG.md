@@ -2,6 +2,23 @@
 
 All notable changes to Traust are documented here.
 
+## [0.39.3]
+
+- Gate final serialized triage output with the shared canonical-write contract,
+  including report-only skill runs; historical validation and replay remain
+  permissive.
+- Accept native Core-prepared triage input through the actual skill and slash
+  wrapper, preserving source identity while skipping remote intake and record.
+  The external SDK records the original output.
+- Add native verification input: author supplied Core finding UUIDs with real
+  original/patch evidence, honor exact output paths, and leave backend lookup
+  and recording to the trusted SDK caller.
+- Exclude explicit weakness kinds from live vulnerability risk totals while
+  retaining pre-kind snapshot reads and historical hardening exclusions.
+- Clarify Hardening as the user-facing category for `kind: weakness`, distinct
+  from CWE software-weakness taxonomy; CWE tags never choose kind or verdict.
+  Keep existing evidence rules, serialized values and historical reads unchanged.
+
 ## [0.39.2]
 
 - Separate triage finding kind from verdict: verified defense-in-depth gaps

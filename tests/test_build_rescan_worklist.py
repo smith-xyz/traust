@@ -501,6 +501,26 @@ class TestLoadPopulation:
         pop = rw.load_population(db)
         assert pop[0]["live_crit_high"] == 2  # live + part
 
+    def test_canonical_weakness_kind_excluded_without_losing_unknown_kinds(self, tmp_path):
+        db = _mk_db(
+            tmp_path,
+            [{"repo_key": "t/a/r", "repo_url": "https://github.com/o/r"}],
+            [
+                {"repo_key": "t/a/r", "finding_id": "weak", "validity": "confirmed"},
+                {"repo_key": "t/a/r", "finding_id": "vuln", "validity": "confirmed"},
+                {"repo_key": "t/a/r", "finding_id": "unknown", "validity": "confirmed"},
+                {"repo_key": "t/a/r", "finding_id": "empty"},
+                {"repo_key": "t/a/r", "finding_id": "legacy", "validity": "hardening"},
+            ],
+        )
+        with sqlite3.connect(db) as con:
+            con.execute("ALTER TABLE findings ADD COLUMN kind TEXT")
+            con.executemany(
+                "UPDATE findings SET kind = ? WHERE finding_id = ?",
+                [("weakness", "weak"), ("vulnerability", "vuln"), ("", "empty")],
+            )
+        assert rw.load_population(db)[0]["live_crit_high"] == 3
+
 
 # ---------------------------------------------------------------------------
 # events (rule 1)
