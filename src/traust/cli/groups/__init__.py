@@ -121,6 +121,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "draft": sweep.DRAFT,
         "sweep": sweep.SWEEP,
         "emit": sweep.EMIT,
+        "propose-rule": sweep.PROPOSE,
         "benchmark": sweep.BENCHMARK,
         "benchmark-targets": sweep.BENCHMARK_TARGETS,
         "build-canaries": sweep.BUILD_CANARIES,

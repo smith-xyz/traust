@@ -24,6 +24,7 @@ from traust_core.v1.models.rule_mining import (
     Allowlist,
     RuleLane,
     RuleLaneRequest,
+    RuleProposal,
     RuleSweepRequest,
     StageStatus,
     SweepRepo,
@@ -407,6 +408,51 @@ def _write_mining(out: Path, lane: RuleLane) -> None:
     (out / "rule-mining.md").write_text(lane.mining_report, encoding="utf-8")
 
 
+def add_propose_args(ap) -> None:
+    _add_rule_args(ap)
+    ap.add_argument("--rule", type=Path, required=True, help="the proposed rule's yaml (one rule)")
+    ap.add_argument(
+        "--example",
+        type=Path,
+        required=True,
+        help="a test target with `ruleid:` and `ok:` comment lines for the rule",
+    )
+    ap.add_argument("--shape", required=True, help="the uncovered shape it is proposed for")
+    ap.add_argument(
+        "--checkout", type=Path, required=True, help="the repository the shape came from"
+    )
+    ap.add_argument("--opengrep", default="opengrep")
+    ap.add_argument("--timeout", type=int, default=300, help="per-scan timeout seconds")
+    ap.add_argument("--json", action="store_true", help="print the verdict as JSON")
+
+
+def call_propose(args) -> int:
+    """Exit 0 admitted (staged as a draft), 1 refused by the gate, 2 an error."""
+
+    def call() -> int:
+        proposal = RuleProposal(
+            rule=args.rule.read_text(encoding="utf-8"),
+            example=args.example.read_text(encoding="utf-8"),
+            example_name=args.example.name,
+            shape=args.shape,
+            checkout=args.checkout,
+            binary=args.opengrep,
+            timeout=args.timeout,
+        )
+        verdict = _core(args, drafts=True).services().detection_quality.propose_rule(proposal)
+        if args.json:
+            print(verdict.model_dump_json(indent=2))
+        else:
+            for c in verdict.checks:
+                detail = f": {c.detail}" if c.detail else ""
+                print(f"  {'ok  ' if c.passed else 'FAIL'} {c.name}{detail}")
+            state = f"admitted, staged as draft {verdict.draft}" if verdict.admitted else "refused"
+            print(f"propose-rule [{verdict.rule_id}]: {state}")
+        return 0 if verdict.admitted else 1
+
+    return _door(call)
+
+
 COLLECT = OpSpec(
     add_args=add_collect_args,
     call=call_collect,
@@ -421,6 +467,11 @@ SWEEP = OpSpec(
     add_args=add_sweep_args,
     call=call_sweep,
     help="run one rule corpus-wide (bounded, resumable per repo)",
+)
+PROPOSE = OpSpec(
+    add_args=add_propose_args,
+    call=call_propose,
+    help="admit an inference-proposed rule through the deterministic gate into the drafts",
 )
 EMIT = OpSpec(
     add_args=add_emit_args,

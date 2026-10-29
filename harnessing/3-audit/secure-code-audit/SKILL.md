@@ -1147,7 +1147,7 @@ framework authenticates by default), and a path its `addAuthPolicy` opens
 carries `backstage:allow-<policy>` and is judged. It also enumerates
 spring and jax-rs (annotations, Spring Security request-matcher rules and
 Quarkus HTTP permissions), axum and actix-web (layer order, `wrap` scopes,
-auth-shaped extractors) and rails and sinatra (`config/routes.rb` resolved
+auth-shaped extractors) and rails and sinatra (`<app>/config/routes.rb` resolved
 to each action's `before_action` chain; `before` filters); the
 `framework-checks.md` section for each says what its rows carry. These
 parse with tree-sitter (`traust-core[js]`, `[java]`, `[rust]`, `[ruby]`,

@@ -32,7 +32,7 @@ These checks are Traust's own wording. Standards are cited by ID only.
 | Spring and JAX-RS | Java code imports `org.springframework.web.bind.annotation` or `javax.ws.rs` / `jakarta.ws.rs`, or `traust adapters route-guards` reports `spring` or `jax-rs` rows |
 | axum and actix-web | Rust code uses `axum::` or `actix_web::`, or `traust adapters route-guards` reports `axum` or `actix-web` rows |
 | tonic | Rust code uses `tonic::` and builds a `Server`, or `traust adapters grpc-guards` reports `tonic` services |
-| Rails and Sinatra | the tree has `config/routes.rb`, Ruby code requires `sinatra` or subclasses `Sinatra::Base`, or `traust adapters route-guards` reports `rails` or `sinatra` rows |
+| Rails and Sinatra | the tree has `<app>/config/routes.rb`, Ruby code requires `sinatra` or subclasses `Sinatra::Base`, or `traust adapters route-guards` reports `rails` or `sinatra` rows |
 
 A checkout can select several. Record which sections ran (see Recording).
 Route-guards rows from a family no section covers (for example `go-http`,
@@ -323,7 +323,7 @@ an auth-shaped layer or interceptor covers it. Rust parsing needs
 ## Rails and Sinatra
 
 `traust adapters route-guards` lists each Rails route from
-`config/routes.rb` (and the files it `draw`s): `resources`/`resource` with
+`<app>/config/routes.rb` (and the files it `draw`s): `resources`/`resource` with
 `only`/`except`, `namespace`, `scope`, `member`/`collection`, explicit
 verbs, `match`, `root` and `mount`, resolved to the controller action,
 with:
@@ -358,8 +358,8 @@ installed with traust.
 | RL.10 | Does request input choose a class or method (`constantize`, `safe_constantize`, `send`, `public_send` with `params`)? | CWE-470 | ASVS V1.2 | the call and its argument's source |
 | RL.11 | Does a request value become part of a file path that is read or served (`send_file params[:path]`, `File.read(Rails.root.join(params[...]))`)? | CWE-22 | ASVS V5.3 | a traced flow to the file call |
 | RL.12 | Is untrusted data deserialized unsafely (`YAML.load` instead of `safe_load`, `Marshal.load`, `Oj.load` in object mode)? | CWE-502 | ASVS V1.5 | the call and its input's source |
-| RL.13 | Does production show error details (`consider_all_requests_local = true` in `config/environments/production.rb`, `rescue_from` handlers that render the exception message)? | CWE-209 | ASVS V16.5 | the environment config and handlers |
-| RL.14 | Do logs keep secrets (`filter_parameters` missing tokens, passwords or keys the app accepts)? | CWE-532 | ASVS V16.2 | `config/initializers/filter_parameter_logging.rb` against the params the controllers take |
+| RL.13 | Does production show error details (`consider_all_requests_local = true` in `<app>/config/environments/production.rb`, `rescue_from` handlers that render the exception message)? | CWE-209 | ASVS V16.5 | the environment config and handlers |
+| RL.14 | Do logs keep secrets (`filter_parameters` missing tokens, passwords or keys the app accepts)? | CWE-532 | ASVS V16.2 | `<app>/config/initializers/filter_parameter_logging.rb` against the params the controllers take |
 | SN.1 | Does every Sinatra route that changes state or returns non-public data require authentication: a `before` filter whose pattern covers it (`/admin/*` doesn't cover `/admin`), auth `use` middleware, or a guard call in the block? | CWE-306 | ASVS V6.3 | the route-guards rows and the filters' patterns |
 | SN.2 | Does the auth helper (`protected!`, `authorized?`) halt with 401 or 403 on failure and compare credentials in constant time (`Rack::Utils.secure_compare`)? | CWE-287 | ASVS V6.3 | the helper's definition |
 | SN.3 | Is the session secret hard-coded, short or left to the default (`set :session_secret`, `enable :sessions`)? | CWE-798 | ASVS V13.3 | the session settings |
