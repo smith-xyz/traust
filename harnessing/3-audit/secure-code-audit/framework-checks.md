@@ -29,6 +29,10 @@ These checks are Traust's own wording. Standards are cited by ID only.
 | gRPC | `go.mod` requires `google.golang.org/grpc` and the code calls `grpc.NewServer`, or `traust adapters grpc-guards` reports servers or services |
 | FastAPI and aiohttp | Python code imports `fastapi` or the aiohttp server (`aiohttp.web`), or `traust adapters route-guards` reports `fastapi` or `aiohttp` rows. A client-only `import aiohttp` doesn't select it |
 | Express | `package.json` depends on `express` or `express-promise-router`, or `traust adapters route-guards` reports `express` rows. A Backstage backend plugin selects it too |
+| Spring and JAX-RS | Java code imports `org.springframework.web.bind.annotation` or `javax.ws.rs` / `jakarta.ws.rs`, or `traust adapters route-guards` reports `spring` or `jax-rs` rows |
+| axum and actix-web | Rust code uses `axum::` or `actix_web::`, or `traust adapters route-guards` reports `axum` or `actix-web` rows |
+| tonic | Rust code uses `tonic::` and builds a `Server`, or `traust adapters grpc-guards` reports `tonic` services |
+| Rails and Sinatra | the tree has `<app>/config/routes.rb`, Ruby code requires `sinatra` or subclasses `Sinatra::Base`, or `traust adapters route-guards` reports `rails` or `sinatra` rows |
 
 A checkout can select several. Record which sections ran (see Recording).
 Route-guards rows from a family no section covers (for example `go-http`,
@@ -203,11 +207,173 @@ is not a negative (see the intro).
 | EX.17 | Do state-changing routes authenticated by cookies or an upstream proxy reject cross-site requests: a CSRF token, `SameSite` cookies, or an `Origin` check? | CWE-352 | ASVS V3.5 | the session or proxy auth and the routes' method handling |
 | EX.18 | Does a route return configuration, environment or secret values, and is the redaction default-deny (everything hidden unless marked safe) rather than hiding only what is marked secret? | CWE-200 | ASVS V13.4 | the handler and the redaction it applies, `file:line` |
 
+## Spring and JAX-RS
+
+`traust adapters route-guards` lists each Spring MVC or WebFlux route
+(`@GetMapping` … `@RequestMapping` on a controller, with class, interface
+and superclass mappings) and each JAX-RS resource method (`@Path` with a
+verb annotation, prefixed by `@ApplicationPath` and `quarkus.rest.path`),
+with:
+- `guards`: the method's security annotations (`@PreAuthorize`,
+  `@Secured`, `@RolesAllowed`, `@Authenticated`, `@PermissionsAllowed`,
+  `@DenyAll`) and bare guard calls in the handler body;
+- `scope_guards`: the class's annotations, the Spring Security rule that
+  matches the route (`spring-security:<rule>`: first match wins, a
+  `securityMatcher` chain before the catch-all), Quarkus HTTP permissions
+  (`quarkus:<policy>`, the most specific path wins) and
+  `deny-unannotated-endpoints` / `default-roles-allowed`. When the
+  security starter is declared with no filter chain, every route carries
+  `spring-security:default` (Spring Boot authenticates everything);
+- `unguard_markers`, each judged:
+  - `@PermitAll`, `spring-security:permitAll` and `quarkus:permit`: the
+    route is opened;
+  - `method-security-not-enabled`: method-security annotations with no
+    `@EnableMethodSecurity` in the checkout, which Spring doesn't enforce;
+  - `spring-security:conditional-config`: the deciding filter chain is a
+    `@ConditionalOn*` or `@Profile` bean, so the row lists every
+    candidate chain's rule and the deployment decides which applies.
+
+Controllers that implement API interfaces generated at build time (an
+OpenAPI generator's `interfaceOnly`) are a coverage gap: read the API
+spec the generator uses and each controller's overrides by hand. Kotlin
+controllers, Micronaut and Spring functional routes (`RouterFunctions`,
+`coRouter`) are coverage gaps too. Java parsing needs `traust-core[java]`,
+installed with traust.
+
+| ID | Check | CWE | Requirement | Evidence |
+|---|---|---|---|---|
+| JV.1 | Does every route that changes state or returns non-public data require authentication: a filter-chain rule, an enforced method-security annotation, a JAX-RS role annotation, a Quarkus permission, or a proxy in front (cite it, and check the app's port can't be reached around it)? | CWE-306 | ASVS V6.3 | the route-guards rows, `judgement_required` and unguard-marked rows first |
+| JV.2 | For a row marked `method-security-not-enabled`, is method security switched on somewhere the matrix doesn't see (a configuration class in another module, a starter that enables it)? If not, its annotations protect nothing. | CWE-862 | ASVS V8.3 | the `@Enable*MethodSecurity` search and the module layout |
+| JV.3 | Do filter-chain rules leave a route open by order or shape: a broad `permitAll` (`/**`, `/api/**`) ahead of narrower rules, `anyRequest().permitAll()`, a verb-restricted guard rule (`requestMatchers(HttpMethod.POST, …)`) that leaves the other verbs on that path unmatched, or a matcher that misses a variant the dispatcher serves (trailing slash, an extension or a regex route)? | CWE-863 | ASVS V8.2 | the `SecurityFilterChain` rules in order and the rows whose `scope_guards` come from them |
+| JV.4 | For a row marked `spring-security:conditional-config`, which chain does the shipped configuration activate (`application.properties`/`yaml` defaults, active profiles in the deployment manifests)? An insecure default is a finding even when a property can turn security on. | CWE-1188 | ASVS V13.2 | the condition, the property's shipped value and the manifests that set it |
+| JV.5 | Does a route that takes an object ID (`@PathVariable`, `@PathParam`, `@QueryParam`) check that the caller may act on that object: a `@PreAuthorize` expression on the ID, an ownership or tenant filter in the query? | CWE-639 | ASVS V8.2 | the lookup and the check on it |
+| JV.6 | Is CSRF protection disabled (`csrf().disable()`, `csrf(AbstractHttpConfigurer::disable)`) while sessions or cookies authenticate the browser? | CWE-352 | ASVS V3.5 | the filter chain's `csrf` and session settings |
+| JV.7 | Does CORS allow any origin with credentials (`allowedOriginPatterns("*")` with `allowCredentials(true)`, `@CrossOrigin` with `*`, a Quarkus `quarkus.http.cors.origins=*` with credentials)? | CWE-942 | ASVS V3.4 | the CORS configuration, read directly |
+| JV.8 | Does a create or update route bind request JSON straight to a persistence entity (`@RequestBody Entity`, a JAX-RS entity parameter) so callers can set fields such as `role`, `owner` or `enabled`? | CWE-915 | ASVS V15.3 | the parameter type and the entity's fields |
+| JV.9 | Does request input reach an expression evaluator: SpEL `parseExpression`, a Thymeleaf `__${…}__` preprocessing expression, an EL or OGNL evaluation? | CWE-917 | ASVS V1.2 | a traced flow to the evaluator, `file:line` at both ends |
+| JV.10 | Is SQL, JPQL or HQL built from request input by concatenation (`createQuery("… " + param)`, `createNativeQuery`, `JdbcTemplate` with a built string) instead of bound parameters? | CWE-89 | ASVS V1.2 | the query construction and where its parts come from |
+| JV.11 | Are actuator or management endpoints (`/actuator/env`, `/heapdump`, `/threaddump`, Quarkus dev UI) exposed and reachable without authentication (`management.endpoints.web.exposure.include=*`, `EndpointRequest.toAnyEndpoint().permitAll()`)? | CWE-200 | ASVS V13.4 | the management properties and the filter-chain rule for them |
+| JV.12 | Are untrusted bodies deserialized into arbitrary types: Jackson default typing (`activateDefaultTyping`, `@JsonTypeInfo(use = Id.CLASS)`), XStream, or `ObjectInputStream`? | CWE-502 | ASVS V1.5 | the mapper configuration and the endpoints that use it |
+| JV.13 | Are XML bodies parsed with external entities left on (`DocumentBuilderFactory`, `SAXParserFactory`, `XMLInputFactory` or a JAXB unmarshaller without the secure-processing features)? | CWE-611 | ASVS V1.5 | the parser factory's feature settings |
+| JV.14 | Does a request value become part of a filesystem path that is read, written or served (`Paths.get(base, param)`, `ResourceLoader.getResource(param)`, `FileSystemResource`) without normalizing and checking it stays under the base? | CWE-22 | ASVS V5.3 | a traced flow to the file call |
+| JV.15 | Does a route fetch a URL the caller controls (`RestTemplate`, `WebClient`, `HttpClient`, a JAX-RS client) and forward credentials there? | CWE-918 | ASVS V1.3 | a traced flow to the client call and its headers |
+| JV.16 | Do error responses carry stack traces or exception messages (`server.error.include-stacktrace=always`, `include-message`, an `ExceptionMapper` or `@ExceptionHandler` that returns `e.getMessage()`)? | CWE-209 | ASVS V16.5 | the error properties and handlers |
+
+## axum and actix-web
+
+`traust adapters route-guards` lists each axum route (`Router` `route`,
+`nest`, `merge` and `route_service` chains, across functions and modules)
+and each actix-web route (`App` and `web::scope` `service`, `route` and
+`configure` calls, and the `#[get]`-style route macros), with:
+- `guards`: auth-shaped handler extractors (`extractor:AuthUser`,
+  `extractor:Claims`; payload extractors such as `Json<…>` don't count),
+  a method router's own `layer`, actix-web-grants attributes
+  (`#[protect(…)]`) and bare guard calls in the handler body;
+- `scope_guards`: for axum, each `layer`/`route_layer` added **after** the
+  route on its router or a router above it (a layer wraps the routes
+  added before it, never later ones); for actix-web, each `wrap` on the
+  route's app or scope (it wraps everything registered there);
+- `unguard_markers`: `actix:registration-not-found` for a route macro no
+  `service` call registers (it may be registered in a way the matrix
+  doesn't follow, or not at all).
+
+Session, cookie, identity-store, CORS and trace middleware only set up
+state, so they never count as guards. Routes built by helper functions
+that take the path and handler as parameters aren't followed: the
+framework shows as a coverage gap. Rust parsing needs `traust-core[rust]`,
+installed with traust.
+
+| ID | Check | CWE | Requirement | Evidence |
+|---|---|---|---|---|
+| RW.1 | Does every route that changes state or returns non-public data require authentication: an auth layer wrapping it, an extractor that rejects, a `wrap` on its scope, or a proxy in front? In axum, a route added after the auth layer, or a router merged after it, isn't wrapped. | CWE-306 | ASVS V6.3 | the route-guards rows, `judgement_required` and asymmetry rows first |
+| RW.2 | Does each guard-named extractor reject a missing or bad credential (its `FromRequestParts` / `FromRequest` returns a rejection), rather than defaulting to an anonymous user? An `Option<AuthUser>` parameter makes it optional. | CWE-287 | ASVS V6.3 | the extractor's implementation, `file:line` |
+| RW.3 | Are admin and write routes authorized beyond "authenticated" (a role or permission check, `#[protect]`, a claim check in the handler)? | CWE-862 | ASVS V8.3 | the check, `file:line`; *judgement* |
+| RW.4 | Does a route that takes an object ID (`Path<Id>`, `web::Path`) check that the caller may act on that object? | CWE-639 | ASVS V8.2 | the lookup and the ownership or tenant filter on it |
+| RW.5 | Is SQL built from request input with `format!` or concatenation (`sqlx::query(&format!(…))`, diesel `sql_query`) instead of bound parameters or the query macros? | CWE-89 | ASVS V1.2 | the query construction |
+| RW.6 | Does request input reach a process (`Command::new` with request-derived arguments, or `sh -c` with a built string)? | CWE-78 | ASVS V1.2 | a traced flow to the `Command` |
+| RW.7 | Does a request value become part of a filesystem path (`PathBuf::join` with `Path<String>`, `NamedFile::open`, `ServeDir` over a directory that holds more than public assets)? | CWE-22 | ASVS V5.3 | a traced flow to the file call |
+| RW.8 | Does a route fetch a URL the caller controls (`reqwest`, `hyper` client) and forward credentials there? | CWE-918 | ASVS V1.3 | a traced flow to the client call |
+| RW.9 | Are body sizes and request time bounded: axum `DefaultBodyLimit::disable()` or a large limit, actix `PayloadConfig` / `JsonConfig::limit` raised, no `TimeoutLayer` on slow routes? | CWE-770 | ASVS V2.4 | the limit and timeout configuration |
+| RW.10 | Does CORS allow any origin with credentials (`CorsLayer::permissive()` / `very_permissive()`, `allow_credentials(true)` with a mirrored origin, actix `Cors::permissive()`)? | CWE-942 | ASVS V3.4 | the CORS layer or `wrap` |
+| RW.11 | Is JWT validation weakened: `insecure_disable_signature_validation`, `validate_exp = false`, algorithms not pinned, or a hard-coded secret? | CWE-347 | ASVS V9.1 | the `Validation` and `DecodingKey` construction |
+| RW.12 | Do error responses carry internal errors (`e.to_string()` or an `anyhow` chain in the body)? | CWE-209 | ASVS V16.5 | the error types' `IntoResponse` / `ResponseError` implementations |
+| RW.13 | Do request logs capture secrets (`TraceLayer` or `Logger` formats that include the `Authorization` header or bodies)? | CWE-532 | ASVS V16.2 | the logging layer's configuration |
+
+## tonic
+
+`traust adapters grpc-guards` lists tonic servers next to Go ones
+(`framework: tonic`): each `Server::builder()` chain with its tower
+`layer`s as `interceptors` (marked `guard` when auth-shaped), each
+`add_service` as a service with its own `interceptors` (`with_interceptor`,
+`InterceptedService::new`) and the methods of its trait `impl`, and
+reflection and health services as `exposures`. A service is judged unless
+an auth-shaped layer or interceptor covers it. Rust parsing needs
+`traust-core[rust]`.
+
+| ID | Check | CWE | Requirement | Evidence |
+|---|---|---|---|---|
+| TN.1 | Does every service reachable from outside the pod authenticate its callers, in a server layer, a service interceptor or each method? | CWE-306 | ASVS V6.3 | the services' `judgement_required` and their `interceptors`, each read to confirm it returns `Status::unauthenticated` on failure |
+| TN.2 | Once a caller is authenticated, are methods authorized individually (claims from `request.extensions()` checked per method) rather than all-or-nothing? | CWE-862 | ASVS V8.3 | the methods' checks; *judgement* |
+| TN.3 | Are reflection or health services added to a server that is reachable from outside the pod or unauthenticated? | CWE-200 | ASVS V14.2 | the matrix's `exposures` |
+| TN.4 | Does a server listening beyond loopback use TLS (`tls_config(ServerTlsConfig…)`), and, where client certificates are the authentication, does it require them (`client_ca_root`)? | CWE-319 | ASVS V12.2 | the server's `credentials` and its listener address |
+| TN.5 | Are message size, concurrency and timeouts set for untrusted callers (`max_decoding_message_size`, `concurrency_limit_per_connection`, `timeout`)? | CWE-770 | ASVS V2.4 | the builder and service settings |
+| TN.6 | Do status errors returned to callers carry internal errors (`Status::internal(e.to_string())`)? | CWE-209 | ASVS V16.5 | the methods' error returns |
+| TN.7 | Are authorization decisions based on caller-supplied metadata (`x-user-id`, a tenant key) that nothing verifies? | CWE-807 | ASVS V2.3 | the `metadata()` reads that feed a decision |
+
+## Rails and Sinatra
+
+`traust adapters route-guards` lists each Rails route from
+`<app>/config/routes.rb` (and the files it `draw`s): `resources`/`resource` with
+`only`/`except`, `namespace`, `scope`, `member`/`collection`, explicit
+verbs, `match`, `root` and `mount`, resolved to the controller action,
+with:
+- `guards`: the action's `before_action` chain through the controller
+  hierarchy (`only`/`except` applied; `http_basic_authenticate_with` and
+  `load_and_authorize_resource` included) and bare guard calls in the
+  action (`call:authorize`);
+- `scope_guards`: a Devise `authenticate` or `authenticated` block around
+  the route;
+- `unguard_markers`: `skip_before_action:<callback>` when a skip removes a
+  guard for that action, judged;
+- asymmetry rows: an action missing a guard callback the controller's other
+  actions run (the `before_action :x, except: [...]` shape).
+
+Sinatra routes (`get '/path' do`) carry `before` filters whose block calls a
+guard (`before:<name>`, matched by path pattern), a guard-shaped `use`
+middleware (`Rack::Auth::Basic`), and bare guard calls in the block.
+`concern`s aren't expanded. Ruby parsing needs `traust-core[ruby]`,
+installed with traust.
+
+| ID | Check | CWE | Requirement | Evidence |
+|---|---|---|---|---|
+| RL.1 | Does every action that changes state or returns non-public data require authentication: a `before_action` that halts (`authenticate_user!` redirects or returns 401), a Devise route block, or a proxy in front? A callback that only loads a user when a token is present is not enforcement. | CWE-306 | ASVS V6.3 | the route-guards rows, skip-marked and asymmetry rows first; each guard callback's definition |
+| RL.2 | Is each action authorized for the caller (Pundit `authorize` with `verify_authorized`, CanCanCan `load_and_authorize_resource`, `policy_scope` on listings)? | CWE-862 | ASVS V8.3 | the callbacks and calls in the action |
+| RL.3 | Are records looked up through the caller's scope (`current_user.projects.find(params[:id])`) rather than globally (`Project.find(params[:id])`)? | CWE-639 | ASVS V8.2 | the lookups in the actions |
+| RL.4 | Do strong parameters let callers set privileged fields (`permit!`, `permit(:role, :admin)`, `to_unsafe_h`, attributes assigned from `params` directly)? | CWE-915 | ASVS V15.3 | the `permit` lists and the model's attributes |
+| RL.5 | Is SQL built from request input (`where("… #{params[:x]}")`, `order(params[:sort])`, `find_by_sql`, `pluck` or `select` with raw strings)? | CWE-89 | ASVS V1.2 | the query construction |
+| RL.6 | Does request or stored data reach HTML unescaped (`html_safe`, `raw`, `<%==`, `render inline:` with request data, `link_to` with a caller-set URL)? | CWE-79 | ASVS V1.2 | a traced flow to the view |
+| RL.7 | Is a caller-set URL a redirect target (`redirect_to params[:url]`, `allow_other_host: true`)? | CWE-601 | ASVS V3.7 | the redirect and where its target comes from |
+| RL.8 | Is forgery protection off for cookie-authenticated controllers (`skip_forgery_protection`, `skip_before_action :verify_authenticity_token`, `protect_from_forgery with: :null_session` on a browser controller)? | CWE-352 | ASVS V3.5 | the controller hierarchy's forgery settings |
+| RL.9 | Does request input reach a shell (`system`, backticks, `%x`, `Open3` with interpolation)? | CWE-78 | ASVS V1.2 | a traced flow to the call |
+| RL.10 | Does request input choose a class or method (`constantize`, `safe_constantize`, `send`, `public_send` with `params`)? | CWE-470 | ASVS V1.2 | the call and its argument's source |
+| RL.11 | Does a request value become part of a file path that is read or served (`send_file params[:path]`, `File.read(Rails.root.join(params[...]))`)? | CWE-22 | ASVS V5.3 | a traced flow to the file call |
+| RL.12 | Is untrusted data deserialized unsafely (`YAML.load` instead of `safe_load`, `Marshal.load`, `Oj.load` in object mode)? | CWE-502 | ASVS V1.5 | the call and its input's source |
+| RL.13 | Does production show error details (`consider_all_requests_local = true` in `<app>/config/environments/production.rb`, `rescue_from` handlers that render the exception message)? | CWE-209 | ASVS V16.5 | the environment config and handlers |
+| RL.14 | Do logs keep secrets (`filter_parameters` missing tokens, passwords or keys the app accepts)? | CWE-532 | ASVS V16.2 | `<app>/config/initializers/filter_parameter_logging.rb` against the params the controllers take |
+| SN.1 | Does every Sinatra route that changes state or returns non-public data require authentication: a `before` filter whose pattern covers it (`/admin/*` doesn't cover `/admin`), auth `use` middleware, or a guard call in the block? | CWE-306 | ASVS V6.3 | the route-guards rows and the filters' patterns |
+| SN.2 | Does the auth helper (`protected!`, `authorized?`) halt with 401 or 403 on failure and compare credentials in constant time (`Rack::Utils.secure_compare`)? | CWE-287 | ASVS V6.3 | the helper's definition |
+| SN.3 | Is the session secret hard-coded, short or left to the default (`set :session_secret`, `enable :sessions`)? | CWE-798 | ASVS V13.3 | the session settings |
+| SN.4 | Does request data reach HTML unescaped (string bodies built from `params`, ERB without `escape_html`)? | CWE-79 | ASVS V1.2 | a traced flow to the response |
+| SN.5 | Does a request value become part of a file path that is read or served (`send_file`, `File.join(settings.public_folder, params[:splat])`)? | CWE-22 | ASVS V5.3 | a traced flow to the file call |
+| SN.6 | Is `Rack::Protection` disabled or narrowed (`disable :protection`, `set :protection, except: …`) for a browser-facing app? | CWE-352 | ASVS V3.5 | the protection settings |
+| SN.7 | Does production show exceptions (`set :show_exceptions, true`, `raise_errors`)? | CWE-209 | ASVS V16.5 | the environment settings |
+
 ## Recording the review
 
 - **Coverage:** in `metadata.additional.deterministic_steps`, record
   `"framework-checks": "ran: <sections>"` (for example
-  `"ran: operators, grpc"` or `"ran: fastapi-aiohttp, express"`), or
+  `"ran: operators, grpc"`, `"ran: fastapi-aiohttp, express"`,
+  `"ran: spring-jaxrs"`, `"ran: axum-actix, tonic"` or `"ran: rails-sinatra"`), or
   `"ran: none"` when no section applies.
 - **A check you couldn't answer** is a `coverage_gaps` entry:
   `{"tool": "framework-checks", "system": "<check ID>", "reason": "…"}`.

@@ -184,6 +184,32 @@ lines, the plan's test-and-calibrate gate — never promoted by the
 engine); (3) verdicts on sweep hits, which belong to /triage and its
 disposition ledger like any other candidate batch.
 
+**Proposing a rule for an uncovered shape.** When an audit or a
+coverage gap shows a code shape no pack rule covers, you may propose a
+rule for it. Write one rule and an example file in the target language
+with `ruleid:` lines it must match and `ok:` lines it must not. Submit
+both through the deterministic gate, never into `rule-drafts/` by hand:
+
+```bash
+python3 -m traust.cli sweep propose-rule --rule <rule.yaml> --example <example.py> \
+  --shape "<the uncovered shape, one line>" --checkout <the repository it came from>
+```
+
+The gate admits it only if all of these pass:
+- it is one well-formed rule (id, message, languages, severity, `metadata.cwe`);
+- no pattern is a catch-all;
+- no path glob leaves the tree or selects every file;
+- no regex has a backreference, lookbehind or nested quantifier;
+- the examples fire exactly;
+- its hits on the checkout stay under the cap.
+
+A rule that fails a static check never runs. Exit 0 means it was staged
+as an authored draft. Exit 1 lists each failing check: fix it or drop
+the proposal, and never loosen the example to pass. An admitted draft
+then follows steps 3–4 like any other: calibrate, `sweep sweep`,
+`sweep emit`. Its hits are triage candidates, never findings, and
+promotion into the shipped pack stays a human point.
+
 Sweep output lands at
 `analysis-results/scan-testing/sweeps/<rule-id>/sweep-candidates.json`
 (schema: repo, file:line, matched excerpt, rule id, source-finding
