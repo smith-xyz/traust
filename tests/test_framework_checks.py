@@ -22,8 +22,18 @@ def test_every_section_is_present_and_ids_unique():
     rows = _rows()
     ids = [m["id"] for m in rows]
     assert len(ids) == len(set(ids))
-    assert {i.split(".")[0] for i in ids} == {"OP", "GR", "FA", "EX"}
-    for prefix, floor in (("OP", 10), ("GR", 8), ("FA", 10), ("EX", 12)):
+    assert {i.split(".")[0] for i in ids} == {"OP", "GR", "FA", "EX", "JV", "RW", "TN", "RL", "SN"}
+    for prefix, floor in (
+        ("OP", 10),
+        ("GR", 8),
+        ("FA", 10),
+        ("EX", 12),
+        ("JV", 14),
+        ("RW", 11),
+        ("TN", 6),
+        ("RL", 12),
+        ("SN", 6),
+    ):
         assert sum(i.startswith(f"{prefix}.") for i in ids) >= floor, prefix
 
 
@@ -55,3 +65,19 @@ def test_both_skills_wire_the_reference():
 
 def test_the_grpc_section_names_the_matrix_command():
     assert "python3 -m traust.cli adapters grpc-guards" in CHECKS.read_text(encoding="utf-8")
+
+
+def test_jvm_rust_and_ruby_sections_name_their_matrix_markers():
+    text = CHECKS.read_text(encoding="utf-8")
+    for marker in (
+        "method-security-not-enabled",
+        "spring-security:conditional-config",
+        "spring-security:default",
+        "quarkus:permit",
+        "actix:registration-not-found",
+        "skip_before_action:<callback>",
+        "framework: tonic",
+    ):
+        assert marker in text, marker
+    for extra in ("java", "rust", "ruby"):
+        assert f"traust-core[{extra}]" in text, extra
