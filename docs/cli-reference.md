@@ -97,6 +97,60 @@ the docs gate on any dot-separated invocation in `README.md`, `AGENTS.md`,
 See [tooling-and-structure-files.md](tooling-and-structure-files.md) for what
 each packaged CLI does, and [skills.md](skills.md) for the skills that call them.
 
+## New-output versus historical validation
+
+`traust reporting validate` retains historical schema compatibility by default.
+For a final newly authored triage, use the explicit shared write contract:
+
+```bash
+traust reporting validate /path/to/repo-triage.json --schema triage --canonical-write
+```
+
+`--canonical-write` requires `--schema` and a shared `$defs.canonical_write`;
+it adds that contract's checks on the serialized bytes to the existing schema
+and content checks. It never converts verdicts, invents kinds or rewrites the
+report. The triage skill requires this gate before rendering or completion,
+including generic scanner inputs that have no recording step. Read-only citation
+checking/rendering and exact stored record replay remain separate; do not use
+the new-output gate to reject historical artifacts.
+
+For a trusted caller's already prepared Core `TriageInput`, the executable
+skill supports `traust session run --skill triage --role triage-verifier --
+/staged/input.json --prepared-input --auto --votes 1 --repo /staged/checkout
+--fresh`. `--prepared-input` is a skill flag after the runner's `--`, not a
+new Core API or a wrapper DTO. The skill reads native
+`subject/findings/prepared_at/assessor/items`, retains supplied identities and
+source labels, and skips intake/prepare/record. The external SDK caller records
+the original canonically gated output. Full field handling is in the
+[triage skill](../harnessing/4-triage/triage/SKILL.md#1a-detect-input-shape).
+
+### Native verification producer input
+
+The existing verification skill accepts the worker's read-only native
+executor input:
+
+```text
+/verify-remediation --native-input /workspace/results/<repo>-core-input.json --repo /tmp/repos/<repo> --output /workspace/results/<repo>-verification.json
+```
+
+Its runtime fields are `subject` (patched native subject), `source_subject`
+(original subject with source SHA/assessment), `findings` (assigned Core
+`FindingView[]`), and `source_bindings` (original artifact label to UUID).
+The source artifact defaults to the staged sibling `<repo>-security-audit.json`;
+`--source-report FILE` selects another already staged source explicitly.
+The producer authors `verified_findings[].original_id` from the supplied
+`findings[].finding.id`, not the artifact's old label. Timeline and
+existing-finding coverage references use that same UUID. This is distinct
+from triage, which must not invent `orig_id` from a native UUID.
+
+Original/patch SHAs, before/after code and per-finding root-cause diffs remain
+actual source evidence. Missing source/binding/severity data is reported,
+never manufactured. Native mode skips Core DB lookups, scanner intake,
+DB-backed differential and recording; the final original JSON still passes
+`traust reporting validate OUTPUT --schema verification`. The installed
+verification schema has no `canonical_write` fragment. The external SDK
+caller records the original bytes through Core's existing admission gates.
+
 ## Authentication and finding statements
 
 `traust auth login` stores a deployment login obtained by device code.

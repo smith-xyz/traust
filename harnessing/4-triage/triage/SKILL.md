@@ -3,13 +3,14 @@ name: triage
 description: Triage a batch of raw security findings. Verify each is real,
   keep finding kind separate from verdict, collapse duplicates, re-rank
   vulnerabilities by derived exploitability, and tag with an owner.
-  Takes a directory or file of scanner output and writes <repo>-triage.json
+  Gates the final new report with the shared canonical-write contract.
+  Takes scanner output or a read-only Core-prepared input and writes <repo>-triage.json
   + <repo>-triage.md sorted by what actually needs engineering attention. Use when
   asked to "triage findings", "validate scanner output", "prioritize vulns",
   or "review the backlog". Runs interactively by default; pass --auto to
   skip the interview. Scanner source attribution comes from the recorded Core
   assessment, not a caller-supplied origin flag.
-argument-hint: "<findings-path> [--auto] [--votes N] [--repo PATH] [--fp-rules FILE] [--fresh]"
+argument-hint: "<findings-path> [--prepared-input] [--auto] [--votes N] [--repo PATH] [--fp-rules FILE] [--fresh]"
 user-invocable: true
 metadata:
   harness.tier: "primary"
@@ -57,13 +58,19 @@ Adversarial triage of raw security-scanner output. Does four jobs:
 claimed severity, and **route** each to a component owner. Output is a
 short, ranked, owned list instead of a raw dump.
 
-Invoke with `/triage <findings-path> [--auto] [--votes N] [--repo PATH] [--fp-rules FILE]`.
+Invoke with `/triage <findings-path> [--prepared-input] [--auto] [--votes N] [--repo PATH] [--fp-rules FILE]`.
 
 **Arguments** (parse from `$ARGUMENTS`; positional `$1`/`$2` expansion is
 not stable across runtimes):
 - findings path (first positional, required): a JSON file, a directory of
   JSON files, a `*-vuln-findings.json` / legacy `VULN-FINDINGS.json`, a pipeline `results/<target>/<ts>/`
   directory, or a markdown report.
+- `--prepared-input`: the positional path is a read-only JSON serialization
+  of Core's native `TriageInput`, staged by the trusted caller. Use input (D)
+  below, never generic scanner parsing. Do not call `triage intake`,
+  `triage prepare` or `triage record` anywhere in this mode, including on
+  resume. The external caller records the original emitted artifact through
+  its native SDK; the remote producer has no recording responsibility.
 - `--auto`: skip the interview and use defaults. Default mode is
   **interactive**.
 - `--votes N`: verifier votes per finding (default 3; use 1 for a quick
@@ -92,7 +99,8 @@ permitted only for `git`, `wc`, `ls`, `jq` (`find` is NOT permitted —
 harness scripts: `check_citations.py` (pre-vote gate, 2c),
 `query_index.py` (symbol index, 2d + verifiers),
 `traust triage check` (post-vote evidence lint on traust-core, 6b2),
-`validate_report.py` (output-contract gate, 6c), and traust-core's triage
+`traust reporting validate --schema triage --canonical-write`
+  (final serialized new-output contract gate, 6c), and traust-core's triage
 doors: `traust triage intake` (scanner output in, 1a), `traust triage
 prepare` (the input with precedents, 1a and 2g), `traust triage render`
 (deterministic Markdown, 6d) and `traust triage record` (decisions, 6e). The deterministic tools
@@ -177,9 +185,12 @@ output. New checkpoints and new triage output use only the canonical shape.
 
 ### 0a. Parse arguments
 
-From `$ARGUMENTS`: extract the findings path (first positional), `--auto`
-flag, `--votes N` (default 3), `--repo PATH` (default `.`), `--fp-rules
-FILE` (default none). If no findings path was given, ask for one and stop.
+From `$ARGUMENTS`: extract the findings path (first positional),
+`--prepared-input` flag (default false), `--auto` flag, `--votes N`
+(default 3), `--repo PATH` (default `.`), `--fp-rules FILE` (default none).
+If no findings path was given, ask for one and stop. Carry the input mode in
+working state/checkpoints; the current invocation's `--prepared-input`
+prohibition on intake/prepare/record always applies, even after resume.
 If `--fp-rules` was given, Read the file now and carry its contents as
 `context.extra_fp_rules` for injection into the Phase 3a verifier prompt.
 
@@ -248,7 +259,7 @@ When `--auto` is set, do not call AskUserQuestion. Use:
 **Checkpoint:** Write tool → `./.triage-state/_chunk.tmp`:
 
 ```json
-{"phase": 0, "context": {mode, environment, threat_model, scoring, noise_tolerance, votes_per_finding, repo, findings_path}}
+{"phase": 0, "context": {mode, environment, threat_model, scoring, noise_tolerance, votes_per_finding, repo, findings_path, prepared_input}}
 ```
 
 Then Bash:
@@ -264,6 +275,37 @@ Turn the input into a flat `findings[]` list with stable ids, regardless of
 source format.
 
 ### 1a. Detect input shape
+
+**(D) Pre-prepared Core input (`--prepared-input` takes precedence).**
+Read the positional JSON file as the existing
+`traust_core.v1.models.findings.TriageInput` serialized by Core, not an
+envelope or a scanner report. Its root fields are `subject`, `findings`,
+`prepared_at`, `assessor`, `items`:
+
+- `subject`: `repository_id`, `repository_url`, `repository_ref_id`, `sha`,
+  `assessment_id` (the source assessment, nullable in the native DTO).
+- `findings`: native `FindingContext` (`baseline`, `precedents`).
+- `prepared_at`: Core's timestamp; `assessor`: Core's source assessor label.
+- `items[]`: native `finding`, `occurrence`, `locations`, `precedents`.
+  `finding` supplies `id`, `repository_id`, `fingerprint`,
+  `fingerprint_algo`, nullable `kind`, `title` and any native advisory fields;
+  `occurrence` supplies its own `id`, `finding_id`, `assessment_id`,
+  `severity`, optional `rule` and CVSS fields. `locations[]` supplies its
+  native identity/occurrence linkage, `path`, `line_start`, `line_end`,
+  `language`, `symbol`; `precedents[]` carries the native precedent evidence.
+  Keep other native base-model fields (for example timestamps) unchanged.
+
+Retain the entire supplied object read-only in working state and the Phase-1
+checkpoint as `core_input`; carry its subject/assessor unchanged, and use
+`items[]` directly in 1b and 2g. If the staged document is unreadable or not
+this native shape, stop and report the input error; never fall back to
+scanner parsing or make up absent source fields. An empty `items[]` is an
+empty native batch, not a reason to scan the checkout for new findings.
+For that empty batch, skip work requiring candidates or source locations and
+continue to Phase 6 with no findings and zero summary counts.
+The trusted caller owns preparation and source binding. Do not query Core
+again, re-ingest the staged file, or record decisions from this mode.
+Continue with 1b, skipping all (A)/(B)/(C) detection below.
 
 **traust-core first: these inputs are recorded, so the verdicts can be (6e).**
 
@@ -327,13 +369,27 @@ If nothing parseable is found, stop and report what was seen.
 
 ### 1b. Normalize fields
 
-For input (A)/(B), each `prepare` item becomes a finding: `title` =
+For input (A)/(B)/(D), each native prepared item becomes a finding: `title` =
 `finding.title`; `file` / `line` = the first location's `path` /
 `line_start`; `severity` = `occurrence.severity` (`unrated` = the scanner
 gave none); `category` = `occurrence.rule`; and **`fingerprint` +
 `fingerprint_algo` copied from `finding`, unchanged, onto the triage
 finding** (6e matches verdicts to recorded findings by them). Keep the
 item's `precedents` for 2g.
+
+For (D), keep input order when assigning the existing triage-local `fNNN`
+labels and set `source` to the prepared path plus `#/items/<zero-based-index>`.
+These labels are artifact-local, never Core finding/occurrence/assessment
+IDs. Preserve the native IDs and all supplied locations in `core_input`;
+never invent a native ID or derive an original scanner label from a UUID.
+This DTO does not expose scanner `orig_id`, description, recommendation or
+arbitrary finding labels: omit absent original labels and use null
+recommendation, rather than fabricating them. Prepared fingerprints and
+source labels are authoritative; kind changes and verification conclusions
+still require the normal cited proof. Preserve a supplied native kind in
+working state (omit null/unknown kind in the artifact, never default it).
+The supplied `occurrence.severity` is a claim, not a final rank; `unrated`
+becomes null `claimed_severity` in the final canonical artifact.
 
 For (C), build a finding dict from each raw record. **Pull what's
 present; never guess what's absent.** Field map (source-key aliases →
@@ -410,7 +466,7 @@ longest common suffix you can see.
 **Checkpoint:** Write tool → `./.triage-state/_chunk.tmp`:
 
 ```json
-{"phase": 1, "context": {...}, "findings": [ {normalized finding dicts with id/source/file/line/category/...} ], "path_resolution": "<which of a/b/c worked>"}
+{"phase": 1, "context": {...}, "core_input": {unchanged native TriageInput for D only}, "findings": [ {normalized finding dicts with id/source/file/line/category/...} ], "path_resolution": "<which of a/b/c worked>"}
 ```
 
 Then Bash:
@@ -668,8 +724,8 @@ in the Phase 2 checkpoint delta.
 ### 2g. Shared-component FP-precedent annotation (deterministic, no subagent)
 
 Shared and vendored code gets the same false positive re-litigated in
-every repo that ships it. For input (A)/(B), each `prepare` item already
-carries its `precedents`: prior verdicts on **the same function in the
+every repo that ships it. For input (A)/(B)/(D), each native prepared item
+already carries its `precedents`: prior verdicts on **the same function in the
 same file** (vendor roots stripped, so `vendor/x/p.go` matches
 `third_party/x/p.go`), in any repository, with a shared CWE, strongest
 first. Each has a `reason.strength`:
@@ -1137,6 +1193,9 @@ countersigner/adjudicator, strength). For
 terminal summary as pending human adjudication; request a core review item with
 `traust findings request` for the finding UUID and use `/track-findings` to
 review its full evidence card through `traust findings review-cases`.
+For input (D), retain that disagreement and pending-human-adjudication notice,
+but leave the review request to the external caller; never mutate the remote
+Core review queue from the prepared-input producer.
 A verifier disagreeing with a countersigned precedent escalates to a
 human, it neither silently follows the precedent nor silently
 overrides the countersigner. For `machine_refuted_sound` precedents
@@ -1364,9 +1423,11 @@ census, and every dashboard (docs-verification 2026-07-31, wiring
 F10). A bare `TRIAGE.json` is equally invisible (legacy bare names are
 still read by the validator and `/patch`, never written).
 
-For input (A)/(B), every non-duplicate finding keeps the `fingerprint`
-and `fingerprint_algo` copied in 1b: `record` (6e) refuses a triage whose
-verdicts it can't match to the assessment's findings.
+For input (A)/(B)/(D), every non-duplicate finding keeps the `fingerprint`
+and `fingerprint_algo` copied in 1b: Core recording refuses a triage whose
+verdicts it cannot match to the assessment's findings. For (D), write next
+to the staged prepared file; `<repo>` is the repository slug from the
+supplied `subject.repository_url`, not the scratch checkout directory name.
 
 The output contract is Core's installed `triage` schema — shared
 vocabulary with `report.schema.json` (identical severity enum, canonical
@@ -1491,20 +1552,26 @@ is an accelerator, never a prerequisite.
 ### 6c. Validate <repo>-triage.json
 
 Bash:
-`python3 -m traust.cli reporting validate ./<repo>-triage.json`
+`python3 -m traust.cli reporting validate <findings-dir>/<repo>-triage.json --schema triage --canonical-write`
 
-The validator auto-detects `TRIAGE.json` / `*-triage.json` and applies
-Core's installed `triage` schema plus cross-validation gates:
+The validator applies Core's installed `triage` schema, its shared
+`triage#/$defs/canonical_write` contract to the final serialized bytes,
+and the triage cross-validation gates:
 confirmed rule-13 gaps use TP+weakness (never `false_positive`), false
 positives must carry refute_reasons, undetermined findings carry no
 confident conclusion, weaknesses have null severity, and disjoint summary
-counts must reconcile. The schema retains historical read compatibility;
-Core's `canonical_write` admission gate separately refuses deprecated
-`verdict: hardening` on NEW triage records. These instructions are producer
-guidance, not write enforcement. **The triage is not complete until the
-validator exits with `Result: ALL PASSED` and 0 errors.** Fix and
-re-validate before the done checkpoint; investigate warnings (vote-majority
-contradictions, non-canonical orig_ids) rather than suppressing them.
+counts must reconcile. Default validation deliberately retains historical
+read compatibility; it is NOT the final new-output gate. The explicit
+`--canonical-write` step refuses deprecated final verdicts and contradictory
+kind/rule-13/severity claims even for input (C), which has no record step.
+Neither constructor enums nor a verifier vote label admit a new report.
+Do not rewrite the output with a conversion script to pass this gate:
+return to the responsible phase's evidence-backed judgment or serialization,
+rebuild its summary and write the report again.
+**The triage is not complete until this canonical-write validator exits with
+`Result: ALL PASSED` and 0 errors.** Fix and re-validate before rendering or
+the done checkpoint; investigate warnings (vote-majority contradictions,
+non-canonical orig_ids) rather than suppressing them.
 
 ### 6d. Render `./<repo>-triage.md`
 
@@ -1512,7 +1579,7 @@ The Markdown is a deterministic projection of the validated JSON — never
 hand-assemble it. Bash:
 
 ```
-python3 -m traust.cli triage render <findings-dir>/<repo>-triage.json -o ./<repo>-triage.md
+python3 -m traust.cli triage render <findings-dir>/<repo>-triage.json -o <findings-dir>/<repo>-triage.md
 ```
 
 traust-core's renderer emits, in order: summary and context, `## Act on these`
@@ -1525,6 +1592,12 @@ and re-run 6c rather than writing the Markdown by hand — divergent
 hand-built reports are exactly what the renderer exists to prevent.
 
 ### 6e. Record the verdicts (input A/B only)
+
+**For input (D), skip this entire section.** Do not call Core, create a
+replacement assessment or print a fabricated recording receipt. Report that
+canonical output is ready for the external SDK caller to record against the
+unchanged prepared source subject. All verification, canonical-write
+validation and deterministic rendering still run before completion.
 
 Bash:
 
@@ -1588,7 +1661,7 @@ Triage complete: {N} findings -> {T} non-weakness true positives, {G} confirmed 
   Top refute reasons: {top 3 refute_reasons with counts}
   Verdict-citation lint: {broken citations found and re-votes triggered, or "clean"}
 
-Wrote ./<repo>-triage.md and ./<repo>-triage.json
+Wrote <findings-dir>/<repo>-triage.md and <findings-dir>/<repo>-triage.json
 ```
 
 The false-positives-by-rule line is a regression tripwire: rule 13 must
@@ -1607,6 +1680,20 @@ The fixture is self-contained: the target codebase ships alongside it at
 ```
 /triage <skill-base>/fixtures/canary-findings.json --auto --repo <skill-base>/fixtures/canary-target
 ```
+
+For a real headless producer run, use `traust session run --skill triage
+--role triage-verifier -- <absolute-findings-path> --auto --votes 1 --repo
+<absolute-read-only-target> --fresh` from the installed harness environment.
+This starts the actual `/triage` agent, including source-reading verifier
+Tasks, aggregation, canonical-write validation and rendering; it is not a
+deterministic report generator. Copy the raw input to a disposable output
+directory first so production writes no artifacts alongside shipped fixtures.
+The runner resolves its model from the configured `triage-verifier` role and
+requires authenticated Claude Code in `$TRAUST_CONFIG_HOME/claude-runner`
+(`CLAUDE_CONFIG_DIR`), or `ANTHROPIC_API_KEY`. Keep agent cwd in the harness,
+never the target; target configuration is untrusted data. Preserve the actual
+model output and validation result as evidence; do not replace judgments with
+the expected outcomes below.
 
 Seven canaries — expected outcomes:
 
@@ -1703,7 +1790,8 @@ unattributed run is a calibration gap.
 generic scanner JSON) as the finding source; `<repo>-threat-model.md`
 for environment context; `*-impact-analysis.json` from
 `analysis-results/impact/` (Phase 2f); precedents from `traust triage prepare`
-(Phase 2g).
+(Phase 2g), or the same native `TriageInput` staged read-only by a trusted
+caller with `--prepared-input` (input D; no in-process intake/prepare/record).
 
 **Emits:** `<repo>-triage.{json,md}` next to the input report —
 consumed by `/patch` and as explicitly bound source evidence by
@@ -1711,3 +1799,6 @@ consumed by `/patch` and as explicitly bound source evidence by
 record`) feed `/track-findings` and `traust findings queue` / `review-cases`
 (review items). The record receipt exposes native IDs for that binding handoff
 without local database discovery.
+In prepared-input mode the caller consumes the original emitted JSON and
+records it through the native SDK; the producer does not rewrite the report
+or manufacture Core recording IDs.

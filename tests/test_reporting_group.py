@@ -10,6 +10,7 @@ import pytest
 
 from tests.test_render_section_guard import FULL
 from tests.test_validate_report import _valid_report
+from tests.test_validate_triage import _valid_triage
 from traust.cli.__main__ import main as cli
 
 CLOUD = Path(__file__).parent / "fixtures" / "cloud_config" / "myrepo-cloud-config-audit.json"
@@ -49,6 +50,62 @@ def test_validate_with_nothing_to_validate(tmp_path, capsys):
     assert f"No .json files found in {tmp_path}" in capsys.readouterr().out
     assert cli(["reporting", "validate", str(tmp_path / "missing.json")]) == 1
     assert "Path not found" in capsys.readouterr().out
+
+
+def test_canonical_write_requires_an_explicit_contract(tmp_path):
+    path = _write(tmp_path / "repo-triage.json", _valid_triage())
+    assert cli(["reporting", "validate", str(path), "--canonical-write"]) == 2
+
+
+def test_canonical_write_fails_closed_without_a_shared_gate(tmp_path):
+    path = _write(tmp_path / "repo-triage.json", _valid_triage())
+    assert (
+        cli(["reporting", "validate", str(path), "--schema", "triage-missing", "--canonical-write"])
+        == 2
+    )
+
+
+def _canonical_triage():
+    report = _valid_triage()
+    report["findings"][0]["kind"] = "vulnerability"
+    report["findings"][1].update(verdict="true_positive", kind="weakness", verify_verdict=None)
+    return report
+
+
+def test_final_canonical_gate_accepts_disjoint_weakness_and_vulnerability_totals(tmp_path):
+    path = _write(tmp_path / "repo-triage.json", _canonical_triage())
+    assert cli(["reporting", "validate", str(path), "--schema", "triage", "--canonical-write"]) == 0
+
+
+def test_historical_triage_remains_readable_without_new_output_gate(tmp_path):
+    report = _valid_triage()
+    path = _write(tmp_path / "repo-triage.json", report)
+    assert cli(["reporting", "validate", str(path)]) == 0
+    assert cli(["reporting", "validate", str(path), "--schema", "triage", "--canonical-write"]) == 1
+    assert json.loads(path.read_text()) == report
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"severity": "high"},
+        {"kind": "vulnerability"},
+        {"exclusion_rule": None},
+        {"claimed_severity": "MEDIUM"},
+    ],
+)
+def test_final_canonical_gate_rejects_contradictory_serialized_weakness(tmp_path, change):
+    report = _canonical_triage()
+    report["findings"][1].update(change)
+    path = _write(tmp_path / "repo-triage.json", report)
+    assert cli(["reporting", "validate", str(path), "--schema", "triage", "--canonical-write"]) == 1
+
+
+def test_canonical_weakness_is_not_counted_again_as_a_vulnerability(tmp_path):
+    report = _canonical_triage()
+    report["summary"]["true_positives"] += 1
+    path = _write(tmp_path / "repo-triage.json", report)
+    assert cli(["reporting", "validate", str(path), "--schema", "triage", "--canonical-write"]) == 1
 
 
 def test_lint_reports_each_threat_model(tmp_path, capsys):

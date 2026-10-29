@@ -254,11 +254,11 @@ Use when the user wants to record human feedback against audit findings, review 
 
 ## triage
 
-Triage a batch of raw security findings. Verify each is real, keep finding kind separate from verdict, collapse duplicates, re-rank vulnerabilities by derived exploitability, and tag with an owner. Takes a directory or file of scanner output and writes <repo>-triage.json + <repo>-triage.md sorted by what actually needs engineering attention. Use when asked to "triage findings", "validate scanner output", "prioritize vulns", or "review the backlog". Runs interactively by default; pass --auto to skip the interview. Scanner source attribution comes from the recorded Core assessment, not a caller-supplied origin flag.
+Triage a batch of raw security findings. Verify each is real, keep finding kind separate from verdict, collapse duplicates, re-rank vulnerabilities by derived exploitability, and tag with an owner. Gates the final new report with the shared canonical-write contract. Takes scanner output or a read-only Core-prepared input and writes <repo>-triage.json + <repo>-triage.md sorted by what actually needs engineering attention. Use when asked to "triage findings", "validate scanner output", "prioritize vulns", or "review the backlog". Runs interactively by default; pass --auto to skip the interview. Scanner source attribution comes from the recorded Core assessment, not a caller-supplied origin flag.
 
 - **Stage:** ④ Triage
 - **Tier:** `primary`
-- **Invoke:** `/triage` — arguments: `<findings-path> [--auto] [--votes N] [--repo PATH] [--fp-rules FILE] [--fresh]`
+- **Invoke:** `/triage` — arguments: `<findings-path> [--prepared-input] [--auto] [--votes N] [--repo PATH] [--fp-rules FILE] [--fresh]`
 - **Skill:** [harnessing/4-triage/triage/SKILL.md](../harnessing/4-triage/triage/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/4-triage/triage/SKILL.md#integrations)
 
@@ -333,11 +333,11 @@ Use when the user asks to remediate, patch, fix, or produce a code fix for a sec
 
 ## verify-remediation
 
-Use when the user provides a previous secure-code-audit report and a patched version of the scanned repository, and asks to verify that findings have been resolved. Performs a targeted re-audit of each original finding against the patched code using the same frameworks, criteria, and evidence standards as the original secure-code-audit, then emits a structured verification report. Regression artifacts have no validity field; Core owns subsequent validity judgments.
+Verify previous security findings against patched source, using an original report or a read-only native executor input with Core finding identities. Performs targeted root-cause and regression review with real before/after evidence, then authors a schema-gated verification report. Native execution leaves recording to the caller; Core owns subsequent validity judgments.
 
 - **Stage:** ⑧ Verification
 - **Tier:** `primary`
-- **Invoke:** `/verify-remediation`
+- **Invoke:** `/verify-remediation` — arguments: `<report> <patched-repo> | --native-input FILE --repo PATH --output FILE [--source-report FILE]`
 - **Skill:** [harnessing/8-verify/verify-remediation/SKILL.md](../harnessing/8-verify/verify-remediation/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/8-verify/verify-remediation/SKILL.md#integrations)
 

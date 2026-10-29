@@ -19,10 +19,11 @@ Risk tiers, from live crit/high counts in findings.db:
 "Live" predicate (value domains inspected 2026-07-27; '' treated as
 NULL): severity IN ('critical','high') AND validity (when set) NOT IN
 ('false_positive','withdrawn','refuted','hardening') AND resolution
-(when set) NOT IN ('resolved','risk_accepted'). hardening validity is
-excluded because hardening recommendations are not open vulnerability
-risk; risk_accepted is a deliberate closed disposition. partially_
-resolved / regression_introduced / open stay live.
+(when set) NOT IN ('resolved','risk_accepted') AND kind (when the snapshot
+provides it) != 'weakness'. Canonical weaknesses and historical hardening
+validity are excluded because they are not open vulnerability risk;
+risk_accepted is a deliberate closed disposition. partially_resolved /
+regression_introduced / open stay live. Snapshots predating kind remain readable.
 
 Two-stage change detection (per-host; unknown hosts get status
 'unsupported-host' and still hit the age-ceiling rule — never silently
@@ -1473,6 +1474,7 @@ WHERE severity IN ('critical','high')
        ('false_positive','withdrawn','refuted','hardening'))
   AND (resolution IS NULL OR resolution = '' OR resolution NOT IN
        ('resolved','risk_accepted'))
+  {kind_predicate}
 GROUP BY repo_key
 """
 
@@ -1513,7 +1515,9 @@ def load_population(db_path: Path) -> list[dict]:
     duplicates never double-count the same finding)."""
     con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
     try:
-        live = dict(con.execute(_LIVE_SQL).fetchall())
+        columns = {column[1] for column in con.execute("PRAGMA table_info(findings)")}
+        kind_predicate = "AND (kind IS NULL OR kind != 'weakness')" if "kind" in columns else ""
+        live = dict(con.execute(_LIVE_SQL.format(kind_predicate=kind_predicate)).fetchall())
         rows = con.execute(_REPOS_SQL).fetchall()
     finally:
         con.close()

@@ -66,6 +66,53 @@ Common invocations:
 /triage backlog.md --auto --votes 1                 # quick first pass on a markdown report
 ```
 
+The installed headless runner invokes the same executable skill:
+
+```bash
+traust session run --skill triage --role triage-verifier -- \
+    /absolute/path/to/raw-findings.json --auto --votes 1 \
+    --repo /absolute/path/to/read-only-target --fresh
+```
+
+Run from the harness environment, not the target checkout. The runner resolves
+the configured model-registry role and requires Claude Code authenticated in
+`$TRAUST_CONFIG_HOME/claude-runner` or `ANTHROPIC_API_KEY`. The source-reading
+agent and its verifier Tasks author the judgments; no deterministic helper
+does. For controlled producer coverage, copy the shipped
+`fixtures/canary-findings.json` to a disposable output directory and pass its
+paired `fixtures/canary-target` as `--repo`. The seven inputs cover exploitable
+findings, a verified weakness, duplicates, refutations and unlocatable evidence.
+Capture the real emitted JSON and final validation result; expected outcomes
+are not a replacement report. This runs a real model and incurs model spend.
+
+### Read-only Core-prepared input
+
+For remote execution, the trusted caller prepares Core's native `TriageInput`
+once and stages its JSON without an envelope. The actual producer accepts it
+explicitly:
+
+```bash
+traust session run --skill triage --role triage-verifier -- \
+    /staged/core-triage-input.json --prepared-input --auto --votes 1 \
+    --repo /staged/read-only-checkout --fresh
+```
+
+The root fields are `subject`, `findings`, `prepared_at`, `assessor`, `items`.
+`subject` contains the repository IDs/URL/ref/SHA and source `assessment_id`;
+`findings` is native `FindingContext`. Each item contains `finding`,
+`occurrence`, `locations`, `precedents`. The skill retains these native
+objects read-only, copying the supplied title/rule/severity/kind and exact
+fingerprint/version into working findings while verifiers independently
+judge the source. Native IDs are never replaced by triage-local `fNNN` labels.
+The current DTO exposes no original scanner report ID, description,
+recommendation or arbitrary label collection; absent fields are not invented.
+
+This mode skips **all intake, prepare and record calls**, including on resume.
+Source-reading verification, canonical-write validation and deterministic
+rendering still run. Output is written next to the prepared input, named from
+the supplied repository URL; the external caller records the original JSON
+through the native SDK against its original Core source assessment.
+
 ## Output
 
 - `<findings-dir>/<repo>-triage.json` — every input finding, annotated with
@@ -102,6 +149,11 @@ Recording maps TP+weakness to `validity: confirmed, kind: weakness`, not
 `validity: hardening`; `needs_manual_test` and undetermined cases go to
 review instead of confirmation. Core's canonical-write admission gate
 refuses new deprecated hardening verdicts; prose is not write enforcement.
+The final producer gate is
+`traust reporting validate <report>-triage.json --schema triage --canonical-write`.
+It checks the serialized report against the shared contract, including
+input-only runs that do not record Core decisions. Default validation,
+`triage check` and `triage render` remain historical-read compatible.
 Exact stored historical triage replay remains idempotent, without rewriting
 its artifact.
 
