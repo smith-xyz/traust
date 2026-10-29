@@ -30,6 +30,11 @@ IMPACT: dict[str, object] = {
         "Evidence packets for advisories whose stated range starts above the installed version.",
         "below_range",
     ),
+    "manifest-sbom": passthrough_op(
+        "impact",
+        "Record a repository head's dependency SBOM from its manifests (the manifest_sbom asset).",
+        "manifest_sbom",
+    ),
     "below-range-scan": passthrough_op(
         "impact",
         "Record a repository head's below-range packets (the below_range_packets asset).",

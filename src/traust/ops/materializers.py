@@ -6,11 +6,12 @@ import logging
 import tempfile
 from collections import Counter
 from collections.abc import Iterable
+from http import HTTPStatus
 from pathlib import Path
 from uuid import UUID
 
 from traust_core.v1.context import Services
-from traust_core.v1.errors import ConfigError, NotFoundError, ValidationError
+from traust_core.v1.errors import ConfigError, NotFoundError, ServiceError, ValidationError
 from traust_core.v1.models.below_range import BelowRangeStatus
 from traust_core.v1.models.dependencies import FeedName
 from traust_core.v1.models.insight import RenderedView, ViewFilter, ViewName
@@ -49,6 +50,46 @@ class RepoStateMaterializer:
         if facts.status in ANSWERED:
             return JobResult.succeeded()
         return JobResult.partly({facts.status.value: 1})
+
+
+class ManifestSbomMaterializer:
+    """`manifest_sbom`: the dependency SBOM of one inventory repository's observed default head,
+    from its manifests on the forge. A head that has one is a no-op; no observed head is refused."""
+
+    asset = "manifest_sbom"
+
+    def __init__(self, services: Services, hosts: Iterable[str]) -> None:
+        self._portfolio = services.portfolio
+        self._exposure = services.exposure
+        self._hosts = tuple(hosts)
+
+    def materialize(self, request: AssetRequest) -> JobResult:
+        try:
+            url = HttpsRepoUrl.parse(request.partition or "", self._hosts)
+        except ValidationError as e:
+            log.warning("run %s: %s: %s", request.run_id, OrderReason.BAD_REQUEST, e)
+            return JobResult.failed(OrderReason.BAD_REQUEST)
+        repo = self._portfolio.find_repository(url)
+        head = self._portfolio.default_ref(repo.id) if repo and repo.id else None
+        if head is None or head.id is None:
+            log.warning(
+                "run %s: %s: no observed default head for %s",
+                request.run_id,
+                OrderReason.NOT_FOUND,
+                url,
+            )
+            return JobResult.refused(OrderReason.NOT_FOUND)
+        try:
+            sbom = self._exposure.record_manifest_sbom(head.id)
+        except (ConfigError, ValidationError) as e:
+            log.warning("run %s: %s: %s", request.run_id, OrderReason.BAD_REQUEST, e)
+            return JobResult.failed(OrderReason.BAD_REQUEST)
+        except ServiceError as e:
+            gone = e.status == HTTPStatus.NOT_FOUND
+            reason = OrderReason.NOT_FOUND if gone else OrderReason.SOURCE_UNAVAILABLE
+            log.warning("run %s: %s: %s", request.run_id, reason, e)
+            return JobResult.refused(reason) if gone else JobResult.failed(reason)
+        return JobResult.succeeded(written=(str(sbom.id),))
 
 
 # A run by hand, not for an engine order.

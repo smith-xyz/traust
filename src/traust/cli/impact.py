@@ -50,7 +50,7 @@ from traust_core.v1.models.vocabulary import (
 
 from traust.cli._doors import add_branch_arg, answer, parser, register_commit, run
 from traust.context import load
-from traust.ops.materializers import MANUAL, BelowRangePacketsMaterializer
+from traust.ops.materializers import MANUAL, BelowRangePacketsMaterializer, ManifestSbomMaterializer
 from traust.paths import HARNESS_ROOT
 from traust.registry.feeds_config import registry_path
 from traust.registry.osv_urls import osv_access
@@ -114,7 +114,10 @@ def package(argv: list[str] | None = None) -> int:
 def sbom(argv: list[str] | None = None) -> int:
     ap = _parser("sbom", "Record a commit's manifest SBOM (CycloneDX or SPDX JSON).")
     ap.add_argument(
-        "sbom", type=Path, nargs="?", help="the SBOM document (default: syft over the commit)"
+        "sbom",
+        type=Path,
+        nargs="?",
+        help="the SBOM document (default: syft over the commit's manifests)",
     )
     ap.add_argument("--repo-url", required=True, help="https URL of the repository")
     ap.add_argument("--sha", required=True, help="the commit the SBOM was read from")
@@ -131,14 +134,8 @@ def sbom(argv: list[str] | None = None) -> int:
         if args.sbom is not None:
             kept = services.exposure.ingest_sbom(args.sbom.read_bytes(), ref.id)
             return {"repository_ref_id": ref.id, "sbom_id": kept.id}
-        with tempfile.TemporaryDirectory(prefix="sbom-") as tmp:
-            checkout = clone(str(url), args.sha, Path(tmp) / "repo")
-            ingest = services.exposure.ingest_dependencies(ref.id, checkout)
-        return {
-            "repository_ref_id": ref.id,
-            "sbom_id": ingest.sbom.id,
-            "tool": f"{ingest.tool} {ingest.tool_version or ''}".strip(),
-        }
+        kept = services.exposure.record_manifest_sbom(ref.id)
+        return {"repository_ref_id": ref.id, "sbom_id": kept.id}
 
     return run(call)
 
@@ -413,6 +410,22 @@ def _no_air_gap() -> None:
             "below-range needs the OSV API and the package registries; feeds.yaml sets the "
             "osv source air-gapped"
         )
+
+
+def manifest_sbom(argv: list[str] | None = None) -> int:
+    ap = _parser(
+        "manifest-sbom",
+        "The manifest_sbom asset's materializer: the dependency SBOM of an inventory repository's "
+        "observed default head, from its manifests on the forge. Prints the JobResult; its "
+        "outcome is the exit code.",
+    )
+    ap.add_argument("--repo", required=True, help="https URL of an inventory repository")
+    ap.add_argument("--run-id", default=MANUAL, help="the run order this SBOM is for")
+    args = ap.parse_args(argv)
+    core = _core(args.config_home)
+    materializer = ManifestSbomMaterializer(core.services(), core.config.forge_hosts)
+    request = AssetRequest(asset=materializer.asset, run_id=args.run_id, partition=args.repo)
+    return answer(materializer.materialize(request))
 
 
 def below_range_scan(argv: list[str] | None = None) -> int:

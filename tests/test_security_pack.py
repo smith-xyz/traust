@@ -35,6 +35,7 @@ STANDING_JOBS = Path(__file__).resolve().parents[1] / "docs" / "continuous-opera
 ASSETS = {
     # the refresh half; its rescan router is the pack router (route_on: repo_state)
     "Fleet refresh + rescan router": "repo_state",
+    "Manifest SBOM sweep": "manifest_sbom",
     "Below-range verification (packets, then review)": "below_range_packets",
     "Weekly diff-drain tranche": "diff_scan_quarterly",
     # the calendar backstop; the release review is routed (ROUTED), and the `pr` stamp rides
@@ -75,7 +76,6 @@ EXCLUDED = {
     "FP-precedent cache rebuild": "drift-triggered; the schema has no event trigger",
     "Threshold re-derivation": "human-decision: a person edits the decision table",
     "IaC quarterly re-baseline": "human-decision, drift-flagged",
-    "Portfolio-graph heavyweight rebuild": "human-decision, drift-flagged",
     "ADR / pin / external-tool advances": "human-decision, never automated",
     "Docs semantic sweep": "a reviewer sweep, not a job",
 }
