@@ -169,8 +169,8 @@ the Python facts with `python3 -m traust.cli adapters opengrep <local-path>
 Session, passport-session, helmet, cors and cookie middleware only set up
 state, so they never count as guards. The matrix doesn't list `use()` calls
 that only add a handler or middleware (a block-list, `express.static`, a
-rewrite): read those by hand. Express needs the JS/TS parser
-(`traust-core[js]`); without it, the matrix reports Express as a coverage
+rewrite): read those by hand. Express needs the JS/TS grammar
+(`tree-sitter-javascript`); without it, the matrix reports Express as a coverage
 gap. Record that gap and review routes by hand.
 
 **Backstage.** A plugin's router mounted through the `httpRouter` service
@@ -237,8 +237,8 @@ Controllers that implement API interfaces generated at build time (an
 OpenAPI generator's `interfaceOnly`) are a coverage gap: read the API
 spec the generator uses and each controller's overrides by hand. Kotlin
 controllers, Micronaut and Spring functional routes (`RouterFunctions`,
-`coRouter`) are coverage gaps too. Java parsing needs `traust-core[java]`,
-installed with traust.
+`coRouter`) are coverage gaps too. Java parsing needs `tree-sitter-java`,
+a traust-core dependency.
 
 | ID | Check | CWE | Requirement | Evidence |
 |---|---|---|---|---|
@@ -280,8 +280,8 @@ and each actix-web route (`App` and `web::scope` `service`, `route` and
 Session, cookie, identity-store, CORS and trace middleware only set up
 state, so they never count as guards. Routes built by helper functions
 that take the path and handler as parameters aren't followed: the
-framework shows as a coverage gap. Rust parsing needs `traust-core[rust]`,
-installed with traust.
+framework shows as a coverage gap. Rust parsing needs `tree-sitter-rust`,
+a traust-core dependency.
 
 | ID | Check | CWE | Requirement | Evidence |
 |---|---|---|---|---|
@@ -308,7 +308,7 @@ installed with traust.
 `InterceptedService::new`) and the methods of its trait `impl`, and
 reflection and health services as `exposures`. A service is judged unless
 an auth-shaped layer or interceptor covers it. Rust parsing needs
-`traust-core[rust]`.
+`tree-sitter-rust`.
 
 | ID | Check | CWE | Requirement | Evidence |
 |---|---|---|---|---|
@@ -341,8 +341,8 @@ with:
 Sinatra routes (`get '/path' do`) carry `before` filters whose block calls a
 guard (`before:<name>`, matched by path pattern), a guard-shaped `use`
 middleware (`Rack::Auth::Basic`), and bare guard calls in the block.
-`concern`s aren't expanded. Ruby parsing needs `traust-core[ruby]`,
-installed with traust.
+`concern`s aren't expanded. Ruby parsing needs `tree-sitter-ruby`,
+a traust-core dependency.
 
 | ID | Check | CWE | Requirement | Evidence |
 |---|---|---|---|---|

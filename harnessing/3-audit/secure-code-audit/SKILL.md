@@ -1150,8 +1150,8 @@ Quarkus HTTP permissions), axum and actix-web (layer order, `wrap` scopes,
 auth-shaped extractors) and rails and sinatra (`<app>/config/routes.rb` resolved
 to each action's `before_action` chain; `before` filters); the
 `framework-checks.md` section for each says what its rows carry. These
-parse with tree-sitter (`traust-core[js]`, `[java]`, `[rust]`, `[ruby]`,
-installed with traust); without a grammar, that framework is a coverage gap
+parse with tree-sitter grammars that traust-core installs (`traust admin
+doctor` checks they load); without a grammar, that framework is a coverage gap
 that says so. Rows of the python families and express add
 a per-guard-family asymmetry shape: a check (scope, admin, role, permission,
 token, …) that most rows of one view class or router carry but a guarded

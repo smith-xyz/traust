@@ -42,7 +42,7 @@ def test_web_sections_name_their_deterministic_evidence():
     assert "traust adapters route-guards" in text
     for rule in ("traust-ts-xss-", "traust-ts-open-redirect-", "traust-ts-path-traversal-fs-taint"):
         assert rule in text, rule
-    assert "backstage:httpRouter" in text and "traust-core[js]" in text
+    assert "backstage:httpRouter" in text and "tree-sitter-javascript" in text
 
 
 def test_every_check_names_a_cwe_and_its_standard_requirement():
@@ -79,5 +79,5 @@ def test_jvm_rust_and_ruby_sections_name_their_matrix_markers():
         "framework: tonic",
     ):
         assert marker in text, marker
-    for extra in ("java", "rust", "ruby"):
-        assert f"traust-core[{extra}]" in text, extra
+    for lang in ("java", "rust", "ruby"):
+        assert f"tree-sitter-{lang}" in text, lang
