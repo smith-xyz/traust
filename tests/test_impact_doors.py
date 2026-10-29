@@ -22,8 +22,10 @@ from traust_core.v1.models.dependencies import (
 )
 from traust_core.v1.models.vocabulary import Ecosystem
 from traust_core.v1.providers.base import Acquisition, Readiness, Result
+from traust_core.v1.providers.forge_archive import ArchiveCheckout
 from traust_core.v1.providers.osv import OsvAdvisoryLookup
-from traust_core.v1.providers.syft import SyftSbom
+from traust_core.v1.providers.sources import CheckoutRequest, Workspace
+from traust_core.v1.providers.syft import MANIFESTS, SyftSbom
 from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
 
 from traust.cli import check_fix_propagation, impact
@@ -261,13 +263,16 @@ def test_sweep_over_the_cap_is_sbom_only_and_ecosystems_are_checked(
         run(impact.sweep, home, "--ecosystem", "cobol")
 
 
-def test_sbom_without_a_document_reads_the_commits_checkout(
+def test_sbom_without_a_document_reads_the_commits_manifests(
     home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def clone(url: str, sha: str, dest: Path) -> Path:
-        assert (url, sha) == (REPO, SHA)
-        dest.mkdir(parents=True)
-        return dest
+    asked: list[CheckoutRequest] = []
+
+    def checkout(self: Any, request: CheckoutRequest) -> Result[Workspace]:
+        asked.append(request)
+        when = datetime.now(UTC)
+        workspace = Workspace(repo=request.repo, sha=request.ref, path=tmp_path)
+        return Result(workspace, Acquisition(provider="forge-archive", acquired_at=when))
 
     def acquire(self: Any, request: Any) -> Result[bytes]:
         raw = sbom(tmp_path, "4.17.20").read_bytes()
@@ -276,7 +281,10 @@ def test_sbom_without_a_document_reads_the_commits_checkout(
 
     monkeypatch.setattr(SyftSbom, "check", lambda self: Readiness(ready=True))
     monkeypatch.setattr(SyftSbom, "acquire", acquire)
-    monkeypatch.setattr(impact, "clone", clone)
+    monkeypatch.setattr(ArchiveCheckout, "checkout", checkout)
+    monkeypatch.setattr(ArchiveCheckout, "release", lambda self, workspace: None)
     rc, out = run(impact.sbom, home, "--repo-url", REPO, "--sha", SHA)
     done = json.loads(out)
-    assert rc == 0 and done["sbom_id"] and done["tool"] == "syft 1.51.1"
+    assert rc == 0 and done["sbom_id"]
+    [request] = asked
+    assert (str(request.repo), str(request.ref), request.keep) == (REPO, SHA, MANIFESTS)
