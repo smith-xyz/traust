@@ -7,17 +7,18 @@ import io
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 import yaml
+from traust_core.v1.context import observation
 from traust_core.v1.errors import NotFoundError
 from traust_core.v1.models.assessment import Assessment, AssessmentKind
 from traust_core.v1.models.inventory import RepositoryRef
 from traust_core.v1.models.observation import ComparisonStatus
 from traust_core.v1.models.operations import AssetRequest, JobResult, OrderReason
 from traust_core.v1.models.values import HttpsRepoUrl
-from traust_core.v1.providers.process import ProcessResult, ProcessRunner
 from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
 
 from traust.cli import portfolio_observe
@@ -33,10 +34,10 @@ FORGE = {
         "default_branch": "main",
         "visibility": "private",
         "fork": True,
-        "parent": "org/upstream",
+        "parent": {"full_name": "org/upstream"},
     },
-    "repos/org/app/branches/main": {"sha": "b" * 40},
-    "rate_limit": 4000,
+    "repos/org/app/branches/main": {"commit": {"sha": "b" * 40}},
+    "rate_limit": {"resources": {"core": {"remaining": 4000}}},
     "repos/org/app/compare/" + "a" * 40 + "...HEAD": {
         "ahead_by": 1,
         "status": "ahead",
@@ -51,13 +52,18 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     config.mkdir()
     (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
 
-    def forge(self: ProcessRunner, argv: list[str], **kwargs: Any) -> ProcessResult:
-        answer = FORGE[argv[2]]
-        out = str(answer) if isinstance(answer, int) else json.dumps(answer)
-        return ProcessResult(tuple(argv), 0, out.encode(), b"", 0)
-
-    monkeypatch.setattr(ProcessRunner, "run", forge)
+    forge_api(monkeypatch, lambda host, endpoint, headers=None: FORGE[endpoint])
     return config
+
+
+def forge_api(monkeypatch: pytest.MonkeyPatch, get: Any) -> None:
+    """Core's forge reads GitHub over its ForgeApi; answer them from `get`."""
+    wire = observation.command_source
+    api = SimpleNamespace(get=get)
+    monkeypatch.setattr(
+        "traust_core.v1.context.context.command_source",
+        lambda hosts, **kw: wire(hosts, **{**kw, "api": api}),
+    )
 
 
 def observe(home: Path, repo: str) -> tuple[int, dict[str, Any]]:
@@ -104,7 +110,7 @@ def test_a_never_audited_repository_succeeds_without_the_forge(
     home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     register(home, audited=False)
-    monkeypatch.setattr(ProcessRunner, "run", lambda *a, **k: pytest.fail("forge contacted"))
+    forge_api(monkeypatch, lambda *a, **k: pytest.fail("forge contacted"))
     assert observe(home, REPO)[0] == 0
 
 

@@ -4,7 +4,7 @@
 One command that answers "why doesn't my session work" before an hour
 is lost to it — checks the top onboarding failure modes: traust-core's
 store and provider readiness (in-process, SQLite by default), venv +
-locked deps, pinned external tools, forge auth, VPN reachability, and
+locked deps, the tree-sitter grammars, pinned external tools, forge auth, VPN reachability, and
 the harness's own gates.
 
 Usage:
@@ -27,6 +27,7 @@ import sys
 
 from traust_core.v1.errors import TraustError
 from traust_core.v1.models.common import PageRequest
+from traust_core.v1.providers import syntax
 
 from traust.context import add_config_home_arg, load
 from traust.paths import HARNESS_ROOT, skill_dir
@@ -97,6 +98,25 @@ def check_core(results, config_home, network=True):
             results.append((OK, f"provider {name} ready"))
         else:
             results.append((WARN, f"provider {name} not ready — {binding.readiness.detail}"))
+
+
+def check_grammars(results):
+    """The tree-sitter grammars behind the Express, Java, Rust and Ruby route matrices."""
+    for language, package, loader in (
+        ("JS/TS", "tree-sitter-javascript", syntax.js_parsers),
+        ("Java", "tree-sitter-java", syntax.java_parser),
+        ("Rust", "tree-sitter-rust", syntax.rust_parser),
+        ("Ruby", "tree-sitter-ruby", syntax.ruby_parser),
+    ):
+        if loader() is None:
+            results.append(
+                (
+                    WARN,
+                    f"{syntax.grammar_missing(language, package)}; its routes are a coverage gap",
+                )
+            )
+        else:
+            results.append((OK, f"{language} grammar loads"))
 
 
 def check_python(results):
@@ -235,6 +255,7 @@ def main(argv=None) -> int:
     results: list[tuple[str, str]] = []
     check_core(results, args.config_home, network=not args.quick)
     check_python(results)
+    check_grammars(results)
     check_tools(results)
     if not args.quick:
         check_auth(results)
