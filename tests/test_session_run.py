@@ -6,13 +6,15 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from traust_core.v1.errors import NotFoundError
+from traust_core.v1.errors import NotFoundError, ServiceError, ValidationError
 
 from traust.cli import session
 from traust.paths import HARNESS_ROOT
@@ -25,20 +27,19 @@ CLAUDE_RESULT = (Path(__file__).parent / "fixtures" / "session" / "claude-result
 
 
 class Processes:
-    """Answers the model registry's `resolve_role`, `git clone`, `git rev-parse`, `assessments
-    prepare` and the agent; records each call."""
+    """Answers the model registry's `resolve_role`, `git rev-parse`, `assessments prepare`
+    and the agent; records each call."""
 
     def __init__(
         self,
         model: str = "claude-opus-5-5",
         agent: int = 0,
-        clone: int = 0,
         prepare: tuple[int, str] = (0, PREPARED),
         pr_agent: int = 0,
         unknown_role: str = "",
         reply: str = CLAUDE_RESULT,
     ) -> None:
-        self.model, self.agent, self.clone, self.reply = model, agent, clone, reply
+        self.model, self.agent, self.reply = model, agent, reply
         self.prepare, self.pr_agent, self.unknown_role = prepare, pr_agent, unknown_role
         self.calls: list[tuple[list[str], dict[str, Any]]] = []
         self.roles: list[str] = []
@@ -54,11 +55,6 @@ class Processes:
         if argv[1:5] == ["-m", "traust.cli", "assessments", "prepare"]:
             code, out = self.prepare
             return subprocess.CompletedProcess(argv, code, out, "not registered")
-        if argv[:2] == ["git", "clone"]:
-            if self.clone:
-                raise subprocess.CalledProcessError(self.clone, argv, stderr=b"not found")
-            Path(argv[-1]).mkdir(parents=True)
-            return subprocess.CompletedProcess(argv, 0, b"", b"")
         if argv[0] == "git" and argv[-2:] == ["rev-parse", "HEAD"]:
             return subprocess.CompletedProcess(argv, 0, HEAD + "\n", "")
         pr = argv[-1].startswith("/threat-model pr ")
@@ -91,6 +87,36 @@ def processes(monkeypatch: pytest.MonkeyPatch) -> Processes:
     return fake
 
 
+class Checkout:
+    """Stands in for `session.checkout`: a workspace under a temporary directory, released
+    (recorded) when the session ends."""
+
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error, self.released, self.path = error, False, None
+
+    def __call__(self, url: str, config_home: Path | None) -> Checkout:
+        return self
+
+    def __enter__(self) -> Checkout:
+        if self.error is not None:
+            raise self.error
+        self.path = Path(tempfile.mkdtemp(prefix="traust-session-")) / "checkout"
+        self.path.mkdir()
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        shutil.rmtree(self.path.parent)
+        self.released = True
+
+
+@pytest.fixture(autouse=True)
+def checkout(monkeypatch: pytest.MonkeyPatch) -> Checkout:
+    """Every `--checkout` run in these tests gets the same stubbed workspace."""
+    fake = Checkout()
+    monkeypatch.setattr(session, "checkout", fake)
+    return fake
+
+
 def run(*argv: str) -> tuple[int, dict[str, Any]]:
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
@@ -114,26 +140,27 @@ def test_a_repository_is_passed_by_url(processes: Processes) -> None:
     assert processes.agent_call()[0][-1] == f"/secure-code-audit {REPO}"
 
 
-def test_a_checkout_is_a_temporary_directory_outside_the_harness(processes: Processes) -> None:
+def test_a_checkout_is_a_workspace_outside_the_harness_released_when_the_session_ends(
+    processes: Processes, checkout: Checkout
+) -> None:
     rc, _ = run(
         "--skill", "vuln-scan", "--role", "vuln-scan", "--repo", REPO, "--checkout", "--", "--diff"
     )
-    clone = next(c for c in processes.calls if c[0][:2] == ["git", "clone"])
-    assert clone[0][-2] == REPO and clone[1]["env"]["GIT_ALLOW_PROTOCOL"] == "https"
     prompt = processes.agent_call()[0][-1]
     path = Path(prompt.split()[1])
     assert prompt.startswith("/vuln-scan ") and prompt.endswith(" --diff") and rc == 0
+    assert path == checkout.path
     assert not path.is_relative_to(HARNESS_ROOT) and not path.exists()  # gone after the session
 
 
-def test_a_mode_token_comes_before_the_checkout(processes: Processes) -> None:
+def test_a_mode_token_comes_before_the_checkout(processes: Processes, checkout: Checkout) -> None:
     run(
         *("--skill", "threat-model", "--mode", "review", "--role", "threat-model"),
         *("--repo", REPO, "--checkout", "--", "--auto", "--apply-ratings"),
     )
     skill, mode, path, *flags = processes.agent_call()[0][-1].split()
     assert (skill, mode, flags) == ("/threat-model", "review", ["--auto", "--apply-ratings"])
-    assert Path(path).name == "checkout"
+    assert Path(path) == checkout.path
 
 
 @pytest.mark.parametrize(
@@ -157,28 +184,8 @@ def test_a_mode_token_comes_before_the_checkout(processes: Processes) -> None:
             "failed",
             "bad_request",
         ),
-        (
-            Processes(clone=128),
-            ["--skill", "vuln-scan", "--role", "vuln-scan", "--repo", REPO, "--checkout"],
-            "refused",
-            "not_found",
-        ),
-        (
-            Processes(),
-            [
-                "--skill",
-                "vuln-scan",
-                "--role",
-                "vuln-scan",
-                "--repo",
-                "http://x.io/a/b",
-                "--checkout",
-            ],
-            "refused",
-            "not_found",
-        ),
     ],
-    ids=["session fails", "unknown role", "unknown skill", "clone fails", "not https"],
+    ids=["session fails", "unknown role", "unknown skill"],
 )
 def test_what_cannot_run_is_answered_with_a_registered_reason(
     monkeypatch: pytest.MonkeyPatch, fake: Processes, argv: list[str], outcome: str, reason: str
@@ -187,6 +194,24 @@ def test_what_cannot_run_is_answered_with_a_registered_reason(
     rc, result = run(*argv)
     assert (result["outcome"], result["reason"]) == (outcome, reason)
     assert rc == {"failed": 1, "refused": 5}[outcome]
+
+
+@pytest.mark.parametrize(
+    ("error", "repo"),
+    [
+        (ServiceError("cannot check out: commit not in the repository"), REPO),
+        (ValidationError("repo url must be https: 'http://x.io/a/b'"), "http://x.io/a/b"),
+    ],
+    ids=["checkout fails", "not https"],
+)
+def test_a_checkout_that_cannot_be_made_is_refused(
+    monkeypatch: pytest.MonkeyPatch, error: Exception, repo: str
+) -> None:
+    monkeypatch.setattr(session, "checkout", Checkout(error))
+    monkeypatch.setattr(session.subprocess, "run", Processes())
+    rc, result = run("--skill", "vuln-scan", "--role", "vuln-scan", "--repo", repo, "--checkout")
+    assert (result["outcome"], result["reason"]) == ("refused", "not_found")
+    assert rc == 5
 
 
 def test_checkout_needs_a_repository() -> None:
@@ -202,6 +227,7 @@ STAMPED_SCAN = (
 
 def test_a_stamped_diff_scan_runs_threat_model_pr_on_the_same_checkout_at_its_anchor(
     processes: Processes,
+    checkout: Checkout,
 ) -> None:
     rc, result = run(*STAMPED_SCAN)
     assert (rc, result["outcome"]) == (0, "succeeded")
@@ -214,6 +240,7 @@ def test_a_stamped_diff_scan_runs_threat_model_pr_on_the_same_checkout_at_its_an
     assert prepare[5:] == [
         *("--kind", "vuln-scan", "--repo-url", REPO, "--sha", HEAD, "--diff", clone)
     ]
+    assert checkout.released  # the workspace outlives both sessions, then goes
 
 
 @pytest.mark.parametrize("rule", ["rule-5", "rule-3+preroute"])
