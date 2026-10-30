@@ -1,5 +1,6 @@
-# Template for $TRAUST_CONFIG_HOME/product-definitions-map.yaml — install_traust
-# seeds it; copy there and edit. The harness never reads this example at run time.
+# Example product map: keep yours in your own repository and record it with
+# `traust registry product-map <file>` (each recording is the next version; lookups use the
+# newest). The harness never reads this example at run time.
 #
 # Reviewed findings-package / repo -> ps_product mappings for
 # python3 -m traust.cli registry products (consumers: /assign-findings-owners,
@@ -13,7 +14,7 @@
 # the guesses that turned out to be right, so they stop being guesses.
 #
 # MATCH TIERS, highest first:
-#   mapped    an entry in this file. Trusted.
+#   mapped    an entry in the recorded map. Trusted.
 #   repo-url  exact managed_service_components[].git_repo_url. Trusted.
 #   slug      package name matched a ps_product id/name. ADVISORY ONLY —
 #             never feeds an owner decision until confirmed here.
@@ -25,7 +26,7 @@
 # Review each one — check the contacts and lifecycle actually describe the
 # product you think it is — then copy the confirmed pairs in below.
 #
-# The script NEVER writes here. Every entry is a human assertion.
+# The script NEVER writes the map. Every entry is a human assertion.
 #
 # ps_product ids are immutable by upstream policy (they are foreign keys in
 # Flaw/Affect records), so an entry does not rot on a rename.

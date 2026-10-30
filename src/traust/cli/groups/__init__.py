@@ -93,6 +93,7 @@ GROUPS: dict[str, dict[str, object]] = {
     "registry": {
         "models": registry.MODELS,
         "products": registry.PRODUCTS,
+        "product-map": registry.PRODUCT_MAP,
     },
     "portfolio": {
         "dependencies": portfolio.DEPENDENCIES,

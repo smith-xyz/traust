@@ -1,5 +1,5 @@
-"""The live spend view, `attribute-spend` and `registry products` read files only: on a fresh
-install they never create the record store (`<core home>/traust.db`)."""
+"""The live spend view and `attribute-spend` read files only: on a fresh install they never create
+the record store (`<core home>/traust.db`). `registry products` reads the recorded product map."""
 
 from __future__ import annotations
 
@@ -69,21 +69,41 @@ def test_the_spend_views_never_create_the_record_store(
     assert not (tmp_path / "store" / "traust.db").exists()
 
 
-def test_registry_products_never_creates_the_record_store(config: Path, tmp_path: Path) -> None:
+def products_args(config: Path, tmp_path: Path) -> Any:
     cache = shutil.copytree(PRODUCT_DEFINITIONS, tmp_path / "feeds")
-    args = SimpleNamespace(
+    return SimpleNamespace(
         config_home=config,
         package=["widget-core"],
         repo_url=[],
         product=[],
         all=False,
-        map=None,
         cache_dir=Path(cache),
         json=True,
     )
-    rc, out = run(registry.call_products, args)
-    assert rc == 0 and json.loads(out)["results"]
-    assert not (tmp_path / "store" / "traust.db").exists()
+
+
+def test_registry_products_says_when_no_map_is_recorded(config: Path, tmp_path: Path) -> None:
+    rc, out = run(registry.call_products, products_args(config, tmp_path))
+    doc = json.loads(out)
+    assert rc == 0 and doc["warnings"][0] == registry.NO_MAP
+    assert [r["match_tier"] for r in doc["results"]] == ["none"]
+
+
+def test_registry_products_uses_the_recorded_map(config: Path, tmp_path: Path) -> None:
+    mapping = tmp_path / "map.yaml"
+    mapping.write_text("mappings:\n  packages:\n    widget-core: widget\n")
+    recorded = SimpleNamespace(config_home=config, map=mapping)
+    assert run(registry.call_product_map, recorded)[0] == 0
+    rc, out = run(registry.call_products, products_args(config, tmp_path))
+    doc = json.loads(out)
+    assert rc == 0 and registry.NO_MAP not in doc.get("warnings", [])
+    assert [r["match_tier"] for r in doc["results"]] == ["mapped"]
+
+
+def test_a_malformed_map_is_refused(config: Path, tmp_path: Path) -> None:
+    mapping = tmp_path / "map.yaml"
+    mapping.write_text("mappings:\n  packages:\n    widget-core: 1\n")
+    assert run(registry.call_product_map, SimpleNamespace(config_home=config, map=mapping))[0] == 2
 
 
 def test_appending_spend_does_record(config: Path, tmp_path: Path) -> None:

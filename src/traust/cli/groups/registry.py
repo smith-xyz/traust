@@ -8,14 +8,16 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+import yaml
 from traust_core.v1.errors import ConfigError, NotFoundError, ValidationError
+from traust_core.v1.models.artifacts import ProductDefinitionsMapArtifact
 from traust_core.v1.models.operations import ModelName, SpendEvent, TokenUsage
 
+from traust.cli import _doors
 from traust.cli.groups._registry import OpSpec
 from traust.context import MODEL_REGISTRY, load, load_spend_core
-from traust.paths import optional_config_path
 
-PRODUCT_MAP = "product-definitions-map.yaml"
+NO_MAP = "no product map recorded; record one with `traust registry product-map <file>`"
 # NEED(data-model: spend calibration tuple repo/loc/batch/note)
 UNSTORED = "not stored: spend_event has no column for it"
 
@@ -143,7 +145,6 @@ def add_products_args(ap) -> None:
         action="store_true",
         help="propose a match for every package under processed-results/",
     )
-    ap.add_argument("--map", type=Path, default=optional_config_path(PRODUCT_MAP))
     ap.add_argument("--cache-dir", type=Path, default=None)
     ap.add_argument("--json", action="store_true", help="JSON only, no human-readable summary")
 
@@ -151,8 +152,10 @@ def add_products_args(ap) -> None:
 def call_products(args) -> int:
     core = load(args.config_home)
     snapshot = core.product_definitions(args.cache_dir).read()
-    mappings = core.product_mappings(args.map)
-    packages, unresolved = list(args.package), None
+    portfolio = core.services().portfolio
+    mappings = portfolio.product_mappings()
+    notes = [] if mappings.packages or mappings.repos else [NO_MAP]
+    packages = list(args.package)
     if args.all and snapshot.document is not None:
         tracker = core.config.locations.progress_tracker_dir()
         packages_dir = tracker / "processed-results" if tracker else None
@@ -161,13 +164,13 @@ def call_products(args) -> int:
                 p.name for p in packages_dir.iterdir() if p.is_dir() and not p.name.startswith(".")
             )
         else:
-            unresolved = f"{packages_dir} not found — --all resolved no packages"
-    resolution = core.product_lookup.resolve_products(
+            notes.append(f"{packages_dir} not found — --all resolved no packages")
+    resolution = portfolio.resolve_products(
         snapshot, mappings, packages, args.repo_url, args.product
     )
     out = resolution.model_dump(mode="json", exclude_unset=True)
-    if unresolved:
-        out.setdefault("warnings", []).insert(len(mappings.warnings), unresolved)
+    if notes:
+        out["warnings"] = [*notes, *out.get("warnings", [])]
     print(json.dumps(out, indent=2))
     if snapshot.document is not None and not args.json:
         _summarise(out)
@@ -197,4 +200,24 @@ PRODUCTS = OpSpec(
     add_args=add_products_args,
     call=call_products,
     help="Resolve ownership context from the product registry",
+)
+
+
+def add_product_map_args(ap) -> None:
+    ap.add_argument("map", type=Path, help="a product-definitions-map document (YAML)")
+
+
+def call_product_map(args) -> int:
+    def call() -> dict:
+        doc = ProductDefinitionsMapArtifact.from_document(yaml.safe_load(args.map.read_text()))
+        portfolio = load(args.config_home).services().portfolio
+        return {"artifact_id": portfolio.record_product_map(doc, _doors.interactive()).artifact_id}
+
+    return _doors.run(call)
+
+
+PRODUCT_MAP = OpSpec(
+    add_args=add_product_map_args,
+    call=call_product_map,
+    help="Record the reviewed package/repo -> product map product lookups use",
 )

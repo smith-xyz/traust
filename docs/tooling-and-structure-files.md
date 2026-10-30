@@ -49,6 +49,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 | `schemas/v1/attack-mapping.schema.json` | JSON Schema for the finding-category→ATT&CK mapping table |
 | `schemas/v1/adr-registry.schema.json` | JSON Schema for the architecture-decision-record registry |
 | `schemas/v1/org-parameters.schema.json` | JSON Schema for org-wide parameter files |
+| `schemas/v1/product-definitions-map.schema.json` | JSON Schema for the reviewed package/repo → product map (`traust registry product-map`) |
 | `schemas/v1/risk-rating-methodology.schema.json` | JSON Schema for the risk-rating methodology config |
 | `schemas/v1/repo-state.schema.json` | JSON Schema for a repository's forge observation: observed default-branch head compared with its latest audit, stored as a repo-state assessment artifact; unavailable/deferred run outcomes are not observation documents |
 | python3 -m traust.cli reporting validate | Validates report JSON against schema; supports `--strict` and batch validation |

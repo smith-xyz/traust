@@ -112,5 +112,7 @@ def test_moved_files_get_their_new_home(old: Path, capsys) -> None:
         f"{old / 'sla-policy.yaml'}",
         "internal-vocabulary.yaml: not migrated, public-export tooling input",
         "--vocabulary` (tools/public-export/)",
+        f"product-definitions-map.yaml: adopter fact, record it: traust registry product-map "
+        f"{old / 'product-definitions-map.yaml'}",
     ):
         assert line in report

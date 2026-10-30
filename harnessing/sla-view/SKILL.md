@@ -102,7 +102,7 @@ harness enum are different languages and the join must stay auditable.
 owners (`SlaView`); the recorded SLA policy, else `packs/security/sla-policy.yaml`
 (human-curated policy data); `analysis-results/feeds/product_definitions.json`
 (producer: python3 -m traust.cli feeds fetch-products, read via
-python3 -m traust.cli registry products) plus `$TRAUST_CONFIG_HOME/product-definitions-map.yaml`
+python3 -m traust.cli registry products) plus the recorded product map (`registry product-map`)
 for the accountable-contact join (NEED(core: a product-definitions provider
 giving `SlaView` each product's accountable contacts; until then the view
 reports contacts unavailable)).
