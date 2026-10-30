@@ -117,7 +117,7 @@ def test_the_effective_config_names_each_values_source(
     monkeypatch.delenv("FEEDS_CACHE_DIR", raising=False)
     rows = _config_rows(home)
     assert rows["config file: " + str(home / "traust.yaml")]
-    assert rows["config database.url"].endswith("***@db/t (file)")
+    assert rows["config database.url"].endswith('"postgresql://u:***@db/t" (file)')
     assert "secret" not in rows["config database.url"]
     assert rows["config database.password_env"].endswith("(file, DB_PW UNSET)")
     assert rows["config locations.workspace"] == 'config locations.workspace = "/w" (file)'

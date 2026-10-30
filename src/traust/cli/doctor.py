@@ -25,10 +25,10 @@ import shutil
 import socket
 import subprocess
 import sys
+from urllib.parse import urlsplit
 
 import pydantic
 import pydantic_core
-import sqlalchemy as sa
 import yaml
 from traust_core.v1.context import Config, resolve_config_home
 from traust_core.v1.context.config import CONFIG_FILE
@@ -116,8 +116,8 @@ SHIPPED_FILES = ("external-tools.yaml", "safe-exec-profiles.yaml", "feeds.yaml")
 
 
 def _render(key: str, value: object) -> str:
-    if key == "database.url" and value:
-        return sa.make_url(str(value)).render_as_string(hide_password=True)
+    if key == "database.url" and value and (password := urlsplit(str(value)).password):
+        value = str(value).replace(f":{password}@", ":***@")
     return json.dumps(pydantic_core.to_jsonable_python(value))
 
 
