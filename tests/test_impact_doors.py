@@ -271,7 +271,9 @@ def test_sbom_without_a_document_reads_the_commits_manifests(
     def checkout(self: Any, request: CheckoutRequest) -> Result[Workspace]:
         asked.append(request)
         when = datetime.now(UTC)
-        workspace = Workspace(repo=request.repo, sha=request.ref, path=tmp_path)
+        workspace = Workspace(
+            repo=request.repo, sha=request.ref, path=tmp_path, provider="forge-archive"
+        )
         return Result(workspace, Acquisition(provider="forge-archive", acquired_at=when))
 
     def acquire(self: Any, request: Any) -> Result[bytes]:
