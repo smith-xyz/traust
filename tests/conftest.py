@@ -67,6 +67,9 @@ os.environ["HARNESS_TEST_FIXTURE_CONFIG"] = "1"
 _HOME = _TEST_HOME / "home"
 _HOME.mkdir(parents=True, exist_ok=True)
 os.environ["HOME"] = str(_HOME)
+_XDG_CONFIG = _HOME / ".config"
+_XDG_CONFIG.mkdir()
+os.environ["XDG_CONFIG_HOME"] = str(_XDG_CONFIG)
 
 assert _TEST_HOME.resolve() != TRAUST_CONFIG_HOME_DEFAULT.resolve(), (
     "test suite must not inherit ~/.traust/config"

@@ -181,7 +181,7 @@ assets:
   below_range_review:  # skill session: /dependency-watch below-range, recorded with
     # `traust impact below-range-record`; applicable cases become dependency findings
     model: {role: fact-judge}
-    run: [python3, -m, traust.cli, session, run, --skill, dependency-watch, --role, "{role}", --run-id, "{run_id}", --, below-range, "{repo_url}"]
+    run: [python3, -m, traust.cli, session, run, --skill, dependency-watch, --mode, below-range, --role, "{role}", --repo, "{repo_url}", --run-id, "{run_id}", --worker, "{worker}"]
     partitions: dynamic:repo
     deps: [below_range_packets]
     trigger: {every: 7d}
