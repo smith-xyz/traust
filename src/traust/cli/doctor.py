@@ -34,7 +34,6 @@ from traust_core.v1.context import Config, resolve_config_home
 from traust_core.v1.context.config import CONFIG_FILE
 from traust_core.v1.errors import TraustError
 from traust_core.v1.models.common import PageRequest
-from traust_core.v1.providers import syntax
 
 from traust.context import add_config_home_arg, load
 from traust.paths import HARNESS_ROOT, skill_dir
@@ -90,8 +89,9 @@ def _run(argv, timeout=30):
 
 
 def check_core(results, config_home, network=True):
-    """traust-core in-process: the store answers a read, and each registered provider's readiness
-    (ProviderCatalog.readiness; without `network`, the feed sources' probes are skipped)."""
+    """traust-core in-process: the store answers a read, each registered provider's readiness
+    (ProviderCatalog.readiness; without `network`, the feed sources' probes are skipped) and the
+    route matrices' grammars (CodeFactsService.grammar_readiness)."""
     try:
         services = load(config_home).services()
         services.portfolio.list_products(PageRequest(limit=1))
@@ -105,6 +105,11 @@ def check_core(results, config_home, network=True):
             results.append((OK, f"provider {name} ready"))
         else:
             results.append((WARN, f"provider {name} not ready — {binding.readiness.detail}"))
+    for language, ready in services.code_facts.grammar_readiness().items():
+        if ready.ready:
+            results.append((OK, f"{language} grammar loads"))
+        else:
+            results.append((WARN, f"{ready.detail}; its routes are a coverage gap"))
 
 
 # Environment overrides traust.context honours over the file (its sanctioned list).
@@ -147,25 +152,6 @@ def check_config(results, config_home):
             results.append((OK, f"config {key} = {_render(key, leaf)} ({source})"))
     for name in SHIPPED_FILES:
         results.append((OK, f"config {name}: shipped with traust-core (not configurable)"))
-
-
-def check_grammars(results):
-    """The tree-sitter grammars behind the Express, Java, Rust and Ruby route matrices."""
-    for language, package, loader in (
-        ("JS/TS", "tree-sitter-javascript", syntax.js_parsers),
-        ("Java", "tree-sitter-java", syntax.java_parser),
-        ("Rust", "tree-sitter-rust", syntax.rust_parser),
-        ("Ruby", "tree-sitter-ruby", syntax.ruby_parser),
-    ):
-        if loader() is None:
-            results.append(
-                (
-                    WARN,
-                    f"{syntax.grammar_missing(language, package)}; its routes are a coverage gap",
-                )
-            )
-        else:
-            results.append((OK, f"{language} grammar loads"))
 
 
 def check_python(results):
@@ -305,7 +291,6 @@ def main(argv=None) -> int:
     check_core(results, args.config_home, network=not args.quick)
     check_config(results, args.config_home)
     check_python(results)
-    check_grammars(results)
     check_tools(results)
     if not args.quick:
         check_auth(results)

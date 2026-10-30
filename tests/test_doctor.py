@@ -28,6 +28,11 @@ OSV = ProviderBinding(
     readiness=Readiness(ready=False, detail="offline"),
 )
 
+GRAMMARS = {
+    "Java": Readiness(ready=True),
+    "Ruby": Readiness(ready=False, detail="the Ruby grammar (tree-sitter-ruby) won't import"),
+}
+
 
 def stub(monkeypatch: pytest.MonkeyPatch, list_products: Any) -> list[Any]:
     asked: list[Any] = []
@@ -38,6 +43,7 @@ def stub(monkeypatch: pytest.MonkeyPatch, list_products: Any) -> list[Any]:
                 asked.append((capability, network)) or [CHECKOV, OSV]
             )
         ),
+        code_facts=SimpleNamespace(grammar_readiness=lambda: GRAMMARS),
     )
     monkeypatch.setattr(Context, "services", lambda self: services)
     return asked
@@ -62,6 +68,11 @@ def test_a_reachable_store_and_every_providers_readiness(
         (doctor.OK, "traust-core store reachable"),
         (doctor.OK, "provider tool checkov ready"),
         (doctor.WARN, "provider feed osv not ready — offline"),
+        (doctor.OK, "Java grammar loads"),
+        (
+            doctor.WARN,
+            "the Ruby grammar (tree-sitter-ruby) won't import; its routes are a coverage gap",
+        ),
     ]
 
 

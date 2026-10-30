@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import uuid
 from collections import Counter
@@ -39,7 +40,7 @@ from traust_core.v1.models.dependencies import (
     Version,
     parse_advisory_identifier,
 )
-from traust_core.v1.models.operations import AssetRequest, JobResult
+from traust_core.v1.models.operations import AssetRequest, JobResult, OrderReason
 from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import (
     Ecosystem,
@@ -440,7 +441,8 @@ def below_range_scan(argv: list[str] | None = None) -> int:
     try:
         _no_air_gap()
     except ValidationError as e:
-        return answer(JobResult.refused(str(e)))
+        print(e, file=sys.stderr)
+        return answer(JobResult.refused(OrderReason.BAD_REQUEST))
     core = _core(args.config_home)
     materializer = BelowRangePacketsMaterializer(core.services(), core.config.forge_hosts)
     request = AssetRequest(asset=materializer.asset, run_id=args.run_id, partition=args.repo)
