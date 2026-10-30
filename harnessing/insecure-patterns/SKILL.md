@@ -45,7 +45,7 @@ one/two-line root-cause fix per pattern.
 
 *Retired:* traust-core holds the findings; there is no root to locate.
 
-### Step 2 — Run the harness script
+### Step 2 — Run the view
 
 ```bash
 python3 -m traust.cli dashboard view insecure-patterns \
@@ -71,8 +71,8 @@ What the view does:
    label only.
 7. *Retired:* the evidence-text function-name regexes. An example is
    `repo · file:lines · symbol`, with the symbol only where traust-core recorded one.
-8. Ranks patterns by **distinct repository count**, then occurrence count
-   (owned class only). Every other ownership class gets its own ranking by the
+8. Ranks patterns by **distinct repository count**, then occurrence count.
+   Every ownership class gets its own ranking by the
    same key, rendered as its own section in `insecure-patterns.md` and
    `insecure-patterns.html`, and as its own cut in `insecure-patterns.json`.
 9. Writes the artefacts under `progress-tracker/metrics/dashboards/insecure-patterns/`.
@@ -82,10 +82,11 @@ What the view does:
 Always tell the user:
 
 - The output paths.
-- Corpus stats: findings counted per ownership class, findings without a
+- Corpus stats: occurrences counted per ownership class (one per repository·path),
+  occurrences without a
   CWE, distinct patterns.
-- The top-25 table (CWE · ASVS § · repos · occurrences) — owned
-  class only; mention the upstream cut headline (top pattern) when it is present.
+- The top-25 table (CWE · ASVS § · repos · occurrences) for each ownership
+  class; mention the upstream cut headline (top pattern) when it is present.
 
 If `open` was requested, open the dashboard:
 `open progress-tracker/metrics/dashboards/insecure-patterns/insecure-patterns.html`
