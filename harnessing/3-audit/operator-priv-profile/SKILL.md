@@ -27,10 +27,13 @@ records privilege *violations*, not inventories; this skill builds the
 ## Tier 1+2 — static profile
 
 ```bash
-GIT_ALLOW_PROTOCOL=https git clone --depth 1 [--branch <ref>] -- <url> <local-path>
+traust repo checkout <url> --ref <commit-sha> --history 1
 python3 -m traust.cli adapters priv-profile <local-path> --name <repo-name> \
     --out analysis-results/findings/<product>/<repo>/<repo-name>-priv-profile.json
 ```
+
+The command prints the checkout's path (`<local-path>`); resolve a branch ref to
+its head commit SHA first (the forge's MCP tools, or `git ls-remote <url> <ref>`).
 
 Emits `<repo>-priv-profile.json` next to the repo's audit report:
 

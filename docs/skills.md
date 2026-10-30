@@ -494,7 +494,7 @@ Use when the user asks code-level portfolio questions or to build/refresh/query 
 
 ## recall-benchmark
 
-Use when the user asks to measure the auditor's detection recall, run the recall benchmark, score a harness release against ground truth, bootstrap/admit benchmark targets, or asks "what fraction of real vulnerabilities do we find". Audits pinned pre-fix refs of repos with known-real findings (self-replay from the disposition ledger, CVE replay, seeded) on clean clones using the shared canonical remediation-authoring rules, records real-target reports through Core, scores detection with the finding_identity match ladder via traust-core (`traust sweep score-benchmark`), and emits benchmark.json — recall overall/per-CWE/per-severity/per-language, held-out split, and run-to-run stability.
+Use when the user asks to measure the auditor's detection recall, run the recall benchmark, score a harness release against ground truth, bootstrap/admit benchmark targets, or asks "what fraction of real vulnerabilities do we find". Audits pinned pre-fix refs of repos with known-real findings (self-replay from the disposition ledger, CVE replay, seeded) on clean checkouts using the shared canonical remediation-authoring rules, records real-target reports through Core, scores detection with the finding_identity match ladder via traust-core (`traust sweep score-benchmark`), and emits benchmark.json — recall overall/per-CWE/per-severity/per-language, held-out split, and run-to-run stability.
 
 - **Stage:** —
 - **Tier:** `secondary`

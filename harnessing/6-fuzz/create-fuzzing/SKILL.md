@@ -160,7 +160,7 @@ and `BATCH-*.md` for pattern guidance (sprig/`text/template` DoS,
 ### 3. Compile-check
 
 ```bash
-make clone           # shallow-fetch repos at pinned commits (idempotent)
+make clone           # check out repos at pinned commits via the checkout service (idempotent)
 make install build   # copy harnesses in-tree and go test -run '^$' compile-check
 ```
 
