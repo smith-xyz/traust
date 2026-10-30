@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import ClassVar
 
 from adapter import BrowserAdapter, StepResult
+from pydantic import ValidationError as PydanticValidationError
+from traust_core.v1.errors import ValidationError as CoreValidationError
 from traust_core.v1.models.validation import (
     BrowserTarget,
     ValidationAction,
@@ -75,7 +77,7 @@ class Targets:
     """The targets.yaml scope; credentials stay here, never in the core scope document."""
 
     scope: ValidationScope
-    credentials: dict[str, dict]
+    credentials: tuple[dict, ...]  # parallel to scope.browser, resolved by target index
 
     @classmethod
     def from_file(cls, path: Path) -> Targets:
@@ -98,11 +100,15 @@ class Targets:
                 for b in browser
             ),
         )
-        return cls(scope, {b["victim_origin"]: b.get("credentials", {}) for b in browser})
+        return cls(scope, tuple(b.get("credentials", {}) for b in browser))
 
     def credentials_for(self, url: str) -> dict:
-        target = next((t for t in self.scope.browser if t.matches_url(url)), None)
-        return self.credentials[target.victim_origin] if target else {}
+        # Same first-match walk the scope gate uses, so the credentials come
+        # from the entry that authorised the verb even when origins repeat.
+        for i, target in enumerate(self.scope.browser):
+            if target.matches_url(url):
+                return self.credentials[i]
+        return {}
 
 
 # --- Services ---
@@ -182,11 +188,25 @@ class PlanExecutor:
         # checks still bind to the page actually being acted on.
         if not url:
             url = getattr(self._adapter, "current_url", "") or ""
-        decision = self._targets.scope.decide(
-            ValidationAction(kind=ValidationActionKind.BROWSER, verb=verb),
-            ValidationTarget(url=url),
-            as_of=dt.date.today(),
-        )
+        try:
+            decision = self._targets.scope.decide(
+                ValidationAction(kind=ValidationActionKind.BROWSER, verb=verb),
+                ValidationTarget(url=url),
+                as_of=dt.date.today(),
+            )
+        except (PydanticValidationError, CoreValidationError) as e:
+            # A malformed verb or URL is blocked and audited, never a crash:
+            # the audit trail must survive every rejected step.
+            reason = f"invalid action: {e}"
+            self._audit.record(step_id=sid, verb=verb, verdict="blocked_by_scope", reason=reason)
+            return StepResult(
+                step_id=sid,
+                verb=verb,
+                target=target,
+                classification=cls,
+                verdict="blocked_by_scope",
+                observed=reason,
+            )
         if not decision.allowed:
             reason = decision.reason
             self._audit.record(step_id=sid, verb=verb, verdict="blocked_by_scope", reason=reason)

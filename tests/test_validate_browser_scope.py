@@ -9,7 +9,6 @@ import sys
 from types import SimpleNamespace
 
 import pytest
-from traust_core.v1.errors import ValidationError as CoreValidationError
 
 from traust.paths import skill_dir
 
@@ -50,6 +49,10 @@ browser:
     attacker_origins: [http://attacker.example.com]
     allowed_verbs: {verbs}
     credentials: {{username: u, password: p}}
+  - victim_origin: http://victim.example.com
+    attacker_origins: []
+    allowed_verbs: [navigate]
+    credentials: {{username: other, password: second}}
 """
 
 
@@ -64,6 +67,14 @@ class _FakeAdapter:
 
     def execute(self, step, artifacts_dir):
         return SimpleNamespace(verdict="confirmed", observed="", duration_ms=0, evidence=[])
+
+
+class _RecordingAudit:
+    def __init__(self):
+        self.rows = []
+
+    def record(self, **kw):
+        self.rows.append(kw)
 
 
 def _executor(tmp_path, audit=None, **kwargs):
@@ -84,11 +95,33 @@ def test_from_file_reads_engagement_and_expiry(tmp_path):
 def test_credentials_stay_out_of_core_scope(tmp_path):
     targets = _targets(tmp_path)
     assert "password" not in targets.scope.model_dump_json()
+    # duplicate victim_origin: the entry that authorised (the first) owns the
+    # credentials; the second entry's never win
     assert targets.credentials_for("http://victim.example.com/login") == {
         "username": "u",
         "password": "p",
     }
     assert targets.credentials_for("http://other.example.com/") == {}
+
+
+def test_authenticate_injects_credentials_but_audit_stays_clean(tmp_path):
+    audit = _RecordingAudit()
+    seen = {}
+
+    class _CapturingAdapter(_FakeAdapter):
+        def execute(self, step, artifacts_dir):
+            seen.update(step)
+            return super().execute(step, artifacts_dir)
+
+    ex = PlanExecutor(_CapturingAdapter(), _targets(tmp_path, verbs="[authenticate]"), audit)
+    result = ex._execute_step(
+        {"id": "s2", "verb": "authenticate", "target": {"url": "http://victim.example.com/x"}},
+        tmp_path,
+        destructive=False,
+    )
+    assert result.verdict == "confirmed"
+    assert seen["payload"] == {"username": "u", "password": "p"}
+    assert all("password" not in str(row) for row in audit.rows)
 
 
 @pytest.mark.parametrize(
@@ -124,9 +157,23 @@ def test_expired_engagement_blocks(tmp_path):
     assert "expired" in result.observed
 
 
-def test_invalid_url_is_a_typed_error(tmp_path):
-    with pytest.raises(CoreValidationError):
-        _executor(tmp_path)._execute_step(_step(url="http://[bad"), tmp_path, destructive=False)
+def test_invalid_url_is_blocked_and_audited(tmp_path):
+    audit = _RecordingAudit()
+    result = _executor(tmp_path, audit=audit)._execute_step(
+        _step(url="http://[bad"), tmp_path, destructive=False
+    )
+    assert result.verdict == "blocked_by_scope"
+    assert "invalid action" in result.observed
+    assert audit.rows[-1]["verdict"] == "blocked_by_scope"
+
+
+def test_missing_verb_is_blocked_and_audited(tmp_path):
+    audit = _RecordingAudit()
+    step = {"id": "s1", "target": {"url": "http://victim.example.com/x"}}
+    result = _executor(tmp_path, audit=audit)._execute_step(step, tmp_path, destructive=False)
+    assert result.verdict == "blocked_by_scope"
+    assert "invalid action" in result.observed
+    assert audit.rows[-1]["verdict"] == "blocked_by_scope"
 
 
 @pytest.mark.parametrize(

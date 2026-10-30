@@ -96,8 +96,8 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
     (
         "S1",
         "harnessing/validate-browser-finding/SKILL.md",
-    ): "grandfathered — remediation plan P2.14 batch; browser scope.py "
-    "fail-closed guard is the operative control",
+    ): "grandfathered — remediation plan P2.14 batch; the core "
+    "ValidationScope gate (validate-browser-finding run.py) is the operative control",
     # (verify-remediation S1 retired 2026-07-31 P1-W4: allowed-tools
     # added — scoped git + anchored scripts.)
     (
