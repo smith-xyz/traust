@@ -436,3 +436,34 @@ def test_interactive_and_headless_record_the_same_document(
         assert session.record(["--config-home", str(estate.config), "--task", str(root)]) == 0
     interactive = json.loads(printed.getvalue().splitlines()[-1])
     assert interactive["written"] == headless["written"]
+
+
+def test_an_order_cannot_record_another_repositorys_review(
+    estate: Estate, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    other_url = "https://github.com/org/another-app"
+    with SqlTraustUnitOfWork(estate.core.database) as uow:
+        other = uow.repositories.add(Repository(url=other_url, public=True))
+        ref = uow.repository_refs.add(
+            RepositoryRef(
+                repository_id=other.id, name="main", kind="branch", sha=SHA, is_default=True
+            )
+        )
+        uow.assessments.add(
+            Assessment(
+                repository_ref_id=ref.id,
+                kind=AssessmentKind.REPO_STATE,
+                status="completed",
+                assessor="fixture",
+                assessor_version="1",
+                occurred_at=estate.core.clock.now(),
+            )
+        )
+        uow.commit()
+    estate.core.services().below_range.scan(other.id, tmp_path / "other-packets")
+    executor(tmp_path, monkeypatch)
+    code, result = run(estate, "--repo", other_url)
+    assert code != 0 and result["reason"] == "bad_request"
+    assert estate.core.services().ops.manifest(estate.order_id).sessions == ()
+    with SqlTraustUnitOfWork(estate.core.database) as uow:
+        assert uow.assessments.list_for_run_order(estate.order_id) == []

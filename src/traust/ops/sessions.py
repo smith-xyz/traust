@@ -173,7 +173,7 @@ class SessionRunner:
             raise ValidationError("session mode is not registered")
         if self._osv_access == "air-gapped":
             raise ValidationError("below-range requires OSV API access")
-        self._lease(order_id, worker)
+        self._lease(order_id, worker, repo)
         models = {slot: self._resolve(role, tier) for slot, (role, tier) in doors.models.items()}
         root = root.resolve()
         if root.exists() and any(root.iterdir()):
@@ -244,7 +244,7 @@ class SessionRunner:
         task, audit = staged if staged is not None else self.task(root)
         failed = failed or (result is not None and result.error is not None)
         order_id = UUID(task.run_id) if task.run_id is not None else None
-        self._lease(order_id, worker)
+        self._lease(order_id, worker, task.args[0] if task.args else None)
         measured = usage(result) if result else ()
         output_digest, artifact_id = None, None
         outcome = JobResult.failed(OrderReason.RUNNER_CRASHED)
@@ -291,7 +291,7 @@ class SessionRunner:
             print(recorded.model_dump_json())
         return outcome.model_copy(update={"usage": measured})
 
-    def _lease(self, order_id: UUID | None, worker: WorkerId | None) -> None:
+    def _lease(self, order_id: UUID | None, worker: WorkerId | None, repo: str | None) -> None:
         if order_id is None:
             if worker is not None:
                 raise ValidationError("manual sessions do not have a worker lease")
@@ -306,3 +306,8 @@ class SessionRunner:
             or order.lease_expires_at <= self._clock.now()
         ):
             raise ConflictError("session order is not leased to this worker")
+        if order.repository_id is None or not repo:
+            raise ValidationError("ordered review requires its repository")
+        expected = self._services.portfolio.get_repository(order.repository_id).url
+        if HttpsRepoUrl.parse(repo, self._hosts) != HttpsRepoUrl.parse(expected, self._hosts):
+            raise ValidationError("session repository differs from the leased order")
