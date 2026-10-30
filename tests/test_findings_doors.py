@@ -28,7 +28,7 @@ REPO = "https://github.com/example/canary"
 def config_home(tmp_path: Path, **core: Any) -> Path:
     home = tmp_path / "config"
     home.mkdir(exist_ok=True)
-    (home / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store"), **core}))
+    (home / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store"), **core}))
     return home
 
 
@@ -521,7 +521,7 @@ def test_stored_unauthorized_caller_cannot_countersign(
     services = load(home).services()
     item = services.attestation.request(UUID(finding_id), None, ReviewReason.AMBIGUOUS_STATEMENT)
     if state == "machine-admin":
-        (home / "core.yaml").write_text(
+        (home / "traust.yaml").write_text(
             yaml.safe_dump(
                 {
                     "home": str(tmp_path / "store"),
@@ -536,7 +536,7 @@ def test_stored_unauthorized_caller_cannot_countersign(
     elif state == "logged-out":
         assert registered(home, "auth", "logout") == (0, {"logged_in": False})
     else:
-        (home / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+        (home / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     if operation == "record":
         arguments = (
             "--finding",

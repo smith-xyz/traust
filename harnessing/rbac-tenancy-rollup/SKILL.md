@@ -10,7 +10,7 @@ metadata:
 > **Being ported to traust-core** (progress-tracker skill port 41, rbac-tenancy-rollup): build_rbac_tenancy_rollup.py retired with the traust-core hub (it ran on the old ledger / corpus code). The steps marked RETIRED don't run until the port lands.
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 
@@ -96,7 +96,7 @@ underlying findings reports into progress-tracker; the rollups reference
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `configured tree missing on disk` warning | tree name typo or unregistered tree | check `$TRAUST_CONFIG_HOME/corpus-config.yaml` / run `/census` |
+| `configured tree missing on disk` warning | tree name typo or unregistered tree | check the corpus registry (`/corpus-intake`) / run `/census` |
 | `other` pattern bucket dominates | bucket regexes lag new finding phrasing | extend `PATTERNS` in the builder (order matters; first match wins) |
 | Counts disagree with census headline | census counts ALL findings; this rollup selects RBAC/tenancy classes only and applies the same disposition rules | expected — cite the population block |
 | Zero tenancy findings on a multi-tenant tree | reports predate PEACH tagging | note the coverage gap; re-audit or isolation-review refreshes tags |

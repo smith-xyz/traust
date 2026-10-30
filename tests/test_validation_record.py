@@ -81,7 +81,7 @@ def record_source(core, repo, ref, source, checkout):
 def recording(tmp_path):
     config = tmp_path / "config"
     config.mkdir()
-    (config / "core.yaml").write_text(f"home: {tmp_path / 'store'}\n")
+    (config / "traust.yaml").write_text(f"home: {tmp_path / 'store'}\n")
     core = load(config)
     services = core.services()
     url = "https://github.com/example/validation-fixture"

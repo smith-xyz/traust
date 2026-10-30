@@ -52,7 +52,7 @@ allowed-tools:
 # Remediate Finding — Automated Patching Harness (Stage 7)
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 
@@ -293,8 +293,8 @@ so the campaign inherits Phase 4's boundary: rootless, cap-dropped,
 `no-new-privileges`, credential-free, `--network=none`, digest-pinned image,
 and a disposable copy rather than your worktree.
 
-How it executes is one deployment setting — `sandbox:` in
-`$TRAUST_CONFIG_HOME/execution-boundaries.yaml`, `none` by default (direct,
+How it executes is one deployment setting — `execution.sandbox` in
+`$TRAUST_CONFIG_HOME/traust.yaml`, `none` by default (direct,
 scrubbed environment) or `podman` for a nested container. A configured
 `podman` mode is never silently downgraded: with no working runtime the lane
 reports `not_attempted`. The mode is recorded in the evidence item's
@@ -446,8 +446,8 @@ What each kind may conclude is bounded by the evidence ceilings in
 `docs/disposition-ledger.md` §8a.
 
 **External tools:** Phase 4b runs the `mewt` binary (AGPL-3.0, subprocess
-only) under the `mutation-testing` safe-exec profile; its freshness row is in
-`$TRAUST_CONFIG_HOME/external-tools.yaml` and its licence row in
+only) under the `mutation-testing` safe-exec profile; it has no freshness row
+(tool pins ship with traust-core, which leaves it out) and its licence row is in
 `docs/external-dependencies.md`. The optional reviewer aid for the pushed
 diff is the same one `/patch` names.
 

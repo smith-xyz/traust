@@ -51,7 +51,7 @@ on `PATH`. Copyleft licenses (GPL) in this table therefore impose **no
 obligations** on the harness; they matter only if a distribution *bundles* the
 binaries (in which case ship the license text and a source offer for those
 tools). Pinned versions for the scanner binaries live in
-`config/external-tools.yaml`; `scripts/install-toolchain.sh` installs them.
+traust-core's shipped `external-tools.yaml`; `scripts/install-toolchain.sh` installs them.
 
 | Tool | Required by | License | Evidence |
 |---|---|---|---|
@@ -63,7 +63,7 @@ tools). Pinned versions for the scanner binaries live in
 | `gitleaks` | secure-code-audit secret pre-scan, delta-watch history scan, router tripwire | MIT | [LICENSE](https://github.com/gitleaks/gitleaks/blob/master/LICENSE) — the **only** secret scanner in scope; detector gaps are closed with harness-owned rules in `traust_engine/data/secure-code-audit/gitleaks-rules/` (bundled in traust-engine), never by adopting AGPL alternatives |
 | `syft` | secure-container-audit; secure-code-audit (optional SBOM step) | Apache-2.0 | [LICENSE](https://github.com/anchore/syft/blob/main/LICENSE) |
 | `grype` | secure-container-audit; secure-code-audit (optional SBOM step) | Apache-2.0 (code — DB is data, see feeds table) | [LICENSE](https://github.com/anchore/grype/blob/main/LICENSE) |
-| `osv-scanner` | **Air-gapped deployments only** (`access: air-gapped` on the `osv` source in `feeds.yaml`): the dependency pre-scan runs it offline. Adopter-provided, with its offline database; the default path is the OSV API | Apache-2.0 | [LICENSE](https://github.com/google/osv-scanner/blob/main/LICENSE) |
+| `osv-scanner` | **Air-gapped deployments only** (`feeds.osv_access: air-gapped` in `traust.yaml`): the dependency pre-scan runs it offline. Adopter-provided, with its offline database; the default path is the OSV API | Apache-2.0 | [LICENSE](https://github.com/google/osv-scanner/blob/main/LICENSE) |
 | `govulncheck` | secure-code-audit, secure-rpm-audit, triage, impact-analysis (Go reachability); `go-scan` safe-exec profile | BSD-3-Clause | [LICENSE](https://github.com/golang/vuln/blob/master/LICENSE) |
 | `pip-audit` | secure-code-audit optional Python-environment dependency check | Apache-2.0 | [LICENSE](https://github.com/pypa/pip-audit/blob/main/LICENSE) |
 | `cosign` | secure-container-audit (signature checks); **ledger Merkle-root signing** (`traust_ledger` keypair backend, offline bundle format — see [signing.md](signing.md)) | Apache-2.0 | [LICENSE](https://github.com/sigstore/cosign/blob/main/LICENSE) |
@@ -126,17 +126,18 @@ assurance. This deployment scopes it Go-first via the `mutation-testing`
 safe-exec profile; other supported languages are a deliberate later widening,
 not an assumed capability.
 
-**Opt-in, not shipped.** The `mewt` roster row lives in the *deployment's*
-`$TRAUST_CONFIG_HOME/external-tools.yaml`, not the harness default. That
-manifest doubles as the job-image install target, so adding an optional
-AGPL engine to the shipped roster would push it into every adopter's image.
-Adopters who install the plugin add their own row.
+**Opt-in, not shipped.** `mewt` has no row in the `external-tools.yaml`
+traust-core ships. That manifest doubles as the job-image install target, so
+adding an optional AGPL engine to the shipped roster would push it into every
+adopter's image. Tool pins are the project's, not adopter config, so a
+deployment that installs the plugin has no freshness row for it (configurable
+pins are the *Tool execution API* follow-up).
 
 **The execution boundary for evidence lanes, and why podman is optional.**
 `run_checks.sh`, `run_mutation.sh` and `run_property.sh` all execute a target
 repository's own build/test code — hostile-input execution (rule S10). How
-they do it is one deployment setting, `sandbox:` in
-`$TRAUST_CONFIG_HOME/execution-boundaries.yaml`:
+they do it is one deployment setting, `execution.sandbox` in
+`$TRAUST_CONFIG_HOME/traust.yaml`:
 
 - **`none`** (default) — direct execution with a scrubbed environment, on a
   disposable copy rather than the worktree the patch diff comes from. What a
@@ -193,7 +194,7 @@ the versions above are recorded as *installed* with a commit sha rather than
 as a pin.
 
 **Freshness.** Plugins have no binary and no `--version`, so
-`config/external-tools.yaml` cannot describe them. The roster at
+traust-core's shipped `external-tools.yaml` cannot describe them. The roster at
 `$TRAUST_CONFIG_HOME/agent-plugins.yaml` drove `check drift`'s
 `agent-plugins:*` rows; *retired* with it (workstation hygiene, not a product
 report). Never auto-advance a version — upstream can change a skill's behaviour *and* its licence terms
@@ -227,7 +228,7 @@ Code and data license differently — all these feeds permit free
 *consumption at runtime*; attribution obligations trigger only if the data is
 **republished**.
 
-**The machine-readable registry is [`config/feeds.yaml`](../config/feeds.yaml)** —
+**The machine-readable registry is traust-core's shipped `feeds.yaml`** —
 every source, cached or live, with its endpoint, cadence, licence block, and
 consumers. The feed fetcher, the advisory fetcher, and traust-core's freshness
 view (`feeds:*` freshness) all read it, so adding a source is a config
@@ -244,7 +245,7 @@ intake.
 | grype vulnerability DB (grype.anchore.io) | secure-container-audit, secure-code-audit SBOM step | **No published license/ToS** — provided "at no cost to users" | [Anchore docs](https://oss.anchore.com/docs/guides/vulnerability/database/) | The one undocumented feed; obtain written terms before redistributing a product that depends on it |
 | Go vulnerability DB (vuln.go.dev) | govulncheck runs | CC-BY-4.0 | [copyright](https://vuln.go.dev/copyright) | Attribute if republishing records |
 | OSV.dev | the dependency pre-scan (`traust adapters osv`, API by default), the fleet sweep, secure-rpm-audit, the CVE-replay monitor, fork-advisory lag, `resolve-advisory-symbols`; offline database via osv-scanner when air-gapped | Pass-through: each record keeps its home DB's license (mostly CC-BY-4.0; some CC0/MIT/BSD) | [data docs](https://google.github.io/osv.dev/data/) | Free unauthenticated API; attribute the source DB when reproducing advisory text |
-| deps.dev API (`api.deps.dev/v3`, Google) | the dependency pre-scan (`traust adapters osv`, via `traust_engine.adapters.osv.resolve_transitive`): resolves the transitive tree of manifests without a lockfile, and the default version of declarations without one. **On by default**; opt out with `access: disabled` on the `deps_dev` source in `feeds.yaml` | **Data deps.dev generates** (resolved dependency graphs, which is all traust stores, as package/version pairs) is **CC BY 4.0**. Aggregated upstream data keeps its source's terms. **API use is subject to the [Google APIs Terms of Service](https://developers.google.com/terms)**, which bind the operator who runs it | [API docs: data and terms](https://docs.deps.dev/api/v3/) (verified 2026-10-21) | **Attribution** (CC BY 4.0), carried in every scan's `metadata.resolution.attribution`: "Resolved dependency data: deps.dev (Google LLC), https://deps.dev, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); used unmodified as package/version pairs." deps.dev expressly permits caching (24 h on-disk cache). **Operator obligations under the Google APIs ToS:** usage limits set by Google (2.d); the API may be discontinued at any time (8.a), and an outage leaves manifests unresolved, a recorded coverage gap; no sublicensing or re-serving the API (4.a); a business operator indemnifies Google for misuse (9.c); California law and Santa Clara venue (10.c). No API key, so nothing to keep out of the open-source tree (4.b). Not used air-gapped. Owner decision 2026-10-21: on by default, no legal sign-off required at this time |
+| deps.dev API (`api.deps.dev/v3`, Google) | the dependency pre-scan (`traust adapters osv`, via `traust_engine.adapters.osv.resolve_transitive`): resolves the transitive tree of manifests without a lockfile, and the default version of declarations without one. **On** (the feeds registry ships with traust-core; not used air-gapped) | **Data deps.dev generates** (resolved dependency graphs, which is all traust stores, as package/version pairs) is **CC BY 4.0**. Aggregated upstream data keeps its source's terms. **API use is subject to the [Google APIs Terms of Service](https://developers.google.com/terms)**, which bind the operator who runs it | [API docs: data and terms](https://docs.deps.dev/api/v3/) (verified 2026-10-21) | **Attribution** (CC BY 4.0), carried in every scan's `metadata.resolution.attribution`: "Resolved dependency data: deps.dev (Google LLC), https://deps.dev, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); used unmodified as package/version pairs." deps.dev expressly permits caching (24 h on-disk cache). **Operator obligations under the Google APIs ToS:** usage limits set by Google (2.d); the API may be discontinued at any time (8.a), and an outage leaves manifests unresolved, a recorded coverage gap; no sublicensing or re-serving the API (4.a); a business operator indemnifies Google for misuse (9.c); California law and Santa Clara venue (10.c). No API key, so nothing to keep out of the open-source tree (4.b). Not used air-gapped. Owner decision 2026-10-21: on by default, no legal sign-off required at this time |
 | NVD CVE API | `traust impact document nvd` → impact-analysis advisory ingestion | Free public API; attribution requested ("This product uses the NVD API but is not endorsed or certified by the NVD"); rate limits apply without an API key | [NVD terms](https://nvd.nist.gov/developers/terms-of-use) | US-Gov data, no content license on records; consumed at runtime, not republished |
 | OpenSSF Scorecard API | secure-code-audit, secure-rpm-audit | CDLA-Permissive-2.0 (data); Apache-2.0 (code) | [repo](https://github.com/ossf/scorecard) | Essentially no downstream obligations |
 | FIRST EPSS scores | `traust feeds fetch` snapshot → CVE-finding enrichment | Free to the public incl. commercial products; "appropriate attribution" requested | [EPSS FAQ](https://www.first.org/epss/faq) | Cite "EPSS at https://www.first.org/epss" wherever scores are rendered |
@@ -295,7 +296,7 @@ when a whole BY-SA work is adapted.
 | MITRE ATT&CK (Enterprise) | `harnessing/attack-coverage/` — vendored distilled technique/mitigation table built from one sha256-pinned STIX release; technique IDs cited in validation reports, threat models, and the coverage layer | ATT&CK Terms of Use: royalty-free use, reproduction, and distribution incl. commercial, with attribution and the MITRE copyright statement carried | [ToU](https://attack.mitre.org/resources/legal-and-branding/terms-of-use/) | **None** — attribution statement embedded in the vendored table and every emitted layer |
 | CVSS v3.1/v4.0 (FIRST) | all audit skills | Open standard: free use with attribution to FIRST, scoring per official spec, **vector string published alongside every score** | [spec](https://www.first.org/cvss/v3-1/specification-document) | **None** — the schema's `cvss.vector` requirement satisfies the disclosure condition |
 | **Harness-authored opengrep rule pack** (the default) | `run_opengrep.py` default ruleset — shipped in the security pack (`packs/security/detection/opengrep-rules/`, the only copy), mined from the deployment's own ledger-confirmed findings | Same license as the harness | in-tree | **None** — own IP; framework citations by ID only, messages in the harness's own words |
-| argus-observe-rules (contributor pack) | `run_opengrep.py` **opt-in supplement** — fetched at run time to the user cache, pinned by SHA, never vendored; individual rules enabled per deployment via `$TRAUST_CONFIG_HOME/rule-pack-allowlist.yaml` | MIT | [LICENSE](https://github.com/smith-xyz/argus-observe-rules/blob/main/LICENSE) | **Low** — MIT permits internal use, redistribution and commercial use with attribution; the notice stays with the upstream clone and the pack's licence is recorded in `metadata.tools` per run |
+| argus-observe-rules (contributor pack) | `run_opengrep.py` **opt-in supplement** — fetched at run time to the user cache, pinned by SHA, never vendored; individual rules enabled per deployment via the allowlist named by `overrides.rule_pack_allowlist` in `traust.yaml` | MIT | [LICENSE](https://github.com/smith-xyz/argus-observe-rules/blob/main/LICENSE) | **Low** — MIT permits internal use, redistribution and commercial use with attribution; the notice stays with the upstream clone and the pack's licence is recorded in `metadata.tools` per run |
 | ReversingLabs YARA rules | `run_yara.py` **default malware-family pack** for secure-container-audit / secure-rpm-audit — fetched at run time to the user cache, pinned by SHA, never vendored | MIT | [LICENSE](https://github.com/reversinglabs/reversinglabs-yara-rules/blob/develop/LICENSE) | **Low** — MIT; rolling `develop` branch, so the SHA pin is a deliberate bump watched by the `yara-rules-pin` drift row |
 | pqc-scan rules (wakaken/pqc-scan) | pqc-readiness — vendored default rules snapshot (`rules/*.yml`) alongside the pinned binary; supplemented by a harness-owned pack | MIT | [LICENSE](https://github.com/wakaken/pqc-scan/blob/develop/LICENSE) | **Low** — MIT permits vendoring, modification, and redistribution with attribution |
 

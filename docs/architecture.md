@@ -195,12 +195,12 @@ vars). Three layers, each owning exactly one thing:
 ### The one config directory
 
 Everything lives under `$TRAUST_CONFIG_HOME` (default `~/.traust/config`).
-`make install` (→ `scripts/install_traust`) seeds it from `config/*.example.*`
-templates plus the shipped filled defaults (`model-registry.yaml`, `feeds.yaml`,
-`external-tools.yaml`); `make doctor` runs a `load_context()` smoke that names
-exactly which files still need filling. Runtime *paths* (workspace, analysis
-results, progress tracker, feed cache, scanner-ruleset overrides, product
-registry endpoint) live in one file, **`locations.yaml`** — see
+`make install` (→ `scripts/install_traust`) seeds it with `traust.yaml` (from
+`config/traust.example.yaml`) and the shipped `model-registry.yaml`; `make doctor`
+runs a `load()` smoke that names exactly what still needs filling. Tool pins,
+safe-exec profiles and the feeds registry ship with traust-core. Runtime *paths*
+(workspace, analysis results, progress tracker, feed cache, scanner-ruleset
+overrides, product registry endpoint) live in `traust.yaml` under **`locations:`** — see
 [storage.md](storage.md). Operator setup: [setup.md](setup.md).
 
 ### The runtime flow
@@ -215,11 +215,10 @@ entry point (CLI main / app)
 A required-but-absent (or still-a-template) config file raises
 `DeploymentConfigMissing` **at the entry point** — fail once, loudly, with the
 fix named, never deep in a module at an unpredictable moment. Signing is
-optional: with no `ledger-signing-key.pub`, the ledger records unsigned and
-verification is skipped (set `ledger.yaml` → `signing.required` to enforce).
-Ledger mode, signing and token verification are `ledger.yaml` (optional): with a
-`dsn` the Ledger database is the authority and layer files are read-only
-snapshots; every ledger CLI then takes `--ledger-layer` / `--product-repo`.
+optional: with no `ledger.public_key_path`, the ledger records unsigned and
+verification is skipped (set `traust.yaml` → `ledger.required` to enforce).
+Signing and token verification are `traust.yaml`'s `ledger:` and `identity:`
+sections (optional); ledger layers are contract tables in the record store.
 
 **What stays environment-driven** (deliberately, not config): secrets
 (`GITHUB_TOKEN`, LDAP bind-password file, signing key *paths*), OS/tool

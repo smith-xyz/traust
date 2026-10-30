@@ -10,7 +10,6 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "scripts" / "install_traust"
-TEMPLATES = sorted(p for p in (REPO / "config").glob("*.example.*"))
 
 
 def _run(args, env_extra=None, cwd=REPO):
@@ -25,52 +24,27 @@ def test_help_exits_zero():
     assert r.returncode == 0 and "TRAUST_CONFIG_HOME" in r.stdout
 
 
-def test_noninteractive_install_copies_every_copyable_template(tmp_path):
+def test_noninteractive_install_copies_traust_yaml_and_the_model_registry(tmp_path):
     home = tmp_path / "cfg"
     r = _run(["--yes", "--config-home", str(home), "--no-toolchain", "--no-profile-write"])
     assert r.returncode == 0, r.stdout + r.stderr
-    written = sorted(p.name for p in home.iterdir())
-    # every non-key template, plus the three shipped-as-is filled defaults
-    # (model-registry + the MANIFEST-required feeds/external-tools).
-    # storage.yaml / ledger.yaml are opt-in: a copied example DSN would switch the
-    # deployment to a database that does not exist, so they are never auto-copied.
-    # The declared-policy files are opt-in too: a copied placeholder SLA policy,
-    # region allowlist, ADR pin, watch register or answer key would make the
-    # harness report on values nobody declared.
-    opt_in = {
-        "storage.yaml",
-        "ledger.yaml",
-        "sla-policy.yaml",
-        "org-parameters.yaml",
-        "adr-registry.yaml",
-        "reachability-watch.yaml",
-        "benchmark-targets.yaml",
-    }
-    expected = sorted(
-        [
-            t.name.replace(".example", "")
-            for t in TEMPLATES
-            if not t.name.endswith(".pub") and t.name.replace(".example", "") not in opt_in
-        ]
-        + ["model-registry.yaml", "feeds.yaml", "external-tools.yaml"]
-    )
-    for shipped in ("model-registry.yaml", "feeds.yaml", "external-tools.yaml"):
-        assert (home / shipped).read_text() == (REPO / "config" / shipped).read_text()
-    assert written == expected
-    assert not any((home / name).exists() for name in opt_in)
-    # the key template is instructions, never copied as a key
-    assert not (home / "ledger-signing-key.pub").exists()
-    assert "ledger-signing-key.pub" in r.stdout
+    assert sorted(p.name for p in home.iterdir()) == ["model-registry.yaml", "traust.yaml"]
+    assert (home / "traust.yaml").read_text() == (
+        REPO / "config" / "traust.example.yaml"
+    ).read_text()
+    assert (home / "model-registry.yaml").read_text() == (
+        REPO / "config" / "model-registry.yaml"
+    ).read_text()
 
 
 def test_install_never_overwrites_without_force(tmp_path):
     home = tmp_path / "cfg"
     home.mkdir()
-    (home / "corpus-config.yaml").write_text("version: 1\ntrees: {}\n")
+    (home / "traust.yaml").write_text("execution: {sandbox: podman}\n")
     r = _run(["--yes", "--config-home", str(home), "--no-toolchain", "--no-profile-write"])
     assert r.returncode == 0
-    assert (home / "corpus-config.yaml").read_text() == "version: 1\ntrees: {}\n"
-    assert "kept existing corpus-config.yaml" in r.stdout
+    assert (home / "traust.yaml").read_text() == "execution: {sandbox: podman}\n"
+    assert "kept existing traust.yaml" in r.stdout
 
 
 def test_doctor_fails_closed_when_unset_and_default_absent(tmp_path):
@@ -85,16 +59,30 @@ def test_doctor_fails_closed_when_unset_and_default_absent(tmp_path):
     assert r.returncode == 1 and "run scripts/install_traust" in r.stdout
 
 
-def test_doctor_smoke_reports_empty_estate(tmp_path):
-    """Fresh install: completeness fails on empty corpus; load_context still parses."""
+def test_doctor_smoke_on_a_fresh_install(tmp_path):
+    """Fresh install: the copied traust.yaml loads; unset locations are warnings, not errors."""
     home = tmp_path / "cfg"
     _run(["--yes", "--config-home", str(home), "--no-toolchain", "--no-profile-write"])
     r = _run(
         ["--doctor", "--toolchain", "ledger-signing"], env_extra={"TRAUST_CONFIG_HOME": str(home)}
     )
-    assert r.returncode == 1
-    assert "trees is empty" in r.stdout
-    assert "ledger-signing-key.pub missing" not in r.stdout
+    assert "traust configuration loads" in r.stdout, r.stdout
+    assert "locations.workspace unset" in r.stdout
+    assert "none left in the home" in r.stdout
+
+
+def test_doctor_names_retired_files_and_the_migrate_command(tmp_path):
+    home = tmp_path / "cfg"
+    _run(["--yes", "--config-home", str(home), "--no-toolchain", "--no-profile-write"])
+    (home / "locations.yaml").write_text("workspace: /w\n")
+    (home / "feeds.yaml").write_text("sources: {}\n")
+    r = _run(
+        ["--doctor", "--toolchain", "ledger-signing"], env_extra={"TRAUST_CONFIG_HOME": str(home)}
+    )
+    assert (
+        "no longer read: locations.yaml feeds.yaml — fold them into traust.yaml with: " in r.stdout
+    )
+    assert f"traust config migrate {home}" in r.stdout
 
 
 @pytest.mark.skipif(
@@ -103,7 +91,7 @@ def test_doctor_smoke_reports_empty_estate(tmp_path):
 )
 def test_doctor_passes_on_the_operational_config():
     """With a real TRAUST_CONFIG_HOME (developer workstation / SCI) the doctor's
-    file + resolver sections pass; toolchain is checked for the smallest profile."""
+    file + config-load sections pass; toolchain is checked for the smallest profile."""
     r = _run(["--doctor", "--toolchain", "ledger-signing"])
-    assert "every operational file resolves under" in r.stdout, r.stdout
-    assert "missing" not in r.stdout.split("3. Resolver")[0].replace("openssl not found", "")
+    assert "traust configuration loads" in r.stdout, r.stdout
+    assert "missing" not in r.stdout.split("3. Retired files")[0]

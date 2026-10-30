@@ -19,7 +19,7 @@ allowed-tools:
 # Mine Ledger
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 
@@ -247,7 +247,7 @@ Watched set: `WATCHED_LANGS` / `WATCHED_PACKS` in traust-core's `models.rule_min
 
 **Enabled external-pack rules are re-checked against the precision
 gate.** An external pack is enabled per-rule via
-`$TRAUST_CONFIG_HOME/rule-pack-allowlist.yaml` (`run_opengrep.py --rule-allow @<file>`),
+`overrides.rule_pack_allowlist` in `traust.yaml` (`run_opengrep.py --rule-allow @<file>`),
 never wholesale — argus ships 640 rules of which 19 are 86% of volume.
 Stage A can only measure *rediscovery* before a rule has ever run;
 precision arrives afterwards from `scanner_correlation`, so each pass

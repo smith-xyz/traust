@@ -9,7 +9,7 @@ metadata:
 # Generate Team Security Report
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 
@@ -243,7 +243,7 @@ renderer. Sections 1–4 below now say what the door renders and what you add.
 | Section | Rendered by | Content |
 |---------|-------------|---------|
 | **Banner** | you | `RED HAT INTERNAL — EMBARGOED.` warning |
-| **Header** | door (title, date); you (tracking reference) | Product name(s), date, the tracking reference from `campaign.yaml` (`tracking_reference`, omitted when unset) |
+| **Header** | door (title, date); you (tracking reference) | Product name(s), date, the tracking reference from `traust.yaml` (`campaign.tracking_reference`, omitted when unset) |
 | **KPI tiles** | door (Summary) | open by severity, execution-proven, unverified; false positives, resolved, risk accepted, hardening |
 | **By product / By repository** | door | Component/product × severity tables |
 | **Top findings table** | door (Critical and high findings) | repository, finding, severity, CVSS, proven, SLA due; sorted by severity then CVSS |
@@ -287,7 +287,7 @@ must sort and share together). (`traust dashboard team-report` writes both.)
 
 Include:
 - `RED HAT INTERNAL — EMBARGOED` classification (you add)
-- Date and the tracking reference from `$TRAUST_CONFIG_HOME/campaign.yaml` (omit the line when unset) (the door writes the date; you add the reference)
+- Date and the tracking reference from `campaign.tracking_reference` in `$TRAUST_CONFIG_HOME/traust.yaml` (omit the line when unset) (the door writes the date; you add the reference)
 - Summary table: Component × Severity (Critical/High/Medium/Low/Info/Total) (the door)
 - Folder structure tree (abbreviated) (you add, bundled mode)
 - Top Critical findings with one-line impact descriptions (the door lists them; you add the impact lines)

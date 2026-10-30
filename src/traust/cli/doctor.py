@@ -3,7 +3,8 @@
 
 One command that answers "why doesn't my session work" before an hour
 is lost to it — checks the top onboarding failure modes: traust-core's
-store and provider readiness (in-process, SQLite by default), venv +
+effective traust.yaml (each value's source), its store and provider readiness
+(in-process, SQLite by default), venv +
 locked deps, the tree-sitter grammars, pinned external tools, forge auth, VPN reachability, and
 the harness's own gates.
 
@@ -24,10 +25,15 @@ import shutil
 import socket
 import subprocess
 import sys
+from urllib.parse import urlsplit
 
+import pydantic
+import pydantic_core
+import yaml
+from traust_core.v1.context import Config, resolve_config_home
+from traust_core.v1.context.config import CONFIG_FILE
 from traust_core.v1.errors import TraustError
 from traust_core.v1.models.common import PageRequest
-from traust_core.v1.providers import syntax
 
 from traust.context import add_config_home_arg, load
 from traust.paths import HARNESS_ROOT, skill_dir
@@ -83,13 +89,14 @@ def _run(argv, timeout=30):
 
 
 def check_core(results, config_home, network=True):
-    """traust-core in-process: the store answers a read, and each registered provider's readiness
-    (ProviderCatalog.readiness; without `network`, the feed sources' probes are skipped)."""
+    """traust-core in-process: the store answers a read, each registered provider's readiness
+    (ProviderCatalog.readiness; without `network`, the feed sources' probes are skipped) and the
+    route matrices' grammars (CodeFactsService.grammar_readiness)."""
     try:
         services = load(config_home).services()
         services.portfolio.list_products(PageRequest(limit=1))
     except (SystemExit, TraustError, OSError) as e:
-        results.append((FAIL, f"traust-core store not reachable — {e or 'core.yaml invalid'}"))
+        results.append((FAIL, f"traust-core store not reachable — {e or 'traust.yaml invalid'}"))
         return
     results.append((OK, "traust-core store reachable"))
     for binding in services.catalog.readiness(None, network=network):
@@ -98,25 +105,53 @@ def check_core(results, config_home, network=True):
             results.append((OK, f"provider {name} ready"))
         else:
             results.append((WARN, f"provider {name} not ready — {binding.readiness.detail}"))
-
-
-def check_grammars(results):
-    """The tree-sitter grammars behind the Express, Java, Rust and Ruby route matrices."""
-    for language, package, loader in (
-        ("JS/TS", "tree-sitter-javascript", syntax.js_parsers),
-        ("Java", "tree-sitter-java", syntax.java_parser),
-        ("Rust", "tree-sitter-rust", syntax.rust_parser),
-        ("Ruby", "tree-sitter-ruby", syntax.ruby_parser),
-    ):
-        if loader() is None:
-            results.append(
-                (
-                    WARN,
-                    f"{syntax.grammar_missing(language, package)}; its routes are a coverage gap",
-                )
-            )
-        else:
+    for language, ready in services.code_facts.grammar_readiness().items():
+        if ready.ready:
             results.append((OK, f"{language} grammar loads"))
+        else:
+            results.append((WARN, f"{ready.detail}; its routes are a coverage gap"))
+
+
+# Environment overrides traust.context honours over the file (its sanctioned list).
+_ENV_LOCATIONS = {
+    "locations.analysis_results": "AUDIT_RESULTS_ROOT",
+    "locations.feeds_cache": "FEEDS_CACHE_DIR",
+}
+SHIPPED_FILES = ("external-tools.yaml", "safe-exec-profiles.yaml", "feeds.yaml")
+
+
+def _render(key: str, value: object) -> str:
+    if key == "database.url" and value and (password := urlsplit(str(value)).password):
+        value = str(value).replace(f":{password}@", ":***@")
+    return json.dumps(pydantic_core.to_jsonable_python(value))
+
+
+def check_config(results, config_home):
+    """Every effective traust.yaml value and where it came from: the file, the environment or
+    core's default. The shipped files are traust-core's, never the adopter's."""
+    home = resolve_config_home(config_home)
+    path = home / CONFIG_FILE if home is not None else None
+    found = path is not None and path.is_file()
+    try:
+        raw = (yaml.safe_load(path.read_text()) or {}) if found else {}
+        config = Config.from_home(home)
+    except (OSError, yaml.YAMLError, TraustError) as e:
+        results.append((FAIL, f"{CONFIG_FILE} not loadable — {e}"))
+        return
+    results.append((OK, f"config file: {path if found else 'none (zero-config defaults)'}"))
+    for name, value in config:
+        fields = value if isinstance(value, pydantic.BaseModel) else [(None, value)]
+        for sub, leaf in fields:
+            key = f"{name}.{sub}" if sub else name
+            in_file = sub in (raw.get(name) or {}) if sub else name in raw
+            source = "file" if in_file else "default"
+            if (var := _ENV_LOCATIONS.get(key)) and os.environ.get(var):
+                leaf, source = os.environ[var], f"env {var}"
+            elif key.endswith("_env") and isinstance(leaf, str):
+                source += f", {leaf} {'set' if os.environ.get(str(leaf)) else 'UNSET'}"
+            results.append((OK, f"config {key} = {_render(key, leaf)} ({source})"))
+    for name in SHIPPED_FILES:
+        results.append((OK, f"config {name}: shipped with traust-core (not configurable)"))
 
 
 def check_python(results):
@@ -254,8 +289,8 @@ def main(argv=None) -> int:
 
     results: list[tuple[str, str]] = []
     check_core(results, args.config_home, network=not args.quick)
+    check_config(results, args.config_home)
     check_python(results)
-    check_grammars(results)
     check_tools(results)
     if not args.quick:
         check_auth(results)

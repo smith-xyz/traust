@@ -113,7 +113,7 @@ fi
 # Rewrite a private-forge HTTPS URL to SSH so the ambient SSH key handles
 # auth without embedding a token in the URL or .git/config. The forge is
 # named by FORK_SSH_REWRITE_HOST; unset means no rewrite. The DESTINATION mirror
-# is always a private repo in the adopter's mirror organisation (remediation.yaml
+# is always a private repo in the adopter's mirror organisation (traust.yaml `remediation:`
 # fork_org) regardless of upstream host — embargo perimeter stays uniform.
 CLONE_URL="$UPSTREAM"
 if [[ -n "${FORK_SSH_REWRITE_HOST:-}" ]]; then

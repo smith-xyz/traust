@@ -68,6 +68,6 @@ def run(home: Path) -> tuple[int, dict[str, Any]]:
 def test_the_door_end_to_end(tmp_path: Path, core: dict, expected: tuple[int, str]) -> None:
     home = tmp_path / "config"
     home.mkdir()
-    (home / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store"), **core}))
+    (home / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store"), **core}))
     rc, result = run(home)
     assert (rc, result["outcome"]) == expected

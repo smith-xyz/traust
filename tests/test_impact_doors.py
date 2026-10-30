@@ -70,7 +70,7 @@ class Lookup:
 def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     config = tmp_path / "config"
     config.mkdir()
-    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
 
     def core(config_home: Path | None) -> Any:
         made = load(config_home)

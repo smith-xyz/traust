@@ -28,6 +28,11 @@ OSV = ProviderBinding(
     readiness=Readiness(ready=False, detail="offline"),
 )
 
+GRAMMARS = {
+    "Java": Readiness(ready=True),
+    "Ruby": Readiness(ready=False, detail="the Ruby grammar (tree-sitter-ruby) won't import"),
+}
+
 
 def stub(monkeypatch: pytest.MonkeyPatch, list_products: Any) -> list[Any]:
     asked: list[Any] = []
@@ -38,6 +43,7 @@ def stub(monkeypatch: pytest.MonkeyPatch, list_products: Any) -> list[Any]:
                 asked.append((capability, network)) or [CHECKOV, OSV]
             )
         ),
+        code_facts=SimpleNamespace(grammar_readiness=lambda: GRAMMARS),
     )
     monkeypatch.setattr(Context, "services", lambda self: services)
     return asked
@@ -47,7 +53,7 @@ def stub(monkeypatch: pytest.MonkeyPatch, list_products: Any) -> list[Any]:
 def home(tmp_path: Path) -> Path:
     config = tmp_path / "config"
     config.mkdir()
-    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     return config
 
 
@@ -62,6 +68,11 @@ def test_a_reachable_store_and_every_providers_readiness(
         (doctor.OK, "traust-core store reachable"),
         (doctor.OK, "provider tool checkov ready"),
         (doctor.WARN, "provider feed osv not ready — offline"),
+        (doctor.OK, "Java grammar loads"),
+        (
+            doctor.WARN,
+            "the Ruby grammar (tree-sitter-ruby) won't import; its routes are a coverage gap",
+        ),
     ]
 
 
@@ -90,3 +101,57 @@ def test_main_reports_the_core_rows_and_exits_by_failures(
     assert rc == 0
     assert json.loads(out.getvalue())[0]["check"] == "traust-core store reachable"
     assert asked == [(None, False)]  # --quick skips the feed sources' network probes
+
+
+def _config_rows(home: Path | None) -> dict[str, str]:
+    results: list[tuple[str, str]] = []
+    doctor.check_config(results, home)
+    return {m.split(" = ")[0]: m for s, m in results if s == doctor.OK}
+
+
+def test_the_effective_config_names_each_values_source(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    home = tmp_path / "config"
+    home.mkdir()
+    (home / "traust.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "database": {"url": "postgresql://u:secret@db/t", "password_env": "DB_PW"},
+                "locations": {"workspace": "/w", "analysis_results": "/ar"},
+                "feeds": {"osv_access": "air-gapped"},
+            }
+        )
+    )
+    monkeypatch.delenv("DB_PW", raising=False)
+    monkeypatch.setenv("AUDIT_RESULTS_ROOT", "/elsewhere")
+    monkeypatch.delenv("FEEDS_CACHE_DIR", raising=False)
+    rows = _config_rows(home)
+    assert rows["config file: " + str(home / "traust.yaml")]
+    assert rows["config database.url"].endswith('"postgresql://u:***@db/t" (file)')
+    assert "secret" not in rows["config database.url"]
+    assert rows["config database.password_env"].endswith("(file, DB_PW UNSET)")
+    assert rows["config locations.workspace"] == 'config locations.workspace = "/w" (file)'
+    assert rows["config locations.analysis_results"].endswith(
+        '"/elsewhere" (env AUDIT_RESULTS_ROOT)'
+    )
+    assert rows["config locations.feeds_cache"].endswith("null (default)")
+    assert rows["config feeds.osv_access"].endswith('"air-gapped" (file)')
+    assert rows["config execution.sandbox"].endswith('"none" (default)')
+    assert rows["config overrides.rule_pack_allowlist"].endswith("null (default)")
+    for name in ("external-tools.yaml", "safe-exec-profiles.yaml", "feeds.yaml"):
+        assert f"config {name}: shipped with traust-core (not configurable)" in rows
+
+
+def test_no_traust_yaml_is_the_zero_config_defaults(tmp_path: Path) -> None:
+    rows = _config_rows(tmp_path)
+    assert "config file: none (zero-config defaults)" in rows
+    assert rows["config database.url"].endswith("null (default)")
+
+
+def test_an_invalid_traust_yaml_fails_the_config_row(tmp_path: Path) -> None:
+    (tmp_path / "traust.yaml").write_text("nonsense_key: 1\n")
+    results: list[tuple[str, str]] = []
+    doctor.check_config(results, tmp_path)
+    assert [s for s, _ in results] == [doctor.FAIL]
+    assert "traust.yaml not loadable" in results[0][1]

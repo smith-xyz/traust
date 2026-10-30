@@ -2,17 +2,16 @@
 
 import json
 import os
-import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
+from traust_core.v1.context.config import SHIPPED_FEEDS
 from traust_core.v1.providers.tools import osv as osv_mod
 from traust_core.v1.providers.tools import osv_sbom
 
 from traust.cli.groups import adapters
 
 FIXTURE_HOME = Path(__file__).parent / "fixtures" / "config"
-SHIPPED_FEEDS = Path(__file__).resolve().parents[1] / "config" / "feeds.yaml"
 
 
 def _args(repo: Path, out: Path, source="api", sbom=None, grype=None, config_home=None):
@@ -336,30 +335,12 @@ def _deps_dev(monkeypatch, settings):
     monkeypatch.setattr(osv_urls, "deps_dev_settings", lambda: settings)
 
 
-def _home_with_deps_dev(tmp_path, access="api"):
-    """The test config home with the shipped feeds.yaml's deps_dev source at `access`."""
-    import yaml
-
-    home = tmp_path / "home"
-    shutil.copytree(FIXTURE_HOME, home)
-    feeds = yaml.safe_load((home / "feeds.yaml").read_text())
-    deps_dev = yaml.safe_load(SHIPPED_FEEDS.read_text())["sources"]["deps_dev"]
-    feeds["sources"]["deps_dev"] = {**deps_dev, "access": access}
-    (home / "feeds.yaml").write_text(yaml.safe_dump(feeds))
-    return home
-
-
 def test_deps_dev_is_on_by_default(tmp_path):
-    home = _home_with_deps_dev(tmp_path)
-    core, scanner, _ = adapters._osv_core(_args(tmp_path, tmp_path, config_home=home), "api")
+    core, scanner, _ = adapters._osv_core(
+        _args(tmp_path, tmp_path, config_home=FIXTURE_HOME), "api"
+    )
     assert scanner is None
     assert core.deps_dev is not None
-
-
-def test_deps_dev_opt_out(tmp_path):
-    home = _home_with_deps_dev(tmp_path, access="disabled")
-    core, _, _ = adapters._osv_core(_args(tmp_path, tmp_path, config_home=home), "api")
-    assert core.deps_dev is None
 
 
 def test_a_config_without_deps_dev_says_so(monkeypatch, capsys):
@@ -369,10 +350,9 @@ def test_a_config_without_deps_dev_says_so(monkeypatch, capsys):
 
 
 def test_the_shipped_feeds_yaml_enables_deps_dev_with_its_license():
-    from traust.paths import HARNESS_ROOT
     from traust.registry import feeds_config
 
-    spec = feeds_config.load(HARNESS_ROOT / "config" / "feeds.yaml")["deps_dev"]
+    spec = feeds_config.load(SHIPPED_FEEDS)["deps_dev"]
     assert spec["access"] == "api"
     assert spec["license"]["id"] == "CC-BY-4.0"
     assert "Google APIs Terms of Service" in spec["license"]["terms"]
@@ -390,9 +370,8 @@ def test_resolution_is_reported(tmp_path, monkeypatch, capsys):
             resolution={"status": "complete", "manifests_resolved": 3, "packages_added": 40},
         )
 
-    home = _home_with_deps_dev(tmp_path)
     monkeypatch.setattr(osv_mod, "scan_api", fake_scan)
-    assert adapters.call_osv(_args(tmp_path, tmp_path / "o.json", config_home=home)) == 0
+    assert adapters.call_osv(_args(tmp_path, tmp_path / "o.json", config_home=FIXTURE_HOME)) == 0
     assert seen["resolver"] is not None
     err = capsys.readouterr().err
     assert "deps.dev resolved 3 manifest(s)" in err

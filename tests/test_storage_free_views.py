@@ -37,7 +37,7 @@ def config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     home = tmp_path / "config"
     home.mkdir()
     (home / "model-registry.yaml").write_text(REGISTRY.read_text())
-    (home / "core.yaml").write_text(f"home: {tmp_path / 'store'}\n")
+    (home / "traust.yaml").write_text(f"home: {tmp_path / 'store'}\n")
     return home
 
 

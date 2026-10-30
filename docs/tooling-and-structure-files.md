@@ -6,7 +6,7 @@ The schemas below (from the installed `traust-contracts` package) are the comple
 
 | Component | Purpose |
 |---|---|
-| python3 -m traust.cli util safe-exec + `$TRAUST_CONFIG_HOME/safe-exec-profiles.yaml` | Enforced sandbox for target-derived commands (argv allowlists, env scrub, shell-free pipelines) — gate rule S10; [docs/safe-exec.md](safe-exec.md) |
+| python3 -m traust.cli util safe-exec + the `safe-exec-profiles.yaml` traust-core ships | Enforced sandbox for target-derived commands (argv allowlists, env scrub, shell-free pipelines) — gate rule S10; [docs/safe-exec.md](safe-exec.md) |
 | python3 -m traust.cli dashboard refresh | The packaged dashboards rebuild (core views → remaining registered builders → scoreboard); retired corpus projections/builders are not restored — see [continuous-operations.md](continuous-operations.md#standing-jobs--the-complete-inventory) |
 | `traust_engine.escaping` | Shared untrusted-text helpers every emitter uses (HTML, inline-script JSON, md cells, CSV, slugs) — library import, not a CLI |
 | `schemas/v1/report.schema.json` | JSON Schema (draft 2020-12) for security-audit reports |

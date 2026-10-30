@@ -19,12 +19,14 @@ from traust.context import (
 def _minimal_home(tmp_path: Path) -> Path:
     home = tmp_path / "cfg"
     home.mkdir()
-    (home / "locations.yaml").write_text(
+    (home / "traust.yaml").write_text(
         yaml.safe_dump(
             {
-                "workspace": str(tmp_path / "ws"),
-                "analysis_results": str(tmp_path / "ar"),
-                "progress_tracker": str(tmp_path / "pt"),
+                "locations": {
+                    "workspace": str(tmp_path / "ws"),
+                    "analysis_results": str(tmp_path / "ar"),
+                    "progress_tracker": str(tmp_path / "pt"),
+                }
             }
         ),
         encoding="utf-8",

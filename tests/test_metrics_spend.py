@@ -163,7 +163,7 @@ def test_capture_on_core_is_idempotent_and_reconciles(
     with contextlib.ExitStack() as stack:
         if database == "postgres":
             core["database"] = {"url": stack.enter_context(_postgres())}
-        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        (config / "traust.yaml").write_text(yaml.safe_dump(core))
         append = args(append=True, config_home=config)
         assert call(metrics.call_collect_spend, append)[1].startswith("recorded 3")
         assert call(metrics.call_collect_spend, append)[1].startswith("recorded 0")
@@ -181,7 +181,7 @@ def test_capture_without_a_model_registry_is_exit_2(
 ) -> None:
     config = tmp_path / "config"
     config.mkdir()
-    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     err = io.StringIO()
     workspace(monkeypatch, transcripts(tmp_path)[0].parent)
     with pytest.raises(SystemExit) as exit, contextlib.redirect_stderr(err):

@@ -89,7 +89,7 @@ the gate could be introduced at all, not as a pattern to follow.
   isolation doctrine in the launching file.
 - **S10**: route the build/test invocation through
   python3 -m traust.cli util safe-exec with a profile from
-  `$TRAUST_CONFIG_HOME/safe-exec-profiles.yaml` (validated argv, git `-c`/network
+  the `safe-exec-profiles.yaml` traust-core ships (validated argv, git `-c`/network
   hardening, shell-free pipelines, scrubbed env).
 
 ## Integrations

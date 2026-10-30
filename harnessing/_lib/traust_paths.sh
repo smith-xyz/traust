@@ -1,4 +1,4 @@
-# Resolve campaign paths from $TRAUST_CONFIG_HOME / locations.yaml.
+# Resolve campaign paths from `locations:` in $TRAUST_CONFIG_HOME/traust.yaml.
 # Source from harness scripts; requires traust importable (uv sync in traust/).
 # The interpreter is $TRAUST_PYTHON, else the harness venv next to this lib,
 # else python3 — so callers spawned outside an activated venv (tests, cron)

@@ -16,7 +16,6 @@ from traust.cli import _doors
 from traust.cli._doors import parser, run, when
 from traust.context import load
 from traust.ops.materializers import write_view
-from traust.registry.feeds_config import registry_path
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -66,5 +65,5 @@ def _core(view: ViewName, args: Any) -> Context:
     core = load(args.config_home, sla_policy=args.sla_policy, invoices=args.invoice)
     if view is ViewName.FRESHNESS:
         # freshness reads the feed snapshots. NEED(core: feeds registered lazily by name)
-        core.register_feeds(registry_path(args.config_home))
+        core.register_feeds()
     return core

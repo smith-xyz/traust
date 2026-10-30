@@ -31,7 +31,7 @@ allowed-tools:
 > **On traust-core** (skill port 35): the answer key is recorded (`traust sweep benchmark-targets`, `build-canaries`) and runs are scored (`traust sweep score-benchmark`) by traust-core's detection quality service. Canary and seeded targets are local repositories, so their runs are scored on demand from the runs dir and never recorded; real targets are public repositories and their runs are also recorded as benchmark audits, so scorecards trend per auditor version. The step marked RETIRED doesn't run: `bootstrap` needs the harvest from resolved-at-fix-commit findings (NEED(core: benchmark candidate harvest)).
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 

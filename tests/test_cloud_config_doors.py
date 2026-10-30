@@ -77,7 +77,7 @@ def home(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Path]:
     with contextlib.ExitStack() as stack:
         if request.param == "postgres":
             core["database"] = {"url": stack.enter_context(_postgres())}
-        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        (config / "traust.yaml").write_text(yaml.safe_dump(core))
         yield config
 
 
@@ -85,7 +85,7 @@ def home(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Path]:
 def sqlite_home(tmp_path: Path) -> Path:
     config = tmp_path / "config"
     config.mkdir()
-    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     return config
 
 

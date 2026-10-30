@@ -107,8 +107,8 @@ def test_cache_dir_honours_configured_location(tmp_path, monkeypatch):
 
     home = tmp_path / "cfg"
     home.mkdir()
-    (home / "locations.yaml").write_text(
-        yaml.safe_dump({"feeds_cache": str(tmp_path / "elsewhere")}),
+    (home / "traust.yaml").write_text(
+        yaml.safe_dump({"locations": {"feeds_cache": str(tmp_path / "elsewhere")}}),
         encoding="utf-8",
     )
     fixture = Path(__file__).parent / "fixtures" / "config"
@@ -133,12 +133,9 @@ def test_cache_dir_never_lands_inside_the_harness_checkout(monkeypatch, tmp_path
     tracker = tmp_path / "progress-tracker"
     home = tmp_path / "cfg"
     home.mkdir()
-    (home / "locations.yaml").write_text(
+    (home / "traust.yaml").write_text(
         yaml.safe_dump(
-            {
-                "workspace": str(HARNESS_ROOT),
-                "progress_tracker": str(tracker),
-            }
+            {"locations": {"workspace": str(HARNESS_ROOT), "progress_tracker": str(tracker)}}
         ),
         encoding="utf-8",
     )
@@ -166,12 +163,14 @@ def test_cache_dir_is_not_under_analysis_results(monkeypatch, tmp_path):
 
     home = tmp_path / "cfg"
     home.mkdir()
-    (home / "locations.yaml").write_text(
+    (home / "traust.yaml").write_text(
         yaml.safe_dump(
             {
-                "workspace": str(tmp_path / "ws"),
-                "analysis_results": str(tmp_path / "ws" / "analysis-results"),
-                "progress_tracker": str(tmp_path / "ws" / "progress-tracker"),
+                "locations": {
+                    "workspace": str(tmp_path / "ws"),
+                    "analysis_results": str(tmp_path / "ws" / "analysis-results"),
+                    "progress_tracker": str(tmp_path / "ws" / "progress-tracker"),
+                }
             }
         ),
         encoding="utf-8",

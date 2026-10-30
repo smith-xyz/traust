@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import contextlib
 import io
-import shutil
 from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
@@ -47,7 +46,7 @@ def home(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Path]:
     with contextlib.ExitStack() as stack:
         if request.param == "postgres":
             core["database"] = {"url": stack.enter_context(_postgres())}
-        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        (config / "traust.yaml").write_text(yaml.safe_dump(core))
         yield config
 
 
@@ -63,7 +62,7 @@ def run(door: Any, home: Path, *argv: str) -> tuple[int, str]:
 
 def observed_default(home: Path, branch: str) -> None:
     """Setup: what `traust portfolio observe` keeps, the forge's default branch at its head."""
-    core = Context.from_file(home / "core.yaml")
+    core = Context.from_file(home / "traust.yaml")
     url = HttpsRepoUrl.parse(URL, core.config.forge_hosts)
     repo = core.services().portfolio.register_repository(url, False)
     with SqlTraustUnitOfWork(core.database) as uow:
@@ -96,7 +95,7 @@ def test_on_core_the_named_branch_decides_the_default_line(
     argv = ("--kind", "priv_profile", "--repo-url", URL, "--sha", SHA, *branch)
     rc, out = run(assessment_record.main, home, path, *argv)
     assert rc == 0, out
-    services = Context.from_file(home / "core.yaml").services()
+    services = Context.from_file(home / "traust.yaml").services()
     repo = services.portfolio.find_repository(HttpsRepoUrl.parse(URL, ("github.com",)))
     [recorded] = [r for r in services.portfolio.inventory.list_refs(repo.id) if r.sha == SHA]
     assert (recorded.name, recorded.kind, recorded.is_default) == (*ref, False)
@@ -161,8 +160,7 @@ def test_every_recording_door_passes_its_branch_or_none(
 ) -> None:
     home = tmp_path / "config"
     home.mkdir()
-    (home / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
-    shutil.copy(Path(__file__).parent / "fixtures" / "config" / "feeds.yaml", home)
+    (home / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     named = ["--branch", branch] if branch else []
     for door, argv in doors(tmp_path):
         rc, out = run(door, home, *argv, *named)

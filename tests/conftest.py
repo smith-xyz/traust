@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from traust_core.v1.context import TRAUST_CONFIG_HOME_DEFAULT, Locations, resolve_config_home
+from traust_core.v1.context import TRAUST_CONFIG_HOME_DEFAULT, Config, resolve_config_home
 
 # Capture the operator config home before the suite replaces TRAUST_CONFIG_HOME.
 _OPERATOR_CONFIG_HOME = resolve_config_home()
@@ -18,7 +18,7 @@ if _OPERATOR_CONFIG_HOME is not None:
 
 # The suite must never run against an operator's full config home (corpus-config,
 # feeds, etc.). Build a private home from fixtures and isolated temp data trees.
-# progress_tracker is borrowed from the operator locations.yaml when set — same
+# progress_tracker is borrowed from the operator traust.yaml's locations when set — same
 # path production uses, so compliance tests exercise the real loader contract.
 # HARNESS_TEST_FIXTURE_CONFIG=1 so live smokes skip when no sibling checkout.
 _TEST_HOME = Path(tempfile.mkdtemp(prefix="traust-app-test-cfg-"))
@@ -31,7 +31,7 @@ _ISO = Path(tempfile.mkdtemp(prefix="traust-app-test-data-"))
 def _progress_tracker_from_operator_config() -> Path | None:
     if _OPERATOR_CONFIG_HOME is None:
         return None
-    locs = Locations.from_home(_OPERATOR_CONFIG_HOME)
+    locs = Config.from_home(_OPERATOR_CONFIG_HOME).locations
     if not locs.progress_tracker:
         return None
     return Path(locs.progress_tracker)
@@ -44,12 +44,14 @@ def _resolve_progress_tracker() -> Path:
     return (_ISO / "progress-tracker").resolve()
 
 
-(_TEST_HOME / "locations.yaml").write_text(
+(_TEST_HOME / "traust.yaml").write_text(
     yaml.safe_dump(
         {
-            "workspace": str(_ISO / "ws"),
-            "analysis_results": str(_ISO / "analysis-results"),
-            "progress_tracker": str(_resolve_progress_tracker()),
+            "locations": {
+                "workspace": str(_ISO / "ws"),
+                "analysis_results": str(_ISO / "analysis-results"),
+                "progress_tracker": str(_resolve_progress_tracker()),
+            }
         }
     ),
     encoding="utf-8",

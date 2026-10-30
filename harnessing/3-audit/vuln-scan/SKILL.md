@@ -70,7 +70,7 @@ allowed-tools:
 # /vuln-scan
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 
@@ -190,7 +190,7 @@ python3 -m traust.cli assessments prepare --kind vuln_scan \
 `--repo-url` is the origin remote as https (`git@host:ns/repo.git` →
 `https://host/ns/repo`, no credentials); the repository must be
 registered in traust (exit 2 says so otherwise). traust-core runs git
-only when `core.yaml` lists it under `process.allowed_binaries`.
+only when `traust.yaml` lists it under `process.allowed_binaries`.
 
 It resolves the newest completed `secure-code` audit of the repository's
 default branch (`--since`/`--baseline-assessment` override, recorded as

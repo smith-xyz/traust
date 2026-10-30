@@ -34,7 +34,7 @@ from traust.context import load, load_caller, oidc_client_secret
 
 def _provider(core: Context):
     if core.login is None:
-        raise ConfigError("no identity.login in core.yaml: name the issuer and client_id to log in")
+        raise ConfigError("no identity.login in traust.yaml: name its issuer and client_id")
     return core.login
 
 

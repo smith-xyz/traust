@@ -36,7 +36,7 @@ def seen(monkeypatch: pytest.MonkeyPatch) -> list[Context]:
 def home(tmp_path: Path) -> Path:
     config = tmp_path / "config"
     config.mkdir()
-    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     return config
 
 
@@ -97,7 +97,7 @@ def test_spend_on_core_renders_an_empty_window_with_its_limits(
     with contextlib.ExitStack() as stack:
         if database == "postgres":
             core["database"] = {"url": stack.enter_context(_postgres())}
-        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        (config / "traust.yaml").write_text(yaml.safe_dump(core))
         out = tmp_path / "out"
         window = ["--since", "2026-09-01T00:00:00Z", "--until", "2026-11-01T00:00:00Z"]
         rc, answer = run(config, "spend", *window, "--out", str(out))

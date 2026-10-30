@@ -99,6 +99,23 @@ nothing in the impact pipeline invokes it, for the reason in the note above.
    `test_only` entry points labeled, never laundered into production
    reachability; Joern line numbers labeled approximate on every artifact.
 
+## Revisit when
+
+Two triggers no feed answers; review them on a quarterly clock (they were the
+deployment's `reachability-watch.yaml`, retired with one-file config):
+
+- **OSV publishes call-graph or vulnerable-symbol data for PyPI / npm.** Then
+  Python/JS reachability is a feed-join, not a per-repo CPG pilot: prefer it.
+  As of 2026-08-11 OSV carries per-symbol data for Go only
+  (`ecosystem_specific.imports`); verify at the schema, not from memory.
+- **A permissive (Apache-2.0 or equivalent) symbol-level engine for Python or
+  JS/TS matures.** A permissive licence is a precondition, never evidence of
+  precision: measure promotion on a real advisory corpus before any wiring.
+  Joern's pysrc2cpg/jssrc2cpg are permissive; their blocker is resolution
+  maturity, and the structural argument above (advisories name
+  library-internal symbols first-party code never calls) applies to them too.
+  Reopen for all languages at once when dependency code enters the graph.
+
 ## Validation records
 
 Every engine is admitted or kept on the strength of a ground-truth corpus,

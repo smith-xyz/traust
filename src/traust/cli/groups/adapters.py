@@ -294,7 +294,7 @@ def add_osv_args(ap) -> None:
         "--source",
         choices=("api", "osv-scanner"),
         default=None,
-        help="Default: the `access` setting of the osv source in feeds.yaml — api "
+        help="Default: `feeds.osv_access` in traust.yaml — api "
         "(default: the engine's manifest parsers plus the OSV API) or air-gapped "
         "(osv-scanner offline against an adopter-provided database)",
     )
@@ -305,12 +305,10 @@ def add_osv_args(ap) -> None:
 def _osv_core(args, source: str) -> tuple[Context, str | None, float]:
     """The Context for an osv run (the feeds registry for the API), the osv-scanner binary when
     air-gapped, and the timeout."""
-    from traust.registry.feeds_config import registry_path
-
     core = load(args.config_home)
     if source == "osv-scanner":
         return core, args.osv_scanner, max(args.timeout, 600)
-    core.register_feeds(registry_path(args.config_home))
+    core.register_feeds()
     return core, None, args.timeout
 
 
@@ -319,8 +317,8 @@ def _note_unresolved_manifests() -> None:
 
     if deps_dev_settings() is None:
         print(
-            "NOTE: no deps_dev source in feeds.yaml: manifests without a lockfile are not "
-            "resolved (add it from the shipped config/feeds.yaml to enable)",
+            "NOTE: no deps_dev source in the feeds registry: manifests without a lockfile are "
+            "not resolved",
             file=sys.stderr,
         )
 

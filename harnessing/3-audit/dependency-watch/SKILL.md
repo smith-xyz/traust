@@ -26,7 +26,7 @@ allowed-tools:
 # Dependency Watch — the advisory-driven deps lane, end to end
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 
@@ -186,7 +186,7 @@ dependencies:
    Candidates that can't be checked are listed in `below-range.json`
    `coverage_gaps` with the reason. Report them; never treat one as clean.
    Patches and sources are fetched only from the hosts the `fix-patches` and
-   `package-source` sources in `feeds.yaml` name. When a file the fix touches
+   `package-source` sources in the feeds registry traust-core ships name. When a file the fix touches
    imports a direct dependency, that dependency's source is in the packet too
    (`dependency_sources`; resolved through deps.dev, or go.mod for Go). Packets
    also carry each candidate commit's date and each fixed version's publish

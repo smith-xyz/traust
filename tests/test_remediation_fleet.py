@@ -76,7 +76,7 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     config = tmp_path / "config"
     shutil.copytree(Path(__file__).parent / "fixtures" / "config", config)
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
-    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     return config
 
 

@@ -27,7 +27,7 @@ allowed-tools:
 > **Ported to traust-core** (progress-tracker skill port 13, threat-register): build_threat_register.py retired with the traust-core hub (it ran on the old ledger / corpus code). Run lists the register's threats from traust-core; Output's roll-ups and json/md/html register are traust-core's threat-register view (`traust dashboard view threat-register`). The parts marked *Retired* or NEED don't run.
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 

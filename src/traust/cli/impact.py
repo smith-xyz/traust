@@ -22,6 +22,7 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import uuid
 from collections import Counter
@@ -39,7 +40,7 @@ from traust_core.v1.models.dependencies import (
     Version,
     parse_advisory_identifier,
 )
-from traust_core.v1.models.operations import AssetRequest, JobResult
+from traust_core.v1.models.operations import AssetRequest, JobResult, OrderReason
 from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.models.vocabulary import (
     Ecosystem,
@@ -52,7 +53,6 @@ from traust.cli._doors import add_branch_arg, answer, parser, register_commit, r
 from traust.context import load
 from traust.ops.materializers import MANUAL, BelowRangePacketsMaterializer, ManifestSbomMaterializer
 from traust.paths import HARNESS_ROOT
-from traust.registry.feeds_config import registry_path
 from traust.registry.osv_urls import osv_access
 
 UNDECIDED = (ImpactClassification.INCONCLUSIVE, ImpactClassification.LIKELY_AFFECTED)
@@ -67,7 +67,7 @@ def _parser(op: str, about: str) -> argparse.ArgumentParser:
 def _core(config_home: Path | None) -> Context:
     """Core with the feeds registry's sources, so advisories come from `osv`, never from memory."""
     core = load(config_home)
-    core.register_feeds(registry_path(config_home))  # NEED(core: feeds registered lazily)
+    core.register_feeds()  # NEED(core: feeds registered lazily)
     return core
 
 
@@ -283,7 +283,7 @@ def sweep(argv: list[str] | None = None) -> int:
 
 def document(argv: list[str] | None = None) -> int:
     ap = _parser("document", "Print a feed source's document for one identifier, as served.")
-    ap.add_argument("source", help="a feed source in feeds.yaml (nvd, redhat-csaf, vex, ...)")
+    ap.add_argument("source", help="a registry feed source (nvd, redhat-csaf, vex, ...)")
     ap.add_argument("ident", help="the identifier the source is keyed by (CVE, RHSA, repo)")
     args = ap.parse_args(argv)
 
@@ -407,8 +407,8 @@ def write_packets(
 def _no_air_gap() -> None:
     if osv_access() == "air-gapped":
         raise ValidationError(
-            "below-range needs the OSV API and the package registries; feeds.yaml sets the "
-            "osv source air-gapped"
+            "below-range needs the OSV API and the package registries; traust.yaml sets "
+            "feeds.osv_access: air-gapped"
         )
 
 
@@ -441,7 +441,8 @@ def below_range_scan(argv: list[str] | None = None) -> int:
     try:
         _no_air_gap()
     except ValidationError as e:
-        return answer(JobResult.refused(str(e)))
+        print(e, file=sys.stderr)
+        return answer(JobResult.refused(OrderReason.BAD_REQUEST))
     core = _core(args.config_home)
     materializer = BelowRangePacketsMaterializer(core.services(), core.config.forge_hosts)
     request = AssetRequest(asset=materializer.asset, run_id=args.run_id, partition=args.repo)

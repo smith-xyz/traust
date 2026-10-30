@@ -10,7 +10,6 @@ on:
     paths:
       - "Containerfile.tools"
       - "Containerfile.runtime"
-      - "config/external-tools.yaml"
       - "scripts/build-toolchain-image.sh"
       - "scripts/containerfile-build-args.py"
       - "pyproject.toml"

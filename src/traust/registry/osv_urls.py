@@ -1,4 +1,4 @@
-"""OSV API URL resolution — single source from feeds.yaml."""
+"""OSV API URL resolution — single source from the shipped feeds.yaml."""
 
 from __future__ import annotations
 
@@ -23,10 +23,10 @@ def osv_vuln_url(vid: str | None = None) -> str:
 
 
 def osv_access() -> str:
-    """`api` (default) or `air-gapped` — the osv source's `access` in feeds.yaml."""
-    from traust.registry.feeds_config import live_sources
+    """`api` (default) or `air-gapped`: `feeds.osv_access` in traust.yaml."""
+    from traust_core.v1.context import Config, resolve_config_home
 
-    return live_sources()["osv"].get("access", "api")
+    return Config.from_home(resolve_config_home()).feeds.osv_access
 
 
 def deps_dev_settings() -> tuple[str, str] | None:

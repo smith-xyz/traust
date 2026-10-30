@@ -8,7 +8,7 @@ metadata:
 # Secure RPM Audit
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 
@@ -584,7 +584,7 @@ Where:
 - `<stream>` is the dist-git branch analyzed (e.g. `c10s`, `c9s`, `c8s`) — it plays the role `<product-name>` plays for code audits.
 - `<component>` is the source package name (the `Name:` field from the spec, e.g. `389-ds-base`).
 
-Because the reports use the standard `-security-audit.json` naming inside the registered findings tree, they are discovered by the corpus resolver, enter the census and dashboards, and are disposition-ledger baselines for `/triage`, `/validate-findings`, and `/track-findings` with no extra wiring — `metadata.audit_profile: "rpm"` is what distinguishes them, not the filename. If a campaign's ownership differs from the findings tree default (Hybrid Platforms / owned), register a per-product override for the stream directory in `$TRAUST_CONFIG_HOME/corpus-config.yaml` via `/corpus-intake`.
+Because the reports use the standard `-security-audit.json` naming inside the registered findings tree, they are discovered by the corpus resolver, enter the census and dashboards, and are disposition-ledger baselines for `/triage`, `/validate-findings`, and `/track-findings` with no extra wiring — `metadata.audit_profile: "rpm"` is what distinguishes them, not the filename. If a campaign's ownership differs from the findings tree default (Hybrid Platforms / owned), register a per-product override for the stream directory via `/corpus-intake` (it records the product in traust-core).
 
 **Ref provenance.** Stamp `metadata.ref: "<stream>"` with `metadata.ref_kind: "stream"`. A dist-git stream is a **mainline deliverable audited in its own right** — `"stream"` keeps the report in the census HEAD cuts, whereas `"branch"` would misclassify it as a branch re-audit and drop it from every headline count. Never stamp `ref_kind: "branch"` for a stream checkout.
 

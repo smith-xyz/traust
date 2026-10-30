@@ -30,6 +30,7 @@ def test_all_planned_groups_registered():
         "check",
         "cloud-config",
         "compliance",
+        "config",
         "dashboard",
         "feeds",
         "findings",

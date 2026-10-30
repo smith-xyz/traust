@@ -44,8 +44,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from traust_core.v1.context.config import SHIPPED_SAFE_EXEC_PROFILES
+
 from traust.paths import HARNESS_ROOT, schema_dir, skill_dirs, skill_scripts
-from traust.paths import optional_config_path as _cfg_path
 
 REPO = HARNESS_ROOT
 
@@ -418,16 +419,9 @@ def external_tool_failures(repo: Path = REPO) -> list[str]:
         "git",
         "curl",
     }
-    # The deployment's profiles when this checkout has one; else the shipped
-    # template, so the roster check still runs in open-source CI.
-    profiles = repo / "config" / "safe-exec-profiles.yaml"
-    if repo == REPO and not profiles.is_file():
-        resolved = _cfg_path("safe-exec-profiles.yaml")
-        if resolved is not None:
-            profiles = resolved
-    if not profiles.is_file():
-        profiles = repo / "config" / "safe-exec-profiles.example.yaml"
-    if profiles.is_file():
+    # The profiles traust-core ships are this harness's grant surface, not a scanned tree's.
+    profiles = SHIPPED_SAFE_EXEC_PROFILES
+    if repo == REPO:
         try:
             import yaml as _yaml
 
@@ -779,12 +773,12 @@ def phantom_skill_failures(repo: Path = REPO) -> list[str]:
 
 
 # --- config/ hygiene ---------------------------------------------------------
-# The open-source harness ships exactly three estate-neutral config files plus a
-# *.example.* template per deployment file (config/README.md). Anything else in
+# The open-source harness ships the model registry plus *.example.* templates
+# (traust.example.yaml and the adopter-fact templates; config/README.md). Anything else in
 # config/ is deployment data that leaked back in — the failure shape this
 # repo had before 2026-09-03, when corpus-config, product map, budget policy,
 # signing key and safe-exec profiles all sat here.
-CONFIG_SHIPPED = {"README.md", "external-tools.yaml", "feeds.yaml", "model-registry.yaml"}
+CONFIG_SHIPPED = {"README.md", "model-registry.yaml"}
 CONFIG_EXAMPLE_RX = re.compile(r"^[a-z0-9-]+\.example\.[a-z]+$")
 
 

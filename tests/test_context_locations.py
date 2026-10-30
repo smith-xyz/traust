@@ -1,6 +1,6 @@
 """traust's location helpers read core's ``Config.locations`` and resolve every path the engine did.
 
-``ENGINE`` holds the paths ``traust_engine.locations`` resolved for each ``locations.yaml`` row
+``ENGINE`` holds the paths ``traust_engine.locations`` resolved for each ``locations`` row
 (captured before the engine was dropped); a helper absent from a row raised
 ``DeploymentConfigMissing``.
 """
@@ -40,7 +40,9 @@ def _home(tmp_path: Path, locations: dict | None) -> Path:
         if f.is_file():
             shutil.copy2(f, home / f.name)
     if locations is not None:
-        (home / "locations.yaml").write_text(yaml.safe_dump(locations), encoding="utf-8")
+        (home / "traust.yaml").write_text(
+            yaml.safe_dump({"locations": locations}), encoding="utf-8"
+        )
     return home
 
 

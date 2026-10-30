@@ -7,7 +7,7 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from traust_core.v1.context import Context, resolve_config_home
+from traust_core.v1.context import Context
 from traust_core.v1.context.tool_reports import opengrep_report
 from traust_core.v1.context.tools import load_rule_allowlist
 from traust_core.v1.errors import (
@@ -46,7 +46,6 @@ from traust.context import (
 
 SWEEPS_REL = Path("scan-testing") / "sweeps"
 VALIDATION_BENCHMARK_REL = Path("scan-testing") / "validation-benchmark"
-RULE_PACK_ALLOWLIST = "rule-pack-allowlist.yaml"
 
 
 def _add_rule_args(ap) -> None:
@@ -343,11 +342,9 @@ def add_rule_lane_args(ap) -> None:
     ap.add_argument("--skip-sweep", action="store_true", help="skip the sweep collect/draft stages")
 
 
-def _allowlist(config_home: Path | None) -> Allowlist | None:
-    """The rules ``<config home>/rule-pack-allowlist.yaml`` enables; None when there is none."""
-    home = resolve_config_home(config_home)
-    path = home / RULE_PACK_ALLOWLIST if home is not None else None
-    if path is None or not path.is_file():
+def _allowlist(path: Path | None) -> Allowlist | None:
+    """The rules ``overrides.rule_pack_allowlist`` in traust.yaml enables; None when unset."""
+    if path is None:
         return None
     try:
         allow = load_rule_allowlist(f"@{path}")
@@ -364,7 +361,7 @@ def call_rule_lane(args) -> int:
             RuleLaneRequest(
                 draft_limit=args.draft_limit,
                 skip_sweep=args.skip_sweep,
-                allowlist=_allowlist(args.config_home),
+                allowlist=_allowlist(core.config.overrides.rule_pack_allowlist),
             )
         )
     except TraustError as e:

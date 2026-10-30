@@ -1,4 +1,4 @@
-"""Loader for ``config/feeds.yaml`` — the security-data source registry.
+"""Loader for the security-data source registry: the ``feeds.yaml`` traust-core ships.
 
 Every consumer of an external vulnerability source goes through here
 rather than hardcoding an endpoint. The registry covers BOTH tiers:
@@ -11,12 +11,13 @@ hardcoded URLs plus an argparse literal there was no registry to inspect
 and no check to fail, so ``fetch_advisory.py csaf`` could 404 on every
 CVE indefinitely (measured 2026-08-25 — Red Hat keys CSAF advisories by
 RHSA, not CVE). A source in this file with a ``probe`` gets a
-``feed-source:*`` freshness row for free (traust-core's ProviderCatalog).
+``feed-source:*`` freshness row for free (traust-core's ProviderCatalog). The registry is
+the project's, not adopter config; ``feeds.osv_access`` in ``traust.yaml`` is the one knob.
 
 Cache location resolves via :func:`traust.context.feeds_cache_dir` (first hit wins):
 
 1. ``FEEDS_CACHE_DIR``            explicit operator/orchestrator control
-2. ``locations.feeds_cache``      when set in ``locations.yaml``
+2. ``locations.feeds_cache``      when set in ``traust.yaml``
 3. ``<progress_tracker>/feeds``   default
 
 It is deliberately NOT under ``analysis-results/``. That tree holds work
@@ -33,28 +34,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from traust_core.v1.context import Context
-
-from traust.context import DeploymentConfigMissing, resolve_config_home
+from traust_core.v1.context.config import SHIPPED_FEEDS
 
 try:
     import yaml
 except ImportError:  # pragma: no cover - yaml is a hard dependency
     yaml = None
-
-
-def registry_path(config_home: Path | None = None) -> Path:
-    """The required feeds.yaml in the config home (``--config-home`` or the one config home).
-
-    Lazy (not a module constant): feeds.yaml is a shipped default seeded into
-    $TRAUST_CONFIG_HOME by install_traust, never read from the code tree.
-    """
-    home = resolve_config_home(config_home)
-    if home is None or not (home / "feeds.yaml").is_file():
-        raise DeploymentConfigMissing(
-            f"required config file 'feeds.yaml' not found in {home}. Copy config/feeds.yaml "
-            "there, or run scripts/install_traust."
-        )
-    return home / "feeds.yaml"
 
 
 #: Cadence -> hours, for entries that name a cadence but no explicit age.
@@ -80,9 +65,9 @@ def feeds_cache_dir(*, core: Context) -> Path:
 
 
 def _load_raw(path: Path | None = None) -> dict:
-    p = path or registry_path()
+    p = path or SHIPPED_FEEDS
     if yaml is None:
-        raise FeedsConfigError("PyYAML is required to read config/feeds.yaml — `uv sync`")
+        raise FeedsConfigError("PyYAML is required to read feeds.yaml — `uv sync`")
     try:
         doc = yaml.safe_load(p.read_text(encoding="utf-8"))
     except OSError as e:
@@ -94,10 +79,9 @@ def _load_raw(path: Path | None = None) -> dict:
     return doc
 
 
-# How a live source is reached. `api` is the default; `air-gapped` (osv only)
-# swaps the API for an adopter-provided offline tool and database;
-# `disabled` (deps_dev) opts out of the source.
-ACCESS_MODES = ("api", "air-gapped", "disabled")
+# How a live source is reached. `api` is the default; `disabled` (deps_dev) opts out of the
+# source. Air-gapped osv is the adopter's switch: `feeds.osv_access` in traust.yaml.
+ACCESS_MODES = ("api", "disabled")
 
 
 def _validate(sid: str, spec: dict) -> None:

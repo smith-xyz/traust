@@ -3,10 +3,11 @@ router. No network: gh/glab fetchers are monkeypatched throughout."""
 
 import json
 import sqlite3
-import textwrap
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from traust_core.v1.models.operations import Budget
 
 from traust.cli import build_rescan_worklist as rw
 
@@ -1850,185 +1851,39 @@ class TestThreatModelLanesRegistered:
 
 
 # ---------------------------------------------------------------------------
-# budget-policy reader (fixed 2026-08-05 — silently read the wrong key)
+# budget reader: traust.yaml `budgets` (was budget-policy.yaml, fixed 2026-08-05)
 # ---------------------------------------------------------------------------
 
 
-def _policy(tmp_path, body: str) -> Path:
-    p = tmp_path / "budget-policy.yaml"
-    p.write_text(textwrap.dedent(body), encoding="utf-8")
-    return p
+def _budget(lane: str, usd: str, enforcement: str) -> Budget:
+    return Budget(lane=lane, monthly_usd=Decimal(usd), enforcement=enforcement)
 
 
-class TestReadPolicyBudget:
-    def test_enforcement_none_does_not_gate(self, tmp_path):
-        """The shipped posture. A policy that documents its own
-        non-enforcement must not silently become a control."""
-        p = _policy(
-            tmp_path,
-            """
-            budget_policy:
-              enforcement: none
-              monthly_budget: {usd_central: 23000}
-        """,
-        )
-        ceiling, why = rw.read_policy_budget(p)
-        assert ceiling is None
-        assert "enforcement=none" in why
-
-    def test_advisory_reads_the_nested_key(self, tmp_path):
-        """The actual bug: the reader looked for a flat `monthly_usd`,
-        the policy nests it under monthly_budget.usd_central, so it
-        found nothing on every run and reported budget_usd: null."""
-        p = _policy(
-            tmp_path,
-            """
-            budget_policy:
-              enforcement: advisory
-              monthly_budget: {usd_central: 23000, usd_band_low: 19000}
-        """,
-        )
-        ceiling, why = rw.read_policy_budget(p)
-        assert ceiling == 23000.0
-        assert "monthly_budget.usd_central" in why
-
-    def test_legacy_flat_key_still_read_and_named_honestly(self, tmp_path):
-        p = _policy(
-            tmp_path,
-            """
-            budget_policy:
-              enforcement: advisory
-              monthly_usd: 9000
-        """,
-        )
-        ceiling, why = rw.read_policy_budget(p)
-        assert ceiling == 9000.0
-        assert "legacy flat key" in why
-
-    def test_gating_asked_but_no_figure_is_loud_not_silent(self, tmp_path):
-        """The original failure SHAPE: asked to gate, found no number.
-        Must be reported, never degrade to 'no budget configured'."""
-        p = _policy(
-            tmp_path,
-            """
-            budget_policy:
-              enforcement: advisory
-              per_run_defaults: {default: 100}
-        """,
-        )
-        ceiling, why = rw.read_policy_budget(p)
-        assert ceiling is None
-        assert "MISSING" in why
-
-    def test_enforced_is_platform_only_but_still_applied(self, tmp_path):
-        p = _policy(
-            tmp_path,
-            """
-            budget_policy:
-              enforcement: enforced
-              monthly_budget: {usd_central: 12000}
-        """,
-        )
-        ceiling, why = rw.read_policy_budget(p)
-        assert ceiling == 12000.0
-        assert "platform-only" in why
-
-    def test_unrecognized_enforcement_degrades_to_none(self, tmp_path):
-        p = _policy(
-            tmp_path,
-            """
-            budget_policy:
-              enforcement: totally-on
-              monthly_budget: {usd_central: 23000}
-        """,
-        )
-        ceiling, why = rw.read_policy_budget(p)
-        assert ceiling is None
-        assert "not a recognized mode" in why
-
-    def test_zero_and_boolean_are_not_ceilings(self, tmp_path):
-        for val in ("0", "true"):
-            p = _policy(
-                tmp_path,
-                f"""
-                budget_policy:
-                  enforcement: advisory
-                  monthly_budget: {{usd_central: {val}}}
-            """,
-            )
-            ceiling, why = rw.read_policy_budget(p)
-            assert ceiling is None, val
-            assert "MISSING" in why
-
-    def test_missing_file_explains_itself(self, tmp_path):
-        ceiling, why = rw.read_policy_budget(tmp_path / "absent.yaml")
-        assert ceiling is None and "budget-policy.yaml" in why
-
-    def test_unparseable_file_never_raises(self, tmp_path):
-        p = tmp_path / "budget-policy.yaml"
-        p.write_text("budget_policy: [oops\n", encoding="utf-8")
-        ceiling, why = rw.read_policy_budget(p)
-        assert ceiling is None and "unparseable" in why
-
-    def test_every_path_returns_a_reason(self, tmp_path):
-        """`budget_usd: null` with no explanation is what let the bug
-        hide for months — no branch may return an empty reason."""
-        p = _policy(tmp_path, "budget_policy:\n  enforcement: none\n")
-        for target in (p, tmp_path / "absent.yaml"):
-            _, why = rw.read_policy_budget(target)
-            assert why and isinstance(why, str)
-
-
-from traust.paths import optional_config_path as _cfg_path
-
-
-class TestShippedPolicyPosture:
-    def test_live_policy_does_not_gate_the_router(self):
-        """Regression guard on the REAL config: budget-policy.yaml ships
-        enforcement: none (L1 advisory is Phase 3 of the budget-policy
-        plan). Measured 2026-08-05 the live worklist projected just under
-        the configured ceiling — so flipping this on
-        by accident would start dropping full audits within one ordinary
-        run. If this test fails, that activation was deliberate: confirm
-        it, don't just update the assertion."""
-        live = _cfg_path("budget-policy.yaml")
-        if not live.is_file():
-            pytest.skip("no deployment budget-policy.yaml in this checkout")
-        ceiling, why = rw.read_policy_budget(live)
-        # Assert the PROPERTY (no binding ceiling), not the mode string:
-        # the shipped posture moved none -> observe on 2026-08-06 and
-        # observe is also non-gating by construction. What must never
-        # change silently is that the drop path sees no ceiling.
-        assert ceiling is None, why
-        assert any(m in why for m in ("enforcement=none", "enforcement=observe")), why
-
-    def test_the_figure_is_readable_once_enforcement_flips(self, tmp_path):
-        """The other half: the live policy's shape must actually parse,
-        so flipping enforcement produces a ceiling rather than the
-        'MISSING' warning."""
-        live = _cfg_path("budget-policy.yaml")
-        if not live.is_file():
-            pytest.skip("no deployment budget-policy.yaml in this checkout")
-        text = live.read_text(encoding="utf-8")
-        for mode in ("enforcement: none", "enforcement: observe"):
-            if mode in text:
-                text = text.replace(mode, "enforcement: advisory", 1)
-                break
-        p = tmp_path / "budget-policy.yaml"
-        p.write_text(text, encoding="utf-8")
-        ceiling, why = rw.read_policy_budget(p)
-        # the shipped/fixture budget-policy.example posture figure
-        assert ceiling == 10000.0, why
-
-    def test_shipped_observe_ceiling_is_visible_only_to_the_shadow(self):
-        """Phase 1's safety property, asserted against the REAL config:
-        the drop path sees nothing, the shadow reader sees the figure."""
-        live = _cfg_path("budget-policy.yaml")
-        if not live.is_file():
-            pytest.skip("no deployment budget-policy.yaml in this checkout")
-        assert rw.read_policy_budget(live)[0] is None
-        shadow, _ = rw.read_policy_shadow_ceiling(live)
-        assert shadow is None or shadow > 0
+@pytest.mark.parametrize(
+    ("budgets", "ceiling", "why"),
+    [
+        ((), None, "no budgets for the full-audit lanes"),
+        ((_budget("diff-scan", "500", "advisory"),), None, "no budgets for the full-audit lanes"),
+        ((_budget("full-audit", "23000", "none"),), None, "enforcement=none"),
+        ((_budget("full-audit", "23000", "observe"),), None, "enforcement=observe"),
+        ((_budget("full-audit", "0", "advisory"),), None, "ceiling not applied"),
+        ((_budget("full-audit", "23000", "advisory"),), 23000.0, "enforcement=advisory"),
+        (
+            (
+                _budget("full-audit", "20000", "advisory"),
+                _budget("full-audit+validate", "3000", "advisory"),
+                _budget("full-audit+validate", "9000", "observe"),
+            ),
+            23000.0,
+            "enforcement=advisory",
+        ),
+        ((_budget("full-audit", "12000", "enforced"),), 12000.0, "platform-only"),
+    ],
+)
+def test_policy_budget_binds_only_advisory_full_audit_budgets(budgets, ceiling, why):
+    got, reason = rw.policy_budget(budgets)
+    assert got == ceiling
+    assert why in reason
 
 
 @pytest.mark.parametrize(

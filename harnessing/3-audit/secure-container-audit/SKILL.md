@@ -38,7 +38,7 @@ allowed-tools:
 # Secure Container Audit
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 
@@ -273,8 +273,8 @@ Each candidate it shares with grype is tagged `also_in_grype: true`.
   `"osv-scanner": "ran"`.
 - Record `skipped_os_installed` (the language packages left to grype) in
   `metadata.additional.sbom_packages`.
-- Air-gapped deployments (`access: air-gapped` on the `osv` source in
-  `feeds.yaml`) run the same command; osv-scanner offline reads the
+- Air-gapped deployments (`feeds.osv_access: air-gapped` in
+  `traust.yaml`) run the same command; osv-scanner offline reads the
   filtered packages.
 
 - **Every match** becomes a `dependency_audit` entry: `package`, `version`, `status` (`vulnerable`/`fix-available`/`wont-fix` per upstream data), `notes` with the CVE/GHSA ID and fixed-in version. Negligible-severity or no-fix matches may be summarized in `dependency_audit.prose`.
