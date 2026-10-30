@@ -124,10 +124,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
         "S2",
         "harnessing/drift-watch/SKILL.md",
     ): "reviewed — deterministic checker over harness-owned artifacts",
-    (
-        "S2",
-        "harnessing/rbac-tenancy-rollup/SKILL.md",
-    ): "reviewed — deterministic rollup; keyword in scope prose",
     # --- S3 git-transport: the P0 fix list; MUST empty when P0 lands ---
     # --- S4: pod-side shells — the sh -c runs INSIDE the scoped target
     # pod/container via runtime exec, never on the harness host; the
@@ -197,10 +193,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
     "mode is a deployment setting (traust.yaml `execution.sandbox`); a "
     "configured podman mode is never silently downgraded (ToB plan item 3)",
     # --- S6 tmp-paths ---
-    (
-        "S6",
-        "harnessing/rbac-tenancy-rollup/scripts/rbac_bucket_proposal_check.py",
-    ): "P3 hardening batch — non-secret scratch file, fixed /tmp name",
     # --- S7 unpinned-install ---
     # --- S8 egress-grants ---
 }

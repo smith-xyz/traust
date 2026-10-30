@@ -217,7 +217,7 @@ Audits, threat models, triage, validation, remediation, verification — the rol
 
 Orchestration, inventory, graphs, dashboards and rollups: work whose failure mode is a rerun, not a bad security decision.
 
-`add-inputs` · `attack-coverage` · `census` · `cloud-config-audit` · `corpus-intake` · `dependency-watch` · `financial-tracking` · `findings-db` · `fleet-fix` · `generate-team-report` · `impact-analysis` · `inventory-repositories` · `mine-ledger` · `operator-priv-profile` · `portfolio-graph` · `property-test` · `rbac-tenancy-rollup` · `secure-container-audit` · `sla-view` · `threat-register` · `track-findings` · `traust-metrics` · `validation-fuzz-dashboard` · `vuln-scan`
+`add-inputs` · `attack-coverage` · `census` · `cloud-config-audit` · `corpus-intake` · `dependency-watch` · `financial-tracking` · `findings-db` · `fleet-fix` · `generate-team-report` · `impact-analysis` · `inventory-repositories` · `mine-ledger` · `operator-priv-profile` · `portfolio-graph` · `property-test` · `secure-container-audit` · `sla-view` · `threat-register` · `track-findings` · `traust-metrics` · `validation-fuzz-dashboard` · `vuln-scan`
 
 ### `sonnet-class` — 6 skill(s)
 

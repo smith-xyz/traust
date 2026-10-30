@@ -23,6 +23,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("view", choices=[v.value for v in ViewName])
     ap.add_argument("--product", action="append", default=[], help="a product slug (repeatable)")
     ap.add_argument("--team-id", action="append", default=[], type=uuid.UUID, help="(repeatable)")
+    ap.add_argument(
+        "--category",
+        action="append",
+        default=[],
+        help="a category label to scope to, e.g. authorization (repeatable)",
+    )
     ap.add_argument("--as-of", help="ISO time with a zone (default: now)")
     ap.add_argument("--since", help="window start, ISO time with a zone")
     ap.add_argument("--until", help="window end (default: --as-of, else now)")
@@ -48,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
         scope = ViewFilter(
             product_ids=tuple(p.id for p in _doors.products(services, args.product)),
             team_ids=tuple(args.team_id),
+            categories=tuple(args.category),
             as_of=as_of,
             window=None if since is None else TimeWindow(start=since, end=until),
             bucket=TimeBucket(args.bucket),
