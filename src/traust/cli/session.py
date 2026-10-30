@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -32,7 +33,8 @@ from pathlib import Path
 
 import pydantic
 from pydantic import Field
-from traust_core.v1.errors import NotFoundError, ServiceError, ValidationError
+from traust_core.v1.context import Context
+from traust_core.v1.errors import NotFoundError, ServiceError, TraustError, ValidationError
 from traust_core.v1.models.assessment import DiffRefused
 from traust_core.v1.models.base import Dto
 from traust_core.v1.models.operations import (
@@ -41,14 +43,20 @@ from traust_core.v1.models.operations import (
     ModelUsage,
     OrderReason,
     ProviderName,
+    SessionResult,
     SkillName,
+    WorkerId,
 )
 
 from traust.cli._doors import answer, parser
+from traust.cli._doors import run as door
 from traust.cli.assessments import REFUSED
 from traust.context import MODEL_REGISTRY, TRAUST_CONFIG_HOME_DEFAULT, load, resolve_config_home
+from traust.ops.materializers import _order_id
 from traust.ops.router import THREAT_MODEL_PR
-from traust.paths import HARNESS_ROOT, skill_dir
+from traust.ops.session_guard import flags as confinement_flags
+from traust.ops.sessions import SESSIONS, SessionRunner
+from traust.paths import HARNESS_ROOT, HARNESSING_DIR, skill_dir
 
 # PENDING(agents): Claude Code is the agent sessions start in; Crush is the other implementation.
 AGENT = ("claude", "-p", "--output-format", "json")
@@ -96,8 +104,15 @@ def claude_dir(config_home: Path | None) -> Path:
 def session(
     command: list[str], skill: str, env: Mapping[str, str]
 ) -> tuple[subprocess.CompletedProcess[str], tuple[ModelUsage, ...]]:
-    """Run one agent session in the harness: its reply text goes to stdout, its measured usage
-    comes back; an error result fails the session."""
+    """Run the agent, print its reply and return its measured model usage."""
+    done, reply = execute(command, skill, env)
+    print(reply.result)
+    return done, reply.usage(skill, datetime.now(UTC))
+
+
+def execute(
+    command: list[str], skill: str, env: Mapping[str, str]
+) -> tuple[subprocess.CompletedProcess[str], AgentResult]:
     done = subprocess.run(
         command, cwd=HARNESS_ROOT, env=dict(env), stdout=subprocess.PIPE, text=True, check=False
     )
@@ -105,10 +120,9 @@ def session(
         reply = AgentResult.model_validate_json(done.stdout or "")
     except pydantic.ValidationError as e:
         raise ServiceError(f"/{skill}: not Claude Code's JSON result: {e}") from e
-    print(reply.result)
     if reply.is_error and done.returncode == 0:
         done.returncode = 1
-    return done, reply.usage(skill, datetime.now(UTC))
+    return done, reply
 
 
 def _traust(*argv: str) -> subprocess.CompletedProcess[str]:
@@ -175,7 +189,9 @@ def run(argv: list[str] | None = None) -> int:
         "ANTHROPIC_API_KEY), so `traust metrics collect-spend` never counts it again.",
     )
     ap.add_argument("--skill", required=True, help="the skill the session runs")
-    ap.add_argument("--role", required=True, help="its model-registry role")
+    ap.add_argument(
+        "--role", help="its model-registry role (artifact-only modes use their review role)"
+    )
     ap.add_argument("--repo", help="the repository the order is for")
     ap.add_argument(
         "--checkout", action="store_true", help="pass a checkout of --repo's head, not its URL"
@@ -184,10 +200,24 @@ def run(argv: list[str] | None = None) -> int:
         "--mode", help="the skill's mode token, before the repository (e.g. threat-model review)"
     )
     ap.add_argument("--run-id", default="manual", help="the run order this session is for")
+    ap.add_argument("--worker", help="the engine worker holding the order's lease")
     ap.add_argument("--rule", help="the router rule that routed the order")
     argv = sys.argv[1:] if argv is None else argv
     split = argv.index("--") if "--" in argv else len(argv)
     args, extra = ap.parse_args(argv[:split]), argv[split + 1 :]
+    if (args.skill, args.mode) in SESSIONS:
+        return artifact_run(
+            args.skill,
+            args.mode,
+            args.role,
+            args.repo,
+            args.run_id,
+            args.worker,
+            args.config_home,
+            extra,
+        )
+    if args.role is None:
+        ap.error("--role is required for this session mode")
     if args.checkout and not args.repo:
         ap.error("--checkout needs --repo")
     stamped = bool(args.rule) and args.rule.endswith(THREAT_MODEL_PR)
@@ -233,6 +263,152 @@ def run(argv: list[str] | None = None) -> int:
 
 def _spent(result: JobResult, usage: tuple[ModelUsage, ...]) -> JobResult:
     return result.model_copy(update={"usage": usage})
+
+
+def _runner(config_home: Path | None) -> tuple[Context, SessionRunner]:
+    from traust.cli.impact import _core
+
+    core = _core(config_home)
+    if core.model_catalog is None:
+        raise ValidationError("artifact-only sessions require the model registry")
+    return core, SessionRunner(
+        core.services(),
+        core.clock,
+        core.model_catalog.resolve_role,
+        core.config.forge_hosts,
+        core.config.feeds.osv_access,
+    )
+
+
+def prepare(argv: list[str] | None = None) -> int:
+    ap = parser("session", "prepare", "Stage an artifact-only skill's inputs and task contract.")
+    ap.add_argument("--skill", required=True)
+    ap.add_argument("--mode", required=True)
+    ap.add_argument("--repo", required=True)
+    ap.add_argument("--task", required=True, type=Path)
+    ap.add_argument("--run-id", default="manual")
+    ap.add_argument("--worker")
+    args = ap.parse_args(argv)
+
+    def call() -> str:
+        _, runner = _runner(args.config_home)
+        task = runner.prepare(
+            args.skill,
+            args.mode,
+            args.repo,
+            args.task,
+            _order_id(args.run_id),
+            WorkerId(args.worker) if args.worker else None,
+        )
+        return task.payload.decode()
+
+    return door(call, redact=True)
+
+
+def record(argv: list[str] | None = None) -> int:
+    ap = parser("session", "record", "Validate and record the staged task's declared output.")
+    ap.add_argument("--task", required=True, type=Path)
+    ap.add_argument("--worker")
+    args = ap.parse_args(argv)
+    try:
+        _, runner = _runner(args.config_home)
+        result = runner.record(
+            args.task.resolve(), worker=WorkerId(args.worker) if args.worker else None
+        )
+    except (OSError, TraustError, pydantic.ValidationError, ValueError) as error:
+        print(f"session record: {type(error).__name__}", file=sys.stderr)
+        return answer(JobResult.failed(OrderReason.BAD_REQUEST))
+    return answer(result)
+
+
+def artifact_run(
+    skill: str,
+    mode: str,
+    role: str | None,
+    repo: str | None,
+    run_id: str,
+    worker: str | None,
+    config_home: Path | None,
+    extra: list[str],
+) -> int:
+    result: SessionResult | None = None
+    holder = WorkerId(worker) if worker else None
+    try:
+        core, runner = _runner(config_home)
+        model = core.model_catalog.resolve_role(
+            role or SESSIONS[(skill, mode)].models["reviewer_b"][0]
+        )
+        order_id = _order_id(run_id)
+        if repo is None:
+            raise ValidationError("below-range sessions require a repository")
+    except (TraustError, ValueError) as error:
+        print(f"session setup: {type(error).__name__}", file=sys.stderr)
+        return answer(JobResult.failed(OrderReason.BAD_REQUEST))
+    with tempfile.TemporaryDirectory(prefix="traust-session-") as temporary:
+        root = (Path(temporary) / "task").resolve()
+        try:
+            runner.prepare(skill, mode, repo, root, order_id, holder, extra)
+            staged = runner.task(root)
+        except NotFoundError:
+            return answer(JobResult.refused(OrderReason.NOT_FOUND))
+        except ValidationError:
+            return answer(JobResult.refused(OrderReason.BAD_REQUEST))
+        except (OSError, TraustError) as error:
+            print(f"session prepare: {type(error).__name__}", file=sys.stderr)
+            return answer(JobResult.failed(OrderReason.RUNNER_CRASHED))
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if key
+            in {
+                "PATH",
+                "HOME",
+                "TMPDIR",
+                "LANG",
+                "LC_ALL",
+                "SSL_CERT_FILE",
+                "SSL_CERT_DIR",
+                "HTTP_PROXY",
+                "HTTPS_PROXY",
+                "NO_PROXY",
+                "ANTHROPIC_API_KEY",
+                "ANTHROPIC_AUTH_TOKEN",
+                "ANTHROPIC_BASE_URL",
+                "CLAUDE_CODE_OAUTH_TOKEN",
+            }
+        }
+        env["CLAUDE_CONFIG_DIR"] = str(claude_dir(config_home))
+        command = [
+            *AGENT,
+            *confinement_flags(root, HARNESSING_DIR.resolve(), root / staged[0].output.path),
+            "--model",
+            model,
+            shlex.join([f"/{skill}", mode, "--task", str(root)]),
+        ]
+        failed = True
+        try:
+            done, reply = execute(command, skill, env)
+            measured = reply.usage(skill, core.clock.now())
+            result = SessionResult.from_document(
+                {
+                    "session": reply.session_id,
+                    "usage": [item.model_dump(mode="json") for item in measured],
+                    "error": "executor-failed" if done.returncode != 0 else None,
+                }
+            )
+            failed = done.returncode != 0
+        except (OSError, TraustError, pydantic.ValidationError) as error:
+            print(f"session executor: {type(error).__name__}", file=sys.stderr)
+        try:
+            outcome = runner.record(root, result, holder, failed, staged)
+        except (OSError, TraustError, pydantic.ValidationError) as error:
+            from traust.ops.sessions import usage
+
+            print(f"session recording: {type(error).__name__}", file=sys.stderr)
+            outcome = _spent(
+                JobResult.failed(OrderReason.RUNNER_CRASHED), usage(result) if result else ()
+            )
+    return answer(outcome)
 
 
 def threat_model_pr(
