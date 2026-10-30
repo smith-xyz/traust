@@ -193,6 +193,10 @@ def test_the_shipped_feeds_registry_names_every_host_the_lane_fetches_from() -> 
 
 def test_the_skill_may_run_the_commands_its_below_range_mode_names() -> None:
     text = SKILL.read_text()
-    for door in ("impact sbom", "impact below-range", "registry models resolve"):
-        assert f"Bash(python3 *-m traust.cli {door}:*)" in text
-        assert f"python3 -m traust.cli {door}" in text.replace("\n   ", " ")
+    mode = text.split("## Below-range verification", 1)[1].split("## Constraints", 1)[0]
+    assert "below-range --task <dir>" in text
+    assert "staged in `<task>/input/` by the runner" in mode
+    for slot in ("reviewer_a", "reviewer_b", "judge"):
+        assert f"models.{slot}" in mode
+    assert "Two blind reviews per packet" in mode and "Judge on a split" in mode
+    assert "coverage gaps unchanged" in mode
