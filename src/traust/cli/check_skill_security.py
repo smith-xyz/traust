@@ -194,7 +194,7 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
     "tighter: rootless podman, cap-drop, no-new-privileges, "
     "--network=none for the whole campaign (not just the test phase), and a "
     "disposable copy so mutations cannot reach the worktree under review. The "
-    "mode is a deployment setting (execution-boundaries.yaml `sandbox:`); a "
+    "mode is a deployment setting (traust.yaml `execution.sandbox`); a "
     "configured podman mode is never silently downgraded (ToB plan item 3)",
     # --- S6 tmp-paths ---
     (

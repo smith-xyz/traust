@@ -159,7 +159,7 @@ class AdapterBase:
     # Step text originates in finding prose — hostile per the threat
     # model. Validation and execution of string-form (PoC-derived)
     # steps delegate to traust-core's safe-exec under the
-    # "validation-step" profile ($TRAUST_CONFIG_HOME/safe-exec-profiles.yaml):
+    # "validation-step" profile (the safe-exec-profiles.yaml traust-core ships):
     # substitution/operator denies, per-segment binary allowlist, and
     # native pipeline execution with a scrubbed environment — no shell
     # at any point (closes audit C2 / plan P2.13; sandbox-adoption

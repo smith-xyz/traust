@@ -20,6 +20,7 @@ from traust_core.v1.context import (
     Locations,
     resolve_config_home,
 )
+from traust_core.v1.context.config import CONFIG_FILE
 from traust_core.v1.errors import AuthenticationError, ConfigError, DeploymentConfigMissing
 from traust_core.v1.models.identity import Credential, Principal
 
@@ -27,11 +28,8 @@ from traust.paths import GITLEAKS_CONFIG, HARNESSING_DIR, OPENGREP_RULES_DIR
 
 T = TypeVar("T")
 
-CORE_CONFIG = "core.yaml"
 SLA_POLICY = "sla-policy.yaml"
 MODEL_REGISTRY = "model-registry.yaml"
-EXTERNAL_TOOLS = "external-tools.yaml"
-SAFE_EXEC_PROFILES = "safe-exec-profiles.yaml"
 # Security-pack content (home: traust-pack-security): the pinned ATT&CK release and its mapping.
 _ATTACK = HARNESSING_DIR / "attack-coverage" / "tables"
 ATTACK_TABLES = (_ATTACK / "attack-techniques.json", _ATTACK / "attack-mapping.json")
@@ -40,7 +38,7 @@ ATLAS_TABLE = _ATTACK / "atlas-techniques.json"  # the pinned MITRE ATLAS releas
 # ---------------------------------------------------------------------------
 # Sanctioned environment overrides — read ONLY in this module, never in consumers.
 #
-# ``locations.yaml`` owns estate/campaign paths. These env vars are deliberate
+# ``locations:`` in ``traust.yaml`` owns estate/campaign paths. These env vars are deliberate
 # escape hatches for layouts that must not live in checked-in config, plus one
 # secret that must never sit in a file or on argv.
 # ---------------------------------------------------------------------------
@@ -55,7 +53,7 @@ ATLAS_TABLE = _ATTACK / "atlas-techniques.json"  # the pinned MITRE ATLAS releas
 #
 # AUDIT_RESULTS_ROOT
 #   Point a one-off run or CI matrix job at an analysis-results tree without
-#   editing ``locations.yaml``. Used when the job checks out results elsewhere
+#   editing ``traust.yaml``. Used when the job checks out results elsewhere
 #   or shares a prebuilt tree across steps. Consumed by :func:`resolve_results_root`
 #   (after an explicit ``--results-root`` CLI flag).
 #
@@ -102,32 +100,22 @@ def load(
     rule_pack: Path | None = None,
     rule_drafts: Path | None = None,
 ) -> Context:
-    """traust-core's Context from ``<config home>/core.yaml`` with every provider registered once,
-    or exit 2 when the config is invalid.
+    """traust-core's Context from ``<config home>/traust.yaml`` with every provider registered
+    once, or exit 2 when the config is invalid.
 
-    No ``core.yaml``: core's defaults (SQLite and artifacts under ``~/.traust``), the zero-setup
-    laptop install, with the home's ``locations.yaml``. The ATT&CK coverage view is built on the
-    pack's pinned tables; the SLA view on ``sla_policy``, else on ``<config home>/sla-policy.yaml``
-    when there is one (template: config/sla-policy.example.yaml); the spend view on the home's
-    model registry when there is one, reconciled against ``invoices``. The tools read the home's
-    ``external-tools.yaml`` and ``safe-exec-profiles.yaml`` on first use; detection quality scores
-    the rule pack (``rule_pack``, else :func:`_rule_pack`) against canaries from
+    No ``traust.yaml``: core's defaults (SQLite and artifacts under ``~/.traust``), the zero-setup
+    laptop install. The ATT&CK coverage view is built on the pack's pinned tables; the SLA view on
+    ``sla_policy``, else on ``<config home>/sla-policy.yaml`` when there is one (template:
+    config/sla-policy.example.yaml); the spend view on the home's model registry when there is
+    one, reconciled against ``invoices``. The tools read the pins and safe-exec profiles
+    traust-core ships; detection quality scores the rule pack (``rule_pack``, else
+    :func:`_rule_pack`, with ``overrides.rule_pack_allowlist``) against canaries from
     ``recall-benchmark/<canaries>`` and stages rule drafts in ``rule_drafts``, else
     ``locations.rule_drafts`` when one resolves.
     """
     home = resolve_config_home(config_home)
-    path = home / CORE_CONFIG if home is not None else None
     sla = sla_policy or (home / SLA_POLICY if home is not None else None)
-    core = _guarded(
-        "core config",
-        lambda: Context(
-            _with_bundled_rules(
-                Config.from_file(path)
-                if path is not None and path.is_file()
-                else Config(locations=Locations.from_home(home) if home else Locations())
-            )
-        ),
-    )
+    core = _guarded(CONFIG_FILE, lambda: Context(_with_bundled_rules(Config.from_home(home))))
     _guarded("ATT&CK catalog", lambda: core.register_attack_catalog(*ATTACK_TABLES))
     _guarded("ATLAS catalog", lambda: core.register_atlas_catalog(ATLAS_TABLE))
     if sla is not None and (sla_policy is not None or sla.is_file()):
@@ -137,13 +125,12 @@ def load(
     elif invoices is not None:
         print(f"invoices need the spend view: no {MODEL_REGISTRY} in {home}", file=sys.stderr)
         raise SystemExit(2)
-    # No home: the default home's paths, so the first tool use names the file it needs.
-    files = home or TRAUST_CONFIG_HOME_DEFAULT
-    core.register_toolchain(files / EXTERNAL_TOOLS, files / SAFE_EXEC_PROFILES)
+    core.register_toolchain()
     pack, pack_version = (
         (rule_pack, f"local:{rule_pack}") if rule_pack else _rule_pack(core.config.locations)
     )
-    core.register_rule_pack(pack)
+    core.register_rule_pack(pack, core.config.overrides.rule_pack_allowlist)
+    files = home or TRAUST_CONFIG_HOME_DEFAULT
     cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
     core.register_detection_quality(
         pack_version, files / "recall-benchmark" / canaries, cache / "recall-bench" / canaries
@@ -195,8 +182,8 @@ def load_caller(core: Context) -> Principal:
     """Who is calling: the stored login (``traust auth``), verified by core's identity service."""
     if core.identity is None:
         raise ConfigError(
-            "no identity: section in core.yaml; a solo install adds `identity: {trust_local: true}`"
-            " to accept its own `traust auth local` tokens"
+            "no identity: section in traust.yaml; a solo install adds"
+            " `identity: {trust_local: true}` to accept its own `traust auth local` tokens"
         )
     login = core.credentials.load()
     if login is None:
@@ -244,103 +231,6 @@ def workspace_dir(src: Context) -> Path:
 def inputs_dir(src: Context) -> Path:
     """The repository-inventory tree: ``locations.inputs``, else ``<workspace>/inputs``."""
     return _required(locations(src).inputs_dir, "inputs")
-
-
-def _optional_config(name: str) -> dict:
-    """``$TRAUST_CONFIG_HOME/<name>`` as a dict, or {} when the file is absent.
-
-    For the small per-flow settings files (``remediation.yaml``,
-    ``campaign.yaml``) that ship as ``config/*.example.yaml`` templates. Read
-    directly rather than through the contracts manifest, which lists the
-    schema-gated files; a schema for these is a contracts follow-up.
-    """
-    home = resolve_config_home()
-    if home is None:
-        return {}
-    path = home / name
-    if not path.is_file():
-        return {}
-    import yaml  # local import: only these two settings files need it here
-
-    data = yaml.safe_load(path.read_text()) or {}
-    return data if isinstance(data, dict) else {}
-
-
-def _normalise_host(value: str) -> str:
-    """``https://gitlab.example.com/group/`` → ``gitlab.example.com``."""
-    h = str(value).strip().lower()
-    h = h.split("://", 1)[-1]
-    h = h.split("/", 1)[0]
-    return h.strip(". ")
-
-
-def _private_forge_hosts(cfg: dict) -> tuple[str, ...]:
-    raw = os.environ.get("HARNESS_PRIVATE_FORGE_HOSTS")
-    if raw and raw.strip():
-        values: list = raw.split(",")
-    else:
-        values = cfg.get("private_forge_hosts") or []
-        if isinstance(values, str):
-            values = values.split(",")
-        elif not isinstance(values, list):
-            values = []
-    return tuple(dict.fromkeys(h for h in (_normalise_host(v) for v in values) if h))
-
-
-def remediation_settings() -> dict:
-    """remediate-finding's deployment settings — ``fork_org``,
-    ``naming_prefix`` and ``private_forge_hosts`` — from ``remediation.yaml``
-    in the config home, each overridable by ``HARNESS_FORK_ORG`` /
-    ``REMEDIATION_PREFIX`` / ``HARNESS_PRIVATE_FORGE_HOSTS`` in the
-    environment. ``fork_org`` has no shipped default: the private mirror
-    organisation is the adopter's (decision D5, 2026-09-07); callers fail loud
-    when it is unset. ``naming_prefix`` defaults to ``traust``.
-    ``private_forge_hosts`` defaults to empty — naming an organisation's
-    internal forge is deployment config, never a shipped constant.
-    """
-    cfg = _optional_config("remediation.yaml")
-    fork_org = os.environ.get("HARNESS_FORK_ORG") or str(cfg.get("fork_org") or "").strip()
-    prefix = (
-        os.environ.get("REMEDIATION_PREFIX") or str(cfg.get("naming_prefix") or "traust").strip()
-    )
-    if fork_org in ("", "example-org"):
-        fork_org = ""
-    return {
-        "fork_org": fork_org,
-        "naming_prefix": prefix,
-        "private_forge_hosts": _private_forge_hosts(cfg),
-    }
-
-
-def private_forge_hosts() -> tuple[str, ...]:
-    """Hosts of self-hosted forges whose repositories ARE their own downstream
-    fork — remediation lands in place rather than in a mirror. Empty unless the
-    deployment lists them in ``remediation.yaml``; see
-    ``config/remediation.example.yaml``.
-    """
-    return remediation_settings()["private_forge_hosts"]
-
-
-def require_fork_org() -> str:
-    org = remediation_settings()["fork_org"]
-    if not org:
-        raise SystemExit(
-            "remediate-finding: no private mirror organisation configured — set "
-            "fork_org in $TRAUST_CONFIG_HOME/remediation.yaml (template: "
-            "config/remediation.example.yaml) or HARNESS_FORK_ORG in the environment"
-        )
-    return org
-
-
-def campaign_settings() -> dict:
-    """``campaign.yaml`` in the config home: ``tracking_reference`` (the
-    issue-tracker key dashboards cite) and ``display_name``. Both optional;
-    dashboards omit the line when unset."""
-    cfg = _optional_config("campaign.yaml")
-    return {
-        "tracking_reference": str(cfg.get("tracking_reference") or "").strip(),
-        "display_name": str(cfg.get("display_name") or "").strip(),
-    }
 
 
 def findings_db(src: Context) -> Path:

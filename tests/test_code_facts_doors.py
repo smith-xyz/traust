@@ -128,7 +128,7 @@ class CodeFacts:
 def facts(monkeypatch: pytest.MonkeyPatch) -> CodeFacts:
     stub = CodeFacts()
     services = SimpleNamespace(code_facts=stub)
-    core = SimpleNamespace(register_feeds=lambda path: stub.calls.append(("feeds", path)),
+    core = SimpleNamespace(register_feeds=lambda: stub.calls.append(("feeds",)),
                            services=lambda: services)  # fmt: skip
     monkeypatch.setattr(code_facts, "load", lambda home: core)
     return stub

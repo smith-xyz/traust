@@ -20,7 +20,7 @@ FIXTURE = Path(__file__).parent / "fixtures" / "config"
 def home(tmp_path: Path) -> Path:
     config = tmp_path / "config"
     shutil.copytree(FIXTURE, config)
-    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     return config
 
 

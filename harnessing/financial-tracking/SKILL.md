@@ -22,7 +22,7 @@ allowed-tools:
 # Financial tracking
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 
@@ -124,7 +124,7 @@ is supplied, say plainly that nothing has been checked against billing.
 
 Do not imply spend is being controlled. As of 2026-08-06:
 
-- `$TRAUST_CONFIG_HOME/budget-policy.yaml` runs `enforcement: observe` — every planned
+- `budgets` in `$TRAUST_CONFIG_HOME/traust.yaml` run `enforcement: observe` — every planned
   order gets a budget verdict, recorded in its run manifest, and **withholds
   nothing** (traust-engine's admission).
 - The only lane the router can ever drop is a full audit, and only when
@@ -161,7 +161,7 @@ re-running never double-counts and never freezes a partial day.
 `metrics collect-spend`; runner sessions settle against their order instead); traust-core's spend events (per skill, lane
 and run order); run manifests' budget verdicts; the corpus registry (`business_unit`)
 and the portfolio's finding and repo counts; `config/model-registry.yaml` (prices);
-`$TRAUST_CONFIG_HOME/budget-policy.yaml` (ceiling and enforcement posture);
+`budgets` in `$TRAUST_CONFIG_HOME/traust.yaml` (ceiling and enforcement posture);
 optionally an operator-supplied invoice CSV.
 
 **Emits:** the spend view, `spend.{md,html,json}` under `--out`.

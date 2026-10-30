@@ -116,7 +116,7 @@ def writer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[RecordFi
     config_home = tmp_path / "config"
     config_home.mkdir()
     store_home = tmp_path / "store"
-    (config_home / "core.yaml").write_text(
+    (config_home / "traust.yaml").write_text(
         f"home: {store_home}\n"
         "identity:\n"
         "  issuers:\n"
@@ -224,7 +224,9 @@ def test_inadequate_rationale_is_rejected_without_writes(writer, monkeypatch, ca
 
 
 def test_missing_identity_configuration_refuses(writer, monkeypatch, capsys):
-    (writer.config_home / "core.yaml").write_text(f"home: {writer.store_home}\n", encoding="utf-8")
+    (writer.config_home / "traust.yaml").write_text(
+        f"home: {writer.store_home}\n", encoding="utf-8"
+    )
     assert invoke(writer, monkeypatch, writer.token()) == 2
     assert writer.history() == []
 
@@ -281,7 +283,7 @@ def test_retired_operations_are_strict_errors(operation, tmp_path):
     config_home = tmp_path / "config"
     config_home.mkdir()
     store_home = tmp_path / "store"
-    (config_home / "core.yaml").write_text(f"home: {store_home}\n", encoding="utf-8")
+    (config_home / "traust.yaml").write_text(f"home: {store_home}\n", encoding="utf-8")
     home = tmp_path / "home"
     home.mkdir()
     before = {
@@ -341,7 +343,7 @@ def test_countersign_help_does_not_bootstrap_the_engine(monkeypatch, capsys):
 def test_explicitly_trusted_local_signature_authenticates_a_human(
     writer, monkeypatch, capsys, caplog
 ):
-    (writer.config_home / "core.yaml").write_text(
+    (writer.config_home / "traust.yaml").write_text(
         f"home: {writer.store_home}\nidentity:\n  trust_local: true\n",
         encoding="utf-8",
     )

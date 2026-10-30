@@ -56,7 +56,6 @@ EXPECTED_INTERNAL = (
     "docs/setup.md",
     "docs/requirements.md",
     "CHANGELOG.md",
-    "config/feeds.yaml",
 )
 
 # (id, tier, pattern, why)

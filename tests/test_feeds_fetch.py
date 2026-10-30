@@ -22,7 +22,6 @@ from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
 
 from traust.cli import feeds_fetch
 from traust.context import load
-from traust.registry.feeds_config import registry_path
 
 FIXTURES = Path(__file__).parent / "fixtures" / "feeds"
 FEEDS = ("epss", "kev", "rh-cve", "vex")
@@ -40,7 +39,7 @@ HOSTS = {
 def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     home = tmp_path / "config-home"
     shutil.copytree(os.environ["TRAUST_CONFIG_HOME"], home)
-    (home / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (home / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     monkeypatch.setenv("TRAUST_CONFIG_HOME", str(home))
     return home
 
@@ -72,7 +71,7 @@ def fetch(home: Path, *argv: str) -> tuple[int, dict[str, Any]]:
 
 def payload(home: Path, feed: str) -> bytes | None:
     core = load(home)
-    core.register_feeds(registry_path())
+    core.register_feeds()
     return core.services().exposure.feed_payload(FeedName(feed))
 
 

@@ -221,9 +221,9 @@ def test_safe_exec_lists_profiles_and_names_a_missing_one(capsys) -> None:
     assert "unknown safe_exec profile 'nope'" in capsys.readouterr().err
 
 
-def test_safe_exec_without_a_profiles_file_is_exit_2(tmp_path: Path, capsys) -> None:
-    assert util.call_safe_exec(safe_exec_args("list-profiles", config_home=tmp_path)) == 2
-    assert "safe-exec-profiles.yaml" in capsys.readouterr().err
+def test_safe_exec_in_an_empty_home_lists_core_shipped_profiles(tmp_path: Path, capsys) -> None:
+    assert util.call_safe_exec(safe_exec_args("list-profiles", config_home=tmp_path)) == 0
+    assert any(line.startswith("go-scan ") for line in capsys.readouterr().out.splitlines())
 
 
 def test_the_doctor_checks_each_profile_tool_on_the_core_toolchain(

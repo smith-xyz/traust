@@ -49,18 +49,16 @@ audits of Red Hat Hybrid Platforms source code. Mounted as a volume by agent run
 #   scripts/             RETIRED — CLIs in src/ + traust-engine; do not COPY
 #   src/                 NOT in image — install the wheel on the host/CI runner
 #
-# Deployment-specific config (corpus-config, product map, budget policy,
-# safe-exec profiles, rule-pack allowlist, hardening weights, dist-git watch,
-# signing pubkey, internal vocabulary) never ships in this image. Every
-# consumer resolves it through traust_contracts.config_path(), which
-# reads $TRAUST_CONFIG_HOME and fails closed when the file is absent.
+# Deployment-specific config (traust.yaml, model-registry, product map, the
+# signing key) never ships in this image; it is mounted at $TRAUST_CONFIG_HOME.
+# Tool pins, safe-exec profiles and the feeds registry ship with traust-core.
 
 WORKDIR /harness
 
 # Core skill definitions (the primary payload)
 COPY harnessing/ ./harnessing/
 
-# Shipped config (external-tools, feeds, model-registry) + templates only
+# Shipped config (model-registry) + the traust.example.yaml template
 COPY config/ ./config/
 # Deployment config: mount at runtime, e.g. -v /path/to/deploy/config:/harness/deploy-config:ro
 ENV TRAUST_CONFIG_HOME=/harness/deploy-config

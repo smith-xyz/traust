@@ -59,10 +59,10 @@ SARIF = {
 
 @pytest.fixture
 def home(tmp_path: Path) -> Path:
-    """A config home whose core.yaml keeps the store in the test's directory."""
+    """A config home whose traust.yaml keeps the store in the test's directory."""
     config = tmp_path / "config"
     config.mkdir()
-    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     return config
 
 

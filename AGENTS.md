@@ -62,8 +62,8 @@ Legacy placement (pre-C8):
 
 ### Metrics consistency layer
 
-`$TRAUST_CONFIG_HOME/corpus-config.yaml` (ownership tags per output tree; `/corpus-intake`
-now writes traust-core's corpus registry, which `/census` reads once ported) + `traust_engine.corpus.resolver` (shared discovery/identity/
+traust-core's corpus registry (ownership tags per output tree; `/corpus-intake`
+writes it, `/census` reads it once ported; `corpus-config.yaml` is retired) + `traust_engine.corpus.resolver` (shared discovery/identity/
 dedup resolver) + `/census` (denominator authority: population,
 duplication vectors, distinct-vulnerabilities headline, repo liveness)
 keep every dashboard's numbers reconcilable. Dashboards embed a standard
@@ -74,19 +74,21 @@ and state the population block — never hand-roll a walker.
 
 ### Sibling repositories
 
-The agent runs from a parent workspace with three sibling trees (the inputs inventory, `analysis-results/`, `progress-tracker/` — all resolved through `locations.yaml`). Skills reference siblings by relative path. See [docs/setup.md](docs/setup.md) for the full workspace layout.
+The agent runs from a parent workspace with three sibling trees (the inputs inventory, `analysis-results/`, `progress-tracker/` — all resolved through `locations:` in `traust.yaml`). Skills reference siblings by relative path. See [docs/setup.md](docs/setup.md) for the full workspace layout.
 
 ### Deployment configuration vs shipped configuration
 
-`config/` in this repo ships **only** estate-neutral files (`external-tools.yaml`,
-`feeds.yaml`, `model-registry.yaml`) plus a `*.example.*` template for every
-deployment-specific file. The real corpus registry, product map, budget policy,
-safe-exec profiles, rule-pack allowlist, hardening weights, dist-git watch list,
-internal vocabulary and ledger signing key live in the directory named by
+`config/` in this repo ships **only** estate-neutral files (`model-registry.yaml`)
+plus `traust.example.yaml` and a `*.example.*` template for each adopter-fact file.
+Tool pins, safe-exec profiles and the feeds registry ship with traust-core and are not
+adopter config. A deployment's one config file, `traust.yaml` (database, identity,
+ledger key, budgets, locations, and the few adopter fields), the product map and
+internal vocabulary live in the directory named by
 **`TRAUST_CONFIG_HOME`** (default `~/.traust/config`; a deployment usually points it
 at its own private configuration repository, set by the orchestrator). `scripts/install_traust`
 creates that directory from the templates and is the documented starting point;
-`install_traust --doctor` checks it. Resolve every such file through
+`install_traust --doctor` and `traust admin doctor` check it; `traust config migrate`
+folds an old multi-file home into `traust.yaml`. Resolve every other file through
 `config_path("<name>")` from `traust.paths` (or
 `traust_contracts`) — never `HARNESS_ROOT / "config" / …`. It raises
 `DeploymentConfigMissing` rather than falling back to a template. traust-engine
@@ -236,7 +238,7 @@ three of them mechanically enforced, keep that from recurring:
   systems, test suites, and scanners that load code from an audited
   checkout are hostile-input execution; route them through
   python3 -m traust.cli util safe-exec with a profile from
-  `$TRAUST_CONFIG_HOME/safe-exec-profiles.yaml` (gate rule S10 blocks bare
+  the `safe-exec-profiles.yaml` traust-core ships (gate rule S10 blocks bare
   invocations). Headless agents additionally run under repo-config
   isolation — cwd outside the checkout, repo `.claude/`/`CLAUDE.md`
   never loaded as config (rule S9). Full contract: [docs/safe-exec.md](docs/safe-exec.md)

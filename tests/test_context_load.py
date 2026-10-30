@@ -25,7 +25,7 @@ def core(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Context]:
     tmp = tmp_path_factory.mktemp("load")
     home = tmp / "config"
     shutil.copytree(ROOT / "tests" / "fixtures" / "config", home)
-    (home / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp / "store")}))
+    (home / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp / "store")}))
     shutil.copy(ROOT / "config" / "sla-policy.example.yaml", home / "sla-policy.yaml")
     with pytest.MonkeyPatch.context() as mp:
         mp.setenv("XDG_CACHE_HOME", str(tmp / "cache"))

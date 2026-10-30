@@ -25,7 +25,6 @@ from traust_core.v1.models.common import ToolRequest
 
 from traust.cli._doors import parser, run
 from traust.context import load
-from traust.registry.feeds_config import registry_path
 
 
 def _parser(op: str, about: str) -> argparse.ArgumentParser:
@@ -134,7 +133,7 @@ def fork_lag(argv: list[str] | None = None) -> int:
     def call() -> dict:
         core = load(args.config_home)
         # advisories come from the registry's osv source. NEED(core: feeds registered lazily)
-        core.register_feeds(registry_path(args.config_home))
+        core.register_feeds()
         fork = core.services().code_facts.fork_lag(
             ToolRequest(workspace=args.checkout), offline=args.offline
         )

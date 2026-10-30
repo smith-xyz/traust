@@ -3,7 +3,7 @@
 `src/traust/context.py` calls `HarnessEngine.load()` once and turns
 `DeploymentConfigMissing` into a one-line `SystemExit(2)`. 93 modules call
 `load_engine()` and 96 call `add_config_home_arg()`, so every lane inherits the same
-config precedence (CLI flag > AUDIT_RESULTS_ROOT > `locations.yaml`) and the same
+config precedence (CLI flag > AUDIT_RESULTS_ROOT > `traust.yaml` locations) and the same
 fail-loud exit, pinned by `tests/test_context.py`. A second caller re-resolves config
 on its own terms and the guarantee stops being one.
 

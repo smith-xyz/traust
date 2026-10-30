@@ -117,8 +117,8 @@ third_party/, dist/, *_generated*, *.pb.go, *.md excluded); S/S_lines
 use the narrow sensitive-identifier matcher over first-party paths.
 
 Budget guard (advisory, no silent truncation): with --monthly-budget
-(or a monthly USD ceiling in $TRAUST_CONFIG_HOME/budget-policy.yaml, when one
-exists), projected full-audit cost = count x --unit-cost-full; if it
+(or the full-audit lanes' advisory `budgets` in traust.yaml, when there
+are any), projected full-audit cost = count x --unit-cost-full; if it
 exceeds the budget, lowest-tier table-routed fulls are dropped to fit
 and LISTED in dropped_for_budget. Event-injected rows are never
 dropped.
@@ -149,6 +149,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.parse
+from collections.abc import Sequence
 from pathlib import Path
 
 from traust_core.v1.models.observation import (
@@ -156,9 +157,11 @@ from traust_core.v1.models.observation import (
     is_deps_manifest,
     is_first_party,
 )
+from traust_core.v1.models.operations import Budget
+from traust_core.v1.models.vocabulary import BudgetEnforcement
 
 from traust.context import add_config_home_arg, analysis_results_dir, load
-from traust.paths import HARNESS_ROOT, optional_config_path
+from traust.paths import HARNESS_ROOT
 
 # Copied from harnessing/8-verify/verify-remediation/scripts/build_verify_sweep.py
 # (parse_pinned_sha + SHA_RX) — small shared copy by convention rather
@@ -1562,173 +1565,44 @@ def load_population(db_path: Path) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# budget guard (advisory — Layer-1 posture of $TRAUST_CONFIG_HOME/budget-policy.yaml)
+# budget guard (advisory — Layer-1 posture of traust.yaml `budgets`)
 # ---------------------------------------------------------------------------
 
 _FULL_LANES = ("full-audit", "full-audit+validate")
 
 
-# budget-policy.yaml `enforcement` values under which a policy ceiling
-# actually binds a router run. `none` is the shipped posture (the policy
-# is a documented artifact, not a control — see the plan's design
-# principle: "a config that documents its own non-enforcement is honest;
-# one that implies enforcement it lacks is a vulnerability").
-_POLICY_GATING_MODES = ("advisory", "enforced")
-# `observe` (Phase 1, 2026-08-05) computes a verdict and records it but
-# NEVER withholds work, so it is deliberately absent from the gating
-# set above: read_policy_budget() reports it as a non-binding ceiling
-# and the drop path physically cannot see it. The shadow accounting
-# reads it through read_policy_shadow_ceiling() instead.
-_POLICY_OBSERVE_MODE = "observe"
-# Pre-2026-08 flat key names. The live policy has never used them — this
-# reader looked ONLY here and so silently found nothing for months (see
-# the docstring). Kept as a fallback so an external deployment carrying
-# the flat shape is not newly broken.
-_LEGACY_BUDGET_KEYS = ("monthly_usd", "monthly_budget_usd", "per_month_usd")
+# `enforcement` values under which a budget binds a router run. `none` documents and `observe`
+# records a verdict but never withholds work ("a config that documents its own non-enforcement
+# is honest; one that implies enforcement it lacks is a vulnerability").
+_POLICY_GATING_MODES = (BudgetEnforcement.ADVISORY, BudgetEnforcement.ENFORCED)
 
 
-def read_policy_budget(path: Path | None) -> tuple[float | None, str]:
-    """Monthly USD ceiling from budget-policy.yaml -> (ceiling, why).
+def policy_budget(budgets: Sequence[Budget]) -> tuple[float | None, str]:
+    """The full-audit lanes' monthly USD ceiling from traust.yaml `budgets` -> (ceiling, why).
 
-    `why` is always populated and is surfaced in the worklist as
-    `summary.budget_source`, because the failure this function shipped
-    with was INVISIBLE: it looked for a flat `monthly_usd` key, the
-    policy nests the figure at `budget_policy.monthly_budget.usd_central`,
-    so it returned None on every run and the worklist reported
-    `budget_usd: null` as if no budget had ever been configured. Silence
-    is not an acceptable outcome for a spend control — every path here
-    explains itself.
-
-    Two rules, in order:
-
-    1. **`enforcement` decides whether a ceiling binds at all.** The
-       shipped posture is `none`: the policy is documentation, and only
-       `--monthly-budget` gates a run. Fixing the key lookup must NOT
-       quietly switch on a guillotine nobody enabled — measured
-       2026-08-05, the live worklist projected just under the configured
-       ceiling, so activation would have begun
-       dropping full audits within one ordinary run. L1 advisory
-       enforcement is Phase 3 of
-       progress-tracker/plans/budget-policy-implementation-plan.md.
-    2. **Then read the nested figure**, falling back to the legacy flat
-       keys. A policy that asks to gate but carries no readable ceiling
-       is a loud warning, never a silent no-op.
-
-    `enforced` is legal only on the central platform (L4), never in a
-    user checkout. Encountering it here warns and still applies the
-    ceiling — honoring a stricter-than-asked intent is safer than
-    ignoring it, but the caller is told the enforcement is only
-    advisory-strength because the client cannot self-enforce.
+    `why` is never empty: it is `summary.budget_source`, because a spend control that reports
+    `budget_usd: null` with no reason once hid a misread policy for months. `enforced` is
+    platform-only (L4): a user checkout applies it advisory-strength, and says so.
     """
-    if path is None or not path.is_file():
-        return None, "no budget-policy.yaml in $TRAUST_CONFIG_HOME"
-    try:
-        import yaml
-    except ImportError:
-        return None, "PyYAML unavailable — budget policy not read"
-    try:
-        pol = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("budget_policy") or {}
-    except Exception:
-        print(f"[!] unparseable {path} — no policy ceiling applied", file=sys.stderr)
-        return None, "unparseable budget policy"
-    if not pol:
-        return None, "budget policy has no budget_policy block"
-
-    mode = str(pol.get("enforcement") or "none").strip().lower()
-    if mode == _POLICY_OBSERVE_MODE:
-        return None, (
-            "policy enforcement=observe — shadow accounting "
-            "only; the verdict is recorded and NOTHING is "
-            "withheld (budget-guard plan Phase 1)"
-        )
-    if mode not in _POLICY_GATING_MODES:
-        why = (
-            f"policy enforcement={mode} — ceiling not applied "
-            f"(L1 advisory enforcement is Phase 3 of the "
-            f"budget-policy plan); only --monthly-budget binds"
-        )
-        if mode != "none":
-            print(
-                f"[!] unrecognized budget-policy enforcement '{mode}' — treating as 'none'",
-                file=sys.stderr,
-            )
-            why = (
-                f"policy enforcement='{mode}' is not a recognized "
-                f"mode — treated as none, ceiling not applied"
-            )
-        return None, why
-
-    ceiling, found_at = None, ""
-    mb = pol.get("monthly_budget")
-    if isinstance(mb, dict):
-        v = mb.get("usd_central")
-        if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0:
-            ceiling, found_at = float(v), "monthly_budget.usd_central"
-    if ceiling is None:
-        for key in _LEGACY_BUDGET_KEYS:
-            v = pol.get(key)
-            if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0:
-                ceiling, found_at = float(v), f"legacy flat key `{key}`"
-                break
-    if ceiling is None:
-        # The exact shape of the original bug — asked to gate, found no
-        # number. Never degrade to "no budget configured" in silence.
+    full = [b for b in budgets if b.lane in _FULL_LANES]
+    if not full:
+        return None, "no budgets for the full-audit lanes in traust.yaml"
+    binding = [b for b in full if b.enforcement in _POLICY_GATING_MODES and b.monthly_usd > 0]
+    if not binding:
+        modes = ",".join(sorted({b.enforcement.value for b in full}))
+        return None, f"budget enforcement={modes}: ceiling not applied; only --monthly-budget binds"
+    ceiling = float(sum(b.monthly_usd for b in binding))
+    if any(b.enforcement == BudgetEnforcement.ENFORCED for b in binding):
         print(
-            f"[!] budget policy sets enforcement={mode} but carries no "
-            f"readable monthly ceiling (expected "
-            f"budget_policy.monthly_budget.usd_central) — NO ceiling "
-            f"applied; fix the policy or pass --monthly-budget",
-            file=sys.stderr,
-        )
-        return None, (
-            f"policy enforcement={mode} but no readable "
-            f"monthly_budget.usd_central — ceiling MISSING"
-        )
-    if mode == "enforced":
-        print(
-            f"[!] budget policy sets enforcement=enforced, which is "
-            f"valid only on the central platform (L4) — a user "
-            f"checkout cannot self-enforce. Applying ${ceiling:,.0f} "
-            f"as an advisory ceiling.",
+            "[!] a traust.yaml budget sets enforcement=enforced, which is valid only on the "
+            f"central platform (L4) — applying ${ceiling:,.0f} as an advisory ceiling.",
             file=sys.stderr,
         )
         return ceiling, (
-            f"policy {found_at} (enforcement=enforced is "
-            f"platform-only; applied advisory-strength here)"
+            "traust.yaml budgets (enforcement=enforced is platform-only; "
+            "applied advisory-strength here)"
         )
-    return ceiling, f"policy {found_at} (enforcement={mode})"
-
-
-def read_policy_shadow_ceiling(path: Path) -> tuple[float | None, str]:
-    """The ceiling for OBSERVE-mode shadow accounting only.
-
-    Separate entry point on purpose. read_policy_budget() is the drop
-    path's reader and reports `observe` as no ceiling, so no future
-    edit there can accidentally start withholding work under a mode
-    whose entire contract is that it withholds nothing. This reader is
-    the only way to see an observe ceiling; its one caller, the retired budget shadow, never
-    filtered a work list (traust-engine's admission records verdicts now).
-    """
-    if not path.is_file():
-        return None, f"no budget policy at {path}"
-    try:
-        import yaml
-    except ImportError:
-        return None, "PyYAML unavailable — budget policy not read"
-    try:
-        pol = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("budget_policy") or {}
-    except Exception:
-        return None, "unparseable budget policy"
-    mode = str(pol.get("enforcement") or "none").strip().lower()
-    if mode != _POLICY_OBSERVE_MODE:
-        return None, f"policy enforcement={mode} — not observe mode"
-    mb = pol.get("monthly_budget")
-    v = mb.get("usd_central") if isinstance(mb, dict) else None
-    if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0:
-        return float(v), "policy monthly_budget.usd_central (observe)"
-    return None, (
-        "policy enforcement=observe but no readable monthly_budget.usd_central — ceiling MISSING"
-    )
+    return ceiling, "traust.yaml budgets (enforcement=advisory)"
 
 
 def apply_budget(
@@ -2270,7 +2144,8 @@ def main(argv=None) -> int:
     )
     args = ap.parse_args(argv)
 
-    results_root = analysis_results_dir(load(args.config_home))
+    core = load(args.config_home)
+    results_root = analysis_results_dir(core)
     manifest = results_root / "findings" / "_manifest"
     args.db = args.db or results_root / "graph" / "findings.db"
     args.events = args.events or manifest / "rescan-events.jsonl"
@@ -2667,7 +2542,7 @@ def main(argv=None) -> int:
         budget = args.monthly_budget
         budget_source = "--monthly-budget (explicit operator override)"
     else:
-        budget, budget_source = read_policy_budget(optional_config_path("budget-policy.yaml"))
+        budget, budget_source = policy_budget(core.config.budgets)
     decisions, dropped = apply_budget(decisions, args.unit_cost_full, budget)
 
     statuses = {}

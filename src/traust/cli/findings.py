@@ -307,7 +307,7 @@ def _human_review(args: argparse.Namespace) -> int:
             principal = load_caller(core)
         else:
             if services.identity is None:
-                print("findings: core identity is not configured in core.yaml.", file=sys.stderr)
+                print("findings: core identity is not configured in traust.yaml.", file=sys.stderr)
                 return 2
             principal = services.identity.authenticate(Credential(token=token))
         if not principal.is_verified_human():

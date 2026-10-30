@@ -323,7 +323,7 @@ Dashboards rebuild on cadence via
 Every campaign number flows through one consistency spine
 (`progress-tracker/plans/metrics-improvement-plan.md`):
 
-- **`$TRAUST_CONFIG_HOME/corpus-config.yaml`** registers every output tree with an
+- **traust-core's corpus registry** (was `corpus-config.yaml`) registers every output tree with an
   ownership tag — `owned` (`findings/`, Hybrid Platforms), `upstream`
   (`oss-findings/`, community code HP depends on; reported adjacent,
   never folded into the owned headline), `external-bu` (scan engagements

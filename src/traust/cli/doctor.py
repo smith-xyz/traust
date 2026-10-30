@@ -3,7 +3,8 @@
 
 One command that answers "why doesn't my session work" before an hour
 is lost to it — checks the top onboarding failure modes: traust-core's
-store and provider readiness (in-process, SQLite by default), venv +
+effective traust.yaml (each value's source), its store and provider readiness
+(in-process, SQLite by default), venv +
 locked deps, the tree-sitter grammars, pinned external tools, forge auth, VPN reachability, and
 the harness's own gates.
 
@@ -25,6 +26,12 @@ import socket
 import subprocess
 import sys
 
+import pydantic
+import pydantic_core
+import sqlalchemy as sa
+import yaml
+from traust_core.v1.context import Config, resolve_config_home
+from traust_core.v1.context.config import CONFIG_FILE
 from traust_core.v1.errors import TraustError
 from traust_core.v1.models.common import PageRequest
 from traust_core.v1.providers import syntax
@@ -89,7 +96,7 @@ def check_core(results, config_home, network=True):
         services = load(config_home).services()
         services.portfolio.list_products(PageRequest(limit=1))
     except (SystemExit, TraustError, OSError) as e:
-        results.append((FAIL, f"traust-core store not reachable — {e or 'core.yaml invalid'}"))
+        results.append((FAIL, f"traust-core store not reachable — {e or 'traust.yaml invalid'}"))
         return
     results.append((OK, "traust-core store reachable"))
     for binding in services.catalog.readiness(None, network=network):
@@ -98,6 +105,48 @@ def check_core(results, config_home, network=True):
             results.append((OK, f"provider {name} ready"))
         else:
             results.append((WARN, f"provider {name} not ready — {binding.readiness.detail}"))
+
+
+# Environment overrides traust.context honours over the file (its sanctioned list).
+_ENV_LOCATIONS = {
+    "locations.analysis_results": "AUDIT_RESULTS_ROOT",
+    "locations.feeds_cache": "FEEDS_CACHE_DIR",
+}
+SHIPPED_FILES = ("external-tools.yaml", "safe-exec-profiles.yaml", "feeds.yaml")
+
+
+def _render(key: str, value: object) -> str:
+    if key == "database.url" and value:
+        return sa.make_url(str(value)).render_as_string(hide_password=True)
+    return json.dumps(pydantic_core.to_jsonable_python(value))
+
+
+def check_config(results, config_home):
+    """Every effective traust.yaml value and where it came from: the file, the environment or
+    core's default. The shipped files are traust-core's, never the adopter's."""
+    home = resolve_config_home(config_home)
+    path = home / CONFIG_FILE if home is not None else None
+    found = path is not None and path.is_file()
+    try:
+        raw = (yaml.safe_load(path.read_text()) or {}) if found else {}
+        config = Config.from_home(home)
+    except (OSError, yaml.YAMLError, TraustError) as e:
+        results.append((FAIL, f"{CONFIG_FILE} not loadable — {e}"))
+        return
+    results.append((OK, f"config file: {path if found else 'none (zero-config defaults)'}"))
+    for name, value in config:
+        fields = value if isinstance(value, pydantic.BaseModel) else [(None, value)]
+        for sub, leaf in fields:
+            key = f"{name}.{sub}" if sub else name
+            in_file = sub in (raw.get(name) or {}) if sub else name in raw
+            source = "file" if in_file else "default"
+            if (var := _ENV_LOCATIONS.get(key)) and os.environ.get(var):
+                leaf, source = os.environ[var], f"env {var}"
+            elif key.endswith("_env") and isinstance(leaf, str):
+                source += f", {leaf} {'set' if os.environ.get(str(leaf)) else 'UNSET'}"
+            results.append((OK, f"config {key} = {_render(key, leaf)} ({source})"))
+    for name in SHIPPED_FILES:
+        results.append((OK, f"config {name}: shipped with traust-core (not configurable)"))
 
 
 def check_grammars(results):
@@ -254,6 +303,7 @@ def main(argv=None) -> int:
 
     results: list[tuple[str, str]] = []
     check_core(results, args.config_home, network=not args.quick)
+    check_config(results, args.config_home)
     check_python(results)
     check_grammars(results)
     check_tools(results)

@@ -1,5 +1,5 @@
 """`traust impact below-range`: one `BelowRangeService.prepare` call (stubbed), the packet files the
-skill reads, exit codes, and the shipped feeds.yaml hosts core loads."""
+skill reads, exit codes, and the feeds.yaml hosts core ships and loads."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+from traust_core.v1.context.config import SHIPPED_FEEDS
 from traust_core.v1.context.feeds import load_package_sources
 from traust_core.v1.models.below_range import (
     AdvisoryExcerpt,
@@ -41,7 +42,7 @@ from traust.paths import HARNESS_ROOT
 __all__ = ["home"]
 
 SKILL = HARNESS_ROOT / "harnessing" / "3-audit" / "dependency-watch" / "SKILL.md"
-FEEDS = HARNESS_ROOT / "config" / "feeds.yaml"
+FEEDS = SHIPPED_FEEDS
 CANDIDATE = Candidate(
     ecosystem=Ecosystem.GO,
     package="example.com/lib",

@@ -59,10 +59,9 @@ the doctrine says why, this section says what the launch must look like.
 
 ## Profiles
 
-Policy lives in **`$TRAUST_CONFIG_HOME/safe-exec-profiles.yaml`** (an embedded
-fallback copy of the `validation-step` profile lives in the module — keep them
-in sync; the harness ships the template as
-`config/safe-exec-profiles.example.yaml`). Each profile declares `allow`
+Policy lives in **the `safe-exec-profiles.yaml` traust-core ships** (the project's
+policy, not adopter config; an embedded fallback copy of the `validation-step`
+profile lives in the module — keep them in sync). Each profile declares `allow`
 (binary heads), optional `allowed_path_heads` (e.g. `./gradlew`),
 `allow_pipelines`, and `keep_env`. Current profiles and their consumers:
 

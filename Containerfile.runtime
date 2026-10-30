@@ -73,7 +73,7 @@ COPY docs/       /harness/docs/
 COPY bin/        /harness/bin/
 COPY VERSION     /harness/
 RUN chown -R 1001:1001 /harness
-# Deployment config (corpus-config, product map, …) is mounted, never baked in.
+# Deployment config (traust.yaml, model-registry, …) is mounted, never baked in.
 ENV TRAUST_CONFIG_HOME=/harness/deploy-config
 ENV HARNESS_ROOT=/harness
 ENV PATH="/opt/traust/.venv/bin:/opt/traust-engine/bin:${PATH}"

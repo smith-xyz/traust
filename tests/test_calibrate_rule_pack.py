@@ -49,7 +49,7 @@ def stub(monkeypatch: pytest.MonkeyPatch, result: Any) -> Door:
 def home(tmp_path: Path) -> Path:
     config = tmp_path / "config"
     config.mkdir()
-    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     return config
 
 

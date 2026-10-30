@@ -4,7 +4,6 @@ progress-tracker/plans/harness-security-remediation-plan.md."""
 from pathlib import Path
 
 import pytest
-from traust_core.v1.errors import ConfigError
 
 _ROOT = Path(__file__).resolve().parents[1]
 
@@ -47,11 +46,12 @@ def test_run_blocks_instead_of_crashing():
     assert rc == 126 and "step blocked" in err
 
 
-def test_string_steps_need_the_config_homes_safe_exec_profiles(tmp_path, monkeypatch):
+def test_string_steps_vet_against_core_shipped_profiles_in_an_empty_home(tmp_path, monkeypatch):
     monkeypatch.setenv("TRAUST_CONFIG_HOME", str(tmp_path))
     monkeypatch.setattr(AdapterBase, "_safe_exec_policy", None)
-    with pytest.raises(ConfigError, match="safe-exec-profiles"):
-        AdapterBase._vet_shell_string("oc get pods")
+    assert AdapterBase._vet_shell_string("oc get pods") == (["oc", "get", "pods"], "")
+    _argv, reason = AdapterBase._vet_shell_string("sh -c evil")
+    assert "never grantable" in reason
 
 
 def test_classify_ifs_evasion_not_safe():

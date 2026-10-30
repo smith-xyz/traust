@@ -20,7 +20,7 @@ FIXTURE_CONFIG = Path(__file__).parent / "fixtures" / "config"
 def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     config = tmp_path / "config"
     shutil.copytree(FIXTURE_CONFIG, config)
-    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     return config
 
@@ -97,7 +97,9 @@ def test_unset_gitleaks_rules_resolve_to_the_packs_file(home: Path) -> None:
 def test_an_explicit_gitleaks_location_wins(home: Path, tmp_path: Path) -> None:
     rules = tmp_path / "gitleaks.toml"
     rules.write_text("")
-    (home / "locations.yaml").write_text(yaml.safe_dump({"gitleaks_config": str(rules)}))
+    (home / "traust.yaml").write_text(
+        yaml.safe_dump({"locations": {"gitleaks_config": str(rules)}})
+    )
     assert load(home).config.locations.gitleaks_config_path() == rules
 
 
@@ -110,5 +112,5 @@ def test_the_rule_pack_defaults_to_the_packs_rules_at_the_traust_version(home: P
 
 
 def test_an_explicit_rule_pack_location_wins(home: Path, tmp_path: Path) -> None:
-    (home / "locations.yaml").write_text(yaml.safe_dump({"opengrep_rules": "rules"}))
+    (home / "traust.yaml").write_text(yaml.safe_dump({"locations": {"opengrep_rules": "rules"}}))
     assert load(home).rule_pack == (home / "rules").resolve()

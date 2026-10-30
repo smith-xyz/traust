@@ -8,7 +8,7 @@
 #   ./scripts/build-toolchain-image.sh --tag myregistry/traust-runtime:v0.37.1
 #   ./scripts/build-toolchain-image.sh --tools-tag myregistry/traust-toolchain:latest
 #
-# Scanner versions and the pin-set hash come from config/external-tools.yaml
+# Scanner versions and the pin-set hash come from the external-tools.yaml traust-core ships
 # (scripts/containerfile-build-args.py); the Python stack's pinned Git SHAs come from
 # pyproject.toml / uv.lock. Never edit the Containerfiles' scanner ARGs directly.
 #

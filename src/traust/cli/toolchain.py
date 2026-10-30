@@ -10,12 +10,12 @@ One command to get a working toolchain for any profile:
 Subcommands:
 
   setup     Install the profile's tools (direct upstream downloads at the
-            pins in config/external-tools.yaml), then populate DBs.
+            pins traust-core ships in external-tools.yaml), then populate DBs.
   doctor    Check every tool: installed? right version? DB present?
             Fail-closed: exits 1 if anything is wrong.
   fetch-dbs Populate vulnerability databases for the given profile.
 
-Profiles match the ``consumers`` field in ``config/external-tools.yaml``.
+Profiles match the ``consumers`` field of the tool pins traust-core ships.
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ def cmd_setup(args: argparse.Namespace, core: Context) -> int:
     if direct_tools:
         print(f"Step 1: Direct upstream downloads ({', '.join(direct_tools)})")
         print(f"  {INSTALL_SCRIPT} is missing — re-check the harness checkout;")
-        print("  pins live in config/external-tools.yaml.")
+        print("  pins ship with traust-core (external-tools.yaml).")
         for name in direct_tools:
             installed = "installed" if shutil.which(name) else "MISSING"
             print(f"  [{installed}] {name}")
@@ -222,7 +222,7 @@ def cmd_fetch_dbs(args: argparse.Namespace, core: Context) -> int:
 
 def _install_hint(name: str) -> str:
     if name in _DIRECT_DOWNLOAD:
-        return "scripts/install-toolchain.sh <profile>  (pin: config/external-tools.yaml)"
+        return "scripts/install-toolchain.sh <profile>  (pin: traust-core external-tools.yaml)"
     return _HYBRID_INSTALL.get(name, "see docs/setup.md")
 
 

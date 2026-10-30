@@ -18,7 +18,7 @@ SRC_DIR = HARNESS_ROOT / "src"
 CLI_DIR = _PKG_ROOT / "cli"
 HARNESSING_DIR = HARNESS_ROOT / "harnessing"
 SECURITY_PACK_DIR = HARNESS_ROOT / "packs" / "security"
-#: The pack's opengrep rules and gitleaks config: the defaults when ``locations.yaml`` names none.
+#: The pack's opengrep rules and gitleaks config: the defaults when traust.yaml names none.
 OPENGREP_RULES_DIR = SECURITY_PACK_DIR / "detection" / "opengrep-rules"
 GITLEAKS_CONFIG = SECURITY_PACK_DIR / "detection" / "gitleaks-rules" / "gitleaks-default.toml"
 #: The repo's ``config/`` holds SOURCE only — shipped defaults + ``*.example.*``

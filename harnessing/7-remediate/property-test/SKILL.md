@@ -159,8 +159,8 @@ credential-free, `--network=none` for both test runs, digest-pinned image, and
 disposable copies so neither run can touch the worktree the patch diff comes
 from.
 
-The mode comes from `sandbox:` in
-`$TRAUST_CONFIG_HOME/execution-boundaries.yaml` — `none` by default, or
+The mode comes from `execution.sandbox` in
+`$TRAUST_CONFIG_HOME/traust.yaml` — `none` by default, or
 `podman` for a nested container, which is never silently downgraded (see
 `docs/external-dependencies.md`). The mode is recorded in the evidence.
 

@@ -9,7 +9,7 @@ metadata:
 # SLA View — Owner-Response Clocks
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 
@@ -63,7 +63,7 @@ harness enum are different languages and the join must stay auditable.
    report it with the caveat that an accountable contact is an
    escalation path, **not** an owner — anyone acting on one checks the
    contact against the deployment's employee directory first (the
-   `ledger.yaml` `identity.directory_command`, where one is configured).
+   `traust.yaml` `identity.directory_command`, where one is configured).
 
 ## Clock semantics (deterministic, stated in the artifact)
 

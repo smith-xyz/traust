@@ -62,7 +62,7 @@ def publish(monkeypatch: pytest.MonkeyPatch) -> Door:
 def home(tmp_path: Path) -> Path:
     config = tmp_path / "config"
     config.mkdir()
-    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     return config
 
 
@@ -340,7 +340,7 @@ def test_threat_register_on_core_renders_an_empty_fleet(tmp_path: Path, database
     with contextlib.ExitStack() as stack:
         if database == "postgres":
             core["database"] = {"url": stack.enter_context(_postgres())}
-        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        (config / "traust.yaml").write_text(yaml.safe_dump(core))
         out = tmp_path / "out"
         rc, answer = run(config, "threat-register", "--out", str(out))
     assert rc == 0, answer
@@ -351,19 +351,18 @@ def test_threat_register_on_core_renders_an_empty_fleet(tmp_path: Path, database
 def test_freshness_reads_the_engines_tools_and_the_feeds_registry(
     publish: Door, home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    feeds: list[Path] = []
+    feeds: list[tuple] = []
 
     def engine_core(config_home: Path | None, **kw: Any) -> Context:
-        core = Context.from_file(config_home / "core.yaml")  # type: ignore[operator]
-        monkeypatch.setattr(core, "register_feeds", feeds.append)
+        core = Context.from_file(config_home / "traust.yaml")  # type: ignore[operator]
+        monkeypatch.setattr(core, "register_feeds", lambda *a: feeds.append(a))
         return core
 
     monkeypatch.setattr(dashboard_view, "load", engine_core)
-    monkeypatch.setattr(dashboard_view, "registry_path", lambda home: tmp_path / "feeds.yaml")
     publish.result = RENDERED.model_copy(update={"view": ViewName.FRESHNESS, "stem": "freshness"})
     rc, answer = run(home, "freshness", "--out", str(tmp_path / "fresh"))
     assert rc == 0, answer
-    assert feeds == [tmp_path / "feeds.yaml"]
+    assert feeds == [()]  # core's shipped registry
     assert publish.calls == [(ViewName.FRESHNESS, ViewFilter())]
     assert (tmp_path / "fresh" / "freshness.md").is_file()
 
@@ -378,7 +377,7 @@ def test_attack_coverage_on_core_renders_on_the_pinned_catalog(
     with contextlib.ExitStack() as stack:
         if database == "postgres":
             core["database"] = {"url": stack.enter_context(_postgres())}
-        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        (config / "traust.yaml").write_text(yaml.safe_dump(core))
         out = tmp_path / "out"
         rc, answer = run(config, "attack-coverage", "--out", str(out))
     assert rc == 0, answer

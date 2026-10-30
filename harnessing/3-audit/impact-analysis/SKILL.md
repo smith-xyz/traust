@@ -32,7 +32,7 @@ allowed-tools:
 # Impact Analysis
 
 > **Paths.** `analysis-results/…` and `progress-tracker/…` in this skill are the
-> default workspace layout. They resolve through `locations.yaml` in
+> default workspace layout. They resolve through `locations:` in `traust.yaml` in
 > `$TRAUST_CONFIG_HOME` (`docs/setup.md`, Storage locations); substitute your
 > configured roots.
 
@@ -197,7 +197,7 @@ symbols/packages, and feature description. `traust impact find` returns the
 OSV record `analyze` itself works from:
 
 All advisory fetches go through the scoped fetcher — the skill's only
-network egress (the hosts registered in `config/feeds.yaml`, default TLS; a raw `curl` grant
+network egress (the hosts registered in the feeds registry traust-core ships, default TLS; a raw `curl` grant
 would be an arbitrary-destination exfiltration channel under
 injection — audit D7):
 

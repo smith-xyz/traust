@@ -15,7 +15,7 @@
 #   scripts/local_ops.sh down               stop Postgres (data kept)
 #   scripts/local_ops.sh reset              drop the volume, regenerate config and pack
 #
-# The rig never edits shipped files: config, core.yaml and the overlay pack are
+# The rig never edits shipped files: config, traust.yaml and the overlay pack are
 # generated under .local-ops/ (gitignored). The overlay pack is sed'd from
 # packs/security/assets.yaml with cadences compressed to minutes; it is a test
 # artifact, never committed. Tokens live in .local-ops/env (also gitignored).
@@ -81,14 +81,17 @@ install_engine() {
     uv run --no-sync python -c "import traust_engine"
 }
 
-# Engine invocation shared by run/claim/smoke: the overlay pack, the repo's
-# feeds and external-tools pins, and the config home's core + model registry.
+# Engine invocation shared by run/claim/smoke: the overlay pack, the feeds and
+# tool pins traust-core ships, and the config home's traust.yaml + model registry.
+shipped() {
+    uv run --no-sync python -c "from traust_core.v1.context import config; print(config.$1)"
+}
 engine() {
     TRAUST_CONFIG_HOME="$CONFIG_HOME" uv run --no-sync traust-engine "$@" \
-        --core "$CONFIG_HOME/core.yaml" \
+        --core "$CONFIG_HOME/traust.yaml" \
         --pack "$OPS_DIR/pack/assets.yaml" \
-        --pin config/external-tools.yaml \
-        --feeds config/feeds.yaml \
+        --pin "$(shipped SHIPPED_EXTERNAL_TOOLS)" \
+        --feeds "$(shipped SHIPPED_FEEDS)" \
         --models "$CONFIG_HOME/model-registry.yaml"
 }
 
@@ -121,16 +124,14 @@ cmd_up() {
     uv sync --quiet
     install_engine
 
-    if [ ! -f "$CONFIG_HOME/locations.yaml" ]; then
+    # The rig's traust.yaml: its database and locations. `home` keeps core's credential
+    # store and local-issuer key inside the rig: without it they land in ~/.traust, over a
+    # real install's login there.
+    if [ ! -f "$CONFIG_HOME/traust.yaml" ]; then
         bash scripts/install_traust --config-home "$CONFIG_HOME" \
             --yes --no-toolchain --no-profile-write >/dev/null
-    fi
-    # The rig's database, in core.yaml (storage.yaml stays absent: that feature is off).
-    # `home` keeps core's credential store and local-issuer key inside the rig: without
-    # it they land in ~/.traust, over a real install's login there.
-    if [ ! -f "$CONFIG_HOME/core.yaml" ]; then
-        cat > "$CONFIG_HOME/core.yaml" <<EOF
-# Written by scripts/local_ops.sh (make ops-up); the local rig's core.
+        cat > "$CONFIG_HOME/traust.yaml" <<EOF
+# Written by scripts/local_ops.sh (make ops-up); the local rig's traust.yaml.
 home: $RUN_DIR/home
 database:
   url: $OPS_DSN
@@ -138,13 +139,13 @@ artifacts:
   path: $RUN_DIR/artifacts
 identity:
   trust_local: true
+locations:
+  workspace: $RUN_DIR/workspace
+  analysis_results: $RUN_DIR/analysis-results
+  progress_tracker: $RUN_DIR/progress-tracker
 EOF
     fi
     mkdir -p "$RUN_DIR/home" "$RUN_DIR/workspace" "$RUN_DIR/analysis-results" "$RUN_DIR/progress-tracker" "$OPS_DIR/pack"
-    sed -i.bak -e "s|^workspace: *\"\"|workspace: $RUN_DIR/workspace|" \
-        -e "s|^analysis_results: *\"\"|analysis_results: $RUN_DIR/analysis-results|" \
-        -e "s|^progress_tracker: *\"\"|progress_tracker: $RUN_DIR/progress-tracker|" \
-        "$CONFIG_HOME/locations.yaml" && rm -f "$CONFIG_HOME/locations.yaml.bak"
     pack_overlay > "$OPS_DIR/pack/assets.yaml"
 
     # Core applies its schema itself only for its local SQLite; a Postgres
@@ -240,7 +241,7 @@ cmd_doctor() {
     else
         echo "traust-engine: NOT importable (make ops-up reinstalls it)" >&2; bad=1
     fi
-    if [ -f "$CONFIG_HOME/core.yaml" ]; then
+    if [ -f "$CONFIG_HOME/traust.yaml" ]; then
         echo "config home: $OPS_DIR/config"
     else
         echo "config home: missing (make ops-up)" >&2; bad=1

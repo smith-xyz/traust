@@ -9,7 +9,7 @@ Using Traust skills locally, one at a time, outside the automated campaign workf
 These skills work against any codebase or report files you supply _outside of the full workflow_ with minimal coaxing. The expected inputs are always listed in the "Inputs" column, but if you want all of the options, see [docs/skills.md](skills.md).
 
 Skills marked with Environment or Infrastructure requirements need access to services your organisation runs; the workflow engine names the kind of service, your deployment supplies the instance. Typical setup:
-* **Employee directory** - the optional `ledger.yaml` `identity.directory_command` cross-check; SSO/VPN as your directory requires
+* **Employee directory** - the optional `traust.yaml` `identity.directory_command` cross-check; SSO/VPN as your directory requires
 * **Jira** - MCP or CLI with access to target projects required
 * **Ephemeral OCP Cluster** - any short-lived OCP cluster; if your organization runs an on-demand cluster service, that is the simplest route
 * **Playwright** - the playwright MCP server and package installed and configured for web-driving support

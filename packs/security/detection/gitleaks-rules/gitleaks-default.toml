@@ -1,7 +1,7 @@
 # Traust-owned gitleaks rules — traust-* extensions over the built-in set.
 #
 # Default config for the gitleaks adapter: upstream defaults plus the
-# detectors below. Override via locations.yaml ``gitleaks_config``, the
+# detectors below. Override via traust.yaml ``locations.gitleaks_config``, the
 # GITLEAKS_CONFIG env var, or ``--config``.
 #
 # Rule conventions: ids are traust-<slug>; each rule has a fixture line in

@@ -71,7 +71,10 @@ def quality(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> SimpleNamespace:
         return SimpleNamespace(
             services=lambda: SimpleNamespace(detection_quality=stub),
             rule_drafts=SimpleNamespace(root=kw.get("rule_drafts") or tmp_path / "drafts"),
-            config=SimpleNamespace(locations=locations),
+            config=SimpleNamespace(
+                locations=locations,
+                overrides=SimpleNamespace(rule_pack_allowlist=getattr(stub, "allowlist", None)),
+            ),
         )
 
     monkeypatch.setattr(sweep, "load", load)
@@ -293,6 +296,7 @@ def test_the_lane_rechecks_the_config_homes_allowlist(
     home.mkdir()
     if text is not None:
         (home / "rule-pack-allowlist.yaml").write_text(text)
+        quality.allowlist = home / "rule-pack-allowlist.yaml"
     quality.rule_lane = Door(lane())
     call(sweep.call_rule_lane, config_home=home, out=tmp_path / "o", draft_limit=0, skip_sweep=True)
     (request,) = quality.rule_lane.calls[0]

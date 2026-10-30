@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Emit --build-arg flags for Containerfile.tools from external-tools.yaml, and compute the
+"""Emit --build-arg flags for Containerfile.tools from the external-tools.yaml traust-core ships
+(``SHIPPED_EXTERNAL_TOOLS``, the tool pins; run it in the project venv), and compute the
 pin-set hash that tags both split images (Containerfile.tools, Containerfile.runtime).
 
 Usage (the canonical build commands — scripts/build-toolchain-image.sh wraps these):
@@ -32,7 +33,11 @@ except ImportError:
     print("ERROR: PyYAML required — pip install pyyaml", file=sys.stderr)
     sys.exit(1)
 
-MANIFEST = Path(__file__).resolve().parents[1] / "config" / "external-tools.yaml"
+try:
+    from traust_core.v1.context.config import SHIPPED_EXTERNAL_TOOLS as MANIFEST
+except ImportError:
+    print("ERROR: traust-core not importable — run under `uv run`", file=sys.stderr)
+    sys.exit(1)
 
 NAME_TO_ARG = {
     "opengrep": "OPENGREP_VERSION",

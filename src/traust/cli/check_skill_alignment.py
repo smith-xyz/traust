@@ -76,8 +76,8 @@ Rules:
                       unanchored script.
   A17 locations-note  A SKILL.md that names `analysis-results/` or
                       `progress-tracker/` carries the note that those are
-                      the default layout resolved through `locations.yaml`
-                      in $TRAUST_CONFIG_HOME — a reader outside this
+                      the default layout resolved through `locations:` in
+                      `traust.yaml` in $TRAUST_CONFIG_HOME — a reader outside this
                       deployment cannot otherwise tell a default from a
                       hardcode (52/56 docs named them, 2026-09-07).
   A16 layer-writes    Ledger layers are written through the SDK, never by
@@ -844,7 +844,7 @@ A18_CONFIG_HOME_ROOTS = ("src/traust/context.py", "src/traust/paths.py")
 
 
 _A17_TREES = ("analysis-results/", "progress-tracker/")
-_A17_MARK = "`locations.yaml`"
+_A17_MARK = "`traust.yaml`"
 
 
 def a17_locations_note_failures(repo: Path = REPO, used: list | None = None) -> list[str]:
@@ -852,11 +852,11 @@ def a17_locations_note_failures(repo: Path = REPO, used: list | None = None) -> 
 
     52 of 56 skill docs write `analysis-results/…` or `progress-tracker/…`
     literally (measured 2026-09-07). The code underneath resolves those roots
-    through `locations.yaml` in $TRAUST_CONFIG_HOME, so the literals are the
+    through `locations:` in `traust.yaml`, so the literals are the
     documented DEFAULT layout — but a reader outside this deployment cannot
     tell a default from a hardcode. Any skill doc that names either tree must
     carry the one-paragraph note saying the paths resolve through
-    `locations.yaml`. Publish-time pass for the open-source split; this rule
+    `traust.yaml`. Publish-time pass for the open-source split; this rule
     is the ratchet that keeps the next skill honest.
     """
     used = used if used is not None else []
@@ -877,7 +877,7 @@ def a17_locations_note_failures(repo: Path = REPO, used: list | None = None) -> 
             failures.append(
                 f"A17: {rel} names a workspace tree ({', '.join(named)}) without "
                 f"the locations note — add the standard paragraph saying these "
-                f"paths are the default layout resolved through `locations.yaml` "
+                f"paths are the default layout resolved through `locations:` in `traust.yaml` "
                 f"in $TRAUST_CONFIG_HOME (docs/setup.md, Storage locations)"
             )
     return failures
@@ -964,7 +964,7 @@ def a18_composition_root_failures(repo: Path = REPO, used: list | None = None) -
     traust depends on traust-core only: `traust.context.load()` builds core's
     Context, converts a config error into a one-line `SystemExit(2)`, and every
     op that calls `add_config_home_arg()` inherits the same config precedence
-    (CLI flag > AUDIT_RESULTS_ROOT > `locations.yaml`) and the same fail-loud
+    (CLI flag > AUDIT_RESULTS_ROOT > `traust.yaml` locations) and the same fail-loud
     behaviour, pinned by `tests/test_context.py`. A `HarnessEngine` call
     outside `src/traust/cli/groups/_registry.py`, where `load_engine` lived,
     fails.

@@ -15,14 +15,14 @@ def _product_definitions_configured(monkeypatch, tmp_path):
     estate would. Tests that want the open-source default (absent) override it."""
     home = tmp_path / "config-home"
     home.mkdir()
-    (home / "locations.yaml").write_text(f"product_definitions: {URL}\n")
+    (home / "traust.yaml").write_text(f"locations:\n  product_definitions: {URL}\n")
     monkeypatch.setenv("TRAUST_CONFIG_HOME", str(home))
 
 
 def test_product_definitions_absent_without_config(tmp_path, capsys):
     """Open-source default: locations.product_definitions unset → the internal
     product registry is not registered at all; nothing is fetched, the run says so."""
-    (tmp_path / "config-home" / "locations.yaml").unlink()
+    (tmp_path / "config-home" / "traust.yaml").unlink()
     assert ff.main(["--cache-dir", str(tmp_path)]) == 1
     assert "not configured" in capsys.readouterr().out
     assert not (tmp_path / "product_definitions.json").exists()

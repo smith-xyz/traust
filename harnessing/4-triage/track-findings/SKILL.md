@@ -78,7 +78,7 @@ rationale. Run `traust auth status`; if it isn't `verified: true`:
 
 - a deployment: `traust auth login` (device code), then retry
 - a solo install: `traust auth local --identity you@example.com`, with
-  `identity: {trust_local: true}` in `core.yaml`
+  `identity: {trust_local: true}` in `traust.yaml`
 
 Never log in as someone else to record their statement.
 
@@ -229,7 +229,7 @@ explicitly trusts local tokens. Check `traust auth status`; never log in as
 another person. To use a separate operator-delivered token, pass `--token-stdin`;
 it reads only stdin and never falls back to the stored login on refusal.
 Never read credentials into agent context, argv, receipts or logs.
-`--config-home` selects the private directory containing `core.yaml` (otherwise
+`--config-home` selects the private directory containing `traust.yaml` (otherwise
 `TRAUST_CONFIG_HOME`); core's `identity:` configuration owns trusted issuers and
 directory verification. No REST server is required.
 

@@ -36,7 +36,7 @@ def home(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Path]:
     with contextlib.ExitStack() as stack:
         if request.param == "postgres":
             core["database"] = {"url": stack.enter_context(_postgres())}
-        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        (config / "traust.yaml").write_text(yaml.safe_dump(core))
         yield config
 
 

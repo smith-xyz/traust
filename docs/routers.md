@@ -22,7 +22,7 @@ routing + the budget guard inside it), `traust.ops.router`,
 | **Findings routing** | a producer's findings → ledger events | `route_regressions.py`, `route_impact_findings.py` | [findings-routing.md](findings-routing.md) |
 | **Owner routing** | findings packages → teams and named maintainers | `/assign-findings-owners` (internal extension), `/reassign-findings-owners` | those skills' `SKILL.md` |
 | **Defect routing** | findings → Jira issues | `/file-security-defect` (internal extension) | those skills' `SKILL.md` |
-| **Feed routing** — *the security-data refresh* | external sources → traust-core feed snapshots | `traust feeds fetch` (`ExposureService.refresh_feeds`), `config/feeds.yaml` | [continuous-operations.md](continuous-operations.md) |
+| **Feed routing** — *the security-data refresh* | external sources → traust-core feed snapshots | `traust feeds fetch` (`ExposureService.refresh_feeds`), traust-core's shipped `feeds.yaml` | [continuous-operations.md](continuous-operations.md) |
 
 ### Worklist builders — routing's other half
 
@@ -62,13 +62,13 @@ builder stays until the shadow run's cutover.
 ## 2. Cost routing — the budget guard
 
 **Decides what the harness can afford to do.** This is a router in the literal
-sense: when the projected spend of the routed worklist exceeds the ceiling in
-`$TRAUST_CONFIG_HOME/budget-policy.yaml`, **lowest-tier table-routed full audits are dropped
+sense: when the projected spend of the routed worklist exceeds the full-audit
+lanes' `budgets` in `$TRAUST_CONFIG_HOME/traust.yaml`, **lowest-tier table-routed full audits are dropped
 to fit** and listed in `dropped_for_budget`. Event-injected rows are never
 dropped.
 
-**Know before relying on it:** `enforcement` in
-`$TRAUST_CONFIG_HOME/budget-policy.yaml` takes `none | observe | advisory |
+**Know before relying on it:** a budget's `enforcement` in
+`$TRAUST_CONFIG_HOME/traust.yaml` takes `none | observe | advisory |
 enforced`. At `observe` the guard does shadow accounting only: the ceiling is a
 recorded verdict, not a control, and **nothing is ever withheld**. Only
 `advisory` and `enforced` bind a run, and moving to either is a deliberate
@@ -136,7 +136,7 @@ specific tracker project is an internal-extension skill, not part of the harness
 ## 7. Feed routing — the security-data refresh
 
 **Decides which external sources to pull, and when.** Reads
-`config/feeds.yaml` — the registry covering both the cached tier this
+traust-core's shipped `feeds.yaml` — the registry covering both the cached tier this
 snapshots and the live tier `traust impact document` queries — and snapshots
 every cached source through traust-core (`ExposureService.refresh_feeds`);
 the pack's `feeds_cache` cadence decides when.

@@ -76,7 +76,7 @@ def doors(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
 def home(tmp_path: Path) -> Path:
     config = tmp_path / "config"
     config.mkdir()
-    (config / "core.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
     return config
 
 
@@ -240,7 +240,7 @@ def core_home(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Path]:
     with contextlib.ExitStack() as stack:
         if request.param == "postgres":
             core["database"] = {"url": stack.enter_context(_postgres())}
-        (config / "core.yaml").write_text(yaml.safe_dump(core))
+        (config / "traust.yaml").write_text(yaml.safe_dump(core))
         yield config
 
 
@@ -249,7 +249,7 @@ def test_record_on_core_files_one_assessment_on_the_bare_commit(core_home, tmp_p
     path = document(tmp_path, PRIV_PROFILE)
     rc, out = run(home, str(path), "--kind", "priv_profile", "--repo-url", URL, "--sha", SHA)
     assert rc == 0, out
-    core = Context.from_file(home / "core.yaml")
+    core = Context.from_file(home / "traust.yaml")
     services = core.services()
     repo = services.portfolio.find_repository(HttpsRepoUrl.parse(URL, core.config.forge_hosts))
     ref = services.portfolio.register_ref(repo.id, GitSha.parse(SHA), None, None)
@@ -277,7 +277,7 @@ def test_record_on_core_takes_a_reports_findings_in(core_home, tmp_path, kind):
         core_home, str(document(tmp_path, body)), "--kind", kind, "--repo-url", URL, "--sha", SHA
     )
     assert rc == 0, out
-    core = Context.from_file(core_home / "core.yaml")
+    core = Context.from_file(core_home / "traust.yaml")
     services = core.services()
     repo = services.portfolio.find_repository(HttpsRepoUrl.parse(URL, core.config.forge_hosts))
     found = {
@@ -301,7 +301,7 @@ def test_record_on_core_refuses_a_finding_at_the_root_and_files_nothing(core_hom
         SHA,
     )
     assert rc == 2, err
-    core = Context.from_file(core_home / "core.yaml")
+    core = Context.from_file(core_home / "traust.yaml")
     services = core.services()
     repo = services.portfolio.find_repository(HttpsRepoUrl.parse(URL, core.config.forge_hosts))
     ref = services.portfolio.register_ref(repo.id, GitSha.parse(SHA), None, None)
@@ -440,7 +440,7 @@ def test_record_on_core_takes_a_fuzz_reports_crashers_in(core_home, tmp_path):
     path = document(tmp_path, FUZZ_REPORT)
     rc, out = run(core_home, str(path), "--kind", "fuzz", "--repo-url", URL, "--sha", SHA)
     assert rc == 0, out
-    core = Context.from_file(core_home / "core.yaml")
+    core = Context.from_file(core_home / "traust.yaml")
     services = core.services()
     repo = services.portfolio.find_repository(HttpsRepoUrl.parse(URL, core.config.forge_hosts))
     reported = FingerprintInput(

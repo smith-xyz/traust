@@ -16,7 +16,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 
 ## Command groups
 
-27 groups.
+29 groups.
 
 | Group | Description | Operations |
 |---|---|---|
@@ -29,6 +29,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `check` | Deterministic gates | `citations`, `content-licenses`, `coverage`, `docs-consistency`, `estate-data`, `drift`, `fix-propagation`, `location-paths`, `reference-integrity`, `skill-alignment`, `skill-security` |
 | `cloud-config` | The cloud-config-audit skill's doors on traust-core | `check`, `record`, `run` |
 | `compliance` | compliance-check doors on traust-core (posture: `dashboard view compliance`) | `adrs`, `calibrate`, `check`, `declare`, `evaluate`, `evidence`, `latest`, `policy`, `record`, `resolve`, `scopes` |
+| `config` | The config home's one file, `traust.yaml`: `migrate <old home>` writes it from a pre-traust.yaml home and reports every file (carried, dropped, a fact to record with its command) | `migrate` |
 | `dashboard` | Dashboard rebuilds, the team report and one insight view | `refresh`, `team-report`, `view` |
 | `feeds` | Security feed snapshots (traust-core) and the product-definitions cache | `fetch`, `fetch-products` |
 | `findings` | track-findings' and findings-db's doors on traust-core | `apply`, `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `record`, `refuted`, `reject`, `request`, `review-cases`, `sarif`, `status`, `summary`, `surfaces`, `tickets`, `timeline` |
@@ -168,7 +169,7 @@ traust auth local --identity reviewer@example.com --config-home /path/to/private
 traust auth status --config-home /path/to/private-config
 ```
 
-Local tokens are trusted only when `core.yaml` explicitly sets
+Local tokens are trusted only when `traust.yaml` explicitly sets
 `identity: {trust_local: true}`. `auth service-account` and `auth local --machine`
 are machine sessions, not human approval. `auth refresh` renews a stored login;
 `auth logout` removes it. `auth token` deliberately prints the secret: do not
@@ -328,7 +329,7 @@ human must review a new pending item. Re-read accepted cards using
 
 ### Identity and receipts
 
-`--config-home` (or `TRAUST_CONFIG_HOME`) selects `core.yaml`; its `identity:`
+`--config-home` (or `TRAUST_CONFIG_HOME`) selects `traust.yaml`; its `identity:`
 configuration owns trust and optional directory policy. Every write requires a
 verified human; a machine admin does not qualify. Without `--token-stdin`, the
 workbench uses the same stored login verified by `load_caller(core)` as the
@@ -340,7 +341,7 @@ accepted. Use an argv-list API or shell-safe quoting for dynamic arguments;
 never interpolate rationale into shell syntax or put tokens in argv/logs.
 
 For PostgreSQL install the core-owned driver with `uv sync --extra postgres`.
-SQLite needs no extra. `database.url` belongs in `core.yaml`; the app never opens
+SQLite needs no extra. `database.url` belongs in `traust.yaml`; the app never opens
 the connection directly.
 
 Write receipts/errors omit submitted rationale and tokens. Queue history and

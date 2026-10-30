@@ -500,17 +500,29 @@ counts or trigger defect filing on its own.
 
 ### 7a. The weight table
 
-λ lives in a versioned, owner-tunable config —
-`$TRAUST_CONFIG_HOME/hardening-risk-weights.json` (template:
-[config/hardening-risk-weights.example.json](../config/hardening-risk-weights.example.json))
+λ lived in a versioned, owner-tunable config, `hardening-risk-weights.json` (retired
+with one-file config: nothing reads it since the emitter retired; the table is kept below)
 — keyed by the finding's existing category slug, so no fresh
 classification happens at metric time. The values encode one judgment:
 **how much does this class of absent hardening change what co-located
 confirmed findings are worth?** Tenancy-load-bearing categories
 (isolation, network exposure, workload configuration, authentication,
 authorization) sit at or near 1.0; observability gaps sit at the floor,
-which is also the `default` for any unlisted category. The current
-values are in the file; this page does not duplicate them.
+which is also the `default` for any unlisted category. The last values
+(version 1, 2026-07-11):
+
+| Category | λ | Category | λ |
+|---|---|---|---|
+| `tenant-isolation` | 1.0 | `supply-chain` | 0.5 |
+| `network-exposure` | 0.9 | `injection` | 0.5 |
+| `insecure-workload-config` | 0.8 | `ssrf` | 0.5 |
+| `authentication` | 0.8 | `path-traversal` | 0.5 |
+| `authorization` | 0.8 | `cross-site-scripting` | 0.4 |
+| `secrets-management` | 0.7 | `data-exposure` | 0.4 |
+| `cryptography` | 0.6 | `resource-management` | 0.3 |
+| `input-validation` | 0.5 | `logging-monitoring` | 0.3 |
+
+`default` 0.3 for an unlisted category; `single_tenant_dampening` 0.5.
 
 The legacy emitter applied two modifiers; these describe the retired method,
 not current CLI options:
@@ -714,7 +726,7 @@ not one signature over the corpus and not one per checkpoint. See
 Division of labor, deliberately layered: **merkle root** = the event set
 and order are exactly what was written (and one 64-hex value a signature
 can attest — `ledger sign` / `ledger verify-signature`, cosign and OIDC backends,
-`ledger.yaml` → `signing.required` to make an unsigned root a fail-closed **ERROR**
+`traust.yaml` → `ledger.required` to make an unsigned root a fail-closed **ERROR**
 — not a warning, and deleting a signature is therefore not a downgrade path; see
 [signing.md](signing.md)); **event_id** = each event's disposition
 content; **claim hashes** = the audited claims underneath. With leaf format 2
@@ -748,7 +760,7 @@ not enter this historical diagram.
                                                                     │     algorithm / leaf_format=2
   re-audit           ───► rebaseline()  ⚠ re-points, does not stamp │
                                                                     ├─ 2. sign_if_configured()
-  a scan by itself   ───► (nothing — a scan is not an event)        │     ledger.yaml signing.key_path
+  a scan by itself   ───► (nothing — a scan is not an event)        │     traust.yaml ledger.key_path
                                                                     │     → signed, format 4
                                                                     ▼
                                                     <repo>-findings-layer.json
@@ -785,11 +797,11 @@ not enter this historical diagram.
 
 | `SignAttempt.status` | Cause | Writer behaviour |
 |---|---|---|
-| `unconfigured` | no `ledger.yaml` `signing.key_path` (or no OIDC token for identity signing) | layer stamped and written, **unsigned**. Expected only on a workstation without the key; every layer in the corpus is signed, and `signing.required: true` makes this state an ERROR |
+| `unconfigured` | no `traust.yaml` `ledger.key_path` (or no OIDC token for identity signing) | layer stamped and written, **unsigned**. Expected only on a workstation without the key; every layer in the corpus is signed, and `ledger.required: true` makes this state an ERROR |
 | `signed` | key present, cosign succeeded | signature written to `metadata.merkle_root_signature` |
 | `failed` | key present, signing broke | **warns on stderr** — a configured-but-broken signer never degrades quietly |
 
-Enforcement is configuration: `ledger.yaml` → `signing.required: true` makes an unsigned root a
+Enforcement is configuration: `traust.yaml` → `ledger.required: true` makes an unsigned root a
 fail-closed ERROR and makes the harness refuse to write a layer it cannot sign (see [signing.md](signing.md)).
 
 Full lifecycle, including where the key lives and how rotation works:
@@ -839,7 +851,7 @@ through core services (§6a), not through the legacy projection.
 | Legacy corpus projection (builder retired; skill port unfinished) | §11b; core assessment/finding services own the replacement |
 | Human queue/request, direct validity/severity/resolution and single/bulk apply | [CLI reference](cli-reference.md#direct-human-severity-recording); §6a |
 | Historical triage → ledger mapping (emitter retired) | §6b |
-| λ weight table (versioned, owner-tunable) | `$TRAUST_CONFIG_HOME/hardening-risk-weights.json` (§7a) |
+| λ weight table (retired file; last values kept) | §7a |
 | Whole-pipeline map (artifacts, producers, consumers) | [artifacts.md](artifacts.md) |
 | Legacy merge derivation (builder retired) | §8; core finding/insight skill ports remain unfinished |
 | Historical trend replay | §8; former `build_trends.py` is retired, not an executable fallback |

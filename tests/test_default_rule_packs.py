@@ -37,7 +37,7 @@ def _run(*args: str) -> subprocess.CompletedProcess:
 
 
 def test_fixture_config_sets_no_rule_pack_location():
-    locations = FIXTURE_CONFIG / "locations.yaml"
+    locations = FIXTURE_CONFIG / "traust.yaml"
     text = locations.read_text(encoding="utf-8") if locations.is_file() else ""
     assert "opengrep_rules" not in text and "gitleaks_config" not in text
 
