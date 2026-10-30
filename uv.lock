@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -1520,8 +1520,8 @@ requires-dist = [
     { name = "pyyaml" },
     { name = "referencing" },
     { name = "sigstore", marker = "extra == 'signing'", specifier = ">=4.0,<5.0" },
-    { name = "traust-core", git = "https://github.com/traust-security/traust-core.git?rev=f8ff5a6006e682c0349174af685bf18274b56514" },
-    { name = "traust-core", extras = ["postgres"], marker = "extra == 'postgres'", git = "https://github.com/traust-security/traust-core.git?rev=f8ff5a6006e682c0349174af685bf18274b56514" },
+    { name = "traust-core", git = "https://github.com/traust-security/traust-core.git?rev=e8ab1524ac05b011382fa7dcfb15aba577c91d70" },
+    { name = "traust-core", extras = ["postgres"], marker = "extra == 'postgres'", git = "https://github.com/traust-security/traust-core.git?rev=e8ab1524ac05b011382fa7dcfb15aba577c91d70" },
 ]
 provides-extras = ["postgres", "signing"]
 
@@ -1535,7 +1535,7 @@ dev = [
 [[package]]
 name = "traust-contracts"
 version = "0.0.0"
-source = { git = "https://github.com/traust-security/traust-contracts.git?rev=762b92f6286edd5056d652e88fa7bb4cea983a57#762b92f6286edd5056d652e88fa7bb4cea983a57" }
+source = { git = "https://github.com/traust-security/traust-contracts.git?rev=55b69a9a9a2f6069804fcdbdf090eeede613250a#55b69a9a9a2f6069804fcdbdf090eeede613250a" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "pydantic" },
@@ -1545,7 +1545,7 @@ dependencies = [
 [[package]]
 name = "traust-core"
 version = "0.1.0"
-source = { git = "https://github.com/traust-security/traust-core.git?rev=f8ff5a6006e682c0349174af685bf18274b56514#f8ff5a6006e682c0349174af685bf18274b56514" }
+source = { git = "https://github.com/traust-security/traust-core.git?rev=e8ab1524ac05b011382fa7dcfb15aba577c91d70#e8ab1524ac05b011382fa7dcfb15aba577c91d70" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "pydantic" },
