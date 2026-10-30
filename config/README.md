@@ -23,7 +23,6 @@ the same file as Helm values and its secrets from a secrets manager.
 | `traust.example.yaml` | the template for `traust.yaml`: every section, documented, commented out except the defaults. As copied it is the zero-config install |
 | `model-registry.yaml` | model tier classes, routing roles and prices; read from the config home, where `install_traust` copies it ([procedure](../docs/model-classes.md#configuring-your-own-models)) |
 | `rule-pack-allowlist.example.yaml` | the calibrated supplemental rule allowlist; enable it with `overrides.rule_pack_allowlist` (shipped default: no supplements) |
-| `product-definitions-map.example.yaml` | the package/repo → product map `traust registry products` reads from the config home |
 
 ## Adopter facts: record them
 
@@ -36,6 +35,7 @@ newest one is used.
 | org parameters | `traust compliance policy org-parameters <file>` | [docs/examples/org-parameters.example.yaml](../docs/examples/org-parameters.example.yaml) |
 | ADR registers | `traust compliance policy adr-registry <file>` | [docs/examples/adr-registry.example.yaml](../docs/examples/adr-registry.example.yaml) |
 | recall-benchmark answer key | `traust sweep benchmark-targets <file>` | [docs/examples/benchmark-targets.example.yaml](../docs/examples/benchmark-targets.example.yaml) |
+| the reviewed package/repo → product map | `traust registry product-map <file>` | [docs/examples/product-definitions-map.example.yaml](../docs/examples/product-definitions-map.example.yaml) |
 | a changed SLA policy | `traust dashboard sla-policy <file>` | the security pack's default, [packs/security/sla-policy.yaml](../packs/security/sla-policy.yaml) ([docs/sla-policy.md](../docs/sla-policy.md)) |
 
 The public-export inputs (the scrub's organization vocabulary) are not runtime config either:

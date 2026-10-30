@@ -40,7 +40,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `portfolio` | The portfolio on traust-core (the graph ops are retired); `observe` is the `repo_state` materializer; `plan` / `onboard` / `owner-hints` / `file` / `import-owners` / `import-release` / `release-changes` are add-inputs' and inventory-repositories' doors on traust-core; `dependencies` / `dependents` read traust-core's SBOMs | `dependencies`, `dependents`, `file`, `import-owners`, `import-release`, `liveness`, `observe`, `onboard`, `owner-hints`, `plan`, `population`, `release-changes` |
 | `pqc` | The pqc-readiness skill's doors on traust-core | `blockers`, `check`, `prepare`, `record`, `summary`, `vendor-claims` |
 | `products` | corpus-intake's doors on traust-core: products and their corpus ownership | `add`, `list`, `update` |
-| `registry` | Model/product registry | `models`, `products` |
+| `registry` | Model/product registry and the recorded product map | `models`, `product-map`, `products` |
 | `remediation` | The remediation loop's doors on traust-core (remediate-finding, patch, property-test, fleet-fix, verify-remediation) | `assemble`, `candidates`, `fleet-approve`, `fleet-claim`, `fleet-record`, `fleet-submit`, `fleet-targets`, `fork`, `mutation-evidence`, `next`, `open`, `prepare`, `progress`, `property-evidence`, `record`, `verifications`, `verify-differential`, `verify-prepare`, `verify-record`, `verify-sweep`, `work-items` |
 | `reporting` | Report validation, rendering & recording | `lint`, `rate-threats`, `record`, `render`, `sarif`, `validate` |
 | `session` | A skill session started headless for a continuous-ops order (the pack's skill-session `run`) | `run` |

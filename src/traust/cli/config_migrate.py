@@ -35,10 +35,10 @@ FACTS = {
     "adr-registry.yaml": "traust compliance policy adr-registry {path}",
     "benchmark-targets.yaml": "traust sweep benchmark-targets {path}",
     "sla-policy.yaml": "traust dashboard sla-policy {path}",
+    "product-definitions-map.yaml": "traust registry product-map {path}",
 }
 KEPT = {
     "model-registry.yaml": "read from the config home as today",
-    "product-definitions-map.yaml": "read by `traust registry products` (--map)",
 }
 RETIRED = {
     "corpus-config.yaml": "no reader",

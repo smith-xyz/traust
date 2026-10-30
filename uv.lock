@@ -1520,8 +1520,8 @@ requires-dist = [
     { name = "pyyaml" },
     { name = "referencing" },
     { name = "sigstore", marker = "extra == 'signing'", specifier = ">=4.0,<5.0" },
-    { name = "traust-core", git = "https://github.com/traust-security/traust-core.git?rev=b808ebb52930fd8fa46e1224043adbc582750e0b" },
-    { name = "traust-core", extras = ["postgres"], marker = "extra == 'postgres'", git = "https://github.com/traust-security/traust-core.git?rev=b808ebb52930fd8fa46e1224043adbc582750e0b" },
+    { name = "traust-core", git = "https://github.com/traust-security/traust-core.git?rev=44cd61b481efbfe39d3c7b5eb0e7c1f9adc18e39" },
+    { name = "traust-core", extras = ["postgres"], marker = "extra == 'postgres'", git = "https://github.com/traust-security/traust-core.git?rev=44cd61b481efbfe39d3c7b5eb0e7c1f9adc18e39" },
 ]
 provides-extras = ["postgres", "signing"]
 
@@ -1535,7 +1535,7 @@ dev = [
 [[package]]
 name = "traust-contracts"
 version = "0.0.0"
-source = { git = "https://github.com/traust-security/traust-contracts.git?rev=60c8f610e8e663b0bbd24837441acd06acc8d2f2#60c8f610e8e663b0bbd24837441acd06acc8d2f2" }
+source = { git = "https://github.com/traust-security/traust-contracts.git?rev=ad8a804e41a891b47cdad258d5eb2eaed25fd918#ad8a804e41a891b47cdad258d5eb2eaed25fd918" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "pydantic" },
@@ -1545,7 +1545,7 @@ dependencies = [
 [[package]]
 name = "traust-core"
 version = "0.1.0"
-source = { git = "https://github.com/traust-security/traust-core.git?rev=b808ebb52930fd8fa46e1224043adbc582750e0b#b808ebb52930fd8fa46e1224043adbc582750e0b" }
+source = { git = "https://github.com/traust-security/traust-core.git?rev=44cd61b481efbfe39d3c7b5eb0e7c1f9adc18e39#44cd61b481efbfe39d3c7b5eb0e7c1f9adc18e39" }
 dependencies = [
     { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "pydantic" },
