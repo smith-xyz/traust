@@ -102,7 +102,7 @@ Ordering is the whole point:
 | `exec-summary` | — | *retired:* rendered by the `views` stage (`ExecutiveSummaryView`) |
 | `insecure-patterns` | — | *retired:* rendered by the `views` stage (`InsecurePatternsView`, core#301) |
 | `validation-fuzz` | — | *retired:* rendered by the `views` stage (`ValidationFuzzView`) |
-| `rbac-tenancy` | consumer | `RETIRED:build_rbac_tenancy_rollup.py` |
+| `rbac-tenancy` | — | *retired:* the `views` stage renders the portfolio rollup (`FindingsRollupView`); the RBAC/tenancy axis returns with Q5 |
 | `sla` | — | *retired:* rendered by the `views` stage (`SlaView`, once `sla-policy.yaml` is in the config home) |
 | `compliance` | — | *retired:* rendered by the `views` stage (`ComplianceDashboardView`) |
 | `attack-coverage` | — | *retired:* rendered by the `views` stage (`AttackCoverageView`) |

@@ -13,9 +13,10 @@ metadata:
 > configured roots.
 
 
-Aggregates the campaign's RBAC (authorization) and multi-tenancy
-(tenant-isolation) findings into leadership-facing rollups. All analysis
-is traust-core-side and deterministic; the model's job is to run the builder,
+Aggregates the portfolio's findings into leadership-facing rollups, read
+through the RBAC/tenancy lens (see Step 1: the axis-scoped selection is
+retired until the classifier lands). All analysis
+is traust-core-side and deterministic; the model's job is to run the commands,
 sanity-check the outputs, and narrate.
 
 ## Input
@@ -25,7 +26,7 @@ sanity-check the outputs, and narrate.
 
 ## Procedure
 
-### Step 1 — run the deterministic builder
+### Step 1 — run the deterministic rollup
 
 ```bash
 python3 -m traust.cli dashboard view findings-rollup \
@@ -37,7 +38,9 @@ traust-core's `FindingsRollupView` counts the findings (never a hand-rolled
 walker) and writes `findings-rollup.{md,html,json}` to
 `progress-tracker/metrics/dashboards/rbac-tenancy/`: headline counts, per-repository
 and per-product tables, top findings. `findings summary` counts one repository's
-findings per `category` (the RBAC/tenancy rows are the ones named below).
+findings per `category` — run it once per repository you care about, and read the
+RBAC/tenancy rows (`authorization`, `tenant-isolation`; category values are
+free-text until the classifier lands).
 *Retired:* the RBAC/tenancy selection, the top-patterns and per-pattern
 detailed reports and the ATT&CK heat. Those await the weakness classification
 (Q5) and the label taxonomy in traust-contracts; the rollup is portfolio-wide until then.
@@ -98,5 +101,4 @@ underlying findings reports into progress-tracker; the rollups reference
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Counts disagree with census headline | census counts ALL findings; this rollup is portfolio-wide until the axis scope returns, and applies the same disposition rules | expected — cite the population block |
-| Zero tenancy findings on a multi-tenant tree | reports predate PEACH tagging | note the coverage gap; re-audit or isolation-review refreshes tags |
+| Counts disagree with census headline | census counts ALL findings; this rollup is portfolio-wide until the axis scope returns, and applies the same disposition rules | expected — state the scope difference in the narration |
