@@ -1,6 +1,6 @@
 ---
 name: rbac-tenancy-rollup
-description: Use when the user asks for a portfolio view of RBAC or multi-tenancy findings — "what are our RBAC issues", "top RBAC misconfigurations", "multi-tenancy findings rollup", "which repos have over-permissive RBAC", "tenant-isolation findings summary", "ATT&CK view of our RBAC findings" — or asks to (re)build the RBAC/tenancy dashboard. Deterministically aggregates authorization and tenant-isolation findings from the corpus-resolved report population (disposition-aware, FP-excluded, branch re-audits excluded) into an executive rollup with MITRE ATT&CK candidate-technique heat, a detailed top-misconfigurations report, and a self-contained HTML dashboard under progress-tracker/metrics/dashboards/rbac-tenancy/.
+description: Use when the user asks for a portfolio view of RBAC or multi-tenancy findings — "what are our RBAC issues", "top RBAC misconfigurations", "multi-tenancy findings rollup", "which repos have over-permissive RBAC", "tenant-isolation findings summary", "ATT&CK view of our RBAC findings" — or asks to (re)build the RBAC/tenancy dashboard. Deterministically aggregates the portfolio's findings (disposition-aware, FP-excluded) into an executive rollup through traust-core's FindingsRollupView and a per-category summary under progress-tracker/metrics/dashboards/rbac-tenancy/; the RBAC/tenancy axis selection, top-patterns detail and ATT&CK heat are retired until the weakness classification (Q5) and the label taxonomy land.
 metadata:
   harness.tier: "secondary"
 ---
