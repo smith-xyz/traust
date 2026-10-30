@@ -144,7 +144,7 @@ def test_the_cli_records_the_observed_heads_sbom_once(
 
     def checkout(self: Any, request: CheckoutRequest) -> Result[Workspace]:
         fetched.append(request)
-        workspace = Workspace(repo=request.repo, sha=request.ref, path=tmp_path)
+        workspace = Workspace(repo=request.repo, sha=request.ref, path=tmp_path, provider=self.name)
         return Result(
             workspace, Acquisition(provider="forge-archive", acquired_at=datetime.now(UTC))
         )
