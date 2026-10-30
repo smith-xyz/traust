@@ -457,11 +457,11 @@ Use when the user asks whether portfolio security findings are trending up or do
 
 ## insecure-patterns
 
-Use when the user asks which insecure coding patterns recur across the portfolio, wants findings grouped/ranked by CWE or OWASP ASVS category, asks "what are our top vulnerabilities by pattern", "which repos share CWE-X", or asks to (re)build the insecure-patterns dashboard. Walks every *-security-audit.json under analysis-results/findings/ (owned) and analysis-results/oss-findings/ (upstream, reported as a separate tagged cut), keeps only source-code findings (drops YAML/Dockerfile/Helm config gaps), buckets by primary CWE mapped to ASVS 5.0, and writes insecure-patterns/{top25.md, detailed.md, dashboard.html, .json}.
+Use when the user asks which insecure coding patterns recur across the portfolio, wants findings grouped/ranked by CWE or OWASP ASVS category, asks "what are our top vulnerabilities by pattern", "which repos share CWE-X", or asks to (re)build the insecure-patterns dashboard. Reads the findings recorded in traust-core (owned and upstream reported as separate ownership cuts), buckets by primary CWE, and writes insecure-patterns.{md,html,json}.
 
 - **Stage:** —
 - **Tier:** `secondary`
-- **Invoke:** `/insecure-patterns` — arguments: `[summary] [open] [<results-root-path>]`
+- **Invoke:** `/insecure-patterns` — arguments: `[summary] [open]`
 - **Skill:** [harnessing/insecure-patterns/SKILL.md](../harnessing/insecure-patterns/SKILL.md)
 
 ## loc-dashboard
