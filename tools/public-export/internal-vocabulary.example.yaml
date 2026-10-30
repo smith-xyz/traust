@@ -1,4 +1,3 @@
-#
 # Organization-specific vocabulary for `scan_internal_refs`.
 #
 # The scanner's UNIVERSAL rules live in code: credential shapes (PEM headers,
@@ -9,17 +8,17 @@
 # The rules BELOW are different: their patterns name one organization's hosts,
 # tools, trackers and products. That vocabulary is itself disclosure -- a
 # scanner shipping a list of an organization's internal tool names has
-# published that list. So it lives here, in config, not in the scanner.
+# published that list. So it lives in your own file, not in the scanner.
 #
 # THIS FILE IS AN EXAMPLE. Its values use RFC 2606's reserved .invalid TLD and
 # obviously-fake tokens, so they can never match a real host -- or this repo's
 # own example.com test fixtures, which an earlier draft using example.com did,
 # producing 48 phantom hits against the harness itself.
 #
-# Copy it to your deployment config dir as internal-vocabulary.yaml and
-# replace the values, or point the scanner at a file directly:
+# Copy it beside your export tooling, replace the values, and point the
+# scanner at it:
 #
-#     scan_internal_refs --vocabulary path/to/yours.yaml
+#     traust admin scan-internal-refs --vocabulary path/to/yours.yaml
 #     HARNESS_INTERNAL_VOCABULARY=path/to/yours.yaml
 #
 # A missing or malformed file is a hard error. A scanner quietly running with

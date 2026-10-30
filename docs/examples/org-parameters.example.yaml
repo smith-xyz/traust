@@ -1,4 +1,5 @@
-# Template for $TRAUST_CONFIG_HOME/org-parameters.yaml — copy there and edit.
+# Example org parameters: keep yours in your own repository and record them with
+# `traust compliance policy org-parameters <file>` (each recording is the next version).
 # The harness never reads this example at run time.
 #
 # Organization-defined parameters (ODPs), schema-gated by the contracts

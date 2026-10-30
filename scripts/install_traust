@@ -3,8 +3,8 @@
 #
 # The harness reads its configuration from ONE file, traust.yaml, in the
 # directory named by the environment variable TRAUST_CONFIG_HOME (beside it:
-# model-registry.yaml and any adopter-fact files you record). Tool pins,
-# safe-exec profiles and the feeds registry ship with traust-core. This script:
+# model-registry.yaml). Tool pins, safe-exec profiles and the feeds registry ship
+# with traust-core; adopter facts are recorded into it (config/README.md). This script:
 #
 #   1. asks where TRAUST_CONFIG_HOME should be (default: ~/.traust/config),
 #   2. creates it and copies config/traust.example.yaml in as traust.yaml, plus

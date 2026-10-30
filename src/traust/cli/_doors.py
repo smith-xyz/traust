@@ -7,15 +7,16 @@ import json
 import sys
 import uuid
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import ValidationError as ModelValidationError
 from traust_core.v1.errors import NotFoundError, TraustError, ValidationError
+from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.inventory import Product, RefName, RepositoryRef
 from traust_core.v1.models.operations import JobResult, Outcome
 from traust_core.v1.models.values import GitSha, ProductSlug
-from traust_core.v1.models.vocabulary import Ecosystem, RefKind
+from traust_core.v1.models.vocabulary import Ecosystem, RefKind, SourceType
 
 from traust.context import add_config_home_arg
 
@@ -42,6 +43,13 @@ def register_commit(
     decides the default line from the forge-observed default branch name."""
     name, kind = (RefName(branch), RefKind.BRANCH) if branch else (None, None)
     return services.portfolio.register_ref(repository_id, GitSha.parse(sha), name, kind)
+
+
+def interactive() -> Provenance:
+    """The provenance of a document a person hands in at the command line, now."""
+    return Provenance(
+        run_id=uuid.uuid4(), source=SourceType.INTERACTIVE, occurred_at=datetime.now(UTC)
+    )
 
 
 def when(raw: str | None) -> datetime | None:

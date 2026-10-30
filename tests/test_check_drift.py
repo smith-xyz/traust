@@ -4,9 +4,16 @@ The rest of drift-watch is traust-core's freshness view (core's tests)."""
 import json
 
 import pytest
+import yaml
+from traust_core.v1.models.artifacts import (
+    AdrRegistryArtifact,
+    OrgParametersArtifact,
+    SlaPolicyArtifact,
+)
 
+from traust.cli import _doors
 from traust.cli import check_drift as pc
-from traust.context import load
+from traust.context import SLA_POLICY, load
 from traust.paths import OPENGREP_RULES_DIR
 
 
@@ -22,59 +29,94 @@ def _unreachable(*a, **k):
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    """An empty config home of the test's own."""
+    """A config home of the test's own, on its own store."""
     path = tmp_path / "config-home"
     path.mkdir()
+    (path / "traust.yaml").write_text(f"home: {tmp_path / 'store'}\n")
     monkeypatch.setenv("TRAUST_CONFIG_HOME", str(path))
     return path
 
 
-def test_adr_registry_pending_then_checked(home, monkeypatch):
-    assert pc.check_adr_registry()[0]["status"] == "pending"
-    (home / "adr-registry.yaml").write_text(
-        "registers:\n  - {name: arch, repo: https://x/y.git, pin: aaaa1111}\n"
-        "  - {name: local, repo: file:///etc, pin: aaaa}\n"
+@pytest.fixture
+def services(home):
+    return load().services()
+
+
+def _adr_registry(services, *registers: dict) -> None:
+    doc = AdrRegistryArtifact.from_document({"version": 1, "registers": list(registers)})
+    services.compliance.record(doc, _doors.interactive())
+
+
+def test_adr_registry_pending_then_checked(services, monkeypatch):
+    assert pc.check_adr_registry(services)[0]["status"] == "pending"
+    _adr_registry(
+        services,
+        {"name": "arch", "repo": "https://x/y.git", "paths": ["adr"], "pin": "aaaa1111"},
+        {"name": "local", "repo": "file:///etc", "paths": ["adr"], "pin": "aaaa222"},
     )
     _remote(monkeypatch, "bbbb2222")
-    rows = {r["item"]: r for r in pc.check_adr_registry()}
+    rows = {r["item"]: r for r in pc.check_adr_registry(services)}
     assert rows["adr-registry:arch"]["status"] == "stale"
     assert "superseded" in rows["adr-registry:arch"]["detail"]
     assert rows["adr-registry:local"]["status"] == "unavailable"
     _remote(monkeypatch, "aaaa1111ffff")
-    assert pc.check_adr_registry()[0]["status"] == "fresh"
+    assert pc.check_adr_registry(services)[0]["status"] == "fresh"
     monkeypatch.setattr(pc.subprocess, "run", _unreachable)
-    assert pc.check_adr_registry()[0]["status"] == "unavailable"
+    assert pc.check_adr_registry(services)[0]["status"] == "unavailable"
 
 
-def test_adr_registry_without_registers_is_unavailable(home):
-    (home / "adr-registry.yaml").write_text("registers: []\n")
-    assert pc.check_adr_registry() == [
-        pc.item("adr-registry", "unavailable", "registry has no registers")
-    ]
+def test_the_newest_recorded_adr_registry_is_checked(services, monkeypatch):
+    register = {"name": "arch", "repo": "https://x/y.git", "paths": ["adr"], "pin": "aaaa1111"}
+    _adr_registry(services, register)
+    _adr_registry(services, {**register, "pin": "bbbb2222"})
+    _remote(monkeypatch, "bbbb2222")
+    assert pc.check_adr_registry(services)[0]["status"] == "fresh"
 
 
-def test_provenance_review_due(home, tmp_path):
-    (home / "sla-policy.yaml").write_text("source: {retrieved: '2020-01-01'}\n")
-    (home / "org-parameters.yaml").write_text(f"declared_on: '{pc._now():%Y-%m-%d}'\n")
-    items = {i["item"]: i for i in pc.check_policy_provenance(tmp_path / "none")}
+def test_provenance_review_due(services, tmp_path):
+    doc = yaml.safe_load(SLA_POLICY.read_text())
+    doc["source"]["retrieved"] = "2020-01-01"
+    services.insight.record_sla_policy(SlaPolicyArtifact.from_document(doc), _doors.interactive())
+    params = {"version": 1, "declared_by": "the suite", "declared_on": f"{pc._now():%Y-%m-%d}"}
+    services.compliance.record(
+        OrgParametersArtifact.from_document(
+            {
+                **params,
+                "parameters": {
+                    "account_review_frequency_days": {
+                        "value": 90,
+                        "controls": ["nist-800-53-rev5:ac-2"],
+                    }
+                },
+            }
+        ),
+        _doors.interactive(),
+    )
+    items = {i["item"]: i for i in pc.check_policy_provenance(tmp_path / "none", services)}
     assert items["provenance:sla-policy"]["status"] == "review_due"
     assert "re-verify" in items["provenance:sla-policy"]["refresh"]
     assert items["provenance:org-parameters"]["status"] == "fresh"
     assert items["provenance:compliance-spine"]["status"] == "pending"
 
 
-def test_catalog_reviewed_dates_covered(home, tmp_path):
+def test_the_packs_sla_policy_is_dated_until_one_is_recorded(services, tmp_path):
+    items = {i["item"]: i for i in pc.check_policy_provenance(tmp_path, services)}
+    retrieved = yaml.safe_load(SLA_POLICY.read_text())["source"]["retrieved"]
+    assert items["provenance:sla-policy"]["detail"].startswith(f"dated {retrieved}")
+    assert items["provenance:org-parameters"]["status"] == "pending"
+
+
+def test_catalog_reviewed_dates_covered(services, tmp_path):
     comp = tmp_path / "compliance-data"
     comp.mkdir()
     (comp / "catalog-pci-dss-v4.yaml").write_text("reviewed: '2020-01-01'\nframework: pci-dss-v4\n")
     (comp / "catalog-gdpr-technical.yaml").write_text("framework: gdpr\n")
     (comp / "provenance.json").write_text("{not json")
-    items = {i["item"]: i for i in pc.check_policy_provenance(comp)}
+    items = {i["item"]: i for i in pc.check_policy_provenance(comp, services)}
     assert items["provenance:catalog-pci-dss"]["status"] == "review_due"
     assert items["provenance:catalog-soc2-tsc"]["status"] == "pending"
     assert items["provenance:catalog-gdpr"]["status"] == "unavailable"
     assert items["provenance:compliance-spine"]["status"] == "unavailable"
-    assert items["provenance:sla-policy"]["status"] == "pending"
 
 
 def test_framework_upstream_pin_check(tmp_path, monkeypatch):
@@ -120,7 +162,6 @@ def test_argus_pack_is_not_the_default_rules_source(home):
 
 def test_main_prints_every_row(home, tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(pc, "compliance_data_dir", lambda: tmp_path)
-    monkeypatch.setattr(pc, "load", lambda: None)
     monkeypatch.setattr(pc, "inputs_dir", lambda core: tmp_path / "inputs")
     monkeypatch.setattr(pc.subprocess, "run", _unreachable)
     assert pc.main([]) == 0

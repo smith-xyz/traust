@@ -42,6 +42,8 @@ def test_seed_org_parameters_validate_and_cover_registry_refs(which):
 
 def test_registry_template_validates():
     """The shipped template is schema-valid (the real registry is deployment config)."""
-    reg = yaml.safe_load((HARNESS_ROOT / "config" / "adr-registry.example.yaml").read_text())
+    reg = yaml.safe_load(
+        (HARNESS_ROOT / "docs" / "examples" / "adr-registry.example.yaml").read_text()
+    )
     jsonschema.validate(reg, _schema("adr-registry"))
     assert reg["registers"]

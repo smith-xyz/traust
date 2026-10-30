@@ -46,7 +46,7 @@ measurable (capability C1 of the roadmap;
 
 1. **Contamination rule.** The manifest
    (`$TRAUST_CONFIG_HOME/benchmark-targets.yaml`, kept in the deployment's
-   private config repository; template `config/benchmark-targets.example.yaml`)
+   private config repository; example `docs/examples/benchmark-targets.example.yaml`)
    is the answer key. It
    must never be readable from inside an audited checkout, audit agents must
    never be told they are being benchmarked (a prompted agent behaves

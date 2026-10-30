@@ -773,19 +773,24 @@ def phantom_skill_failures(repo: Path = REPO) -> list[str]:
 
 
 # --- config/ hygiene ---------------------------------------------------------
-# The open-source harness ships the model registry plus *.example.* templates
-# (traust.example.yaml and the adopter-fact templates; config/README.md). Anything else in
-# config/ is deployment data that leaked back in — the failure shape this
-# repo had before 2026-09-03, when corpus-config, product map, budget policy,
-# signing key and safe-exec profiles all sat here.
-CONFIG_SHIPPED = {"README.md", "model-registry.yaml"}
-CONFIG_EXAMPLE_RX = re.compile(r"^[a-z0-9-]+\.example\.[a-z]+$")
+# config/ ships the traust.yaml template, the model registry, the template for the one override
+# (rule_pack_allowlist) and its README (config/README.md). Anything else in config/ is
+# deployment data that leaked back in — the failure shape this repo had before 2026-09-03,
+# when corpus-config, product map, budget policy, signing key and safe-exec profiles all sat
+# here — or a template that belongs with its reader.
+CONFIG_SHIPPED = {
+    "README.md",
+    "traust.example.yaml",
+    "model-registry.yaml",
+    "rule-pack-allowlist.example.yaml",
+    "product-definitions-map.example.yaml",
+}
 
 
 def _estate_patterns() -> list[tuple[str, re.Pattern]] | None:
     """Block/review rules from scan_internal_refs — universal + the deployment
-    vocabulary in $TRAUST_CONFIG_HOME. None when no vocabulary is configured
-    (a CI checkout without a config home), in which case the estate-marker leg
+    vocabulary ($HARNESS_INTERNAL_VOCABULARY). None when no vocabulary is configured
+    (a CI checkout), in which case the estate-marker leg
     of the config check is skipped rather than run against a shipped list: a
     gate that carries the internal names it looks for has published them
     (2026-09-07 review §1)."""
@@ -815,18 +820,12 @@ def config_hygiene_failures(repo: Path = REPO) -> list[str]:
                 "(operational config belongs in $TRAUST_CONFIG_HOME)"
             )
             continue
-        if f.name not in CONFIG_SHIPPED and not CONFIG_EXAMPLE_RX.match(f.name):
+        if f.name not in CONFIG_SHIPPED:
             failures.append(
-                f"config/{f.name}: not a shipped file or a *.example.* "
-                "template -- operational config belongs in $TRAUST_CONFIG_HOME"
+                f"config/{f.name}: not one of {', '.join(sorted(CONFIG_SHIPPED))} -- "
+                "operational config belongs in $TRAUST_CONFIG_HOME, adopter facts are "
+                "recorded, and a template lives beside its reader (config/README.md)"
             )
-            continue
-        if f.name == "internal-vocabulary.example.yaml":
-            # The template IS a vocabulary: its placeholder patterns match
-            # their own literal text. When an adopter's config home was
-            # installed from the templates (export dry-run 2026-09-08), the
-            # active vocabulary is this file and the leg flagged it against
-            # itself. The scrub scanner skips vocabulary files the same way.
             continue
         try:
             text = f.read_text(encoding="utf-8", errors="replace")
@@ -1213,7 +1212,7 @@ CHECKS = [
     ("single rule pack (rules live only in packs/security/detection/)", rule_pack_copy_failures),
     ("generated skills reference (docs/skills.md matches the tree)", skills_reference_failures),
     (
-        "config/ hygiene (shipped files + templates only, no estate markers)",
+        "config/ hygiene (the shipped set only, no estate markers)",
         config_hygiene_failures,
     ),
     ("count drift", count_failures),

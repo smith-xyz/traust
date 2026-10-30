@@ -1,5 +1,8 @@
 """``traust dashboard view``: publish one traust-core insight view for a scope and write its
-`<stem>.{md,html,json}`; core builds and renders it and stores nothing."""
+`<stem>.{md,html,json}`; core builds and renders it and stores nothing.
+
+``traust dashboard sla-policy``: record the deployment's SLA policy, the SLA view's from then on
+over the security pack's default."""
 
 from __future__ import annotations
 
@@ -8,7 +11,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import yaml
 from traust_core.v1.context import Context
+from traust_core.v1.models.artifacts import SlaPolicyArtifact
 from traust_core.v1.models.common import TimeBucket, TimeWindow
 from traust_core.v1.models.insight import ViewFilter, ViewName
 
@@ -38,7 +43,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--out", type=Path, required=True, help="the folder the view is written to")
     ap.add_argument(
-        "--sla-policy", type=Path, help="the sla view's policy (default: the config home's)"
+        "--sla-policy",
+        type=Path,
+        help="the sla view's policy for this run (default: the recorded one, else the pack's)",
     )
     ap.add_argument(
         "--invoice",
@@ -64,6 +71,19 @@ def main(argv: list[str] | None = None) -> int:
         written = write_view(rendered, args.out / rendered.stem, model=True)
         model = rendered.model.model_dump(mode="json")
         return {"written": [str(p) for p in written], "model": model}
+
+    return run(call)
+
+
+def sla_policy(argv: list[str] | None = None) -> int:
+    ap = parser("dashboard", "sla-policy", "Record the deployment's SLA policy.")
+    ap.add_argument("policy", type=Path, help="an sla-policy document (YAML)")
+    args = ap.parse_args(argv)
+
+    def call() -> dict[str, Any]:
+        doc = SlaPolicyArtifact.from_document(yaml.safe_load(args.policy.read_text()))
+        insight = load(args.config_home).services().insight
+        return {"artifact_id": insight.record_sla_policy(doc, _doors.interactive()).artifact_id}
 
     return run(call)
 

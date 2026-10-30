@@ -20,7 +20,7 @@ from traust_core.v1.models.artifacts import BenchmarkTargetArtifact
 
 from traust.cli import recall
 
-EXAMPLE = Path(__file__).parents[1] / "config" / "benchmark-targets.example.yaml"
+EXAMPLE = Path(__file__).parents[1] / "docs" / "examples" / "benchmark-targets.example.yaml"
 RECORDED = uuid.uuid4()
 
 
