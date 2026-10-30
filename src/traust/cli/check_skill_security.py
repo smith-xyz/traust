@@ -197,10 +197,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
     "mode is a deployment setting (traust.yaml `execution.sandbox`); a "
     "configured podman mode is never silently downgraded (ToB plan item 3)",
     # --- S6 tmp-paths ---
-    (
-        "S6",
-        "harnessing/rbac-tenancy-rollup/scripts/rbac_bucket_proposal_check.py",
-    ): "P3 hardening batch — non-secret scratch file, fixed /tmp name",
     # --- S7 unpinned-install ---
     # --- S8 egress-grants ---
 }
