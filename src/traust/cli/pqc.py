@@ -13,8 +13,6 @@ vendor-claims  the next version of the curated vendor PQC claims (`dashboard vie
 from __future__ import annotations
 
 import argparse
-import uuid
-from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
@@ -25,13 +23,11 @@ from traust_core.v1.models.artifacts import (
     PqcReadinessArtifact,
     PqcVendorClaimsArtifact,
 )
-from traust_core.v1.models.common import Provenance
 from traust_core.v1.models.pqc import PqcDimension, PqcFilter
 from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import (
     PqcReadinessBucket,
     PqcRemediationCategory,
-    SourceType,
 )
 
 from traust.cli import _doors
@@ -57,12 +53,6 @@ def _register(core: Context, args: argparse.Namespace) -> UUID:
     return ref.id
 
 
-def _provenance() -> Provenance:
-    return Provenance(
-        run_id=uuid.uuid4(), source=SourceType.INTERACTIVE, occurred_at=datetime.now(UTC)
-    )
-
-
 def _find(core: Context, repo_url: str, sha: str) -> UUID:
     portfolio = core.services().portfolio
     repo = portfolio.find_repository(HttpsRepoUrl.parse(repo_url, core.config.forge_hosts))
@@ -84,7 +74,7 @@ def record(argv: list[str] | None = None) -> int:
     def call() -> str:
         core = load(args.config_home)
         ref_id = _register(core, args)
-        source = _provenance()
+        source = _doors.interactive()
         pqc = core.services().pqc
         if args.facts is not None:
             done = pqc.record(ref_id, PqcFactsArtifact.parse(args.facts.read_bytes()), source)
@@ -206,7 +196,7 @@ def vendor_claims(argv: list[str] | None = None) -> int:
 
     def call() -> str:
         doc = PqcVendorClaimsArtifact.parse(args.claims.read_bytes())
-        recorded = load(args.config_home).services().pqc.record_claims(doc, _provenance())
+        recorded = load(args.config_home).services().pqc.record_claims(doc, _doors.interactive())
         return recorded.model_dump_json(indent=2)
 
     return run(call)

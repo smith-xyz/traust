@@ -1,5 +1,6 @@
-# Template for $TRAUST_CONFIG_HOME/adr-registry.yaml — copy there and edit.
-# The harness never reads this example at run time.
+# Example ADR registry: keep yours in your own repository and record it with
+# `traust compliance policy adr-registry <file>`. The harness never reads this example at run
+# time.
 #
 # Architecture-decision-record registers, schema-gated by the contracts
 # adr-registry.schema.json (checked through traust-core). Record it with `traust compliance policy

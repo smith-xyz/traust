@@ -57,6 +57,9 @@ def _resolve_progress_tracker() -> Path:
     encoding="utf-8",
 )
 os.environ["TRAUST_CONFIG_HOME"] = str(_TEST_HOME)
+os.environ["HARNESS_INTERNAL_VOCABULARY"] = str(
+    Path(__file__).parent / "fixtures" / "public-export" / "internal-vocabulary.yaml"
+)
 os.environ["HARNESS_TEST_FIXTURE_CONFIG"] = "1"
 
 # Isolated HOME: core's default store (~/.traust) and anything else keyed on

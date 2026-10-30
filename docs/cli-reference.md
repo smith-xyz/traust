@@ -30,7 +30,7 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `cloud-config` | The cloud-config-audit skill's doors on traust-core | `check`, `record`, `run` |
 | `compliance` | compliance-check doors on traust-core (posture: `dashboard view compliance`) | `adrs`, `calibrate`, `check`, `declare`, `evaluate`, `evidence`, `latest`, `policy`, `record`, `resolve`, `scopes` |
 | `config` | The config home's one file, `traust.yaml`: `migrate <old home>` writes it from a pre-traust.yaml home and reports every file (carried, dropped, a fact to record with its command) | `migrate` |
-| `dashboard` | Dashboard rebuilds, the team report and one insight view | `refresh`, `team-report`, `view` |
+| `dashboard` | Dashboard rebuilds, the team report, one insight view and the recorded SLA policy | `refresh`, `sla-policy`, `team-report`, `view` |
 | `feeds` | Security feed snapshots (traust-core) and the product-definitions cache | `fetch`, `fetch-products` |
 | `findings` | track-findings' and findings-db's doors on traust-core | `apply`, `baseline`, `confirm`, `decide`, `find`, `history`, `import`, `queue`, `record`, `refuted`, `reject`, `request`, `review-cases`, `sarif`, `status`, `summary`, `surfaces`, `tickets`, `timeline` |
 | `impact` | Impact analysis; `manifest-sbom` is the `manifest_sbom` materializer, `below-range-scan` the `below_range_packets` one, `below-range-review` / `below-range-record` the review lane's doors | `analyze`, `below-range`, `below-range-record`, `below-range-review`, `below-range-scan`, `calibrate-rule-pack`, `cluster-state-diff`, `document`, `enrich`, `find`, `manifest-sbom`, `package`, `sbom`, `sweep`, `symbols` |

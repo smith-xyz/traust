@@ -22,6 +22,7 @@ from traust_core.v1.models.insight import FindingsTrend, RenderedView, ViewFilte
 
 from tests.test_products_doors import _postgres
 from traust.cli import dashboard_view
+from traust.context import SLA_POLICY
 
 ALPHA = SimpleNamespace(id=uuid.uuid4(), slug="alpha", name="Alpha")
 TEAM = uuid.uuid4()
@@ -267,33 +268,30 @@ def policies(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
     services = SimpleNamespace(insight=SimpleNamespace(publish=Door(RENDERED)))
 
     def build(self: Context) -> SimpleNamespace:
-        seen.append(self.sla_policy)
+        seen.append(self.sla_policy or self.default_sla_policy)
         return services
 
     monkeypatch.setattr(Context, "services", build)
     return seen
 
 
-SLA_TEMPLATE = Path(__file__).resolve().parents[1] / "config" / "sla-policy.example.yaml"
-
-
-def test_the_config_homes_sla_policy_is_registered(
+def test_the_packs_sla_policy_is_the_default_not_the_config_homes(
     policies: list[Any], home: Path, tmp_path: Path
 ) -> None:
-    (home / "sla-policy.yaml").write_text(SLA_TEMPLATE.read_text())
+    (home / "sla-policy.yaml").write_text(SLA_POLICY.read_text().replace("fedramp-rev5-", "home-"))
     rc, _ = run(home, "sla", "--out", str(tmp_path / "sla"))
     assert rc == 0
-    assert [p.policy_name for p in policies] == ["example-sla-policy"]
+    assert [p.policy_name for p in policies] == ["fedramp-rev5-ra-5"]
 
 
-def test_sla_policy_flag_wins_and_no_policy_registers_none(
+def test_sla_policy_flag_wins_over_the_default(
     policies: list[Any], home: Path, tmp_path: Path
 ) -> None:
     other = tmp_path / "other.yaml"
-    other.write_text(SLA_TEMPLATE.read_text().replace("example-sla-policy", "fedramp"))
+    other.write_text(SLA_POLICY.read_text().replace("fedramp-rev5-ra-5", "fedramp"))
     assert run(home, "sla", "--sla-policy", str(other), "--out", str(tmp_path))[0] == 0
     assert run(home, "findings-trend", "--out", str(tmp_path))[0] == 0
-    assert [p and p.policy_name for p in policies] == ["fedramp", None]
+    assert [p.policy_name for p in policies] == ["fedramp", "fedramp-rev5-ra-5"]
 
 
 @pytest.mark.parametrize("policy", ["missing.yaml", "invalid.yaml"])

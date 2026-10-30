@@ -8,7 +8,7 @@ release, not just once.
 
 Universal rules (credential shapes, RFC1918, cloud identifiers) are compiled
 in. The rules that name YOUR hosts, tools, trackers and products come from
-$TRAUST_CONFIG_HOME/internal-vocabulary.yaml — see --vocabulary. That split is not a
+your vocabulary file — see --vocabulary. That split is not a
 convenience: a scanner shipping a list of an organization's internal tool
 names has published that list.
 
@@ -176,15 +176,15 @@ RULES: tuple[tuple[str, str, str, str], ...] = (
 # The rules that name an organization's hosts, tools, trackers and products are
 # NOT universal, and the vocabulary is itself the disclosure it detects -- a
 # scanner shipping a list of internal tool names has published that list. Those
-# live in the DEPLOYMENT config dir as internal-vocabulary.yaml (the harness
-# ships only config/internal-vocabulary.example.yaml) and are loaded here.
+# live with the deployment (the harness ships only the template,
+# tools/public-export/internal-vocabulary.example.yaml) and are loaded here.
 #
-# Order: --vocabulary > HARNESS_INTERNAL_VOCABULARY > config_path("internal-vocabulary.yaml")
+# Order: --vocabulary > HARNESS_INTERNAL_VOCABULARY
 #
 # Missing or malformed fails LOUDLY. A scanner that quietly runs with fewer
 # rules than you think reports "clean" for the wrong reason, which is worse
 # than not running.
-from traust.paths import optional_config_path  # noqa: E402
+from traust.context import internal_vocabulary  # noqa: E402
 
 _VALID_TIERS = ("block", "review", "note")
 
@@ -194,9 +194,7 @@ class VocabularyError(RuntimeError):
 
 
 def vocabulary_path(explicit: str | None = None) -> Path | None:
-    if explicit:
-        return Path(explicit)
-    return optional_config_path("internal-vocabulary.yaml")
+    return Path(explicit) if explicit else internal_vocabulary()
 
 
 def load_vocabulary(explicit: str | None = None) -> tuple[tuple[str, str, str, str], ...]:
@@ -205,10 +203,9 @@ def load_vocabulary(explicit: str | None = None) -> tuple[tuple[str, str, str, s
     if path is None or not path.is_file():
         raise VocabularyError(
             f"vocabulary not found: {path}\n"
-            "Set HARNESS_INTERNAL_VOCABULARY, pass --vocabulary, or put "
-            "internal-vocabulary.yaml in your deployment config dir. The shipped "
-            "config/internal-vocabulary.example.yaml is a generic template and "
-            "matches nothing real."
+            "Pass --vocabulary or set HARNESS_INTERNAL_VOCABULARY. The shipped "
+            "tools/public-export/internal-vocabulary.example.yaml is a generic "
+            "template and matches nothing real."
         )
     try:
         import yaml
@@ -383,10 +380,8 @@ def main(argv=None) -> int:
     ap.add_argument(
         "--vocabulary",
         metavar="PATH",
-        help="organization vocabulary YAML (default: "
-        "$HARNESS_INTERNAL_VOCABULARY, else "
-        "$TRAUST_CONFIG_HOME/internal-vocabulary.yaml, which is a generic "
-        "example and matches nothing real)",
+        help="organization vocabulary YAML (default: $HARNESS_INTERNAL_VOCABULARY; "
+        "template: tools/public-export/internal-vocabulary.example.yaml)",
     )
     args = ap.parse_args(argv)
 

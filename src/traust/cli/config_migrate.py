@@ -34,13 +34,11 @@ FACTS = {
     "org-parameters.yaml": "traust compliance policy org-parameters {path}",
     "adr-registry.yaml": "traust compliance policy adr-registry {path}",
     "benchmark-targets.yaml": "traust sweep benchmark-targets {path}",
+    "sla-policy.yaml": "traust dashboard sla-policy {path}",
 }
 KEPT = {
     "model-registry.yaml": "read from the config home as today",
-    "sla-policy.yaml": "read from the config home until the pack ships the default",
     "product-definitions-map.yaml": "read by `traust registry products` (--map)",
-    "internal-vocabulary.yaml": "export tooling input (`traust admin scan-internal-refs`)",
-    "export.yaml": "export tooling input, not runtime config",
 }
 RETIRED = {
     "corpus-config.yaml": "no reader",
@@ -51,6 +49,9 @@ RETIRED = {
     "rpm-distgit-watch.yaml": "its feeder was deleted",
     "jira-sync.yaml": "moves into traust-internal's file-security-defect skill",
     "escalation-contacts-share.yaml": "moves into traust-internal records/",
+    "internal-vocabulary.yaml": "public-export tooling input: keep it beside your export and "
+    "pass it with `traust admin scan-internal-refs --vocabulary` (tools/public-export/)",
+    "export.yaml": "public-export tooling input, not runtime config (tools/public-export/)",
 }
 _LEDGER_KEYS = ("key_path", "required")
 

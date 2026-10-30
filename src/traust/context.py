@@ -24,11 +24,11 @@ from traust_core.v1.context.config import CONFIG_FILE
 from traust_core.v1.errors import AuthenticationError, ConfigError, DeploymentConfigMissing
 from traust_core.v1.models.identity import Credential, Principal
 
-from traust.paths import GITLEAKS_CONFIG, HARNESSING_DIR, OPENGREP_RULES_DIR
+from traust.paths import GITLEAKS_CONFIG, HARNESSING_DIR, OPENGREP_RULES_DIR, SECURITY_PACK_DIR
 
 T = TypeVar("T")
 
-SLA_POLICY = "sla-policy.yaml"
+SLA_POLICY = SECURITY_PACK_DIR / "sla-policy.yaml"  # the default until one is recorded
 MODEL_REGISTRY = "model-registry.yaml"
 # Security-pack content (home: traust-pack-security): the pinned ATT&CK release and its mapping.
 _ATTACK = HARNESSING_DIR / "attack-coverage" / "tables"
@@ -66,6 +66,12 @@ ATLAS_TABLE = _ATTACK / "atlas-techniques.json"  # the pinned MITRE ATLAS releas
 # TRAUST_OIDC_CLIENT_SECRET
 #   A service account's client secret for ``traust auth service-account`` when no
 #   ``--client-secret-file`` is given. Consumed by :func:`oidc_client_secret`.
+#
+# HARNESS_INTERNAL_VOCABULARY
+#   The organization vocabulary the pre-publication scrub (``traust admin scan-internal-refs``)
+#   and the config/ hygiene gate read when no ``--vocabulary`` is given. It names internal
+#   hosts and tools, so it lives with the deployment, never in config. Consumed by
+#   :func:`internal_vocabulary`.
 #
 
 
@@ -105,21 +111,20 @@ def load(
 
     No ``traust.yaml``: core's defaults (SQLite and artifacts under ``~/.traust``), the zero-setup
     laptop install. The ATT&CK coverage view is built on the pack's pinned tables; the SLA view on
-    ``sla_policy``, else on ``<config home>/sla-policy.yaml`` when there is one (template:
-    config/sla-policy.example.yaml); the spend view on the home's model registry when there is
-    one, reconciled against ``invoices``. The tools read the pins and safe-exec profiles
-    traust-core ships; detection quality scores the rule pack (``rule_pack``, else
-    :func:`_rule_pack`, with ``overrides.rule_pack_allowlist``) against canaries from
-    ``recall-benchmark/<canaries>`` and stages rule drafts in ``rule_drafts``, else
+    ``sla_policy``, else on the recorded policy, else on the pack's default; the spend view on
+    the home's model registry when there is one, reconciled against ``invoices``. The tools read
+    the pins and safe-exec profiles traust-core ships; detection quality scores the rule pack
+    (``rule_pack``, else :func:`_rule_pack`, with ``overrides.rule_pack_allowlist``) against
+    canaries from ``recall-benchmark/<canaries>`` and stages rule drafts in ``rule_drafts``, else
     ``locations.rule_drafts`` when one resolves.
     """
     home = resolve_config_home(config_home)
-    sla = sla_policy or (home / SLA_POLICY if home is not None else None)
     core = _guarded(CONFIG_FILE, lambda: Context(_with_bundled_rules(Config.from_home(home))))
     _guarded("ATT&CK catalog", lambda: core.register_attack_catalog(*ATTACK_TABLES))
     _guarded("ATLAS catalog", lambda: core.register_atlas_catalog(ATLAS_TABLE))
-    if sla is not None and (sla_policy is not None or sla.is_file()):
-        _guarded("SLA policy", lambda: core.register_sla_policy(sla))
+    _guarded("SLA policy", lambda: core.register_default_sla_policy(SLA_POLICY))
+    if sla_policy is not None:
+        _guarded("SLA policy", lambda: core.register_sla_policy(sla_policy))
     if home is not None and (home / MODEL_REGISTRY).is_file():
         _register_spend(core, home / MODEL_REGISTRY, invoices)
     elif invoices is not None:
@@ -194,6 +199,11 @@ def load_caller(core: Context) -> Principal:
 def oidc_client_secret() -> str | None:
     raw = os.environ.get("TRAUST_OIDC_CLIENT_SECRET", "").strip()
     return raw or None
+
+
+def internal_vocabulary() -> Path | None:
+    raw = os.environ.get("HARNESS_INTERNAL_VOCABULARY", "").strip()
+    return Path(raw).expanduser() if raw else None
 
 
 def add_config_home_arg(parser) -> None:

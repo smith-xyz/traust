@@ -16,7 +16,7 @@ def test_universal_rules_carry_no_org_vocabulary():
     try:
         vocab = S.load_vocabulary()
     except S.VocabularyError:
-        pytest.skip("no deployment vocabulary configured (TRAUST_CONFIG_HOME)")
+        pytest.skip("no deployment vocabulary configured (HARNESS_INTERNAL_VOCABULARY)")
     blob = " ".join(f"{r[0]} {r[2]} {r[3]}" for r in S.RULES).lower()
     import re as _re
 
@@ -63,7 +63,12 @@ def test_shipped_example_matches_nothing_in_this_repo():
     explicitly: the default now resolves the deployment vocabulary."""
     from pathlib import Path
 
-    example = Path(S.__file__).resolve().parents[3] / "config" / "internal-vocabulary.example.yaml"
+    example = (
+        Path(S.__file__).resolve().parents[3]
+        / "tools"
+        / "public-export"
+        / "internal-vocabulary.example.yaml"
+    )
     vocab = S.load_vocabulary(str(example))
     assert len(vocab) == 10
     for rid, tier, pat, _why in vocab:
@@ -104,7 +109,12 @@ def test_a_config_rule_may_not_shadow_a_universal_one(tmp_path):
 def test_all_rules_is_universal_plus_vocabulary():
     from pathlib import Path
 
-    example = Path(S.__file__).resolve().parents[3] / "config" / "internal-vocabulary.example.yaml"
+    example = (
+        Path(S.__file__).resolve().parents[3]
+        / "tools"
+        / "public-export"
+        / "internal-vocabulary.example.yaml"
+    )
     vocab = S.load_vocabulary(str(example))
     assert len(S.all_rules(str(example))) == len(S.RULES) + len(vocab)
 

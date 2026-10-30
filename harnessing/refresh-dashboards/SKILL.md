@@ -103,7 +103,7 @@ Ordering is the whole point:
 | `insecure-patterns` | — | *retired:* rendered by the `views` stage (`InsecurePatternsView`, core#301) |
 | `validation-fuzz` | — | *retired:* rendered by the `views` stage (`ValidationFuzzView`) |
 | `rbac-tenancy` | — | *retired (with its skill):* the `views` stage renders the rollup (`FindingsRollupView`), category-scoped on demand via `ViewFilter.categories`; the axis taxonomy returns with Q5 |
-| `sla` | — | *retired:* rendered by the `views` stage (`SlaView`, once `sla-policy.yaml` is in the config home) |
+| `sla` | — | *retired:* rendered by the `views` stage (`SlaView`, on the recorded SLA policy, else the security pack's) |
 | `compliance` | — | *retired:* rendered by the `views` stage (`ComplianceDashboardView`) |
 | `attack-coverage` | — | *retired:* rendered by the `views` stage (`AttackCoverageView`) |
 | `loc` | — | *retired:* rendered by the `views` stage (`LocView`) |

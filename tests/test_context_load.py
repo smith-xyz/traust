@@ -26,7 +26,6 @@ def core(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Context]:
     home = tmp / "config"
     shutil.copytree(ROOT / "tests" / "fixtures" / "config", home)
     (home / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp / "store")}))
-    shutil.copy(ROOT / "config" / "sla-policy.example.yaml", home / "sla-policy.yaml")
     with pytest.MonkeyPatch.context() as mp:
         mp.setenv("XDG_CACHE_HOME", str(tmp / "cache"))
         yield load(home)
@@ -41,7 +40,7 @@ PROVIDERS: dict[str, Callable[[Context], Any]] = {
     "docs source": lambda c: c.doc_source,
     "fleet-fix applier": lambda c: c.fleet_fix_applier,
     "fleet-fix goldens": lambda c: c.fleet_fix_goldens,
-    "sla policy": lambda c: c.sla_policy,
+    "sla policy": lambda c: c.default_sla_policy,
     "attack catalog": lambda c: c.attack_catalog,
 }
 

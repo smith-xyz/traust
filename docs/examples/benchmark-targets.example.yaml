@@ -1,5 +1,5 @@
-# Template for $TRAUST_CONFIG_HOME/benchmark-targets.yaml — copy there and
-# edit. The harness never reads this example at run time.
+# Example recall-benchmark answer key: keep yours in a private repository and record it with
+# `traust sweep benchmark-targets <file>`. The harness never reads this example at run time.
 #
 # Recall-benchmark manifest: the ANSWER KEY for /recall-benchmark. Keep the
 # real file in a private config repository: an audit agent must never read

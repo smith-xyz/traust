@@ -20,9 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any, TypeVar
@@ -39,7 +37,7 @@ from traust_core.v1.models.artifacts import (
     OrgParametersArtifact,
 )
 from traust_core.v1.models.code_facts import CryptoFact
-from traust_core.v1.models.common import PageRequest, Provenance
+from traust_core.v1.models.common import PageRequest
 from traust_core.v1.models.compliance import (
     CLOUD_INVENTORY,
     CRYPTO_AUDIT,
@@ -55,7 +53,6 @@ from traust_core.v1.models.vocabulary import (
     ComplianceEvidenceKind,
     ComplianceFramework,
     ComplianceTargetKind,
-    SourceType,
 )
 
 from traust.cli import _doors
@@ -153,12 +150,6 @@ def _load(path: Path, build: Callable[[Any], T] = lambda raw: raw) -> T:
         raise ValidationError(f"{path}: {e}") from e
 
 
-def _provenance() -> Provenance:
-    return Provenance(
-        run_id=uuid.uuid4(), source=SourceType.INTERACTIVE, occurred_at=datetime.now(UTC)
-    )
-
-
 def _csv(raw: str | None) -> tuple[str, ...]:
     return tuple(v.strip() for v in (raw or "").split(",") if v.strip())
 
@@ -173,7 +164,7 @@ def policy(argv: list[str] | None = None) -> int:
 
     def call() -> dict:
         doc = POLICY[args.kind].from_document(yaml.safe_load(args.document.read_text()))
-        published = load(args.config_home).services().compliance.record(doc, _provenance())
+        published = load(args.config_home).services().compliance.record(doc, _doors.interactive())
         return {"artifact_id": published.artifact_id}
 
     return run(call)
@@ -306,7 +297,7 @@ def record(argv: list[str] | None = None) -> int:
 
     def call() -> str:
         services = load(args.config_home).services()
-        recorded = services.compliance.record(_assessment(args.assessment), _provenance())
+        recorded = services.compliance.record(_assessment(args.assessment), _doors.interactive())
         return recorded.model_dump_json(indent=2)
 
     return run(call)

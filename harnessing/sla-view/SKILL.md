@@ -23,11 +23,10 @@ not whether we shipped them lists.
 ## The one rule that matters
 
 **SLAs are policy data, never code.** The default policy is the
-deployment's `sla-policy.yaml` in the config home (template:
-`config/sla-policy.example.yaml`; gated by
+deployment's, recorded with `traust dashboard sla-policy <file>` (until one
+is recorded: the security pack's `packs/security/sla-policy.yaml`; gated by
 `contracts/schemas/sla-policy.schema.json`, provenance + retrieval date
-inside). With no policy there and no `--sla-policy`, the view is not built
-(`view 'sla' is not built`, exit 2); it never falls back to placeholder SLAs.
+inside). It never falls back to placeholder SLAs.
 Different SLAs — customer contracts, per-BU policies — are a different
 file passed with `--sla-policy`, never an edit to the script. The
 severity mapping (PSIRT Important→high, Moderate→medium, Low→low) is
@@ -100,7 +99,7 @@ harness enum are different languages and the join must stay auditable.
 ## Integrations
 
 **Consumes:** traust-core's findings, decisions, Jira links and repository
-owners (`SlaView`); `$TRAUST_CONFIG_HOME/sla-policy.yaml`
+owners (`SlaView`); the recorded SLA policy, else `packs/security/sla-policy.yaml`
 (human-curated policy data); `analysis-results/feeds/product_definitions.json`
 (producer: python3 -m traust.cli feeds fetch-products, read via
 python3 -m traust.cli registry products) plus `$TRAUST_CONFIG_HOME/product-definitions-map.yaml`

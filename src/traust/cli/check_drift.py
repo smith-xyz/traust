@@ -23,13 +23,21 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from traust_core.v1.context import Services
+from traust_core.v1.models.artifacts import (
+    AdrRegistryArtifact,
+    ArtifactDocument,
+    OrgParametersArtifact,
+    SlaPolicyArtifact,
+)
 
-from traust.context import inputs_dir, load
-from traust.paths import SECURITY_PACK_DIR, optional_config_path
+from traust.context import SLA_POLICY, inputs_dir, load
+from traust.paths import SECURITY_PACK_DIR
 
 PROVENANCE_REVIEW_DAYS = 180
 DOCS_MAP_STALE_DAYS = 30
 _HTTPS_ONLY = {**os.environ, "GIT_ALLOW_PROTOCOL": "https"}
+MISSING = object()
 
 
 def item(name: str, status: str, detail: str, refresh: str | None = None) -> dict:
@@ -69,13 +77,23 @@ def _module_text(module: str) -> str | None:
     return origin.read_text(encoding="utf-8") if origin and origin.is_file() else None
 
 
-def check_adr_registry() -> list[dict]:
-    reg_p = optional_config_path("adr-registry.yaml")
-    if reg_p is None:
-        return [item("adr-registry", "pending", "not built yet (compliance Phase 2c)")]
-    reg = yaml.safe_load(reg_p.read_text(encoding="utf-8")) or {}
+def _recorded(services: Services, kind: type[ArtifactDocument]) -> dict | None:
+    doc = services.artifacts.latest(kind)
+    return None if doc is None else json.loads(doc.payload)
+
+
+def check_adr_registry(services: Services) -> list[dict]:
+    reg = _recorded(services, AdrRegistryArtifact)
+    if reg is None:
+        return [
+            item(
+                "adr-registry",
+                "pending",
+                "none recorded (traust compliance policy adr-registry <file>)",
+            )
+        ]
     out = []
-    for r in reg.get("registers") or []:
+    for r in reg["registers"]:
         name, url, pin = r.get("name"), r.get("repo"), r.get("pin")
         if not str(url).startswith("https://"):
             out.append(
@@ -103,7 +121,7 @@ def check_adr_registry() -> list[dict]:
             out.append(
                 item(f"adr-registry:{name}", "fresh", f"pin matches upstream HEAD ({head[:12]})")
             )
-    return out or [item("adr-registry", "unavailable", "registry has no registers")]
+    return out
 
 
 def _rules_pin(row: str, module: str, constant: str, branch: str, landed: str) -> list[dict]:
@@ -188,34 +206,44 @@ def check_framework_upstream(compliance: Path) -> list[dict]:
     return [item(row, "fresh", f"upstream HEAD matches the derivation pin ({head[:12]})")]
 
 
-def check_policy_provenance(compliance: Path) -> list[dict]:
-    targets: list[tuple[str, Path | None, Callable[[Any], Any]]] = [
-        (
-            "sla-policy",
-            optional_config_path("sla-policy.yaml"),
-            lambda d: (d.get("source") or {}).get("retrieved"),
-        ),
-        ("compliance-spine", compliance / "provenance.json", lambda d: d.get("retrieved")),
+def _file(path: Path) -> Any:
+    """The document at `path`; MISSING when absent, None when unreadable."""
+    if not path.is_file():
+        return MISSING
+    try:
+        text = path.read_text(encoding="utf-8")
+        return json.loads(text) if path.suffix == ".json" else yaml.safe_load(text)
+    except (OSError, json.JSONDecodeError, yaml.YAMLError):
+        return None
+
+
+def check_policy_provenance(compliance: Path, services: Services) -> list[dict]:
+    """Review dates of the policy data: the recorded SLA policy (else the pack's default) and
+    org parameters, and the pack's compliance spine and catalogs."""
+    sla = _recorded(services, SlaPolicyArtifact) or _file(SLA_POLICY)
+    targets: list[tuple[str, Any, Callable[[Any], Any]]] = [
+        ("sla-policy", sla, lambda d: (d.get("source") or {}).get("retrieved")),
+        ("compliance-spine", _file(compliance / "provenance.json"), lambda d: d.get("retrieved")),
         (
             "org-parameters",
-            optional_config_path("org-parameters.yaml"),
+            _recorded(services, OrgParametersArtifact) or MISSING,
             lambda d: d.get("declared_on"),
         ),
         # ids-only framework catalogs: no machine feed, so the review window IS the staleness
-        ("catalog-pci-dss", compliance / "catalog-pci-dss-v4.yaml", lambda d: d.get("reviewed")),
-        ("catalog-soc2-tsc", compliance / "catalog-soc2-tsc.yaml", lambda d: d.get("reviewed")),
-        ("catalog-gdpr", compliance / "catalog-gdpr-technical.yaml", lambda d: d.get("reviewed")),
+        *(
+            (name, _file(compliance / file), lambda d: d.get("reviewed"))
+            for name, file in (
+                ("catalog-pci-dss", "catalog-pci-dss-v4.yaml"),
+                ("catalog-soc2-tsc", "catalog-soc2-tsc.yaml"),
+                ("catalog-gdpr", "catalog-gdpr-technical.yaml"),
+            )
+        ),
     ]
     out = []
-    for name, path, getter in targets:
-        if path is None or not path.is_file():
-            out.append(item(f"provenance:{name}", "pending", "config absent"))
+    for name, doc, getter in targets:
+        if doc is MISSING:
+            out.append(item(f"provenance:{name}", "pending", "not recorded or absent"))
             continue
-        try:
-            text = path.read_text(encoding="utf-8")
-            doc = json.loads(text) if path.suffix == ".json" else yaml.safe_load(text)
-        except (OSError, json.JSONDecodeError, yaml.YAMLError):
-            doc = None
         dated = _parse_iso(getter(doc) or "") if isinstance(doc, dict) else None
         if dated is None:
             out.append(item(f"provenance:{name}", "unavailable", "no retrieval/declaration date"))
@@ -344,13 +372,15 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.parse_args(argv)
     compliance = compliance_data_dir()
+    core = load()
+    services = core.services()
     items = [
         *check_framework_upstream(compliance),
-        *check_policy_provenance(compliance),
-        *check_adr_registry(),
+        *check_policy_provenance(compliance, services),
+        *check_adr_registry(services),
         *check_yara_rules_pin(),
         *check_argus_rules_pin(),
-        *check_docs_product_map(inputs_dir(load())),
+        *check_docs_product_map(inputs_dir(core)),
     ]
     print(json.dumps({"items": items}, indent=2))
     return 0

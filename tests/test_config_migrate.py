@@ -102,3 +102,15 @@ def test_an_empty_home_is_the_zero_config_file(tmp_path: Path) -> None:
 
 def test_a_missing_home_is_exit_2(tmp_path: Path) -> None:
     assert config_migrate.main([str(tmp_path / "absent")]) == 2
+
+
+def test_moved_files_get_their_new_home(old: Path, capsys) -> None:
+    assert config_migrate.main([str(old)]) == 0
+    report = capsys.readouterr().out
+    for line in (
+        f"sla-policy.yaml: adopter fact, record it: traust dashboard sla-policy "
+        f"{old / 'sla-policy.yaml'}",
+        "internal-vocabulary.yaml: not migrated, public-export tooling input",
+        "--vocabulary` (tools/public-export/)",
+    ):
+        assert line in report
