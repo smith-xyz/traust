@@ -15,7 +15,7 @@ ARG TOOLS_IMAGE
 ARG TOOLCHAIN_HASH=unknown
 ARG VCS_REF=unknown
 # The continuous-ops service (`traust-engine run|claim`), installed beside traust, not into it.
-ARG TRAUST_ENGINE_SHA=fe9e9129e2e4682fc8b7d0040efe4fee7c748073
+ARG TRAUST_ENGINE_SHA=779471df5b9473bbf31cf0ad78d213f88bda9153
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal@sha256:c4c285d42941ebb2bd4da878479008e1e4536bb599aad1dbe568f89de9053661 AS app-builder
 RUN microdnf install -y --setopt=install_weak_deps=0 git tar gzip python3.11 python3.11-pip \
@@ -68,6 +68,7 @@ RUN chown -R 1001:1001 /opt/traust /opt/traust-engine
 # Harness skill data — the same payload the pre-split image shipped, now layered on top of the
 # tools base instead of installed alongside ad hoc scanner commands.
 COPY harnessing/ /harness/harnessing/
+COPY packs/      /harness/packs/
 COPY config/     /harness/config/
 COPY docs/       /harness/docs/
 COPY bin/        /harness/bin/
@@ -84,7 +85,10 @@ RUN python3.11 -c "from importlib.metadata import version as v; \
 print({n: v(n) for n in ('traust', 'traust-ledger', 'traust-contracts', 'traust-core')})" \
     && python3.11 -m traust.cli --help >/dev/null \
     && traust-engine --help >/dev/null \
-    && echo "runtime image verified: traust stack importable, CLIs run"
+    && TRAUST_CONFIG_HOME=/tmp/smoke-home python3.11 -c "from traust.context import load; \
+from traust.paths import OPENGREP_RULES_DIR as r; load(); \
+assert any(r.rglob('*.yaml')), f'no opengrep rules under {r}'" \
+    && echo "runtime image verified: traust stack importable, CLIs run, the pack loads"
 
 WORKDIR /workspace
 ENTRYPOINT ["python3.11", "-m", "traust.cli"]

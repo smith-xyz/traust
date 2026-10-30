@@ -106,12 +106,26 @@ def test_an_audited_fork_is_observed_kept_and_its_upstream_inventoried(home: Pat
         assert uow.repositories.find_by_url(REPO).upstream_id == upstream.id
 
 
-def test_a_never_audited_repository_succeeds_without_the_forge(
+def test_a_never_audited_repository_keeps_its_head_with_no_comparison(
     home: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     register(home, audited=False)
-    forge_api(monkeypatch, lambda *a, **k: pytest.fail("forge contacted"))
+    asked: list[str] = []
+
+    def get(host: str, endpoint: str, headers: Any = None) -> Any:
+        asked.append(endpoint)
+        return FORGE[endpoint]
+
+    forge_api(monkeypatch, get)
     assert observe(home, REPO)[0] == 0
+    assert asked == ["repos/org/app", "repos/org/app/branches/main"]
+    core = load(home)
+    repo = core.services().portfolio.find_repository(HttpsRepoUrl.parse(REPO, HOSTS))
+    assert repo is not None and repo.id is not None
+    head = core.services().portfolio.default_ref(repo.id)
+    assert head is not None and head.sha == "b" * 40
+    with core.repository_observation() as observation:
+        assert observation.query.repo_state(repo_url=REPO).status == "never-audited"
 
 
 def test_a_repository_outside_the_inventory_is_refused(home: Path) -> None:
