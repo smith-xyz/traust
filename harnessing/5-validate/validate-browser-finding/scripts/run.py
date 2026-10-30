@@ -18,7 +18,14 @@ from pathlib import Path
 from typing import ClassVar
 
 from adapter import BrowserAdapter, StepResult
-from scope import Scope
+from traust_core.v1.models.validation import (
+    BrowserTarget,
+    ValidationAction,
+    ValidationActionKind,
+    ValidationScope,
+    ValidationTarget,
+)
+from traust_core.v1.models.vocabulary import ScopeBindingMode
 
 try:
     import yaml
@@ -60,6 +67,44 @@ class ValidationConfig:
         )
 
 
+# --- Scope ---
+
+
+@dataclass
+class Targets:
+    """The targets.yaml scope; credentials stay here, never in the core scope document."""
+
+    scope: ValidationScope
+    credentials: dict[str, dict]
+
+    @classmethod
+    def from_file(cls, path: Path) -> Targets:
+        data = _load(path) or {}
+        meta = data.get("metadata", data.get("meta", {}))
+        expires = meta.get("expires") or data.get("expires")
+        browser = data.get("browser", [])
+        scope = ValidationScope(
+            engagement=meta.get("engagement") or data.get("engagement"),
+            authorized_by=meta.get("authorized_by") or data.get("authorized_by"),
+            environment=meta.get("environment") or data.get("environment", "lab"),
+            expires=dt.date.fromisoformat(expires) if isinstance(expires, str) else expires,
+            modes=frozenset({ScopeBindingMode.EXPLICIT}),
+            browser=tuple(
+                BrowserTarget(
+                    victim_origin=b["victim_origin"],
+                    attacker_origins=tuple(b.get("attacker_origins", ())),
+                    allowed_verbs=frozenset(b.get("allowed_verbs", ())),
+                )
+                for b in browser
+            ),
+        )
+        return cls(scope, {b["victim_origin"]: b.get("credentials", {}) for b in browser})
+
+    def credentials_for(self, url: str) -> dict:
+        target = next((t for t in self.scope.browser if t.matches_url(url)), None)
+        return self.credentials[target.victim_origin] if target else {}
+
+
 # --- Services ---
 
 
@@ -80,9 +125,9 @@ class AuditLog:
 class PlanExecutor:
     """Executes attack plan steps through the browser adapter."""
 
-    def __init__(self, adapter: BrowserAdapter, scope: Scope, audit: AuditLog):
+    def __init__(self, adapter: BrowserAdapter, targets: Targets, audit: AuditLog):
         self._adapter = adapter
-        self._scope = scope
+        self._targets = targets
         self._audit = audit
         self._done: dict[str, StepResult] = {}
 
@@ -137,8 +182,13 @@ class PlanExecutor:
         # checks still bind to the page actually being acted on.
         if not url:
             url = getattr(self._adapter, "current_url", "") or ""
-        in_scope, reason = self._scope.check(verb, url)
-        if not in_scope:
+        decision = self._targets.scope.decide(
+            ValidationAction(kind=ValidationActionKind.BROWSER, verb=verb),
+            ValidationTarget(url=url),
+            as_of=dt.date.today(),
+        )
+        if not decision.allowed:
+            reason = decision.reason
             self._audit.record(step_id=sid, verb=verb, verdict="blocked_by_scope", reason=reason)
             return StepResult(
                 step_id=sid,
@@ -153,7 +203,7 @@ class PlanExecutor:
         if (
             verb == "authenticate"
             and not step.get("payload")
-            and (creds := self._scope.credentials_for(url))
+            and (creds := self._targets.credentials_for(url))
         ):
             step["payload"] = creds
 
@@ -178,6 +228,8 @@ class PlanExecutor:
         return f"precondition failed: {','.join(failed)}" if failed else None
 
 
+# NEED(contracts: validation-adapter enum — browser kind): the enum is k8s/container/wasm, so this
+# report cannot be a core ValidationArtifact (recorded by `traust validation record`) yet.
 class ReportBuilder:
     """Builds structured validation report JSON."""
 
@@ -189,7 +241,7 @@ class ReportBuilder:
         "not_attempted",
     ]
 
-    def __init__(self, scope: Scope, name: str):
+    def __init__(self, scope: ValidationScope, name: str):
         self._scope = scope
         self._name = name
 
@@ -282,9 +334,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     config = ValidationConfig.from_args(args)
-    scope = Scope.from_file(config.targets_path)
+    targets = Targets.from_file(config.targets_path)
+    scope = targets.scope
 
-    if scope.is_expired:
+    if scope.expires and dt.date.today() > scope.expires:
         print("ERROR: engagement expired", file=sys.stderr)
         return 1
 
@@ -301,7 +354,7 @@ def main(argv: list[str] | None = None) -> int:
     print()
 
     with BrowserAdapter() as adapter:
-        executor = PlanExecutor(adapter, scope, audit)
+        executor = PlanExecutor(adapter, targets, audit)
         results = executor.run(plan.get("steps", []), artifacts_dir, destructive=config.destructive)
 
     report_path = ReportBuilder(scope, config.name).build(
