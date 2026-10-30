@@ -108,8 +108,8 @@ def test_every_asset_has_a_trigger_freshness_and_runner_labels() -> None:
 
 REGISTRY = Path(__file__).resolve().parents[1] / "config" / "model-registry.yaml"
 # What traust-engine's claim-once runner fills in: the order's id, its repository's URL, a
-# skill session's model role, and a routed order's rule.
-RUNNER_PARAMS = {"run_id", "repo_url", "role", "rule"}
+# skill session's model role, a routed order's rule, and the claiming worker.
+RUNNER_PARAMS = {"run_id", "repo_url", "role", "rule", "worker"}
 
 
 def test_every_skill_session_names_a_registry_role() -> None:

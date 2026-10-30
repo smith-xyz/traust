@@ -44,12 +44,45 @@ python3 -m traust.cli check skill-alignment      # equivalent
 | `remediation` | The remediation loop's doors on traust-core (remediate-finding, patch, property-test, fleet-fix, verify-remediation) | `assemble`, `candidates`, `fleet-approve`, `fleet-claim`, `fleet-record`, `fleet-submit`, `fleet-targets`, `fork`, `mutation-evidence`, `next`, `open`, `prepare`, `progress`, `property-evidence`, `record`, `verifications`, `verify-differential`, `verify-prepare`, `verify-record`, `verify-sweep`, `work-items` |
 | `repo` | A commit's files through core's checkout service (the mirror cache): prints the workspace path, for skills and hand runs | `checkout` |
 | `reporting` | Report validation, rendering & recording | `lint`, `rate-threats`, `record`, `render`, `sarif`, `validate` |
-| `session` | A skill session started headless for a continuous-ops order (the pack's skill-session `run`) | `run` |
+| `session` | Headless skill sessions and artifact-only task preparation/recording | `prepare`, `record`, `run` |
 | `tools` | One door over traust-core's tool registry: each registered tool's readiness, version and database; one tool over a checkout, SBOM, image or symbols, its typed result as JSON | `list`, `run` |
 | `triage` | The triage skill's doors on traust-core | `check`, `intake`, `prepare`, `record`, `render` |
 | `sweep` | Class-generalization sweep; the rule-proposal gate; recall-benchmark answer key | `benchmark`, `benchmark-targets`, `build-canaries`, `cards`, `collect`, `draft`, `emit`, `mine`, `propose-rule`, `regression-drafts`, `rule-lane`, `score-benchmark`, `screen-injection`, `sweep`, `verify-draft` |
 | `util` | Utility commands | `elf`, `redact`, `safe-exec` |
 | `validation` | Core-backed machine validation evidence | `prepare`, `plan`, `record` |
+
+### Artifact-only below-range sessions
+
+The registered `dependency-watch` / `below-range` mode stages the newest recorded packets,
+refetches digest-checked sources and resolves reviewer models before starting the session.
+It requires recorded packets, OSV API access, a model registry and Claude Code supporting
+restricted mode and runner-owned permission hooks (verified with 2.1.312).
+
+```bash
+traust session run --skill dependency-watch --mode below-range --repo https://github.com/example/app --run-id <order-uuid> --worker <claiming-worker>
+```
+
+The runner launches from the harness directory. The session reads `task.json`, staged
+inputs and harness skills; its file tools can write only `output/verdicts.json`. Shell,
+code-running and MCP tools are unavailable. Two blind reviewers and a judge use the model
+slots in `task.json`. The runner validates the declared output, records applicable findings
+and appends task/input/output digests to the leased order's immutable run manifest.
+The executor receives its model credentials and standard process environment, without
+deployment configuration variables. Temporary task directories are removed on every outcome.
+
+Interactive use splits the same workflow:
+
+```bash
+traust session prepare --skill dependency-watch --mode below-range --repo https://github.com/example/app --task /tmp/review-task
+# In the agent: /dependency-watch below-range --task /tmp/review-task
+traust session record --task /tmp/review-task
+```
+
+A manual task has a null run ID; its review remains unattributed and its audit entry is
+printed. For an ordered interactive task, give `--run-id` and `--worker` during preparation,
+then the same `--worker` during recording. Missing/invalid output fails with
+`session-output-invalid`; an executor failure retains measured usage and fails with
+`runner-crashed`. Other skill/mode pairs retain their existing command behavior.
 
 ### Retired workflow entry points
 

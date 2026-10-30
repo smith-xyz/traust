@@ -256,5 +256,9 @@ def test_the_skill_may_run_the_lane_doors_it_names() -> None:
 
     text = SKILL.read_text()
     for door in ("impact below-range-review", "impact below-range-record"):
-        assert f"Bash(python3 *-m traust.cli {door}:*)" in text
-        assert f"python3 -m traust.cli {door}" in text.replace("\n   ", " ")
+        assert f"Bash(python3 *-m traust.cli {door}:*)" not in text
+    mode = text.split("## Below-range verification", 1)[1].split("## Constraints", 1)[0]
+    assert "the runner validates and records it" in mode
+    assert "<task>/output/verdicts.json" in mode
+    assert "traust session prepare" in mode and "traust session record" in mode
+    assert "traust.cli" not in mode
