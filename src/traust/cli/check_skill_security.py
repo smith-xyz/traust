@@ -124,10 +124,6 @@ EXEMPTIONS: dict[tuple[str, str], str] = {
         "S2",
         "harnessing/drift-watch/SKILL.md",
     ): "reviewed — deterministic checker over harness-owned artifacts",
-    (
-        "S2",
-        "harnessing/rbac-tenancy-rollup/SKILL.md",
-    ): "reviewed — deterministic rollup; keyword in scope prose",
     # --- S3 git-transport: the P0 fix list; MUST empty when P0 lands ---
     # --- S4: pod-side shells — the sh -c runs INSIDE the scoped target
     # pod/container via runtime exec, never on the harness host; the

@@ -72,7 +72,6 @@ field on every skill.
 | [loc-dashboard](#loc-dashboard) | — | `tertiary` | `/loc-dashboard` |
 | [mine-ledger](#mine-ledger) | — | `secondary` | `/mine-ledger` |
 | [portfolio-graph](#portfolio-graph) | — | `secondary` | `/portfolio-graph` |
-| [rbac-tenancy-rollup](#rbac-tenancy-rollup) | — | `secondary` | `/rbac-tenancy-rollup` |
 | [recall-benchmark](#recall-benchmark) | — | `secondary` | `/recall-benchmark` |
 | [refresh-dashboards](#refresh-dashboards) | — | `secondary` | `/refresh-dashboards` |
 | [sla-view](#sla-view) | — | `secondary` | `/sla-view` |
@@ -492,15 +491,6 @@ Use when the user asks code-level portfolio questions or to build/refresh/query 
 - **Invoke:** `/portfolio-graph`
 - **Skill:** [harnessing/portfolio-graph/SKILL.md](../harnessing/portfolio-graph/SKILL.md)
 - **Produces / consumes:** [Integrations](../harnessing/portfolio-graph/SKILL.md#integrations)
-
-## rbac-tenancy-rollup
-
-Use when the user asks for a portfolio view of RBAC or multi-tenancy findings — "what are our RBAC issues", "top RBAC misconfigurations", "multi-tenancy findings rollup", "which repos have over-permissive RBAC", "tenant-isolation findings summary", "ATT&CK view of our RBAC findings" — or asks to (re)build the RBAC/tenancy dashboard. Deterministically aggregates the portfolio's findings (disposition-aware, FP-excluded) into an executive rollup through traust-core's FindingsRollupView and a per-category summary under progress-tracker/metrics/dashboards/rbac-tenancy/; the RBAC/tenancy axis selection, top-patterns detail and ATT&CK heat are retired until the weakness classification (Q5) and the label taxonomy land.
-
-- **Stage:** —
-- **Tier:** `secondary`
-- **Invoke:** `/rbac-tenancy-rollup`
-- **Skill:** [harnessing/rbac-tenancy-rollup/SKILL.md](../harnessing/rbac-tenancy-rollup/SKILL.md)
 
 ## recall-benchmark
 
