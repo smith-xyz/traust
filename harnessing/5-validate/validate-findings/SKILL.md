@@ -24,7 +24,6 @@ allowed-tools:
   - Bash(python3 *plan.py:*)
   - Bash(python3 *execute.py:*)
   - Bash(python3 *harnessing/5-validate/validate-findings/run.py:*)
-  - Bash(python3 *harnessing/5-validate/validate-browser-finding/scripts/scope.py:*)
   - Bash(python3 *harnessing/5-validate/validate-core-ocp/scripts/gen_targets.py:*)
   - Bash(python3 *credential_liveness.py:*)
   - Bash(python3 *-m traust.cli reporting validate:*)

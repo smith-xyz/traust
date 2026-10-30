@@ -141,7 +141,7 @@ All security testing code and tools in this repository are used for:
 
 When developing security tools:
 - Assume all testing is against authorized targets with explicit permission
-- Implement safety controls (e.g., scope validation via [`harnessing/5-validate/validate-findings/scope.py`](harnessing/5-validate/validate-findings/scope.py) and [`harnessing/5-validate/validate-browser-finding/scripts/scope.py`](harnessing/5-validate/validate-browser-finding/scripts/scope.py))
+- Implement safety controls (e.g., scope validation via [`harnessing/5-validate/validate-findings/scope.py`](harnessing/5-validate/validate-findings/scope.py))
 - Avoid techniques designed solely for detection evasion in production environments
 
 ### Running validate-browser-finding
