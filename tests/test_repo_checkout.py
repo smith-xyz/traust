@@ -182,14 +182,30 @@ def test_a_keep_set_with_history_or_writes_names_the_two_clean_paths(
     assert "git-mirror" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("cite_file_url", [False, True], ids=["a path", "a file:// url"])
+def test_a_local_repository_is_served_straight_off_itself(
+    forge: Forge, cite_file_url: bool
+) -> None:
+    """The recall-benchmark canary path: a repository materialized on this machine (cited as a
+    plain path or `file://…`) checks out through the same command, no mirror, no fetch."""
+    origin = f"file://{forge.path}" if cite_file_url else str(forge.path)
+    rc, out = run(forge, origin, "--ref", forge.anchor)
+    assert rc == 0
+    path = Path(out.strip())
+    assert _git("-C", str(path), "rev-parse", "HEAD") == forge.anchor
+    assert (path / "audited.py").read_text() == "x = 1\n"
+    assert not (path / "changed.py").exists()
+
+
 @pytest.mark.parametrize(
     ("url", "ref", "because"),
     [
-        ("http://x.io/a/b", "b" * 40, "repo url must be https"),
+        ("http://x.io/a/b", "b" * 40, "repo path must be absolute"),
+        ("origin", "b" * 40, "repo path must be absolute"),
         (REPO, "b" * 41, "not a full lowercase git sha"),
         ("https://x.io/a/b", "b" * 40, "repo host not allowed"),
     ],
-    ids=["not https", "not a sha", "unknown host"],
+    ids=["not https", "a relative path", "not a sha", "unknown host"],
 )
 def test_a_request_that_cannot_be_made_is_refused(
     forge: Forge, capsys: pytest.CaptureFixture[str], url: str, ref: str, because: str

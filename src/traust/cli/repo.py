@@ -5,7 +5,7 @@ session (``traust session run --checkout``) releases its own when it ends."""
 from __future__ import annotations
 
 from traust_core.v1.context import CheckoutRequest
-from traust_core.v1.models.values import GitSha, HttpsRepoUrl
+from traust_core.v1.models.values import GitSha, HttpsRepoUrl, LocalRepoUrl
 
 from traust.cli._doors import parser, run
 from traust.context import load
@@ -26,7 +26,7 @@ def checkout(argv: list[str] | None = None) -> int:
         "(the mirror cache), for skills and hand runs. The workspace stays until its caller is "
         "done with it.",
     )
-    ap.add_argument("url", help="https URL of the repository")
+    ap.add_argument("url", help="https URL or local path of the repository")
     ap.add_argument("--ref", required=True, help="the commit's full sha")
     ap.add_argument(
         "--keep",
@@ -45,7 +45,11 @@ def checkout(argv: list[str] | None = None) -> int:
     def call() -> str:
         core = load(args.config_home)
         request = CheckoutRequest(
-            repo=HttpsRepoUrl.parse(args.url, core.config.forge_hosts),
+            repo=(
+                HttpsRepoUrl.parse(args.url, core.config.forge_hosts)
+                if args.url.startswith("https://")
+                else LocalRepoUrl.parse(args.url)
+            ),
             ref=GitSha.parse(args.ref),
             history=_history(args.history),
             writable=args.writable,
