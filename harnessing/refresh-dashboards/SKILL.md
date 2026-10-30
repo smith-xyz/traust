@@ -100,7 +100,7 @@ Ordering is the whole point:
 |---|---|---|
 | `views` | core | `InsightService.refresh` via `DashboardsMaterializer` (every view traust-core has built) |
 | `exec-summary` | — | *retired:* rendered by the `views` stage (`ExecutiveSummaryView`) |
-| `insecure-patterns` | consumer | `RETIRED:build_insecure_patterns.py` |
+| `insecure-patterns` | — | *retired:* rendered by the `views` stage (`InsecurePatternsView`, core#301) |
 | `validation-fuzz` | — | *retired:* rendered by the `views` stage (`ValidationFuzzView`) |
 | `rbac-tenancy` | consumer | `RETIRED:build_rbac_tenancy_rollup.py` |
 | `sla` | — | *retired:* rendered by the `views` stage (`SlaView`, once `sla-policy.yaml` is in the config home) |
