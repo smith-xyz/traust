@@ -78,6 +78,8 @@ class Checkouts:
 
     def evict(self, idle_days: int) -> list[HttpsRepoUrl]:
         self.evicted.append(idle_days)
+        if self.outcome is not None:
+            raise self.outcome
         return [HttpsRepoUrl.parse(REPO, HOSTS)]
 
 
@@ -164,6 +166,15 @@ def test_the_materializer_answers_each_refresh_outcome(outcome: Exception, want:
     assert materialize(Services(Checkouts(outcome), Portfolio()), States(True)) == want
 
 
+@pytest.mark.parametrize("push_changed", [False, None], ids=["head unmoved", "no audit"])
+def test_a_headless_repository_at_rest_needs_no_fetch(push_changed: bool | None) -> None:
+    checkouts = Checkouts()
+    assert materialize(Services(checkouts, Portfolio(head=None)), States(push_changed)) == (
+        JobResult.succeeded()
+    )
+    assert checkouts.refreshed == []
+
+
 def test_an_unknown_host_is_a_bad_request() -> None:
     checkouts = Checkouts()
     result = materialize(Services(checkouts, Portfolio()), States(True), "https://x.io/a/b")
@@ -178,6 +189,13 @@ def test_eviction_drops_idle_mirrors_and_records_them() -> None:
     )
     assert result == JobResult.succeeded(written=(REPO,))
     assert checkouts.evicted == [EVICT_IDLE_DAYS]
+
+
+def test_the_materializer_answers_an_eviction_failure() -> None:
+    result = MirrorEvictMaterializer(
+        Services(Checkouts(ServiceError("git exited 128")), Portfolio())  # type: ignore[arg-type]
+    ).materialize(AssetRequest(asset="mirror_evict", run_id=str(uuid4())))
+    assert result == JobResult.failed(OrderReason.SOURCE_UNAVAILABLE)
 
 
 def git(repo: Path, *args: str) -> str:
@@ -219,7 +237,10 @@ def lane(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
     carries the local forge standing in for the https repository."""
     config = tmp_path / "config"
     config.mkdir()
-    (config / "traust.yaml").write_text(yaml.safe_dump({"home": str(tmp_path / "store")}))
+    # the mirror's fetches run under the process policy, so the deployment allows git
+    (config / "traust.yaml").write_text(
+        yaml.safe_dump({"home": str(tmp_path / "store"), "process": {"allowed_binaries": ["git"]}})
+    )
     forge = Forge(tmp_path)
     monkeypatch.setenv("HOME", str(tmp_path))
     (tmp_path / ".gitconfig").write_text(f'[url "{forge.bare}"]\n\tinsteadOf = {REPO}\n')

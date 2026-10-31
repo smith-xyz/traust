@@ -96,7 +96,8 @@ class ManifestSbomMaterializer:
 class RepoCheckoutRefreshMaterializer:
     """`repo_checkout_refresh`: fetch one inventory repository's git mirror to its observed
     default head, but only when repo_state says the head moved (pushed since its last audit) —
-    a pre-warm for the lanes' checkouts, so a mirror is never seeded for a repository at rest."""
+    a pre-warm for the lanes' checkouts, so a mirror is never seeded for a repository at rest
+    (a headless one included: no work, no head needed)."""
 
     asset = "repo_checkout_refresh"
 
@@ -117,6 +118,8 @@ class RepoCheckoutRefreshMaterializer:
         except NotFoundError as e:
             log.warning("run %s: %s: %s", request.run_id, OrderReason.NOT_FOUND, e)
             return JobResult.refused(OrderReason.NOT_FOUND)
+        if not state.push_changed:
+            return JobResult.succeeded()
         head = self._portfolio.default_ref(state.repository_id)
         if head is None:
             log.warning(
@@ -126,8 +129,6 @@ class RepoCheckoutRefreshMaterializer:
                 url,
             )
             return JobResult.refused(OrderReason.NOT_FOUND)
-        if not state.push_changed:
-            return JobResult.succeeded()
         try:
             self._checkouts.refresh(url, GitSha.parse(head.sha))
         except NotFoundError as e:
@@ -154,7 +155,11 @@ class MirrorEvictMaterializer:
         self._checkouts = services.checkouts
 
     def materialize(self, request: AssetRequest) -> JobResult:
-        dropped = self._checkouts.evict(EVICT_IDLE_DAYS)
+        try:
+            dropped = self._checkouts.evict(EVICT_IDLE_DAYS)
+        except ServiceError as e:
+            log.warning("run %s: %s: %s", request.run_id, OrderReason.SOURCE_UNAVAILABLE, e)
+            return JobResult.failed(OrderReason.SOURCE_UNAVAILABLE)
         return JobResult.succeeded(written=tuple(map(str, dropped)))
 
 
