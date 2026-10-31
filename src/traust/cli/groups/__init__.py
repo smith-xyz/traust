@@ -25,6 +25,7 @@ from traust.cli.groups import (
     products,
     registry,
     remediation,
+    repo,
     reporting,
     session,
     sweep,
@@ -110,6 +111,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "liveness": portfolio.LIVENESS,
     },
     "remediation": dict(remediation.REMEDIATION),
+    "repo": dict(repo.REPO),
     "reporting": {
         "validate": reporting.VALIDATE,
         "lint": reporting.LINT,

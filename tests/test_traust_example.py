@@ -13,7 +13,9 @@ EXAMPLE = Path(__file__).resolve().parents[1] / "config" / "traust.example.yaml"
 
 def test_the_example_as_copied_is_the_zero_config_install(tmp_path: Path) -> None:
     (tmp_path / "traust.yaml").write_text(EXAMPLE.read_text())
-    assert Config.from_file(tmp_path / "traust.yaml") == Config()
+    # Effective values only: the file also records which keys it set (core's preflight
+    # checks `provided`), so model equality no longer holds for a copied file.
+    assert Config.from_file(tmp_path / "traust.yaml").model_dump() == Config().model_dump()
 
 
 def test_every_section_the_example_documents_is_valid(tmp_path: Path) -> None:
