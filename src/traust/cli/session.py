@@ -177,7 +177,12 @@ def checkout(url: str, config_home: Path | None) -> Iterator[Workspace]:
     try:
         yield workspace
     finally:
-        services.checkouts.release(workspace)
+        # the session's outcome stands: a failed release is reported alongside it, never
+        # instead of it (a completed run is not a missing repository)
+        try:
+            services.checkouts.release(workspace)
+        except TraustError as e:
+            print(f"workspace release failed, left at {workspace.path}: {e}", file=sys.stderr)
 
 
 def prompt(skill: str, args: list[str]) -> str:
