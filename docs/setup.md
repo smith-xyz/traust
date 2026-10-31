@@ -40,7 +40,9 @@ unset locations, and which scanner binaries are absent. Flags for CI:
 ## 2. Prerequisites
 
 - Python 3.11+ and [`uv`](https://github.com/astral-sh/uv) (or pip with the
-  hash-pinned lockfile, below)
+  hash-pinned lockfile, below). The code-facts scans read target Python with
+  the running interpreter, so an older one can't parse newer syntax and
+  reports those files as a coverage gap; the runtime image runs on Python 3.14
 - Git access to this repository and, for the multi-repository pipeline, the
   sibling data repositories (§3)
 - Network access to the forge holding the repositories you audit
