@@ -25,6 +25,7 @@ from traust.cli.groups import (
     products,
     registry,
     remediation,
+    repo,
     reporting,
     session,
     sweep,
@@ -112,6 +113,7 @@ GROUPS: dict[str, dict[str, object]] = {
         "mirror-evict": portfolio.MIRROR_EVICT,
     },
     "remediation": dict(remediation.REMEDIATION),
+    "repo": dict(repo.REPO),
     "reporting": {
         "validate": reporting.VALIDATE,
         "lint": reporting.LINT,

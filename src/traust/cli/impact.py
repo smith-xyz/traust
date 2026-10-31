@@ -20,17 +20,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import sys
-import tempfile
 import uuid
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
-from traust_core.v1.context import Context, Services
-from traust_core.v1.errors import NotFoundError, ServiceError, ValidationError
+from traust_core.v1.context import CheckoutRequest, Context, Services
+from traust_core.v1.errors import NotFoundError, ValidationError
 from traust_core.v1.models.artifacts import BelowRangeVerdictsArtifact
 from traust_core.v1.models.below_range import BelowRangeInput, BelowRangeStatus
 from traust_core.v1.models.common import Provenance
@@ -41,7 +39,7 @@ from traust_core.v1.models.dependencies import (
     parse_advisory_identifier,
 )
 from traust_core.v1.models.operations import AssetRequest, JobResult, OrderReason
-from traust_core.v1.models.values import HttpsRepoUrl
+from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 from traust_core.v1.models.vocabulary import (
     Ecosystem,
     ImpactClassification,
@@ -202,10 +200,17 @@ def analyze(argv: list[str] | None = None) -> int:
         for ref_id in commits:
             prepared = exposure.prepare(advisory_id, ref_id, judged=judged)
             if args.scan and prepared.evidence.classification() in UNDECIDED:
-                with tempfile.TemporaryDirectory(prefix="impact-") as tmp:
-                    subject = prepared.subject
-                    checkout = clone(subject.repository_url, subject.sha, Path(tmp) / "repo")
-                    prepared = exposure.prepare(advisory_id, ref_id, checkout, judged)
+                subject = prepared.subject
+                workspace = services.checkouts.checkout(
+                    CheckoutRequest(
+                        repo=HttpsRepoUrl.parse(subject.repository_url, core.config.forge_hosts),
+                        ref=GitSha.parse(subject.sha),
+                    )
+                ).data
+                try:
+                    prepared = exposure.prepare(advisory_id, ref_id, workspace.path, judged)
+                finally:
+                    services.checkouts.release(workspace)
             when = datetime.now(UTC)
             source = Provenance(
                 run_id=uuid.uuid4(), source=SourceType.IMPACT_REPORT, occurred_at=when
@@ -495,23 +500,6 @@ def below_range_record(argv: list[str] | None = None) -> int:
         return services.below_range.record(doc, source).model_dump(mode="json")
 
     return run(call)
-
-
-def clone(url: str, sha: str, dest: Path) -> Path:
-    """The commit itself (not the default branch's head), shallow, https only."""
-    dest.mkdir(parents=True)
-    env = {**os.environ, "GIT_ALLOW_PROTOCOL": "https", "GIT_TERMINAL_PROMPT": "0"}
-    for step in (
-        ["git", "init", "-q"],
-        ["git", "fetch", "-q", "--depth", "1", "--", url, sha],
-        ["git", "checkout", "-q", "FETCH_HEAD"],
-    ):
-        try:
-            subprocess.run(step, cwd=dest, env=env, check=True, capture_output=True, timeout=600)
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-            detail = getattr(e, "stderr", b"") or b""
-            raise ServiceError(f"cannot check out {url}@{sha}: {detail.decode()[-200:]}") from e
-    return dest
 
 
 def harness_version() -> str:

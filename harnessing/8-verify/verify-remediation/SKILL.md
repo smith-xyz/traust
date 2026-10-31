@@ -11,7 +11,7 @@ allowed-tools:
   - Grep
   - Write
   - Task
-  - Bash(git clone:*)
+  - Bash(traust repo checkout:*)
   - Bash(git fetch:*)
   - Bash(git checkout:*)
   - Bash(git rev-parse:*)
@@ -348,60 +348,41 @@ nature. Categorize each finding:
 
 ### Phase 2 — Obtain the Patched Code
 
-#### 2a. Clone or access the patched repository
+#### 2a. Check out or access the patched repository
 
 Native mode uses the provided `--repo` checkout without clone/fetch/checkout
 or target execution. Use `git -C <repo>` for all read-only comparisons;
 do not replace the caller's HEAD or load target agent configuration.
 
-Clone with **full history** (no `--depth 1`) so that the commit log is
-available for attribution in Phase 3. The original audit commit must be
-reachable from the patched HEAD.
+Check out with **the history back to the original audit commit** so that
+the commit log is available for attribution in Phase 3. The original audit
+commit must be reachable from the patched HEAD.
 
-Based on the input:
-
-- **GitHub URL**: Clone the specified branch/commit
-  ```bash
-  GIT_ALLOW_PROTOCOL=https git clone --branch <branch> -- <url> /tmp/verify-<repo>
-  ```
-  If a commit SHA is specified:
-  ```bash
-  GIT_ALLOW_PROTOCOL=https git clone -- <url> /tmp/verify-<repo>
-  cd /tmp/verify-<repo> && GIT_ALLOW_PROTOCOL=https git fetch origin <sha> && git checkout <sha>
-  ```
-
-- **GitHub PR URL/number**: Clone and check out the PR head
-  ```bash
-  GIT_ALLOW_PROTOCOL=https git clone -- <url> /tmp/verify-<repo>
-  cd /tmp/verify-<repo> && GIT_ALLOW_PROTOCOL=https git fetch origin pull/<number>/head:pr-<number> && git checkout pr-<number>
-  ```
-
-- **GitLab MR URL/number**: Clone and check out the MR head (GitLab
-  exposes MR heads under a different refspec than GitHub PRs)
-  ```bash
-  GIT_ALLOW_PROTOCOL=https git clone -- <url> /tmp/verify-<repo>
-  cd /tmp/verify-<repo> && GIT_ALLOW_PROTOCOL=https git fetch origin merge-requests/<iid>/head:mr-<iid> && git checkout mr-<iid>
-  ```
-  If the MR ref is not fetchable (some instances restrict it), fall back
-  to fetching the MR's source branch, obtainable via the GitLab API or
-  the MR page.
-
-- **Local path**: Use directly (verify it's a git repo with `git rev-parse`)
-
-- **`latest`**: Clone the default branch of the repo URL from the original
-  report's `metadata.repository`
-
-If the clone is prohibitively large (>2GB), use `--filter=blob:none` for a
-treeless clone — this still provides full commit history and allows
-on-demand blob fetching:
 ```bash
-GIT_ALLOW_PROTOCOL=https git clone --filter=blob:none --branch <branch> -- <url> /tmp/verify-<repo>
+traust repo checkout <url> --ref <patched-commit-sha> --history <original-audit-commit>
 ```
+
+The command prints the checkout's path — `<checkout>` in the steps below.
+Resolve `<patched-commit-sha>` from the input:
+
+- **GitHub URL**: the specified commit SHA, or the named branch's head
+  commit (the GitHub MCP tools, or
+  `gh api repos/{org}/{repo}/commits/{branch} --jq '.sha'`)
+- **GitHub PR URL/number**: the PR's head commit (the GitHub MCP tools or
+  the PR page)
+- **GitLab MR URL/number**: the MR's head commit (the GitLab MCP tools or
+  the MR page). If the MR head is not resolvable (some instances restrict
+  it), fall back to the MR's source branch head, obtainable via the
+  GitLab API or the MR page.
+- **Local path**: Use directly (verify it's a git repo with `git rev-parse`)
+  — no checkout
+- **`latest`**: the default branch's head commit of the repo URL from the
+  original report's `metadata.repository`
 
 #### 2b. Record the patched commit
 
 ```bash
-cd /tmp/verify-<repo> && git rev-parse HEAD
+git -C <checkout> rev-parse HEAD
 ```
 
 Store the full SHA — this goes into the verification report metadata.
@@ -446,11 +427,11 @@ use it as the range start; otherwise use the date.
 
 ```bash
 # Preferred: range from original commit to patched HEAD
-git -C /tmp/verify-<repo> log --format='%H %aI %an <%ae> %s' \
+git -C <checkout> log --format='%H %aI %an <%ae> %s' \
   <original-commit>..<patched-commit> -- 2>/dev/null
 
 # Fallback: date-based if original commit is not reachable
-git -C /tmp/verify-<repo> log --format='%H %aI %an <%ae> %s' \
+git -C <checkout> log --format='%H %aI %an <%ae> %s' \
   --since="<audit-date>" -- 2>/dev/null
 ```
 
@@ -462,7 +443,7 @@ For each finding, extract all file paths from `locations[].path`. Then
 query the commit log for commits that touched those paths:
 
 ```bash
-git -C /tmp/verify-<repo> log --format='%H %aI %s' \
+git -C <checkout> log --format='%H %aI %s' \
   <original-commit>..<patched-commit> -- <path1> <path2> ...
 ```
 
@@ -477,8 +458,8 @@ For each candidate commit, inspect the diff to determine whether it
 actually addresses the finding's root cause:
 
 ```bash
-git -C /tmp/verify-<repo> show --stat <commit-sha>
-git -C /tmp/verify-<repo> diff <commit-sha>^..<commit-sha> -- <path>
+git -C <checkout> show --stat <commit-sha>
+git -C <checkout> diff <commit-sha>^..<commit-sha> -- <path>
 ```
 
 Evaluate the diff against the finding's `description` and `remediation`
@@ -519,7 +500,7 @@ To extract PR/MR numbers from commit messages:
 
 ```bash
 # Common merge commit patterns — GitHub PRs (#42) and GitLab MRs (!42)
-git -C /tmp/verify-<repo> log --format='%H %s%n%b' <original-commit>..<patched-commit> -- <path> \
+git -C <checkout> log --format='%H %s%n%b' <original-commit>..<patched-commit> -- <path> \
   | grep -oP '(#\d+|\(#\d+\)|Merge pull request #\d+|!\d+|See merge request [^ ]+!\d+)'
 ```
 
@@ -1097,9 +1078,9 @@ prompts, not noise.
 A few checks the validator cannot perform — verify them manually:
 
 - Evidence code blocks are actual code from the repo, not fabricated
-  (spot-check against the clone)
+  (spot-check against the checkout)
 - All commit SHAs in `remediation_commits` and `commit_timeline` exist in
-  the repo history: `git -C /tmp/verify-<repo> cat-file -e <sha>^{commit}`
+  the repo history: `git -C <checkout> cat-file -e <sha>^{commit}`
 - All `original_id` values are real Core finding UUIDs; in native mode they
   are authored directly from the assigned native finding IDs, and all
   timeline/coverage references use those same IDs.
@@ -1177,7 +1158,7 @@ Native mode must not remove or mutate the caller-provided checkout, staged
 input/source artifacts or required output. The caller owns their lifecycle.
 
 ```bash
-rm -rf /tmp/verify-<repo>
+rm -rf <checkout>
 ```
 
 ---

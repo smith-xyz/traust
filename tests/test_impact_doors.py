@@ -23,6 +23,7 @@ from traust_core.v1.models.dependencies import (
 from traust_core.v1.models.vocabulary import Ecosystem
 from traust_core.v1.providers.base import Acquisition, Readiness, Result
 from traust_core.v1.providers.forge_archive import ArchiveCheckout
+from traust_core.v1.providers.mirror import MirrorCheckout
 from traust_core.v1.providers.osv import OsvAdvisoryLookup
 from traust_core.v1.providers.sources import CheckoutRequest, Workspace
 from traust_core.v1.providers.syft import MANIFESTS, SyftSbom
@@ -127,21 +128,32 @@ def test_analyze_records_every_commit_the_sboms_reach(home: Path, tmp_path: Path
     assert json.loads(run(impact.analyze, home, LODASH.identifier)[1]) == summary
 
 
-def test_scan_clones_an_undecided_commit_at_its_sha(
+def test_scan_checks_out_an_undecided_commit_at_its_sha_through_the_service(
     home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     run(impact.sbom, home, str(sbom(tmp_path, "4.17.20")), "--repo-url", REPO, "--sha", SHA)
-    cloned: list[tuple[str, str]] = []
+    asked: list[CheckoutRequest] = []
+    released: list[Path] = []
 
-    def clone(url: str, sha: str, dest: Path) -> Path:
-        cloned.append((url, sha))
-        dest.mkdir(parents=True)
-        (dest / "a.js").write_text("const _ = require('lodash')\n")
-        return dest
+    def checkout(self: MirrorCheckout, request: CheckoutRequest) -> Result[Workspace]:
+        asked.append(request)
+        path = tmp_path / "repo"
+        path.mkdir()
+        (path / "a.js").write_text("const _ = require('lodash')\n")
+        return Result(
+            Workspace(repo=request.repo, sha=request.ref, path=path, provider=self.name),
+            Acquisition(provider=self.name, acquired_at=datetime.now(UTC)),
+        )
 
-    monkeypatch.setattr(impact, "clone", clone)
+    def release(self: MirrorCheckout, workspace: Workspace) -> None:
+        released.append(workspace.path)
+
+    monkeypatch.setattr(MirrorCheckout, "checkout", checkout)
+    monkeypatch.setattr(MirrorCheckout, "release", release)
     rc, out = run(impact.analyze, home, LODASH.identifier, "--scan")
-    assert rc == 0 and cloned == [(REPO, SHA)]
+    assert rc == 0
+    assert [(str(a.repo), str(a.ref)) for a in asked] == [(REPO, SHA)]
+    assert released == [tmp_path / "repo"]
     assert json.loads(out)["classifications"] == {"likely_affected": 1}
 
 
@@ -271,9 +283,7 @@ def test_sbom_without_a_document_reads_the_commits_manifests(
     def checkout(self: Any, request: CheckoutRequest) -> Result[Workspace]:
         asked.append(request)
         when = datetime.now(UTC)
-        workspace = Workspace(
-            repo=request.repo, sha=request.ref, path=tmp_path, provider="forge-archive"
-        )
+        workspace = Workspace(repo=request.repo, sha=request.ref, path=tmp_path, provider=self.name)
         return Result(workspace, Acquisition(provider="forge-archive", acquired_at=when))
 
     def acquire(self: Any, request: Any) -> Result[bytes]:

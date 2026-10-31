@@ -27,13 +27,14 @@ import shlex
 import subprocess
 import sys
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager, nullcontext
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pydantic
 from pydantic import Field
-from traust_core.v1.context import Context
+from traust_core.v1.context import CheckoutRequest, Context, Workspace
 from traust_core.v1.errors import NotFoundError, ServiceError, TraustError, ValidationError
 from traust_core.v1.models.assessment import DiffRefused
 from traust_core.v1.models.base import Dto
@@ -47,6 +48,7 @@ from traust_core.v1.models.operations import (
     SkillName,
     WorkerId,
 )
+from traust_core.v1.models.values import GitSha, HttpsRepoUrl
 
 from traust.cli._doors import answer, parser
 from traust.cli._doors import run as door
@@ -64,7 +66,6 @@ AGENT = ("claude", "-p", "--output-format", "json")
 PROVIDER = ProviderName("anthropic")
 # PENDING(roles): the pack's threat-model role, as on its threat_model_quarterly asset.
 THREAT_MODEL_ROLE = "threat-model"
-_GIT_ENV = {"GIT_ALLOW_PROTOCOL": "https", "GIT_TERMINAL_PROMPT": "0"}
 
 
 class _Tokens(Dto):
@@ -155,23 +156,33 @@ def diff_anchor(url: str, clone: Path) -> str:
     return str(json.loads(done.stdout)["diff"]["anchor"])
 
 
-def checkout(url: str, dest: Path) -> Path:
-    """The repository's default-branch head, https only, outside this harness. Full history: a
-    diff scan anchors at its baseline audit's commit, which a shallow clone doesn't hold."""
-    if not url.startswith("https://"):
-        raise ValidationError(f"{url}: only https repositories are checked out")
+@contextmanager
+def checkout(url: str, config_home: Path | None) -> Iterator[Workspace]:
+    """The order's commit — the head its repo_state observation recorded, not the branch's
+    current tip — through the checkout service, released when the session ends. The mirror's
+    worktree holds the history a diff scan anchors at (the anchor itself only resolves once
+    the checkout exists, so the request names no bound)."""
+    core = load(config_home)
+    services = core.services()
+    parsed = HttpsRepoUrl.parse(url, core.config.forge_hosts)
+    repo = services.portfolio.find_repository(parsed)
+    if repo is None or repo.id is None:
+        raise NotFoundError(f"{url}: not in the inventory (`traust portfolio observe` records it)")
+    head = services.portfolio.default_ref(repo.id)
+    if head is None:
+        raise NotFoundError(f"{url}: no observed default head to check out")
+    workspace = services.checkouts.checkout(
+        CheckoutRequest(repo=parsed, ref=GitSha.parse(head.sha))
+    ).data
     try:
-        subprocess.run(
-            ["git", "clone", "-q", "--", url, str(dest)],
-            env={**os.environ, **_GIT_ENV},
-            check=True,
-            capture_output=True,
-            timeout=600,
-        )
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
-        detail = (getattr(e, "stderr", b"") or b"").decode()[-200:]
-        raise ServiceError(f"cannot check out {url}: {detail}") from e
-    return dest
+        yield workspace
+    finally:
+        # the session's outcome stands: a failed release is reported alongside it, never
+        # instead of it (a completed run is not a missing repository)
+        try:
+            services.checkouts.release(workspace)
+        except TraustError as e:
+            print(f"workspace release failed, left at {workspace.path}: {e}", file=sys.stderr)
 
 
 def prompt(skill: str, args: list[str]) -> str:
@@ -194,7 +205,9 @@ def run(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--repo", help="the repository the order is for")
     ap.add_argument(
-        "--checkout", action="store_true", help="pass a checkout of --repo's head, not its URL"
+        "--checkout",
+        action="store_true",
+        help="pass a checkout of --repo's observed default head (the order's commit), not its URL",
     )
     ap.add_argument(
         "--mode", help="the skill's mode token, before the repository (e.g. threat-model review)"
@@ -233,28 +246,27 @@ def run(argv: list[str] | None = None) -> int:
     mode = [args.mode] if args.mode else []
     env = {**os.environ, "CLAUDE_CONFIG_DIR": str(claude_dir(args.config_home))}
     usage: tuple[ModelUsage, ...] = ()
-    with tempfile.TemporaryDirectory(prefix="traust-session-") as tmp:
-        target: list[str] = []
-        if args.repo:
+    entered = checkout(args.repo, args.config_home) if args.checkout else nullcontext(None)
+    try:
+        with entered as workspace:
+            target = (
+                [str(workspace.path)]
+                if workspace is not None
+                else ([args.repo] if args.repo else [])
+            )
+            command = [*AGENT, "--model", model, prompt(args.skill, [*mode, *target, *extra])]
             try:
-                target = (
-                    [str(checkout(args.repo, Path(tmp) / "checkout"))]
-                    if args.checkout
-                    else [args.repo]
-                )
-            except (ValidationError, ServiceError) as e:
-                print(f"run {args.run_id}: {OrderReason.NOT_FOUND}: {e}", file=sys.stderr)
-                return answer(JobResult.refused(OrderReason.NOT_FOUND))
-        command = [*AGENT, "--model", model, prompt(args.skill, [*mode, *target, *extra])]
-        try:
-            done, usage = session(command, args.skill, env)
-            if done.returncode == 0 and pr_model:
-                pr = threat_model_pr(args.run_id, args.repo, Path(target[0]), pr_model, env)
-                if pr is not None:
-                    done, usage = pr[0], usage + pr[1]
-        except (OSError, ServiceError, subprocess.CalledProcessError) as e:
-            print(f"run {args.run_id}: {OrderReason.RUNNER_CRASHED}: {e}", file=sys.stderr)
-            return answer(_spent(JobResult.failed(OrderReason.RUNNER_CRASHED), usage))
+                done, usage = session(command, args.skill, env)
+                if done.returncode == 0 and pr_model:
+                    pr = threat_model_pr(args.run_id, args.repo, Path(target[0]), pr_model, env)
+                    if pr is not None:
+                        done, usage = pr[0], usage + pr[1]
+            except (OSError, ServiceError, subprocess.CalledProcessError) as e:
+                print(f"run {args.run_id}: {OrderReason.RUNNER_CRASHED}: {e}", file=sys.stderr)
+                return answer(_spent(JobResult.failed(OrderReason.RUNNER_CRASHED), usage))
+    except (ValidationError, NotFoundError, ServiceError) as e:
+        print(f"run {args.run_id}: {OrderReason.NOT_FOUND}: {e}", file=sys.stderr)
+        return answer(JobResult.refused(OrderReason.NOT_FOUND))
     if done.returncode != 0:
         print(f"run {args.run_id}: session exited {done.returncode}", file=sys.stderr)
         return answer(_spent(JobResult.failed(OrderReason.RUNNER_CRASHED), usage))
