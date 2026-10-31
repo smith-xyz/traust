@@ -16,7 +16,7 @@ allowed-tools:
   - Bash(head:*)
   - Bash(file:*)
   - Bash(jq:*)
-  - Bash(git clone:*)
+  - Bash(traust repo checkout:*)
   - Bash(git fetch:*)
   - Bash(git checkout:*)
   - Bash(git rev-parse:*)
@@ -114,10 +114,10 @@ Perform a comprehensive security assessment of one or more codebases using indus
 When a full local checkout is required for deep analysis (e.g. running static analysis tools, tracing cross-file data flows, or inspecting build configurations):
 
 ```bash
-GIT_ALLOW_PROTOCOL=https git clone --depth 1 --branch <branch-or-ref> -- <github-url> <local-path>
+traust repo checkout <github-url> --ref <commit-sha> --history 1
 ```
 
-If the ref is a commit SHA rather than a branch name, clone with `--depth 1` and then `git fetch origin <sha> && git checkout <sha>`.
+The command prints the checkout's path (`<local-path>` below). If the input names a branch rather than a commit SHA, resolve it to its head SHA first (the GitHub MCP tools, or `gh api repos/{org}/{repo}/commits/{branch} --jq '.sha'`).
 
 **Always analyze the branch or commit ref specified in the input data**, not the repository default branch. The ref represents the exact code shipped in the operator version being assessed.
 

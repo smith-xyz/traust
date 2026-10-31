@@ -13,8 +13,8 @@ allowed-tools:
   - Bash(python3 -m traust.cli remediation fleet-claim:*)
   - Bash(python3 -m traust.cli remediation fleet-record:*)
   - Bash(bash *run_checks.sh:*)
-  - Bash(git clone:*)
-  - Bash(git -C /tmp/fleet-fix/* apply:*)
+  - Bash(traust repo checkout:*)
+  - Bash(git -C *checkout-* apply:*)
   - Bash(git ls-remote:*)
   - Bash(ls:*)
   - Bash(jq:*)
@@ -128,9 +128,10 @@ python3 -m traust.cli remediation fleet-claim -o /tmp/fleet-fix/<id>/out/<n>.jso
 Collect the per-repo results: applied / no-match / unresolved / guard
 refusals. Where the target repo has usable checks, run
 `harnessing/7-remediate/remediate-finding/run_checks.sh` against a fresh
-clone with the result's `patch.diff` applied
-(`GIT_ALLOW_PROTOCOL=https git clone -- <repo> /tmp/fleet-fix/<id>/<repo>`,
-then `git -C /tmp/fleet-fix/<id>/<repo> apply`) and record outcomes.
+writable checkout of the repo's default-branch head with the result's
+`patch.diff` applied (`traust repo checkout <repo> --ref <head-sha> --writable`,
+with `<head-sha>` from `git ls-remote <repo> HEAD`, then
+`git -C <checkout> apply`) and record outcomes.
 
 ### 4. Human review of the batch
 

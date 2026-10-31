@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Scaffold ONE remediation working tree for a traust-core work item.
 #
-# Pure shell/python — sets up the fork, working tree, and fix branch, then
-# stops.  The actual code change is produced by the AI-driven
+# Pure shell/python — sets up the fork and the working tree at the audited
+# commit, then stops.  The actual code change is produced by the AI-driven
 # `remediate-finding` skill (see SKILL.md), which calls this script for
 # Phase 1 and ``run_checks.sh`` + ``traust remediation assemble`` for
 # Phases 4–5.  Mirrors the structure of validate-operator-live/run_one.sh.
@@ -28,7 +28,6 @@ done
 # shellcheck source=../../_lib/traust_paths.sh
 source "${HARNESS}/harnessing/_lib/traust_paths.sh"
 traust_load_paths
-WORKSPACE="$WS"
 traust() { python3 -m traust.cli "$@"; }
 
 WI=""
@@ -85,36 +84,15 @@ traust remediation progress "$WI" forked >/dev/null
 FORK_INFO="$(bash "$HERE/ensure_fork.sh" "$UPSTREAM" "$FORK_URL" "$SHA")"
 echo "[run_one] fork: $FORK_INFO"
 
-# --- 2. prepare working tree at audited commit, cut fix branch -------------
-WORK="$WORKSPACE/.fork-staging/work/$REPO"
-# envtest / vendored toolchains can leave read-only dirs behind
-[[ -d "$WORK" ]] && chmod -R u+w "$WORK" 2>/dev/null || true
-rm -rf "$WORK"
-# local bare-mirror clone — file transport only, made explicit
-GIT_ALLOW_PROTOCOL=file \
-  git clone --quiet "$WORKSPACE/.fork-staging/${REPO}.git" "$WORK"
-# upstream is fetch-only; disable its push URL so an accidental `git push
-# upstream` cannot reach the public repo even if ambient credentials exist.
-git -C "$WORK" remote add upstream "$UPSTREAM" 2>/dev/null || true
-git -C "$WORK" remote set-url --push upstream DISABLED_no_push_to_upstream
-# fork remote uses a clean URL; auth is supplied at push time by an
-# env-reading credential helper so the token is never written to
-# .git/config, never visible in `git remote -v`, and never lands in the
-# tee'd run log above.
-case "$FORK_URL" in https://*) ;; *) echo "refuse: non-https FORK_URL" >&2; exit 1;; esac
-git -C "$WORK" remote add fork "${FORK_URL%.git}.git" 2>/dev/null || \
-  git -C "$WORK" remote set-url fork "${FORK_URL%.git}.git"
-GH_CRED_HELPER='!f() { test "$1" = get && printf "username=x-access-token\npassword=%s\n" "${GITHUB_TOKEN:?GITHUB_TOKEN not set}"; }; f'
-git -C "$WORK" config --local credential.useHttpPath false
-git -C "$WORK" config --local --replace-all 'credential.https://github.com.helper' ''
-git -C "$WORK" config --local --add         'credential.https://github.com.helper' "$GH_CRED_HELPER"
-
-if [[ "$SHA" != "HEAD" ]] && git -C "$WORK" cat-file -e "${SHA}^{commit}" 2>/dev/null; then
-  git -C "$WORK" checkout -B "$FIX_BRANCH" "$SHA"
-else
-  echo "[run_one] WARN: audited SHA unavailable; branching from default HEAD"
-  git -C "$WORK" checkout -B "$FIX_BRANCH"
-fi
+# --- 2. working tree at audited commit -------------------------------------
+# A checkout worktree shares the bare mirror's repository config and ref
+# namespace, so remotes, credential helpers and locally-cut branches are
+# never written here — a later mirror fetch would prune them, and config
+# writes would contaminate every other consumer of that mirror. The worktree
+# is detached at the audited commit; Phase 6 pushes
+# HEAD:refs/heads/<fix_branch> to the fork by URL with a per-command
+# credential helper.
+WORK="$(traust repo checkout "$UPSTREAM" --ref "$SHA" --writable)"
 
 # --- 3. the work item (findings, decisions, strategy) next to the worktree --
 echo "$PREP" > "$OUT/prepared.json"

@@ -10,7 +10,6 @@ allowed-tools:
   - Grep
   - Write
   - Task
-  - Bash(git clone:*)
   - Bash(ls:*)
   - Bash(jq:*)
   - Bash(python3 *traust* -m traust.cli cloud-config run:*)
