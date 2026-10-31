@@ -32,7 +32,6 @@ allowed-tools:
   - Bash(wc:*)
   - Bash(head:*)
   - Bash(file:*)
-  - Bash(git clone:*)
   - Bash(git fetch:*)
   - Bash(git checkout:*)
   - Bash(git rev-parse:*)

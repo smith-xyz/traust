@@ -123,12 +123,22 @@ bash harnessing/7-remediate/remediate-finding/run_one.sh <work-item>
 This:
 1. Ensures the private fork exists and is synced from upstream
    (`ensure_fork.sh` — creates a private mirror if missing).
-2. Clones a working tree at `subject.sha` and creates `fix_branch`.
+2. Checks out a writable working tree at `subject.sha`
+   (`traust repo checkout`, detached at the commit); the fix branch is
+   created on the fork at push time (`HEAD:refs/heads/<fix_branch>`).
 3. Writes the work item (`prepared.json`) next to the worktree.
 4. Moves the work item to `forked` and prints a JSON workspace
    descriptor (`worktree`, `fix_branch`, `out`, `prepared`, …).
 
 Capture the printed JSON — every subsequent phase uses `worktree` and `out`.
+
+If the run refuses at the checkout — the forge no longer serves
+`subject.sha` (rebased away, history rewritten) — the work item stays
+`forked` with no worktree, by design (the old silent fallback branched
+from the default head and patched the wrong tree). Do not hand-patch it:
+re-observe the repository (`traust portfolio observe --repo <url>`) so
+its next routed audit re-cuts the finding at a commit the forge serves,
+and prepare that new work item.
 
 ---
 
@@ -184,7 +194,8 @@ Produce the **smallest correct change** that eliminates the root cause
   removed verbs/resources are not used elsewhere by the same
   ServiceAccount. List the verified call sites in `patch.rationale`.
 
-Commit on `fix_branch` with message:
+Commit on the worktree's HEAD (`fix_branch` is created on the fork at
+push time) with message:
 
 ```
 <fix-prefix>: fix <finding_id> — <short title>
@@ -381,9 +392,22 @@ attack and isolates its reviewer; audit D1, plan P2.12). Before Phase 6:
 Only after Phase 5b ACCEPT:
 
 ```bash
-git -C <worktree> push fork <fix_branch>
+git -C <worktree> \
+  -c credential.helper= \
+  -c credential.helper='!f() { test "$1" = get && printf "username=x-access-token\npassword=%s\n" "${GITHUB_TOKEN:?GITHUB_TOKEN not set}"; }; f' \
+  push --no-verify <fork_url> HEAD:refs/heads/<fix_branch>
 python3 -m traust.cli remediation record <out>/<work-item>-remediation.json
 ```
+
+(`<fork_url>` and `<fix_branch>` come from the Phase 1 workspace descriptor.
+The push is by URL with a per-command credential helper — the empty
+`-c credential.helper=` clears the list first, so the env-reading helper is
+the only one asked and an ambient helper (osxkeychain, a store file) can
+never answer for it; the helper reads the token from the environment,
+never argv or a config file. `--no-verify` runs no pre-push hook: the
+worktree's `.git` is a file, so run_checks.sh's sanitizer skips it, and
+native-fallback target code may have written a hook path into the
+mirror config the worktree shares.)
 
 (`record` attaches the report — its `fork.fix_commit` — links its Jira keys and
 moves the work item to `summary.status`; it refuses a public fork or an
@@ -472,8 +496,9 @@ analysis-results/remediations/<repo>/<work-item>/
 - **Private-fork only**: `traust remediation fork` resolves the push target;
   `ensure_fork.sh` creates it `private: true`. The skill MUST refuse
   if `fork.visibility != private|internal` (`record` refuses it too).
-- **No upstream writes**: `run_one.sh` adds `upstream` as a read-only
-  remote; only `fork` has a push URL with credentials.
+- **No upstream writes**: the working tree is a checkout worktree with no
+  remotes at all (its mirror's config stays pristine); Phase 6 pushes to the
+  fork by URL only, with a per-command credential helper.
 - **Embargo**: commit messages and branch names use the internal
   finding ID, never a CVE or public tracker reference.
 - **Audit trail**: every state transition is recorded via

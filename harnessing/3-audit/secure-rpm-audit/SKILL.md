@@ -69,10 +69,10 @@ Files to retrieve for every component:
 When a full local checkout is required for deep analysis (e.g. running static analysis tools on the prepared source tree, or applying patches that the remote view cannot resolve):
 
 ```bash
-GIT_ALLOW_PROTOCOL=https git clone --depth 1 --branch <branch> -- https://gitlab.com/redhat/centos-stream/rpms/<component>.git <local-path>
+traust repo checkout https://gitlab.com/redhat/centos-stream/rpms/<component>.git --ref <commit-sha> --history 1
 ```
 
-If the ref is a commit SHA rather than a branch name, clone with `--depth 1` and then `git fetch origin <sha> && git checkout <sha>`.
+The command prints the checkout's path (`<local-path>` below). If the input names a branch rather than a commit SHA, resolve it to its head SHA first (the GitLab MCP tools).
 
 **Always analyze the branch or commit ref specified in the input**, not the repository default branch. The ref represents the exact packaging shipped in the target stream.
 
