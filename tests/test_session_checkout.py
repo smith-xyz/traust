@@ -9,13 +9,14 @@ import subprocess
 from datetime import UTC, datetime
 
 import pytest
-from traust_core.v1.errors import NotFoundError, ValidationError
+from traust_core.v1.errors import NotFoundError, ServiceError, ValidationError
 from traust_core.v1.models.assessment import Assessment, AssessmentKind
 from traust_core.v1.models.inventory import RepositoryRef
 from traust_core.v1.models.values import HttpsRepoUrl
 from traust_core.v1.providers.checkout import GitCheckout
 from traust_core.v1.providers.process import ProcessRunner
 from traust_core.v1.repositories.contract import SqlTraustUnitOfWork
+from traust_core.v1.services.repo_checkout import RepoCheckoutService
 
 from tests.test_repo_checkout import REPO, Forge, forge
 from traust.cli import session
@@ -75,6 +76,24 @@ def test_the_workspace_is_the_orders_commit_with_history_released_afterwards(
         assert [r.path for r in git.numstat(workspace.path, forge.anchor)] == ["changed.py"]
         assert not workspace.path.is_relative_to(HARNESS_ROOT)
     assert not workspace.path.exists()  # released when the session ends
+
+
+def test_a_failed_release_is_reported_alongside_not_instead_of_the_session(
+    forge: Forge, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The session's outcome stands: a release that fails at teardown is said on stderr, the
+    workspace left where it was, and no error replaces the run's result."""
+    _observed_head(forge, forge.head)
+
+    def failed(self: RepoCheckoutService, workspace: object) -> None:
+        raise ServiceError("release failed")
+
+    monkeypatch.setattr(RepoCheckoutService, "release", failed)
+    with session.checkout(REPO, forge.config) as workspace:
+        head = _git("-C", str(workspace.path), "rev-parse", "HEAD")
+        assert head == forge.head
+    assert workspace.path.exists()  # left behind, said where
+    assert "workspace release failed" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(

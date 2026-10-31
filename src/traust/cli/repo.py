@@ -23,8 +23,9 @@ def checkout(argv: list[str] | None = None) -> int:
         "repo",
         "checkout",
         "Print the path of a commit's checked-out workspace, through core's checkout service "
-        "(the mirror cache), for skills and hand runs. The workspace stays until its caller is "
-        "done with it.",
+        "(the mirror cache), for skills and hand runs. The workspace is the caller's to use "
+        "and remove when done (a plain directory); a session (`traust session run --checkout`) "
+        "releases its own when it ends.",
     )
     ap.add_argument("url", help="https URL or local path of the repository")
     ap.add_argument("--ref", required=True, help="the commit's full sha")
