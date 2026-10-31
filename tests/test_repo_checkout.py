@@ -97,6 +97,9 @@ def forge(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Forge:
             {
                 "home": str(tmp_path / "store"),
                 "locations": {"mirror_cache": str(cache.parent)},
+                # the mirror's fetches and worktrees run git under the process policy, so the
+                # deployment's traust.yaml must allow it for checkouts to work at all
+                "process": {"allowed_binaries": ["git"]},
             }
         )
     )
