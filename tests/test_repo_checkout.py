@@ -137,8 +137,8 @@ def test_a_ref_the_forge_no_longer_serves_is_not_checked_out(forge: Forge) -> No
 
 @pytest.mark.parametrize(
     ("raw", "history"),
-    [("5", 5), ("b" * 40, GitSha.parse("b" * 40))],
-    ids=["a depth", "an anchor sha"],
+    [("5", 5), ("b" * 40, GitSha.parse("b" * 40)), ("1" * 40, GitSha.parse("1" * 40))],
+    ids=["a depth", "an anchor sha", "an all-digit anchor sha"],
 )
 def test_history_is_a_depth_or_an_anchor_sha(
     forge: Forge, monkeypatch: pytest.MonkeyPatch, raw: str, history: int | GitSha

@@ -15,7 +15,8 @@ def _history(raw: str | None) -> int | GitSha | None:
     """A depth when it reads as one, else the anchor sha the history must reach."""
     if raw is None:
         return None
-    return int(raw) if raw.isdigit() else GitSha.parse(raw)
+    # a sha is 40/64 hex chars and may be all digits; only a shorter digit run is a depth
+    return int(raw) if raw.isdigit() and len(raw) not in (40, 64) else GitSha.parse(raw)
 
 
 def checkout(argv: list[str] | None = None) -> int:

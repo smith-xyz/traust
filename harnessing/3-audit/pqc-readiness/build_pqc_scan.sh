@@ -12,8 +12,9 @@ done
 source "${HARNESS}/harnessing/_lib/traust_paths.sh"
 PIN="be5c760adb7d1d4d99e39d35d87d2956079db76e"
 
+# cargo writes target/ inside the checkout, so it must be writable
 SRC="$("$(_traust_py)" -m traust.cli repo checkout \
-  https://github.com/wakaken/pqc-scan --ref "$PIN")"
+  https://github.com/wakaken/pqc-scan --ref "$PIN" --writable)"
 ACTUAL="$(git -C "$SRC" rev-parse HEAD)"
 [ "$ACTUAL" = "$PIN" ] || { echo "pin mismatch: $ACTUAL != $PIN" >&2; exit 1; }
 
